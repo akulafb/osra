@@ -29,7 +29,20 @@ Users can view and edit only their **1-degree network**:
 
 ### Audit log
 
-`audit_log` has RLS disabled (empty table, no policies). Re-enable and add policies if you implement audit logging.
+`audit_log` has RLS disabled (empty table, no policies). Re-enable and add policies if you implement audit logging. Migration `20260514120000_data_api_public_table_grants.sql` revokes `anon`/`authenticated` on this table (to drop legacy defaults) and grants DML only to `service_role` for PostgREST. Do not extend `anon`/`authenticated` here without enabling RLS and policies first.
+
+### Data API: grants on `public` tables
+
+Supabase applies **Postgres `GRANT`s** plus **RLS policies** together: the JWT role must hold the privilege **and** any policy must allow the row. New projects no longer infer table grants automatically; migrations must declare them—see migration `20260514120000_data_api_public_table_grants.sql`.
+
+**Convention for new tables**
+
+1. `CREATE TABLE` in `public`.
+2. Enable RLS and add policies (`TO authenticated`, `TO public`, etc.) as usual.
+3. In the **same migration** (or immediately after table creation): `GRANT` the appropriate verbs on that table to `anon`, `authenticated`, and/or `service_role` for how you intend PostgREST / `supabase-js` to use it. Omit `anon`/`authenticated` when RLS is off or when only the service role should access the table.
+4. Add `USAGE, SELECT ON SEQUENCES` for that table only if it uses `serial`, identity, or other sequences.
+
+If a grant is missing, PostgREST returns `42501` with a suggested `GRANT` in the error detail.
 
 ## Using another Postgres provider
 
