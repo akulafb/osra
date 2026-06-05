@@ -1004,6 +1004,10 @@ export const FamilyTree3DContent: React.FC<FamilyTree3DProps> = ({
 
         const sprite = new SpriteText(displayName);
         sprite.color = '#ffffff';
+        // Dark backing plate so labels stay legible over bright spheres / busy scenes
+        sprite.backgroundColor = 'rgba(5, 5, 5, 0.6)';
+        sprite.padding = isMob ? 1.5 : 2;
+        sprite.borderRadius = 2;
         // Smaller text on mobile
         sprite.textHeight = isMob ? 3.5 : 4;
         sprite.fontWeight = 'bold';
