@@ -187,7 +187,7 @@ supabase/
 
 ```bash
 git clone <repository-url>
-cd 3d-family-tree
+cd osra
 ```
 
 2. Install dependencies:
