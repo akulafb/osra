@@ -1346,7 +1346,7 @@ export const FamilyTree3DContent: React.FC<FamilyTree3DProps> = ({
       />
 
       {/* Settings Controls - Top Right */}
-      <div style={{ position: 'absolute', top: '24px', right: '24px', display: 'flex', flexDirection: 'column', gap: '12px', zIndex: 1000, alignItems: 'flex-end' }}>
+      <div style={{ position: 'absolute', top: '24px', right: '24px', display: 'flex', flexDirection: 'column', gap: '12px', zIndex: 1300, alignItems: 'flex-end' }}>
         {/* Settings Toggle - First */}
         <Button
           variant="contained"

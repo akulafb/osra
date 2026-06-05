@@ -535,7 +535,7 @@ export const FamilyTree2D: React.FC<FamilyTree2DProps> = ({
         display: 'flex',
         flexDirection: 'column',
         gap: '12px',
-        zIndex: 1000,
+        zIndex: 1300,
         alignItems: 'flex-end',
       }}>
         {/* Settings Toggle - First */}
