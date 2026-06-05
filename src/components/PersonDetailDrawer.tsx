@@ -198,13 +198,6 @@ export const PersonDetailDrawer: React.FC<PersonDetailDrawerProps> = ({
           )}
         </Box>
       </Box>
-
-      {/* Footer / Archive Note */}
-      <Box sx={{ p: 3, borderTop: '1px solid rgba(255,255,255,0.05)', background: 'rgba(0,0,0,0.2)' }}>
-        <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.4)', fontStyle: 'italic', fontSize: '0.75rem' }}>
-          Part of the digital heirloom archive. All entries are preserved for future generations.
-        </Typography>
-      </Box>
     </Drawer>
   );
 };
