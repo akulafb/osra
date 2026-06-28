@@ -27,12 +27,24 @@ export const ENTER_MULT = 1.5;
 /** Return to full detail once camera distance drops below EXIT_MULT * graphRadius. */
 export const EXIT_MULT = 1.0;
 
-/** Smallest "planet" bubble — small but still visible and clickable. (tunable) */
-export const MIN_BUBBLE_RADIUS = 50;
-/** The dominant "sun" — radius of the single largest cluster. (tunable) */
-export const MAX_BUBBLE_RADIUS = 600;
+// Bubble sizes are expressed as fractions of the graph's bounding radius (NOT
+// absolute world units) so they look the same whether the tree has 50 nodes or
+// 5,000. With absolute sizes, a small (few-node) graph gets bubbles far larger
+// than the layout and they mush together. (tunable)
+/** The dominant "sun" — radius of the single largest cluster, as a fraction of the graph radius. */
+export const MAX_BUBBLE_RADIUS_FRAC = 0.15;
+/** Smallest "planet" bubble, as a fraction of the graph radius (kept visible/clickable). */
+export const MIN_BUBBLE_RADIUS_FRAC = 0.015;
 /** Exponent on a cluster's share of the largest cluster. 0.5 = area-proportional. */
 export const BUBBLE_SIZE_EXPONENT = 0.5;
+/**
+ * A bubble may fill at most this fraction of the distance to its nearest
+ * neighbouring bubble. Must be ≤ 0.5 to guarantee no two bubbles overlap (two
+ * adjacent bubbles then span at most 2×this of the gap between them); below 0.5
+ * leaves a visible gap. This is what stops intermarried families — whose
+ * centroids the force layout pulls close together — from meshing into one blob.
+ */
+export const BUBBLE_NEIGHBOR_FRACTION = 0.46;
 
 // --- Declutter (LIN-32 #3): fade bubbles & labels by their on-screen size, so
 // small/distant families drop away when zoomed out instead of colliding. All are
@@ -136,16 +148,48 @@ export function computeClusterCentroids(
 }
 
 /**
- * World-space radius for a cluster bubble, normalized against the largest
- * cluster (`maxCount`). The size encodes member count by *area*
- * (radius ∝ √count, via BUBBLE_SIZE_EXPONENT) so a dominant family reads like a
- * "sun" at MAX_BUBBLE_RADIUS while the rest shrink to "planets" by the root of
- * their share. Floored at MIN_BUBBLE_RADIUS so small families stay findable.
+ * World-space radius for a cluster bubble, as a fraction of the graph's bounding
+ * radius (`graphRadius`) so bubbles stay proportional to the layout regardless of
+ * node count. Normalized against the largest cluster (`maxCount`) and encoding
+ * member count by *area* (radius ∝ √count, via BUBBLE_SIZE_EXPONENT), so the
+ * dominant family reads like a "sun" at MAX_BUBBLE_RADIUS_FRAC·graphRadius while
+ * the rest shrink to "planets" by the root of their share; floored at
+ * MIN_BUBBLE_RADIUS_FRAC·graphRadius so small families stay findable.
  */
-export function bubbleRadius(count: number, maxCount: number): number {
+export function bubbleRadius(count: number, maxCount: number, graphRadius: number): number {
   const share = Math.max(1, count) / Math.max(1, maxCount); // 0..1
   const frac = Math.pow(share, BUBBLE_SIZE_EXPONENT);
-  return Math.max(MIN_BUBBLE_RADIUS, MAX_BUBBLE_RADIUS * frac);
+  return Math.max(MIN_BUBBLE_RADIUS_FRAC, MAX_BUBBLE_RADIUS_FRAC * frac) * Math.max(0, graphRadius);
+}
+
+/**
+ * Shrink each bubble's `desired` radius just enough that it never reaches its
+ * nearest neighbour — guaranteeing no two bubbles overlap (a no-op for bubbles
+ * already comfortably apart). Each is capped at BUBBLE_NEIGHBOR_FRACTION of the
+ * distance to its closest neighbour, then floored at `minRadius` so near-
+ * coincident clusters stay visible (accepting slight overlap only in that case).
+ */
+export function capRadiiToNeighbors(
+  centroids: ReadonlyArray<Vec3>,
+  desired: ReadonlyArray<number>,
+  minRadius: number
+): number[] {
+  const n = centroids.length;
+  const out = new Array<number>(n);
+  for (let i = 0; i < n; i++) {
+    let nearest = Infinity;
+    for (let j = 0; j < n; j++) {
+      if (j === i) continue;
+      const dx = centroids[i].x - centroids[j].x;
+      const dy = centroids[i].y - centroids[j].y;
+      const dz = centroids[i].z - centroids[j].z;
+      const d = Math.sqrt(dx * dx + dy * dy + dz * dz);
+      if (d < nearest) nearest = d;
+    }
+    const cap = Number.isFinite(nearest) ? BUBBLE_NEIGHBOR_FRACTION * nearest : Infinity;
+    out[i] = Math.max(minRadius, Math.min(desired[i], cap));
+  }
+  return out;
 }
 
 /**

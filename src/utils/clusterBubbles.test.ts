@@ -3,14 +3,16 @@ import {
   computeVisibleBounds,
   computeClusterCentroids,
   bubbleRadius,
+  capRadiiToNeighbors,
   detailFactor,
   apparentDiameterFraction,
   ramp01,
   type LiveNode,
   ENTER_MULT,
   EXIT_MULT,
-  MIN_BUBBLE_RADIUS,
-  MAX_BUBBLE_RADIUS,
+  MIN_BUBBLE_RADIUS_FRAC,
+  MAX_BUBBLE_RADIUS_FRAC,
+  BUBBLE_NEIGHBOR_FRACTION,
 } from './clusterBubbles';
 
 describe('computeVisibleBounds', () => {
@@ -87,29 +89,82 @@ describe('computeClusterCentroids', () => {
 });
 
 describe('bubbleRadius', () => {
-  it('sizes the largest cluster as the full "sun"', () => {
-    expect(bubbleRadius(405, 405)).toBe(MAX_BUBBLE_RADIUS);
-    expect(bubbleRadius(7, 7)).toBe(MAX_BUBBLE_RADIUS);
+  const R = 1000; // graph bounding radius
+
+  it('sizes the largest cluster as the full "sun" (fraction of graph radius)', () => {
+    expect(bubbleRadius(405, 405, R)).toBeCloseTo(MAX_BUBBLE_RADIUS_FRAC * R);
+    expect(bubbleRadius(7, 7, R)).toBeCloseTo(MAX_BUBBLE_RADIUS_FRAC * R);
   });
 
-  it('floors tiny / empty clusters at the minimum', () => {
-    expect(bubbleRadius(1, 405)).toBe(MIN_BUBBLE_RADIUS);
-    expect(bubbleRadius(0, 405)).toBe(MIN_BUBBLE_RADIUS);
+  it('floors tiny / empty clusters at the minimum fraction', () => {
+    expect(bubbleRadius(1, 405, R)).toBeCloseTo(MIN_BUBBLE_RADIUS_FRAC * R);
+    expect(bubbleRadius(0, 405, R)).toBeCloseTo(MIN_BUBBLE_RADIUS_FRAC * R);
+  });
+
+  it('scales with the graph radius (so few-node and many-node trees look alike)', () => {
+    expect(bubbleRadius(405, 405, 2000)).toBeCloseTo(2 * bubbleRadius(405, 405, 1000));
+    expect(bubbleRadius(0, 405, 0)).toBe(0); // degenerate graph → no bubble
   });
 
   it('grows monotonically with member count for a fixed max', () => {
-    expect(bubbleRadius(200, 405)).toBeGreaterThan(bubbleRadius(20, 405));
-    expect(bubbleRadius(20, 405)).toBeGreaterThanOrEqual(bubbleRadius(5, 405));
+    expect(bubbleRadius(200, 405, R)).toBeGreaterThan(bubbleRadius(20, 405, R));
+    expect(bubbleRadius(20, 405, R)).toBeGreaterThanOrEqual(bubbleRadius(5, 405, R));
   });
 
   it('gives the dominant family a strong size lead ("sun vs planets")', () => {
     // A 405-member family should dwarf a singleton, unlike the old ~2.4x.
-    expect(bubbleRadius(405, 405)).toBeGreaterThanOrEqual(bubbleRadius(1, 405) * 5);
+    expect(bubbleRadius(405, 405, R)).toBeGreaterThanOrEqual(bubbleRadius(1, 405, R) * 5);
   });
 
   it('is area-proportional: 4x the members ≈ 2x the radius', () => {
     // radius ∝ √count, so quadrupling members doubles the radius (above the floor).
-    expect(bubbleRadius(400, 400)).toBeCloseTo(bubbleRadius(100, 400) * 2);
+    expect(bubbleRadius(400, 400, R)).toBeCloseTo(bubbleRadius(100, 400, R) * 2);
+  });
+});
+
+describe('capRadiiToNeighbors', () => {
+  const O = { x: 0, y: 0, z: 0 };
+
+  it('leaves bubbles that are already comfortably apart untouched', () => {
+    const centroids = [{ x: 0, y: 0, z: 0 }, { x: 1000, y: 0, z: 0 }];
+    const desired = [50, 50]; // 50 + 50 << 1000 apart → no overlap
+    expect(capRadiiToNeighbors(centroids, desired, 5)).toEqual([50, 50]);
+  });
+
+  it('shrinks overlapping bubbles so the pair no longer meshes', () => {
+    const centroids = [{ x: 0, y: 0, z: 0 }, { x: 100, y: 0, z: 0 }];
+    const desired = [400, 400]; // would massively overlap
+    const [a, b] = capRadiiToNeighbors(centroids, desired, 1);
+    expect(a).toBeCloseTo(BUBBLE_NEIGHBOR_FRACTION * 100);
+    expect(a + b).toBeLessThan(100); // sum < centre distance ⇒ a real gap
+  });
+
+  it('never lets any pair overlap, even in a close cluster of families', () => {
+    const centroids = [
+      { x: 0, y: 0, z: 0 },
+      { x: 60, y: 0, z: 0 },
+      { x: 0, y: 80, z: 0 },
+      { x: 50, y: 50, z: 0 },
+    ];
+    const desired = [300, 300, 300, 300];
+    const r = capRadiiToNeighbors(centroids, desired, 1);
+    for (let i = 0; i < centroids.length; i++) {
+      for (let j = i + 1; j < centroids.length; j++) {
+        const dx = centroids[i].x - centroids[j].x;
+        const dy = centroids[i].y - centroids[j].y;
+        const d = Math.hypot(dx, dy);
+        expect(r[i] + r[j]).toBeLessThanOrEqual(d + 1e-9);
+      }
+    }
+  });
+
+  it('keeps near-coincident clusters visible via the min floor', () => {
+    const centroids = [O, { x: 1, y: 0, z: 0 }];
+    expect(capRadiiToNeighbors(centroids, [300, 300], 20)).toEqual([20, 20]);
+  });
+
+  it('does not cap a lone bubble (no neighbours)', () => {
+    expect(capRadiiToNeighbors([O], [123], 5)).toEqual([123]);
   });
 });
 
