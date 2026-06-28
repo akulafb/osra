@@ -23,9 +23,9 @@ export interface LiveNode {
 // --- Tuning constants (exported for live tweaking) ---
 
 /** Begin fully clustering once camera distance exceeds ENTER_MULT * graphRadius. */
-export const ENTER_MULT = 1.5;
+export const ENTER_MULT = 1.8;
 /** Return to full detail once camera distance drops below EXIT_MULT * graphRadius. */
-export const EXIT_MULT = 1.0;
+export const EXIT_MULT = 1.3;
 
 // Bubble sizes are expressed as fractions of the graph's bounding radius (NOT
 // absolute world units) so they look the same whether the tree has 50 nodes or
