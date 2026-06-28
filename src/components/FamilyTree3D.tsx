@@ -20,6 +20,7 @@ import { getTexturePath } from '../utils/imageFormat';
 import { getClusterColors } from '../utils/familyColors';
 import { getNodeId } from '../utils/getNodeId';
 import { filterGraphDataFor3D } from '../lib/filterGraphData';
+import { useClusterBubbles } from '../hooks/useClusterBubbles';
 import { TreeSearchBar } from './TreeSearchBar';
 
 // V3 Shared Assets - paths resolved at runtime for WebP when supported
@@ -378,13 +379,26 @@ export const FamilyTree3DContent: React.FC<FamilyTree3DProps> = ({
     }
   }, [graphData, effectiveCollapsedNodes, visibleClusters3D, uniqueClusters, pendingLinkPreview]);
 
+  // Family cluster view on zoom-out (LIN-32): fades individuals into per-cluster
+  // bubbles when zoomed out. `detailRef` (0..1) drives the node fade below;
+  // `fullyClustered` hides individuals/links entirely once fully zoomed out.
+  const { detailRef, fullyClustered } = useClusterBubbles({
+    fgRef,
+    graphData: filteredGraphData,
+    visibleClusters: visibleClusters3D,
+    enabled: (filteredGraphData.nodes?.length ?? 0) > 0,
+  });
+
   // three-forcegraph multiplies linkOpacity as a number (arrows use state.linkOpacity * 3).
   // Per-link visibility must use linkVisibility, not a function passed to linkOpacity.
   const linkVisibility = useCallback((l: any) => {
     if (isPreviewLink(l)) return true;
+    if (fullyClustered) return false;
     if (l.type === 'parent') return showLinks || showArrows;
     return showLinks;
-  }, [showLinks, showArrows]);
+  }, [showLinks, showArrows, fullyClustered]);
+
+  const nodeVisibility = useCallback(() => !fullyClustered, [fullyClustered]);
 
   const linkMaterial = useCallback((l: any) => {
     if (isPreviewLink(l)) {
@@ -968,6 +982,9 @@ export const FamilyTree3DContent: React.FC<FamilyTree3DProps> = ({
 
       if (nodeTexture !== 'none') {
         const material = nodeTexture === 'planets' ? getPlanetMaterial(node.id, isMob) : getMaterial(color, isMob);
+        if (material.userData.baseOpacity === undefined) {
+          material.userData.baseOpacity = material.opacity;
+        }
         const sphere = new THREE.Mesh(geometries.sphere, material);
         group.add(sphere);
 
@@ -977,6 +994,9 @@ export const FamilyTree3DContent: React.FC<FamilyTree3DProps> = ({
           const rot = rotationRef.current * speedFactor;
           sphere.rotation.y = rot;
           sphere.rotation.z = rot * 0.5;
+          // Crossfade individuals out as cluster bubbles fade in (LIN-32).
+          material.transparent = true;
+          material.opacity = material.userData.baseOpacity * (1 - detailRef.current);
         };
 
         if (isSelected) {
@@ -1014,6 +1034,11 @@ export const FamilyTree3DContent: React.FC<FamilyTree3DProps> = ({
         sprite.position.set(0, 0, 0);
         sprite.renderOrder = 999;
         sprite.material.depthTest = false;
+        sprite.material.transparent = true;
+        // Fade the label together with its sphere when zooming out (LIN-32).
+        sprite.onBeforeRender = () => {
+          sprite.material.opacity = 1 - detailRef.current;
+        };
         group.add(sprite);
       }
 
@@ -1022,7 +1047,7 @@ export const FamilyTree3DContent: React.FC<FamilyTree3DProps> = ({
       console.error('[FamilyTree3D] Error in nodeThreeObject:', err);
       return new THREE.Group();
     }
-  }, [selectedNode, showNames, nodeTexture, geometries, rotationRef, searchHighlightedNodeId]);
+  }, [selectedNode, showNames, nodeTexture, geometries, rotationRef, searchHighlightedNodeId, detailRef]);
 
   useEffect(() => {
     if (fgRef.current?.refresh) fgRef.current.refresh();
@@ -1293,6 +1318,7 @@ export const FamilyTree3DContent: React.FC<FamilyTree3DProps> = ({
         linkStrength={(l: any) =>
           isPreviewLink(l) ? 0 : activePreset ? 0.1 : (l.type === 'marriage' || l.type === 'divorce' ? 0.3 : 0.8)}
         ref={fgRef}
+        nodeVisibility={nodeVisibility}
         warmupTicks={160}
         d3AlphaDecay={0.01}
         d3VelocityDecay={0.1}
