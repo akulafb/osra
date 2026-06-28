@@ -7,10 +7,12 @@ import {
   computeVisibleBounds,
   computeClusterCentroids,
   bubbleRadius,
+  capRadiiToNeighbors,
   detailFactor,
   apparentDiameterFraction,
   ramp01,
   EXIT_MULT,
+  MIN_BUBBLE_RADIUS_FRAC,
   BUBBLE_FADE_MIN,
   BUBBLE_FADE_FULL,
   LABEL_FADE_MIN,
@@ -173,8 +175,19 @@ export function useClusterBubbles(params: {
 
       if (t <= 0.001) return;
 
-      for (const [cluster, agg] of centroids) {
-        if (!visible.has(cluster)) continue;
+      // Size each visible bubble relative to the graph's extent (so it stays
+      // proportional whether the tree has few or many nodes), then cap it against
+      // its nearest neighbour so intermarried families never mesh into one blob.
+      const graphRadius = boundsRef.current.radius;
+      const visEntries = Array.from(centroids).filter(([cluster]) => visible.has(cluster));
+      const radii = capRadiiToNeighbors(
+        visEntries.map(([, agg]) => agg.centroid),
+        visEntries.map(([, agg]) => bubbleRadius(agg.count, maxCount, graphRadius)),
+        MIN_BUBBLE_RADIUS_FRAC * graphRadius,
+      );
+
+      for (let i = 0; i < visEntries.length; i++) {
+        const [cluster, agg] = visEntries[i];
 
         let bubble = bubbles.get(cluster);
         if (!bubble) {
@@ -184,7 +197,7 @@ export function useClusterBubbles(params: {
         }
 
         bubble.group.position.set(agg.centroid.x, agg.centroid.y, agg.centroid.z);
-        const radius = bubbleRadius(agg.count, maxCount);
+        const radius = radii[i];
 
         // Hover (LIN-32 #4): ease toward the target each frame, then grow & brighten.
         bubble.hoverAmt += (bubble.hoverTarget - bubble.hoverAmt) * HOVER_LERP;
