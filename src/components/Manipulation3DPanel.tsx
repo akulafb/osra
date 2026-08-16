@@ -9,6 +9,7 @@ import { Candidacy, ConnectPair, buildTargetOptions } from './cards/connectCandi
 import { CONNECT_ACCENT, relationColor } from './cards/relationStyle';
 import { ConnectTargetingBody } from './ConnectTargetingBody';
 import { countUnreachable } from '../utils/connectTargeting';
+import { CONFIRM_PULSE_COLOR } from '../utils/cosmicFx';
 import { useGhostPreview } from '../hooks/useGhostPreview';
 import { useTargetVisibility } from '../hooks/useTargetVisibility';
 
@@ -27,6 +28,10 @@ import { useTargetVisibility } from '../hooks/useTargetVisibility';
 
 const PANEL_LEFT = 24;
 const PANEL_PADDING = 12;
+
+/** The same red the scene pulses the aura with, so the pill and the planet
+ *  read as one question. */
+const DISSOLVE_ACCENT = CONFIRM_PULSE_COLOR;
 
 const HANDLES: { relation: RelativeDirection; label: string }[] = [
   { relation: 'parent', label: '+ Parent' },
@@ -67,6 +72,23 @@ export interface Connect3DControls {
   ) => Promise<void> | void;
 }
 
+/**
+ * Delete confirmation as the panel sees it (LIN-51).
+ *
+ * Same split as Connect Mode: the state lives in the host because the scene
+ * renders it — the selected planet's aura and glow pulse red — while the ✓ / ✕
+ * that answer the question are DOM here, where they are always hittable.
+ */
+export interface Dissolve3DControls {
+  /** Dissolve is admin-only; the handle is not offered to anyone else. */
+  canDissolve: boolean;
+  /** True while the confirmation is raised on the selected node. */
+  isConfirming: boolean;
+  onStart: () => void;
+  onCancel: () => void;
+  onConfirm: () => Promise<void> | void;
+}
+
 export interface Manipulation3DPanelProps {
   selectedNode: FamilyNode | null;
   /** Action Handles appear only when the active user may edit this person. */
@@ -77,6 +99,7 @@ export interface Manipulation3DPanelProps {
   /** Live simulated nodes — the array handed to the graphData prop. */
   nodes: LiveNodePosition[];
   connect: Connect3DControls;
+  dissolve: Dissolve3DControls;
   /** The existing search query, reused as the fallback target filter. */
   searchQuery: string;
   onSearchQueryChange?: (query: string) => void;
@@ -189,6 +212,7 @@ export const Manipulation3DPanel: React.FC<Manipulation3DPanelProps> = ({
   fgRef,
   nodes,
   connect,
+  dissolve,
   searchQuery,
   onSearchQueryChange,
   searchMatches,
@@ -277,14 +301,22 @@ export const Manipulation3DPanel: React.FC<Manipulation3DPanelProps> = ({
     connect.onStart();
   }, [closeGhostNode, connect]);
 
+  const startDissolve = useCallback(() => {
+    closeGhostNode();
+    dissolve.onStart();
+  }, [closeGhostNode, dissolve]);
+
   if (!selectedNode || !canEdit) return null;
 
   const inConnectMode = Boolean(connect.sourceNode);
+  const isConfirmingDissolve = dissolve.isConfirming && !inConnectMode && !relation;
   const accent = inConnectMode
     ? CONNECT_ACCENT
-    : relation
-      ? relationColor(relation)
-      : '#a78bfa';
+    : isConfirmingDissolve
+      ? DISSOLVE_ACCENT
+      : relation
+        ? relationColor(relation)
+        : '#a78bfa';
 
   // The kinship picker is wider than the Ghost Node card, so the panel takes
   // whichever card it is currently holding.
@@ -335,7 +367,59 @@ export const Manipulation3DPanel: React.FC<Manipulation3DPanelProps> = ({
           {connect.sourceNode?.firstName ?? selectedNode.firstName}
         </div>
 
-        {!relation && !inConnectMode && (
+        {isConfirmingDissolve && (
+          /*
+           * The confirm pill (LIN-51). The question is asked twice over: the
+           * planet's aura pulses red in the scene, and the answer is taken
+           * here, where a hit target cannot be occluded or shrink to a few
+           * pixels at distance.
+           */
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.75)', lineHeight: 1.4 }}>
+              Dissolve <strong>{selectedNode.firstName}</strong>? This cannot be undone.
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                type="button"
+                onClick={() => dissolve.onConfirm()}
+                aria-label={`Confirm dissolving ${selectedNode.firstName}`}
+                style={{
+                  flex: 1,
+                  background: DISSOLVE_ACCENT,
+                  border: `1.5px solid ${DISSOLVE_ACCENT}`,
+                  borderRadius: 999,
+                  color: '#0f172a',
+                  cursor: 'pointer',
+                  fontSize: 13,
+                  fontWeight: 800,
+                  padding: '6px 10px',
+                }}
+              >
+                ✓
+              </button>
+              <button
+                type="button"
+                onClick={dissolve.onCancel}
+                aria-label="Keep this person"
+                style={{
+                  flex: 1,
+                  background: 'rgba(15, 23, 42, 0.92)',
+                  border: '1.5px solid rgba(255,255,255,0.3)',
+                  borderRadius: 999,
+                  color: 'rgba(255,255,255,0.85)',
+                  cursor: 'pointer',
+                  fontSize: 13,
+                  fontWeight: 800,
+                  padding: '6px 10px',
+                }}
+              >
+                ✕
+              </button>
+            </div>
+          </div>
+        )}
+
+        {!relation && !inConnectMode && !isConfirmingDissolve && (
           <>
             {HANDLES.map(({ relation: rel, label }) => (
               <button
@@ -374,6 +458,25 @@ export const Manipulation3DPanel: React.FC<Manipulation3DPanelProps> = ({
             >
               🔗 Connect
             </button>
+            {dissolve.canDissolve && (
+              <button
+                type="button"
+                onClick={startDissolve}
+                style={{
+                  background: 'rgba(15, 23, 42, 0.92)',
+                  border: `1.5px solid ${DISSOLVE_ACCENT}`,
+                  borderRadius: 999,
+                  color: DISSOLVE_ACCENT,
+                  cursor: 'pointer',
+                  fontSize: 11,
+                  fontWeight: 700,
+                  padding: '6px 10px',
+                  textAlign: 'left',
+                }}
+              >
+                ✕ Dissolve
+              </button>
+            )}
           </>
         )}
 

@@ -22,8 +22,18 @@ import { getNodeId } from '../utils/getNodeId';
 import { filterGraphDataFor3D } from '../lib/filterGraphData';
 import { useClusterBubbles } from '../hooks/useClusterBubbles';
 import { EXIT_MULT } from '../utils/clusterBubbles';
+import { useCosmicFx } from '../hooks/useCosmicFx';
+import {
+  beamPulseParticleCount,
+  confirmPulseOpacity,
+  BEAM_PULSE_COLOR,
+  BEAM_PULSE_SPEED,
+  BEAM_PULSE_WIDTH,
+  CONFIRM_PULSE_COLOR,
+  type LinkEndpoints,
+} from '../utils/cosmicFx';
 import { TreeSearchBar } from './TreeSearchBar';
-import { Manipulation3DPanel, Connect3DControls } from './Manipulation3DPanel';
+import { Manipulation3DPanel, Connect3DControls, Dissolve3DControls } from './Manipulation3DPanel';
 import {
   Candidacy,
   ConnectPair,
@@ -242,6 +252,18 @@ interface FamilyTree3DProps {
     type: 'parent' | 'marriage' | 'divorce';
     parentRole?: 'mother' | 'father' | null;
   }) => Promise<void> | void;
+  /**
+   * Cosmic FX (LIN-51). These name the node a **Spawn** or **Dissolve** is
+   * happening to, not a separate animation state: the host owns the triggers
+   * and the rollback, exactly as it does for the 2D renderings.
+   */
+  newlySpawnedNodeId?: string | null;
+  dissolvingNodeId?: string | null;
+  /** The Kinship Link just created, whose beam pulses. Direction-free. */
+  pulsingLink?: LinkEndpoints | null;
+  /** Dissolve is admin-only, so the handle is not offered to anyone else. */
+  canDissolveSelected?: boolean;
+  onDissolveNode?: (node: FamilyNode) => Promise<void> | void;
 }
 
 export const FamilyTree3DContent: React.FC<FamilyTree3DProps> = ({
@@ -282,6 +304,11 @@ export const FamilyTree3DContent: React.FC<FamilyTree3DProps> = ({
   onCreateRelative,
   onConnectExistingRelative,
   onDirectConnectNodes,
+  newlySpawnedNodeId = null,
+  dissolvingNodeId = null,
+  pulsingLink = null,
+  canDissolveSelected = false,
+  onDissolveNode,
 }) => {
   const ForceGraph3DAny = ForceGraph3D as unknown as React.ComponentType<any>;
   const { userProfile } = useAuth();
@@ -325,6 +352,15 @@ export const FamilyTree3DContent: React.FC<FamilyTree3DProps> = ({
    */
   const connectModeRef = useRef<string | null>(null);
   connectModeRef.current = connectSource?.id ?? null;
+
+  /**
+   * Delete confirmation (LIN-51): whose aura is pulsing red.
+   *
+   * Held here rather than in the panel because the scene needs it — the pulse
+   * is on the planet, while the ✓ / ✕ hit targets are DOM in the docked panel.
+   * Same split as Connect Mode.
+   */
+  const [confirmingDissolveId, setConfirmingDissolveId] = useState<string | null>(null);
 
   // Internal state for modals
   const [initialCameraPos, setInitialCameraPos] = useState<{ x: number; y: number; z: number } | null>(null);
@@ -484,6 +520,16 @@ export const FamilyTree3DContent: React.FC<FamilyTree3DProps> = ({
     enabled: (filteredGraphData.nodes?.length ?? 0) > 0,
   });
 
+  // Supernova / black hole collapse — the 3D renderings of Spawn and Dissolve
+  // (LIN-51). Refused outright on mobile by the effect budget.
+  useCosmicFx({
+    fgRef,
+    nodes: filteredGraphData.nodes,
+    spawnNodeId: newlySpawnedNodeId,
+    dissolveNodeId: dissolvingNodeId,
+    isMobileDevice,
+  });
+
   // three-forcegraph multiplies linkOpacity as a number (arrows use state.linkOpacity * 3).
   // Per-link visibility must use linkVisibility, not a function passed to linkOpacity.
   const linkVisibility = useCallback((l: any) => {
@@ -494,6 +540,26 @@ export const FamilyTree3DContent: React.FC<FamilyTree3DProps> = ({
   }, [showLinks, showArrows, fullyClustered]);
 
   const nodeVisibility = useCallback(() => !fullyClustered, [fullyClustered]);
+
+  /**
+   * Link growth → beam pulse (LIN-51).
+   *
+   * The graph's own `linkDirectionalParticles` rather than a hand-written
+   * effect: already integrated, free, and nothing to maintain — which is also
+   * why it does not spend any of the hand-written effect budget and is allowed
+   * to keep running (thinned) on mobile.
+   */
+  const linkDirectionalParticles = useCallback(
+    (l: any) => {
+      if (isPreviewLink(l) || !linkVisibility(l)) return 0;
+      return beamPulseParticleCount({
+        endpoints: { aId: getNodeId(l.source), bId: getNodeId(l.target) },
+        pulsing: pulsingLink,
+        isMobileDevice,
+      });
+    },
+    [pulsingLink, isMobileDevice, linkVisibility]
+  );
 
   const linkMaterial = useCallback((l: any) => {
     if (isPreviewLink(l)) {
@@ -586,6 +652,7 @@ export const FamilyTree3DContent: React.FC<FamilyTree3DProps> = ({
 
   const startConnectMode = useCallback(() => {
     if (!selectedNode) return;
+    setConfirmingDissolveId(null);
     setConnectSource(selectedNode);
     setConnectPair(null);
     setRejectedTarget(null);
@@ -692,6 +759,36 @@ export const FamilyTree3DContent: React.FC<FamilyTree3DProps> = ({
       handleConnectConfirm,
     ]
   );
+
+  /**
+   * Delete confirmation, mirroring Connect Mode's split: the panel offers the
+   * hit targets, the scene renders the state.
+   */
+  const handleDissolveConfirm = useCallback(async () => {
+    const node = selectedNode;
+    setConfirmingDissolveId(null);
+    if (!node) return;
+    await Promise.resolve(onDissolveNode?.(node));
+  }, [selectedNode, onDissolveNode]);
+
+  const dissolveControls = useMemo<Dissolve3DControls>(
+    () => ({
+      canDissolve: canDissolveSelected && Boolean(onDissolveNode),
+      isConfirming: Boolean(selectedNode && confirmingDissolveId === selectedNode.id),
+      onStart: () => setConfirmingDissolveId(selectedNode?.id ?? null),
+      onCancel: () => setConfirmingDissolveId(null),
+      onConfirm: handleDissolveConfirm,
+    }),
+    [canDissolveSelected, onDissolveNode, selectedNode, confirmingDissolveId, handleDissolveConfirm]
+  );
+
+  // A confirmation belongs to the node it was raised on; if the selection moves
+  // the docked panel goes with it, so the question no longer has a subject.
+  useEffect(() => {
+    if (confirmingDissolveId && selectedNode?.id !== confirmingDissolveId) {
+      setConfirmingDissolveId(null);
+    }
+  }, [selectedNode, confirmingDissolveId]);
 
   // Reset View functionality
   const resetView = useCallback(() => {
@@ -1126,6 +1223,14 @@ export const FamilyTree3DContent: React.FC<FamilyTree3DProps> = ({
           document.activeElement?.tagName === 'INPUT' || 
           document.activeElement?.tagName === 'TEXTAREA') return;
       
+      // A raised delete confirmation is the innermost state, so Escape answers
+      // that one first rather than deselecting out from under it.
+      if (key === 'escape' && confirmingDissolveId) {
+        e.preventDefault();
+        setConfirmingDissolveId(null);
+        return;
+      }
+
       // Connect Mode is a targeting state: Escape steps back out of it, and the
       // selection shortcuts are held back so the docked panel cannot be pulled
       // out from under a half-made link.
@@ -1203,6 +1308,7 @@ export const FamilyTree3DContent: React.FC<FamilyTree3DProps> = ({
     isBulkInviteOpen,
     connectSource,
     connectPair,
+    confirmingDissolveId,
     exitConnectMode,
     onBackgroundClick,
   ]);
@@ -1286,6 +1392,38 @@ export const FamilyTree3DContent: React.FC<FamilyTree3DProps> = ({
         addConnectShell(geometries.glow, 0.35);
       }
 
+      /**
+       * Delete confirmation (LIN-51): the aura and glow pulse red.
+       *
+       * Not a shake. The camera in this scene never stops moving, so a jittering
+       * mesh reads as a rendering glitch rather than as a question being asked.
+       * The ✓ / ✕ that answer it are DOM, in the docked panel.
+       */
+      if (confirmingDissolveId === node.id) {
+        const startedAt = performance.now();
+        const addConfirmPulse = (
+          geometry: THREE.BufferGeometry,
+          baseOpacity: number,
+          wireframe = false
+        ) => {
+          const material = new THREE.MeshBasicMaterial({
+            color: CONFIRM_PULSE_COLOR,
+            transparent: true,
+            opacity: baseOpacity,
+            wireframe,
+          });
+          const shell = new THREE.Mesh(geometry, material);
+          shell.onBeforeRender = () => {
+            material.opacity =
+              confirmPulseOpacity(performance.now() - startedAt, baseOpacity) *
+              (1 - detailRef.current);
+          };
+          group.add(shell);
+        };
+        addConfirmPulse(geometries.aura, 0.7, true);
+        addConfirmPulse(geometries.glow, 0.25);
+      }
+
       if (showNames) {
         const first = (node.firstName ?? '').trim();
         const cluster = (node.familyCluster ?? '').trim();
@@ -1332,11 +1470,15 @@ export const FamilyTree3DContent: React.FC<FamilyTree3DProps> = ({
     detailRef,
     connectSource,
     connectCandidateIds,
+    confirmingDissolveId,
   ]);
 
   useEffect(() => {
     if (fgRef.current?.refresh) fgRef.current.refresh();
-  }, [nodeTexture, selectedNode?.id, searchHighlightedNodeId, pendingLinkPreview?.anchorId, pendingLinkPreview?.existingId, showArrows, showLinks, connectSource, connectCandidateIds]);
+    // `pulsingLink` is deliberately absent: the beam pulse changes only the link
+    // accessor, whose new identity the graph picks up on its own. Listing it
+    // here would rebuild every planet in the scene to light one edge.
+  }, [nodeTexture, selectedNode?.id, searchHighlightedNodeId, pendingLinkPreview?.anchorId, pendingLinkPreview?.existingId, showArrows, showLinks, connectSource, connectCandidateIds, confirmingDissolveId]);
 
   // Preview pair framing: one shot after layout; deps = endpoint ids only (no simulation churn).
   useEffect(() => {
@@ -1657,6 +1799,10 @@ export const FamilyTree3DContent: React.FC<FamilyTree3DProps> = ({
         linkDirectionalArrowLength={(l: any) =>
           isPreviewLink(l) ? 0 : (showArrows && l.type === 'parent') ? 14 : 0}
         linkDirectionalArrowColor={() => '#60a5fa'}
+        linkDirectionalParticles={linkDirectionalParticles}
+        linkDirectionalParticleSpeed={BEAM_PULSE_SPEED}
+        linkDirectionalParticleWidth={BEAM_PULSE_WIDTH}
+        linkDirectionalParticleColor={() => BEAM_PULSE_COLOR}
         showNavInfo={false}
       />
 
@@ -2049,6 +2195,7 @@ export const FamilyTree3DContent: React.FC<FamilyTree3DProps> = ({
         fgRef={fgRef}
         nodes={filteredGraphData.nodes}
         connect={connectControls}
+        dissolve={dissolveControls}
         searchQuery={searchQuery}
         onSearchQueryChange={onSearchQueryChange}
         searchMatches={searchMatches}
