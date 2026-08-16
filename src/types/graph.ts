@@ -26,6 +26,9 @@ export interface FamilyGraph {
   links: FamilyLink[];
 }
 
+/** Direction of a relative being added, relative to the anchor Tree Node. */
+export type RelativeDirection = 'parent' | 'child' | 'spouse';
+
 // 2D View Types
 export interface Node2D extends FamilyNode {
   x: number;

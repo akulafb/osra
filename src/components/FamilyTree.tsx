@@ -22,7 +22,7 @@ import { FamilyChat } from './FamilyChat';
 import { NewMembersModal } from './NewMembersModal';
 import { PersonDetailDrawer } from './PersonDetailDrawer';
 import { isMobile } from '../utils/device';
-import { RelativeDirection } from './NodeCard';
+import { RelativeDirection } from '../types/graph';
 import { createRelativeSecure, linkExistingRelativeSecure } from '../lib/familyMutations';
 
 export const FamilyTree: React.FC = () => {

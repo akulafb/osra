@@ -1,4 +1,4 @@
-import { RelativeDirection } from '../components/NodeCard';
+import { RelativeDirection } from '../types/graph';
 
 export interface CreateRelativeParams {
   firstName: string;
