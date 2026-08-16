@@ -23,6 +23,7 @@ import { NewMembersModal } from './NewMembersModal';
 import { PersonDetailDrawer } from './PersonDetailDrawer';
 import { isMobile } from '../utils/device';
 import { RelativeDirection } from './NodeCard';
+import { createRelativeSecure, linkExistingRelativeSecure } from '../lib/familyMutations';
 
 export const FamilyTree: React.FC = () => {
   const { user, userProfile, isAdmin, session } = useAuth();
@@ -200,8 +201,47 @@ export const FamilyTree: React.FC = () => {
 
   const handleAddRelativeDirect = useCallback((node: FamilyNode, _relation: RelativeDirection) => {
     setSelectedNode(node);
-    setIsAddModalOpen(true);
   }, []);
+
+  const handleCreateRelativeDirect = useCallback(
+    async (params: { firstName: string; relation: RelativeDirection; targetNodeId: string }) => {
+      if (!user) return;
+      try {
+        await createRelativeSecure({
+          firstName: params.firstName,
+          relation: params.relation,
+          targetNodeId: params.targetNodeId,
+          userId: user.id,
+          sessionToken: session?.access_token,
+        });
+        await refetch();
+      } catch (e) {
+        console.error('[handleCreateRelativeDirect] Error:', e);
+        window.alert(e instanceof Error ? e.message : 'Failed to create relative.');
+      }
+    },
+    [user, session?.access_token, refetch]
+  );
+
+  const handleConnectExistingRelativeDirect = useCallback(
+    async (params: { existingNodeId: string; relation: RelativeDirection; targetNodeId: string }) => {
+      if (!user) return;
+      try {
+        await linkExistingRelativeSecure({
+          existingNodeId: params.existingNodeId,
+          relation: params.relation,
+          targetNodeId: params.targetNodeId,
+          userId: user.id,
+          sessionToken: session?.access_token,
+        });
+        await refetch();
+      } catch (e) {
+        console.error('[handleConnectExistingRelativeDirect] Error:', e);
+        window.alert(e instanceof Error ? e.message : 'Failed to connect relative.');
+      }
+    },
+    [user, session?.access_token, refetch]
+  );
 
   const handleStartConnectDirect = useCallback((node: FamilyNode) => {
     setSelectedNode(node);
@@ -618,6 +658,8 @@ export const FamilyTree: React.FC = () => {
             onAddRelative={handleAddRelativeDirect}
             onStartConnect={handleStartConnectDirect}
             onStartDissolve={handleStartDissolveDirect}
+            onCreateRelative={handleCreateRelativeDirect}
+            onConnectExistingRelative={handleConnectExistingRelativeDirect}
           />
         )}
       </div>

@@ -12,6 +12,7 @@ import MenuItem from '@mui/material/MenuItem';
 import { FamilyGraph, FamilyNode, FamilyLink, Node2D, LayoutType } from '../types/graph';
 import { calculateLayout, calculateBounds } from '../lib/layoutEngine';
 import { NodeCard, RelativeDirection } from './NodeCard';
+import { GhostNode } from './GhostNode';
 import { OrthogonalLinks } from './OrthogonalLinks';
 import { getNodeId } from '../utils/getNodeId';
 import { filterGraphData } from '../lib/filterGraphData';
@@ -81,6 +82,9 @@ interface FamilyTree2DProps {
   onAddRelative?: (node: Node2D, relation: RelativeDirection) => void;
   onStartConnect?: (node: Node2D) => void;
   onStartDissolve?: (node: Node2D) => void;
+  /** Direct inline Ghost Node creation and linking handlers */
+  onCreateRelative?: (params: { firstName: string; relation: RelativeDirection; targetNodeId: string }) => Promise<void> | void;
+  onConnectExistingRelative?: (params: { existingNodeId: string; relation: RelativeDirection; targetNodeId: string }) => Promise<void> | void;
 }
 
 function ExpandableSpring({ isOpen, children }: { isOpen: boolean; children: React.ReactNode }) {
@@ -133,6 +137,8 @@ export const FamilyTree2D: React.FC<FamilyTree2DProps> = ({
   onAddRelative,
   onStartConnect,
   onStartDissolve,
+  onCreateRelative,
+  onConnectExistingRelative,
 }) => {
   const presetBackground = getBackgroundForTheme(backgroundTheme);
   const emptyBackground = getBackgroundForTheme(backgroundTheme);
@@ -147,6 +153,10 @@ export const FamilyTree2D: React.FC<FamilyTree2DProps> = ({
   const [showControls, setShowControls] = useState(false);
   const [isPresetMenuOpen, setIsPresetMenuOpen] = useState(false);
   const [highlightedNodeId, setHighlightedNodeId] = useState<string | null>(null);
+  const [ghostNodeState, setGhostNodeState] = useState<{
+    anchorNode: Node2D;
+    relation: RelativeDirection;
+  } | null>(null);
   const [isMobileViewport, setIsMobileViewport] = useState(
     () => typeof window !== 'undefined' && window.innerWidth <= 768
   );
@@ -260,13 +270,17 @@ export const FamilyTree2D: React.FC<FamilyTree2DProps> = ({
             .call(zoomBehaviorRef.current.transform as any, targetTransform);
         }
       } else if (e.key === 'Escape') {
-        onBackgroundClick?.();
+        if (ghostNodeState) {
+          setGhostNodeState(null);
+        } else {
+          onBackgroundClick?.();
+        }
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [nodes, selectedNodeId, onNodeSelect, onBackgroundClick, transform.k]);
+  }, [nodes, selectedNodeId, onNodeSelect, onBackgroundClick, transform.k, ghostNodeState]);
 
   // Focus on specific node (scale 1.25 for subtle "Find me!" zoom; duration in ms)
   const FOCUS_DURATION = 1040;
@@ -391,9 +405,13 @@ export const FamilyTree2D: React.FC<FamilyTree2DProps> = ({
   // Handle background click
   const handleBackgroundClick = useCallback((e: React.MouseEvent) => {
     if (e.target === svgRef.current || e.target === gRef.current) {
+      if (ghostNodeState) {
+        setGhostNodeState(null);
+        return;
+      }
       onBackgroundClick?.();
     }
-  }, [onBackgroundClick]);
+  }, [ghostNodeState, onBackgroundClick]);
 
   // Handle node click with proper selection
   const handleNodeClick = useCallback((node: Node2D) => {
@@ -438,6 +456,11 @@ export const FamilyTree2D: React.FC<FamilyTree2DProps> = ({
     return map;
   }, [nodes, userNodeId, isAdmin, graphData?.links]);
 
+  const handleAddRelativeInternal = useCallback((node: Node2D, relation: RelativeDirection) => {
+    setGhostNodeState({ anchorNode: node, relation });
+    onAddRelative?.(node, relation);
+  }, [onAddRelative]);
+
   return (
     <div style={{ position: 'relative', width: '100%', height: '100%', background: activePreset ? presetBackground : emptyBackground }}>
       {!activePreset ? (
@@ -477,8 +500,8 @@ export const FamilyTree2D: React.FC<FamilyTree2DProps> = ({
           width="100%"
           height="100%"
           style={{
-            background: activePreset ? presetBackground : emptyBackground,
             cursor: isDragging ? 'grabbing' : 'grab',
+            touchAction: 'none',
           }}
           onClick={handleBackgroundClick}
         >
@@ -535,11 +558,41 @@ export const FamilyTree2D: React.FC<FamilyTree2DProps> = ({
                 isHighlighted={highlightedNodeId === node.id}
                 isSearchHighlighted={searchHighlightedNodeId === node.id}
                 canEdit={isNodeEditable.get(node.id) ?? (isAdmin ? true : false)}
-                onAddRelative={onAddRelative}
+                onAddRelative={handleAddRelativeInternal}
                 onStartConnect={onStartConnect}
                 onStartDissolve={onStartDissolve}
               />
             ))}
+
+            {/* Transient Ghost Node */}
+            {ghostNodeState && (
+              <GhostNode
+                anchorNode={ghostNodeState.anchorNode}
+                relation={ghostNodeState.relation}
+                existingNodes={graphData?.nodes || []}
+                onSubmit={async (name) => {
+                  if (onCreateRelative) {
+                    await onCreateRelative({
+                      firstName: name,
+                      relation: ghostNodeState.relation,
+                      targetNodeId: ghostNodeState.anchorNode.id,
+                    });
+                  }
+                  setGhostNodeState(null);
+                }}
+                onConnectExisting={async (existingId) => {
+                  if (onConnectExistingRelative) {
+                    await onConnectExistingRelative({
+                      existingNodeId: existingId,
+                      relation: ghostNodeState.relation,
+                      targetNodeId: ghostNodeState.anchorNode.id,
+                    });
+                  }
+                  setGhostNodeState(null);
+                }}
+                onCancel={() => setGhostNodeState(null)}
+              />
+            )}
           </g>
 
           {/* Zoom controls overlay */}
