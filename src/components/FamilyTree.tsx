@@ -11,7 +11,7 @@ import { useAuth } from '../contexts/AuthContext';
 import AdminManageLinksModal from './modals/AdminManageLinksModal';
 import AdminConnectLinkModal from './modals/AdminConnectLinkModal';
 import AdminAddPersonModal from './modals/AdminAddPersonModal';
-import { adminDeleteNode } from '../lib/adminSupabaseRest';
+import { adminDeleteNode, adminInsertLink } from '../lib/adminSupabaseRest';
 import { canEdit, canManageInvites } from '../lib/permissions';
 import { filterGraphData, filterGraphDataFor3D } from '../lib/filterGraphData';
 import { searchNodes } from '../utils/treeSearch';
@@ -247,6 +247,48 @@ export const FamilyTree: React.FC = () => {
     setSelectedNode(node);
     setAdminConnectFirstId(node.id);
   }, []);
+
+  const handleDirectConnectNodes = useCallback(
+    async (params: {
+      sourceNodeId: string;
+      targetNodeId: string;
+      type: 'parent' | 'marriage' | 'divorce';
+      parentRole?: 'mother' | 'father' | null;
+    }) => {
+      if (!user) return;
+      try {
+        if (isAdmin) {
+          await adminInsertLink({
+            session,
+            isAdmin,
+            body: {
+              source_node_id: params.sourceNodeId,
+              target_node_id: params.targetNodeId,
+              type: params.type,
+              parent_role: params.parentRole ?? null,
+              created_by_user_id: user.id,
+            },
+          });
+        } else {
+          // Standard user: call link_existing_relative_secure
+          const relType: RelativeDirection =
+            params.type === 'parent' ? 'parent' : params.type === 'marriage' ? 'spouse' : 'child';
+          await linkExistingRelativeSecure({
+            existingNodeId: params.targetNodeId,
+            relation: relType,
+            targetNodeId: params.sourceNodeId,
+            userId: user.id,
+            sessionToken: session?.access_token,
+          });
+        }
+        await refetch();
+      } catch (e) {
+        console.error('[handleDirectConnectNodes] Error:', e);
+        window.alert(e instanceof Error ? e.message : 'Failed to create kinship link.');
+      }
+    },
+    [isAdmin, user, session, refetch]
+  );
 
   const handleStartDissolveDirect = useCallback(async (node: FamilyNode) => {
     if (!isAdmin || !user) return;
@@ -660,6 +702,7 @@ export const FamilyTree: React.FC = () => {
             onStartDissolve={handleStartDissolveDirect}
             onCreateRelative={handleCreateRelativeDirect}
             onConnectExistingRelative={handleConnectExistingRelativeDirect}
+            onDirectConnectNodes={handleDirectConnectNodes}
           />
         )}
       </div>
