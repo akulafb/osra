@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Node2D, FamilyGraph } from '../types/graph';
 import { validateProposedLink } from '../lib/adminGraphValidation';
 
@@ -72,6 +72,17 @@ export const InlineConnectPicker: React.FC<InlineConnectPickerProps> = ({
       divorce: vDivorce,
     };
   }, [graphData, sourceNode.id, targetNode.id, parentRole]);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.stopPropagation();
+        onCancel();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onCancel]);
 
   const handleConfirm = async () => {
     setIsSubmitting(true);

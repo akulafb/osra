@@ -326,6 +326,7 @@ export const NodeCard: React.FC<NodeCardProps> = ({
           >
             {/* Connect Button */}
             <g
+              className="action-handle handle-connect"
               transform="translate(-30, 0)"
               onClick={(e) => {
                 e.stopPropagation();
@@ -358,6 +359,7 @@ export const NodeCard: React.FC<NodeCardProps> = ({
 
             {/* Dissolve Button */}
             <g
+              className="action-handle handle-dissolve"
               transform="translate(30, 0)"
               onClick={(e) => {
                 e.stopPropagation();

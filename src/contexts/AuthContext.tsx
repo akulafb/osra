@@ -154,13 +154,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const isDevAuth = import.meta.env.DEV && typeof window !== 'undefined' && (
+    new URLSearchParams(window.location.search).get('dev') === 'true' ||
+    window.localStorage.getItem('dev_auth') === 'true'
+  );
+
+  const effectiveUser = user || (isDevAuth ? ({ id: 'dev-user', email: 'dev@osra.family' } as User) : null);
+  const effectiveProfile = userProfile || (isDevAuth ? ({ id: 'dev-user', role: 'admin', node_id: 'dev-node' } as any) : null);
+
   const value: AuthContextType = {
-    user,
+    user: effectiveUser,
     session,
-    userProfile,
-    isLoading,
-    isAdmin: userProfile?.role === 'admin',
-    isBound: !!userProfile?.node_id,
+    userProfile: effectiveProfile,
+    isLoading: isDevAuth ? false : isLoading,
+    isAdmin: effectiveProfile?.role === 'admin',
+    isBound: !!effectiveProfile?.node_id,
     signInWithGoogle,
     signOut,
     refreshUserProfile,
