@@ -11,6 +11,13 @@ const RELATION_COLORS: Record<RelativeDirection, string> = {
   child: '#93c5fd',
 };
 
+/**
+ * Connect Mode's own accent, kept beside the relation colours because it plays
+ * the same role: the 2D HUD, the kinship picker, the docked targeting panel and
+ * the 3D candidate rim-light all have to agree on one purple.
+ */
+export const CONNECT_ACCENT = '#c084fc';
+
 export function relationColor(relation: RelativeDirection): string {
   return RELATION_COLORS[relation];
 }

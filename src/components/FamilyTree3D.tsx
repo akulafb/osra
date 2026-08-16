@@ -23,7 +23,16 @@ import { filterGraphDataFor3D } from '../lib/filterGraphData';
 import { useClusterBubbles } from '../hooks/useClusterBubbles';
 import { EXIT_MULT } from '../utils/clusterBubbles';
 import { TreeSearchBar } from './TreeSearchBar';
-import { Manipulation3DPanel } from './Manipulation3DPanel';
+import { Manipulation3DPanel, Connect3DControls } from './Manipulation3DPanel';
+import {
+  Candidacy,
+  ConnectPair,
+  buildCandidacy,
+  candidacyFor,
+  candidateIds,
+} from './cards/connectCandidates';
+import { KinshipLinkType, ParentRole } from './cards/connectOptions';
+import { CONNECT_ACCENT } from './cards/relationStyle';
 
 // V3 Shared Assets - paths resolved at runtime for WebP when supported
 const planetTexturePaths = [
@@ -51,6 +60,17 @@ const planetMaterialCache = new Map<string, THREE.Material>();
 function isPreviewLink(l: { type?: string }): boolean {
   return l.type === 'preview';
 }
+
+/**
+ * Connect Mode candidate affordance (LIN-50). Valid targets are rim-lit in the
+ * picker's own purple; everyone else is dimmed towards the background, so from
+ * a crowded viewpoint the linkable planets are the ones that still read.
+ */
+const CONNECT_ACCENT_3D = new THREE.Color(CONNECT_ACCENT);
+const CONNECT_NON_CANDIDATE_DIM = 0.2;
+/** Shared so that outside Connect Mode the candidacy identity never changes,
+ *  and the scene is not asked to rebuild every node object for nothing. */
+const NO_CANDIDACY: Map<string, Candidacy> = new Map();
 
 const THEME_COLORS_3D: Record<Exclude<BackgroundTheme, 'deep-space'>, number> = {
   'wax-white': 0xfffef8,
@@ -215,6 +235,13 @@ interface FamilyTree3DProps {
     relation: RelativeDirection;
     targetNodeId: string;
   }) => Promise<void> | void;
+  /** Connect Mode (LIN-50): creates the Kinship Link once a pair and kind are chosen. */
+  onDirectConnectNodes?: (params: {
+    sourceNodeId: string;
+    targetNodeId: string;
+    type: 'parent' | 'marriage' | 'divorce';
+    parentRole?: 'mother' | 'father' | null;
+  }) => Promise<void> | void;
 }
 
 export const FamilyTree3DContent: React.FC<FamilyTree3DProps> = ({
@@ -254,6 +281,7 @@ export const FamilyTree3DContent: React.FC<FamilyTree3DProps> = ({
   canEditSelected = false,
   onCreateRelative,
   onConnectExistingRelative,
+  onDirectConnectNodes,
 }) => {
   const ForceGraph3DAny = ForceGraph3D as unknown as React.ComponentType<any>;
   const { userProfile } = useAuth();
@@ -279,6 +307,24 @@ export const FamilyTree3DContent: React.FC<FamilyTree3DProps> = ({
   const envInitializedRef = useRef(false);
   const hasIntroPlayed = useRef(false);
   const rotationRef = useRef(0);
+
+  // Connect Mode (LIN-50): two-click targeting, source first.
+  const [connectSource, setConnectSource] = useState<FamilyNode | null>(null);
+  const [connectPair, setConnectPair] = useState<ConnectPair | null>(null);
+  const [rejectedTarget, setRejectedTarget] = useState<{ node: FamilyNode; reason: string } | null>(
+    null
+  );
+  /**
+   * Mirrors the source id for the graph's click handler.
+   *
+   * `onNodeClick` otherwise always launches a camera fly-to, which would rip
+   * the viewport away the instant a target is clicked. Nothing else holds the
+   * camera still — Manipulation Freeze was dropped after prototyping (ADR 0002)
+   * — so this gate is the whole of that guarantee, and a ref keeps it correct
+   * even if the graph is holding an older handler.
+   */
+  const connectModeRef = useRef<string | null>(null);
+  connectModeRef.current = connectSource?.id ?? null;
 
   // Internal state for modals
   const [initialCameraPos, setInitialCameraPos] = useState<{ x: number; y: number; z: number } | null>(null);
@@ -374,19 +420,31 @@ export const FamilyTree3DContent: React.FC<FamilyTree3DProps> = ({
         uniqueClusters
       );
 
+      // Synthetic dashed edges. Both reuse the same `isPreviewLink` rendering
+      // path, which is also why the Connect Mode beam appears only once a pair
+      // is chosen and not under the pointer: every one of these rebuilds
+      // graphData, and the graph re-runs its warmup ticks when it does.
+      const previewLinks: { source: string; target: string; type: string }[] = [];
+      const bothVisible = (a: string, b: string) =>
+        filtered.nodes.some(n => n.id === a) && filtered.nodes.some(n => n.id === b);
+
       if (pendingLinkPreview) {
         const { anchorId, existingId } = pendingLinkPreview;
-        const anchorVisible = filtered.nodes.some(n => n.id === anchorId);
-        const existingVisible = filtered.nodes.some(n => n.id === existingId);
-        if (anchorVisible && existingVisible) {
-          return {
-            ...filtered,
-            links: [
-              ...filtered.links,
-              { source: anchorId, target: existingId, type: 'preview' },
-            ],
-          };
+        if (bothVisible(anchorId, existingId)) {
+          previewLinks.push({ source: anchorId, target: existingId, type: 'preview' });
         }
+      }
+
+      if (connectPair && bothVisible(connectPair.source.id, connectPair.target.id)) {
+        previewLinks.push({
+          source: connectPair.source.id,
+          target: connectPair.target.id,
+          type: 'preview',
+        });
+      }
+
+      if (previewLinks.length) {
+        return { ...filtered, links: [...filtered.links, ...previewLinks] };
       }
 
       return filtered;
@@ -394,7 +452,27 @@ export const FamilyTree3DContent: React.FC<FamilyTree3DProps> = ({
       console.error('[FamilyTree3D] Error filtering graph data:', err);
       return { nodes: [], links: [] };
     }
-  }, [graphData, effectiveCollapsedNodes, visibleClusters3D, uniqueClusters, pendingLinkPreview]);
+  }, [
+    graphData,
+    effectiveCollapsedNodes,
+    visibleClusters3D,
+    uniqueClusters,
+    pendingLinkPreview,
+    connectPair,
+  ]);
+
+  const connectCandidacy = useMemo<Map<string, Candidacy>>(
+    () =>
+      connectSource
+        ? buildCandidacy(graphData, connectSource.id, filteredGraphData.nodes)
+        : NO_CANDIDACY,
+    [connectSource, graphData, filteredGraphData.nodes]
+  );
+
+  const connectCandidateIds = useMemo(
+    () => candidateIds(connectCandidacy),
+    [connectCandidacy]
+  );
 
   // Family cluster view on zoom-out (LIN-32): fades individuals into per-cluster
   // bubbles when zoomed out. `detailRef` (0..1) drives the node fade below;
@@ -499,6 +577,121 @@ export const FamilyTree3DContent: React.FC<FamilyTree3DProps> = ({
     };
     animate();
   }, [onNodeSelect, boundsRef]);
+
+  const exitConnectMode = useCallback(() => {
+    setConnectSource(null);
+    setConnectPair(null);
+    setRejectedTarget(null);
+  }, []);
+
+  const startConnectMode = useCallback(() => {
+    if (!selectedNode) return;
+    setConnectSource(selectedNode);
+    setConnectPair(null);
+    setRejectedTarget(null);
+  }, [selectedNode]);
+
+  /**
+   * Resolve the second click of the pair.
+   *
+   * A refused target says why rather than doing nothing: in a crowded scene an
+   * inert click is indistinguishable from a miss, and the user would keep
+   * aiming at someone who can never be linked.
+   */
+  const pickConnectTarget = useCallback(
+    (node: FamilyNode) => {
+      const source = connectSource;
+      if (!source) return;
+      if (source.id === node.id) {
+        exitConnectMode();
+        return;
+      }
+      const verdict = candidacyFor(graphData, source.id, node.id);
+      if (!verdict.ok) {
+        setRejectedTarget({ node, reason: verdict.reason });
+        return;
+      }
+      setRejectedTarget(null);
+      setConnectPair({ source, target: node });
+    },
+    [connectSource, graphData, exitConnectMode]
+  );
+
+  const handleGraphNodeClick = useCallback(
+    (node: FamilyNode) => {
+      if (connectModeRef.current) {
+        pickConnectTarget(node);
+        return;
+      }
+      handleNodeClick(node);
+    },
+    [handleNodeClick, pickConnectTarget]
+  );
+
+  const handleConnectConfirm = useCallback(
+    async (type: KinshipLinkType, parentRole?: ParentRole, parentIsSource?: boolean) => {
+      if (!connectPair) return;
+      // The picker may name the target as the parent, which flips the edge.
+      const flipped = type === 'parent' && parentIsSource === false;
+      await Promise.resolve(
+        onDirectConnectNodes?.({
+          sourceNodeId: flipped ? connectPair.target.id : connectPair.source.id,
+          targetNodeId: flipped ? connectPair.source.id : connectPair.target.id,
+          type,
+          parentRole,
+        })
+      );
+      exitConnectMode();
+    },
+    [connectPair, onDirectConnectNodes, exitConnectMode]
+  );
+
+  const handleGraphBackgroundClick = useCallback(() => {
+    if (connectPair) {
+      setConnectPair(null);
+      return;
+    }
+    if (connectSource) {
+      exitConnectMode();
+      return;
+    }
+    onBackgroundClick?.();
+  }, [connectPair, connectSource, exitConnectMode, onBackgroundClick]);
+
+  // Connect Mode is anchored to the selection it started from; if that moves
+  // out from under it the docked panel goes with it, so the state has nothing
+  // left to sit on.
+  useEffect(() => {
+    if (connectSource && selectedNode?.id !== connectSource.id) exitConnectMode();
+  }, [selectedNode, connectSource, exitConnectMode]);
+
+  const connectControls = useMemo<Connect3DControls>(
+    () => ({
+      sourceNode: connectSource,
+      pair: connectPair,
+      candidacy: connectCandidacy,
+      candidateIds: connectCandidateIds,
+      visibleNodes: filteredGraphData.nodes,
+      rejected: rejectedTarget,
+      onStart: startConnectMode,
+      onPickTarget: pickConnectTarget,
+      onCancelPair: () => setConnectPair(null),
+      onExit: exitConnectMode,
+      onConfirm: handleConnectConfirm,
+    }),
+    [
+      connectSource,
+      connectPair,
+      connectCandidacy,
+      connectCandidateIds,
+      filteredGraphData.nodes,
+      rejectedTarget,
+      startConnectMode,
+      pickConnectTarget,
+      exitConnectMode,
+      handleConnectConfirm,
+    ]
+  );
 
   // Reset View functionality
   const resetView = useCallback(() => {
@@ -933,6 +1126,21 @@ export const FamilyTree3DContent: React.FC<FamilyTree3DProps> = ({
           document.activeElement?.tagName === 'INPUT' || 
           document.activeElement?.tagName === 'TEXTAREA') return;
       
+      // Connect Mode is a targeting state: Escape steps back out of it, and the
+      // selection shortcuts are held back so the docked panel cannot be pulled
+      // out from under a half-made link.
+      if (key === 'escape' && connectPair) {
+        e.preventDefault();
+        setConnectPair(null);
+        return;
+      }
+      if (key === 'escape' && connectSource) {
+        e.preventDefault();
+        exitConnectMode();
+        return;
+      }
+      if (connectSource) return;
+
       if (key === 'r') {
         setIsSteeringActive(prev => !prev);
       } else       if (key === 'tab') {
@@ -993,6 +1201,10 @@ export const FamilyTree3DContent: React.FC<FamilyTree3DProps> = ({
     isAddModalOpen,
     isEditModalOpen,
     isBulkInviteOpen,
+    connectSource,
+    connectPair,
+    exitConnectMode,
+    onBackgroundClick,
   ]);
 
   // Node UI
@@ -1003,6 +1215,16 @@ export const FamilyTree3DContent: React.FC<FamilyTree3DProps> = ({
       const colors = getClusterColors(node.familyCluster);
       const color = colors.border;
       const group = new THREE.Group();
+
+      // Connect Mode candidate affordance (LIN-50).
+      const connectSourceId = connectSource?.id ?? null;
+      const isConnectSource = connectSourceId === node.id;
+      const isConnectCandidate =
+        connectSourceId !== null && !isConnectSource && connectCandidateIds.has(node.id);
+      const connectDim =
+        connectSourceId !== null && !isConnectSource && !isConnectCandidate
+          ? CONNECT_NON_CANDIDATE_DIM
+          : 1;
 
       if (nodeTexture !== 'none') {
         const material = nodeTexture === 'planets' ? getPlanetMaterial(node.id, isMob) : getMaterial(color, isMob);
@@ -1018,9 +1240,11 @@ export const FamilyTree3DContent: React.FC<FamilyTree3DProps> = ({
           const rot = rotationRef.current * speedFactor;
           sphere.rotation.y = rot;
           sphere.rotation.z = rot * 0.5;
-          // Crossfade individuals out as cluster bubbles fade in (LIN-32).
+          // Crossfade individuals out as cluster bubbles fade in (LIN-32), and
+          // sink anyone who cannot be a Connect Mode target (LIN-50).
           material.transparent = true;
-          material.opacity = material.userData.baseOpacity * (1 - detailRef.current);
+          material.opacity =
+            material.userData.baseOpacity * (1 - detailRef.current) * connectDim;
         };
 
         if (isSelected) {
@@ -1033,6 +1257,33 @@ export const FamilyTree3DContent: React.FC<FamilyTree3DProps> = ({
           const searchGlow = new THREE.Mesh(geometries.glow, new THREE.MeshBasicMaterial({ color: 0xef4444, transparent: true, opacity: 0.55 }));
           group.add(searchGlow);
         }
+      }
+
+      // Outside the texture check: with textures off there is no sphere to dim,
+      // so the rim is the only thing telling a candidate from the rest.
+      const addConnectShell = (geometry: THREE.BufferGeometry, opacity: number, wireframe = false) => {
+        const material = new THREE.MeshBasicMaterial({
+          color: CONNECT_ACCENT_3D,
+          transparent: true,
+          opacity,
+          wireframe,
+        });
+        const shell = new THREE.Mesh(geometry, material);
+        // Fades with its planet as the cluster bubbles take over (LIN-32);
+        // a rim still burning over a faded-out tree would read as a bug.
+        shell.onBeforeRender = () => {
+          material.opacity = opacity * (1 - detailRef.current);
+        };
+        group.add(shell);
+      };
+
+      if (isConnectCandidate) {
+        addConnectShell(geometries.aura, 0.6, true);
+        addConnectShell(geometries.glow, 0.18);
+      }
+
+      if (isConnectSource) {
+        addConnectShell(geometries.glow, 0.35);
       }
 
       if (showNames) {
@@ -1061,7 +1312,7 @@ export const FamilyTree3DContent: React.FC<FamilyTree3DProps> = ({
         sprite.material.transparent = true;
         // Fade the label together with its sphere when zooming out (LIN-32).
         sprite.onBeforeRender = () => {
-          sprite.material.opacity = 1 - detailRef.current;
+          sprite.material.opacity = (1 - detailRef.current) * connectDim;
         };
         group.add(sprite);
       }
@@ -1071,11 +1322,21 @@ export const FamilyTree3DContent: React.FC<FamilyTree3DProps> = ({
       console.error('[FamilyTree3D] Error in nodeThreeObject:', err);
       return new THREE.Group();
     }
-  }, [selectedNode, showNames, nodeTexture, geometries, rotationRef, searchHighlightedNodeId, detailRef]);
+  }, [
+    selectedNode,
+    showNames,
+    nodeTexture,
+    geometries,
+    rotationRef,
+    searchHighlightedNodeId,
+    detailRef,
+    connectSource,
+    connectCandidateIds,
+  ]);
 
   useEffect(() => {
     if (fgRef.current?.refresh) fgRef.current.refresh();
-  }, [nodeTexture, selectedNode?.id, searchHighlightedNodeId, pendingLinkPreview?.anchorId, pendingLinkPreview?.existingId, showArrows, showLinks]);
+  }, [nodeTexture, selectedNode?.id, searchHighlightedNodeId, pendingLinkPreview?.anchorId, pendingLinkPreview?.existingId, showArrows, showLinks, connectSource, connectCandidateIds]);
 
   // Preview pair framing: one shot after layout; deps = endpoint ids only (no simulation churn).
   useEffect(() => {
@@ -1348,7 +1609,7 @@ export const FamilyTree3DContent: React.FC<FamilyTree3DProps> = ({
         d3VelocityDecay={0.1}
         cooldownTicks={activePreset ? 1000 : 1000}
         onEngineStop={() => setIsSimulationLoading(false)}
-        onNodeClick={(node: FamilyNode) => handleNodeClick(node)}
+        onNodeClick={handleGraphNodeClick}
         onNodeDoubleClick={(node: any) => {
           const nodeId = getNodeId(node);
           if (!nodeId) return;
@@ -1362,7 +1623,7 @@ export const FamilyTree3DContent: React.FC<FamilyTree3DProps> = ({
             effectiveToggleCollapse(nodeId);
           }
         }}
-        onBackgroundClick={onBackgroundClick}
+        onBackgroundClick={handleGraphBackgroundClick}
         linkColor={(l: any) => {
           if (isPreviewLink(l)) return '#22d3ee';
           if (l.type === 'marriage') return '#f59e0b';
@@ -1784,8 +2045,13 @@ export const FamilyTree3DContent: React.FC<FamilyTree3DProps> = ({
         selectedNode={selectedNode}
         canEdit={canEditSelected && !isMobileDevice}
         existingNodes={graphData?.nodes ?? []}
+        graphData={graphData}
         fgRef={fgRef}
         nodes={filteredGraphData.nodes}
+        connect={connectControls}
+        searchQuery={searchQuery}
+        onSearchQueryChange={onSearchQueryChange}
+        searchMatches={searchMatches}
         onCreateRelative={onCreateRelative}
         onConnectExistingRelative={onConnectExistingRelative}
       />
