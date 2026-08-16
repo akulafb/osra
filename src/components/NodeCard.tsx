@@ -21,6 +21,10 @@ export interface NodeCardProps {
   onAddRelative?: (node: Node2D, relation: RelativeDirection) => void;
   onStartConnect?: (node: Node2D) => void;
   onStartDissolve?: (node: Node2D) => void;
+  /** Playful animation states */
+  isNewlySpawned?: boolean;
+  isDissolving?: boolean;
+  onConfirmDissolve?: (node: Node2D) => void;
 }
 
 /** Lighten colors for maternal-only nodes (same hue, lighter tint) */
@@ -56,8 +60,19 @@ export const NodeCard: React.FC<NodeCardProps> = ({
   onAddRelative,
   onStartConnect,
   onStartDissolve,
+  isNewlySpawned = false,
+  isDissolving = false,
+  onConfirmDissolve,
 }) => {
   const [isHovered, setIsHovered] = React.useState(false);
+  const [isConfirmingDissolve, setIsConfirmingDissolve] = React.useState(false);
+
+  // Reset dissolve confirmation if deselected or unhovered
+  React.useEffect(() => {
+    if (!isSelected && !isHovered) {
+      setIsConfirmingDissolve(false);
+    }
+  }, [isSelected, isHovered]);
 
   const isMaternalOnly =
     activePreset &&
@@ -81,7 +96,16 @@ export const NodeCard: React.FC<NodeCardProps> = ({
     onDoubleClick?.(node);
   };
 
-  const showActionHandles = canEdit && (isHovered || isSelected);
+  const showActionHandles = canEdit && (isHovered || isSelected || isConfirmingDissolve);
+
+  // Animation style
+  const cardAnimation = isDissolving
+    ? 'cardDissolve 0.45s cubic-bezier(0.4, 0, 0.2, 1) forwards'
+    : isConfirmingDissolve
+    ? 'cardShake 0.35s ease-in-out infinite'
+    : isNewlySpawned
+    ? 'cardSpawnPop 0.55s cubic-bezier(0.34, 1.56, 0.64, 1) forwards'
+    : undefined;
 
   return (
     <g
@@ -92,8 +116,10 @@ export const NodeCard: React.FC<NodeCardProps> = ({
       onMouseLeave={() => setIsHovered(false)}
       style={{
         cursor: 'pointer',
+        animation: cardAnimation,
+        transformOrigin: `${node.width / 2}px ${node.height / 2}px`,
       }}
-      className={`node-card ${isSelected ? 'selected' : ''} ${isHighlighted ? 'highlighted' : ''} ${isSearchHighlighted ? 'search-highlighted' : ''}`}
+      className={`node-card ${isSelected ? 'selected' : ''} ${isHighlighted ? 'highlighted' : ''} ${isSearchHighlighted ? 'search-highlighted' : ''} ${isNewlySpawned ? 'newly-spawned' : ''} ${isDissolving ? 'dissolving' : ''}`}
     >
       {/* Search match highlight (red glow, takes precedence) */}
       {isSearchHighlighted && (
@@ -324,71 +350,166 @@ export const NodeCard: React.FC<NodeCardProps> = ({
             className="action-handle-toolbar"
             transform={`translate(${node.width / 2}, ${node.height + 34})`}
           >
-            {/* Connect Button */}
-            <g
-              className="action-handle handle-connect"
-              transform="translate(-30, 0)"
-              onClick={(e) => {
-                e.stopPropagation();
-                onStartConnect?.(node);
-              }}
-              style={{ cursor: 'pointer' }}
-            >
-              <rect
-                x={-25}
-                y={-8}
-                width={50}
-                height={16}
-                rx={8}
-                fill="rgba(15, 23, 42, 0.95)"
-                stroke="rgba(168, 85, 247, 0.85)"
-                strokeWidth={1.2}
-              />
-              <text
-                x={0}
-                y={4}
-                textAnchor="middle"
-                fill="#c084fc"
-                fontSize={9}
-                fontWeight={600}
-                style={{ pointerEvents: 'none', userSelect: 'none' }}
-              >
-                🔗 Link
-              </text>
-            </g>
+            {isConfirmingDissolve ? (
+              /* Inline Shake Confirmation Badge */
+              <g className="dissolve-confirmation-group">
+                <rect
+                  x={-65}
+                  y={-11}
+                  width={130}
+                  height={22}
+                  rx={11}
+                  fill="rgba(239, 68, 68, 0.98)"
+                  stroke="#fff"
+                  strokeWidth={1.5}
+                  style={{ filter: 'drop-shadow(0 0 8px rgba(239, 68, 68, 0.6))' }}
+                />
+                <text
+                  x={-24}
+                  y={4}
+                  textAnchor="middle"
+                  fill="#fff"
+                  fontSize={10}
+                  fontWeight={700}
+                  style={{ pointerEvents: 'none', userSelect: 'none' }}
+                >
+                  Delete?
+                </text>
+                {/* Confirm Yes */}
+                <g
+                  className="handle-confirm-yes"
+                  transform="translate(18, 0)"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setIsConfirmingDissolve(false);
+                    if (onConfirmDissolve) {
+                      onConfirmDissolve(node);
+                    } else {
+                      onStartDissolve?.(node);
+                    }
+                  }}
+                  style={{ cursor: 'pointer' }}
+                >
+                  <rect
+                    x={-14}
+                    y={-8}
+                    width={28}
+                    height={16}
+                    rx={8}
+                    fill="#fff"
+                  />
+                  <text
+                    x={0}
+                    y={4}
+                    textAnchor="middle"
+                    fill="#dc2626"
+                    fontSize={10}
+                    fontWeight={800}
+                    style={{ pointerEvents: 'none', userSelect: 'none' }}
+                  >
+                    ✓
+                  </text>
+                </g>
+                {/* Cancel No */}
+                <g
+                  className="handle-confirm-no"
+                  transform="translate(48, 0)"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setIsConfirmingDissolve(false);
+                  }}
+                  style={{ cursor: 'pointer' }}
+                >
+                  <rect
+                    x={-10}
+                    y={-8}
+                    width={20}
+                    height={16}
+                    rx={8}
+                    fill="rgba(0, 0, 0, 0.3)"
+                  />
+                  <text
+                    x={0}
+                    y={4}
+                    textAnchor="middle"
+                    fill="#fff"
+                    fontSize={9}
+                    fontWeight={700}
+                    style={{ pointerEvents: 'none', userSelect: 'none' }}
+                  >
+                    ✕
+                  </text>
+                </g>
+              </g>
+            ) : (
+              <>
+                {/* Connect Button */}
+                <g
+                  className="action-handle handle-connect"
+                  transform="translate(-30, 0)"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onStartConnect?.(node);
+                  }}
+                  style={{ cursor: 'pointer' }}
+                >
+                  <rect
+                    x={-25}
+                    y={-8}
+                    width={50}
+                    height={16}
+                    rx={8}
+                    fill="rgba(15, 23, 42, 0.95)"
+                    stroke="rgba(168, 85, 247, 0.85)"
+                    strokeWidth={1.2}
+                  />
+                  <text
+                    x={0}
+                    y={4}
+                    textAnchor="middle"
+                    fill="#c084fc"
+                    fontSize={9}
+                    fontWeight={600}
+                    style={{ pointerEvents: 'none', userSelect: 'none' }}
+                  >
+                    🔗 Link
+                  </text>
+                </g>
 
-            {/* Dissolve Button */}
-            <g
-              className="action-handle handle-dissolve"
-              transform="translate(30, 0)"
-              onClick={(e) => {
-                e.stopPropagation();
-                onStartDissolve?.(node);
-              }}
-              style={{ cursor: 'pointer' }}
-            >
-              <rect
-                x={-27}
-                y={-8}
-                width={54}
-                height={16}
-                rx={8}
-                fill="rgba(15, 23, 42, 0.95)"
-                stroke="rgba(239, 68, 68, 0.85)"
-                strokeWidth={1.2}
-              />
-              <text
-                x={0}
-                y={4}
-                textAnchor="middle"
-                fill="#f87171"
-                fontSize={9}
-                fontWeight={600}
-                style={{ pointerEvents: 'none', userSelect: 'none' }}
-              >
-                🗑️ Delete
-              </text>
-            </g>
+                {/* Dissolve Button */}
+                <g
+                  className="action-handle handle-dissolve"
+                  transform="translate(30, 0)"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setIsConfirmingDissolve(true);
+                  }}
+                  style={{ cursor: 'pointer' }}
+                >
+                  <rect
+                    x={-27}
+                    y={-8}
+                    width={54}
+                    height={16}
+                    rx={8}
+                    fill="rgba(15, 23, 42, 0.95)"
+                    stroke="rgba(239, 68, 68, 0.85)"
+                    strokeWidth={1.2}
+                  />
+                  <text
+                    x={0}
+                    y={4}
+                    textAnchor="middle"
+                    fill="#f87171"
+                    fontSize={9}
+                    fontWeight={600}
+                    style={{ pointerEvents: 'none', userSelect: 'none' }}
+                  >
+                    🗑️ Delete
+                  </text>
+                </g>
+              </>
+            )}
           </g>
         </g>
       )}

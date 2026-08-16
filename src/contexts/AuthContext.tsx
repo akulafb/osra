@@ -160,7 +160,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 
   const effectiveUser = user || (isDevAuth ? ({ id: 'dev-user', email: 'dev@osra.family' } as User) : null);
-  const effectiveProfile = userProfile || (isDevAuth ? ({ id: 'dev-user', role: 'admin', node_id: 'dev-node' } as any) : null);
+  const effectiveProfile = userProfile || (isDevAuth ? ({ id: 'dev-user', role: 'admin', node_id: 'node-1' } as any) : null);
 
   const value: AuthContextType = {
     user: effectiveUser,

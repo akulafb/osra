@@ -203,17 +203,25 @@ export const FamilyTree: React.FC = () => {
     setSelectedNode(node);
   }, []);
 
+  // Playful Animation Pipeline State (LIN-45)
+  const [newlySpawnedNodeId, setNewlySpawnedNodeId] = useState<string | null>(null);
+  const [dissolvingNodeId, setDissolvingNodeId] = useState<string | null>(null);
+
   const handleCreateRelativeDirect = useCallback(
     async (params: { firstName: string; relation: RelativeDirection; targetNodeId: string }) => {
       if (!user) return;
       try {
-        await createRelativeSecure({
+        const res = await createRelativeSecure({
           firstName: params.firstName,
           relation: params.relation,
           targetNodeId: params.targetNodeId,
           userId: user.id,
           sessionToken: session?.access_token,
         });
+        if (res && res.new_node_id) {
+          setNewlySpawnedNodeId(res.new_node_id);
+          setTimeout(() => setNewlySpawnedNodeId(null), 1200);
+        }
         await refetch();
       } catch (e) {
         console.error('[handleCreateRelativeDirect] Error:', e);
@@ -243,10 +251,30 @@ export const FamilyTree: React.FC = () => {
     [user, session?.access_token, refetch]
   );
 
-  const handleStartConnectDirect = useCallback((node: FamilyNode) => {
-    setSelectedNode(node);
-    setAdminConnectFirstId(node.id);
-  }, []);
+  const handleConfirmDissolveDirect = useCallback(
+    async (node: FamilyNode) => {
+      if (!isAdmin || !user) return;
+      // Optimistic particle dissolve animation immediately
+      setDissolvingNodeId(node.id);
+      try {
+        await adminDeleteNode({
+          session,
+          isAdmin,
+          nodeId: node.id,
+        });
+        await refetch();
+        if (selectedNode?.id === node.id) {
+          setSelectedNode(null);
+        }
+      } catch (e) {
+        console.error('[handleConfirmDissolveDirect] Error:', e);
+        // Rollback
+        setDissolvingNodeId(null);
+        window.alert(e instanceof Error ? e.message : 'Delete failed.');
+      }
+    },
+    [isAdmin, user, session, refetch, selectedNode?.id]
+  );
 
   const handleDirectConnectNodes = useCallback(
     async (params: {
@@ -289,31 +317,6 @@ export const FamilyTree: React.FC = () => {
     },
     [isAdmin, user, session, refetch]
   );
-
-  const handleStartDissolveDirect = useCallback(async (node: FamilyNode) => {
-    if (!isAdmin || !user) return;
-    if (
-      !window.confirm(
-        `Delete ${node.firstName} and all their invites and links? This cannot be undone.`
-      )
-    ) {
-      return;
-    }
-    try {
-      await adminDeleteNode({
-        session,
-        isAdmin,
-        nodeId: node.id,
-      });
-      await refetch();
-      if (selectedNode?.id === node.id) {
-        setSelectedNode(null);
-      }
-    } catch (e) {
-      console.error(e);
-      window.alert(e instanceof Error ? e.message : 'Delete failed.');
-    }
-  }, [isAdmin, user, session, refetch, selectedNode?.id]);
 
   // Visible nodes for search (depends on mode)
   const visibleNodes = useMemo(() => {
@@ -698,11 +701,13 @@ export const FamilyTree: React.FC = () => {
             isAdmin={isAdmin}
             onAdminAddPersonClick={() => setAdminAddPersonOpen(true)}
             onAddRelative={handleAddRelativeDirect}
-            onStartConnect={handleStartConnectDirect}
-            onStartDissolve={handleStartDissolveDirect}
             onCreateRelative={handleCreateRelativeDirect}
             onConnectExistingRelative={handleConnectExistingRelativeDirect}
             onDirectConnectNodes={handleDirectConnectNodes}
+            newlySpawnedNodeId={newlySpawnedNodeId}
+            dissolvingNodeId={dissolvingNodeId}
+            onDissolveComplete={() => setDissolvingNodeId(null)}
+            onConfirmDissolve={handleConfirmDissolveDirect}
           />
         )}
       </div>

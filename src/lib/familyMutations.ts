@@ -18,7 +18,7 @@ export interface LinkExistingRelativeParams {
   parentRole?: 'mother' | 'father' | null;
 }
 
-export async function createRelativeSecure(params: CreateRelativeParams): Promise<void> {
+export async function createRelativeSecure(params: CreateRelativeParams): Promise<{ success: boolean; new_node_id?: string; message?: string }> {
   const sanitizedName = params.firstName.trim().slice(0, 200);
   if (!sanitizedName) {
     throw new Error('Name cannot be empty.');
@@ -53,6 +53,7 @@ export async function createRelativeSecure(params: CreateRelativeParams): Promis
   if (result && result.success === false) {
     throw new Error(result.message || 'Failed to create relative.');
   }
+  return result;
 }
 
 export async function linkExistingRelativeSecure(params: LinkExistingRelativeParams): Promise<void> {

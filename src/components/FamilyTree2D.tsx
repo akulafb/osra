@@ -14,6 +14,8 @@ import { calculateLayout, calculateBounds } from '../lib/layoutEngine';
 import { NodeCard, RelativeDirection } from './NodeCard';
 import { GhostNode } from './GhostNode';
 import { InlineConnectPicker } from './InlineConnectPicker';
+import { ParticleDissolve } from './ParticleDissolve';
+import { SpawnBurst } from './SpawnBurst';
 import { OrthogonalLinks } from './OrthogonalLinks';
 import { getNodeId } from '../utils/getNodeId';
 import { filterGraphData } from '../lib/filterGraphData';
@@ -82,7 +84,6 @@ interface FamilyTree2DProps {
   /** Action Handles event callbacks */
   onAddRelative?: (node: Node2D, relation: RelativeDirection) => void;
   onStartConnect?: (node: Node2D) => void;
-  onStartDissolve?: (node: Node2D) => void;
   /** Direct inline Ghost Node creation and linking handlers */
   onCreateRelative?: (params: { firstName: string; relation: RelativeDirection; targetNodeId: string }) => Promise<void> | void;
   onConnectExistingRelative?: (params: { existingNodeId: string; relation: RelativeDirection; targetNodeId: string }) => Promise<void> | void;
@@ -93,6 +94,11 @@ interface FamilyTree2DProps {
     type: 'parent' | 'marriage' | 'divorce';
     parentRole?: 'mother' | 'father' | null;
   }) => Promise<void> | void;
+  /** Animation Pipeline states (LIN-45) */
+  newlySpawnedNodeId?: string | null;
+  dissolvingNodeId?: string | null;
+  onDissolveComplete?: (nodeId: string) => void;
+  onConfirmDissolve?: (node: Node2D) => void;
 }
 
 function ExpandableSpring({ isOpen, children }: { isOpen: boolean; children: React.ReactNode }) {
@@ -144,10 +150,13 @@ export const FamilyTree2D: React.FC<FamilyTree2DProps> = ({
   onAdminAddPersonClick,
   onAddRelative,
   onStartConnect,
-  onStartDissolve,
   onCreateRelative,
   onConnectExistingRelative,
   onDirectConnectNodes,
+  newlySpawnedNodeId = null,
+  dissolvingNodeId = null,
+  onDissolveComplete,
+  onConfirmDissolve,
 }) => {
   const presetBackground = getBackgroundForTheme(backgroundTheme);
   const emptyBackground = getBackgroundForTheme(backgroundTheme);
@@ -667,9 +676,44 @@ export const FamilyTree2D: React.FC<FamilyTree2DProps> = ({
                 canEdit={isNodeEditable.get(node.id) ?? (isAdmin ? true : false)}
                 onAddRelative={handleAddRelativeInternal}
                 onStartConnect={handleStartConnectInternal}
-                onStartDissolve={onStartDissolve}
+                isNewlySpawned={newlySpawnedNodeId === node.id}
+                isDissolving={dissolvingNodeId === node.id}
+                onConfirmDissolve={onConfirmDissolve}
               />
             ))}
+
+            {/* Celebratory Spawn Burst Animation */}
+            {nodes.map(node => {
+              if (newlySpawnedNodeId === node.id) {
+                return (
+                  <SpawnBurst
+                    key={`spawn-burst-${node.id}`}
+                    x={node.x - node.width / 2}
+                    y={node.y}
+                    width={node.width}
+                    height={node.height}
+                  />
+                );
+              }
+              return null;
+            })}
+
+            {/* Particle Dissolve Disintegration Animation */}
+            {nodes.map(node => {
+              if (dissolvingNodeId === node.id) {
+                return (
+                  <ParticleDissolve
+                    key={`dissolve-${node.id}`}
+                    x={node.x}
+                    y={node.y + node.height / 2}
+                    width={node.width}
+                    height={node.height}
+                    onComplete={() => onDissolveComplete?.(node.id)}
+                  />
+                );
+              }
+              return null;
+            })}
 
             {/* Transient Ghost Node */}
             {ghostNodeState && (
