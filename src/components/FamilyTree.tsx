@@ -668,6 +668,9 @@ export const FamilyTree: React.FC = () => {
             pendingLinkPreview={pendingLinkPreview}
             isAdmin={isAdmin}
             onAdminAddPersonClick={() => setAdminAddPersonOpen(true)}
+            canEditSelected={canEditSelected}
+            onCreateRelative={handleCreateRelativeDirect}
+            onConnectExistingRelative={handleConnectExistingRelativeDirect}
           />
         ) : (
           <FamilyTree2D

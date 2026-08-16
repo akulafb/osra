@@ -8,8 +8,8 @@ import { relationColor, relationLabel } from './relationStyle';
  *
  * Presentational and unpositioned — it renders at whatever origin its host
  * gives it. The 2D view mounts it inside an SVG `<foreignObject>` in graph
- * coordinates; the 3D view (LIN-48, not yet built) will mount it in a
- * screen-docked panel. Knows nothing about SVG, `Node2D`, or where it sits.
+ * coordinates; the 3D view mounts it in a screen-docked panel. Knows nothing
+ * about SVG, `Node2D`, or where on screen it sits.
  */
 export interface GhostNodeCardProps {
   relation: RelativeDirection;
@@ -21,6 +21,12 @@ export interface GhostNodeCardProps {
   onSubmit: (name: string) => Promise<void> | void;
   onConnectExisting: (existingNodeId: string) => Promise<void> | void;
   onCancel: () => void;
+  /**
+   * Observes the name as it is typed. The 3D view mirrors it onto the Ghost
+   * Preview in the scene; 2D ignores it. Called synchronously from the change
+   * handler, so hosts never render a frame behind what the input shows.
+   */
+  onNameChange?: (name: string) => void;
 }
 
 export const GHOST_CARD_WIDTH = 190;
@@ -33,6 +39,7 @@ export const GhostNodeCard: React.FC<GhostNodeCardProps> = ({
   onSubmit,
   onConnectExisting,
   onCancel,
+  onNameChange,
 }) => {
   const [name, setName] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -135,7 +142,11 @@ export const GhostNodeCard: React.FC<GhostNodeCardProps> = ({
           ref={inputRef}
           type="text"
           value={name}
-          onChange={(e) => setName(e.target.value.slice(0, 100))}
+          onChange={(e) => {
+            const next = e.target.value.slice(0, 100);
+            setName(next);
+            onNameChange?.(next);
+          }}
           onKeyDown={handleKeyDown}
           placeholder="First name..."
           disabled={isSubmitting}

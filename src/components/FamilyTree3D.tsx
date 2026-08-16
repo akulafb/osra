@@ -11,7 +11,7 @@ import Switch from '@mui/material/Switch';
 import FormControlLabel from '@mui/material/FormControlLabel';
 import Select from '@mui/material/Select';
 import MenuItem from '@mui/material/MenuItem';
-import { FamilyGraph, FamilyNode } from '../types/graph';
+import { FamilyGraph, FamilyNode, RelativeDirection } from '../types/graph';
 import { useAuth } from '../contexts/AuthContext';
 import { createStarfield, type NebulaData } from '../utils/starfield';
 import { isMobile } from '../utils/device';
@@ -22,6 +22,7 @@ import { getNodeId } from '../utils/getNodeId';
 import { filterGraphDataFor3D } from '../lib/filterGraphData';
 import { useClusterBubbles } from '../hooks/useClusterBubbles';
 import { TreeSearchBar } from './TreeSearchBar';
+import { Manipulation3DPanel } from './Manipulation3DPanel';
 
 // V3 Shared Assets - paths resolved at runtime for WebP when supported
 const planetTexturePaths = [
@@ -201,6 +202,18 @@ interface FamilyTree3DProps {
   /** Admin: add standalone person (opens modal in parent) */
   isAdmin?: boolean;
   onAdminAddPersonClick?: () => void;
+  /** Direct manipulation (LIN-46): docked Action Handles for the selected node. */
+  canEditSelected?: boolean;
+  onCreateRelative?: (params: {
+    firstName: string;
+    relation: RelativeDirection;
+    targetNodeId: string;
+  }) => Promise<void> | void;
+  onConnectExistingRelative?: (params: {
+    existingNodeId: string;
+    relation: RelativeDirection;
+    targetNodeId: string;
+  }) => Promise<void> | void;
 }
 
 export const FamilyTree3DContent: React.FC<FamilyTree3DProps> = ({
@@ -237,6 +250,9 @@ export const FamilyTree3DContent: React.FC<FamilyTree3DProps> = ({
   pendingLinkPreview = null,
   isAdmin = false,
   onAdminAddPersonClick,
+  canEditSelected = false,
+  onCreateRelative,
+  onConnectExistingRelative,
 }) => {
   const ForceGraph3DAny = ForceGraph3D as unknown as React.ComponentType<any>;
   const { userProfile } = useAuth();
@@ -1750,6 +1766,21 @@ export const FamilyTree3DContent: React.FC<FamilyTree3DProps> = ({
           </>
         )}
       </div>
+
+      {/*
+        Direct manipulation (LIN-46): docked handles + in-scene Ghost Preview.
+        Desktop only per ADR 0002 — touch has no hover model and the gestures
+        fight pinch-zoom, so mobile keeps the PersonDetailDrawer path.
+      */}
+      <Manipulation3DPanel
+        selectedNode={selectedNode}
+        canEdit={canEditSelected && !isMobileDevice}
+        existingNodes={graphData?.nodes ?? []}
+        fgRef={fgRef}
+        nodes={filteredGraphData.nodes}
+        onCreateRelative={onCreateRelative}
+        onConnectExistingRelative={onConnectExistingRelative}
+      />
     </div>
   );
 };
