@@ -204,7 +204,7 @@ export const FamilyTree: React.FC = () => {
     setActivePreset(userCluster);
   }, []);
 
-  const handleAddRelativeDirect = useCallback((node: FamilyNode, _relation: RelativeDirection) => {
+  const handleAddRelativeDirect = useCallback((node: FamilyNode) => {
     setSelectedNode(node);
   }, []);
 

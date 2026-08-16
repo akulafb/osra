@@ -19,9 +19,11 @@ export function useFamilyData() {
     }
   }, [session, user]);
 
-  const fetchFamilyData = async (): Promise<void> => {
+  const fetchFamilyData = async (isBackground = false): Promise<void> => {
     try {
-      setIsLoading(true);
+      if (!isBackground) {
+        setIsLoading(true);
+      }
       setError(null);
 
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
@@ -162,7 +164,7 @@ export function useFamilyData() {
     }
   };
 
-  const refetch = (): Promise<void> => fetchFamilyData();
+  const refetch = (): Promise<void> => fetchFamilyData(true);
 
   return { graphData, isLoading, error, refetch };
 }
