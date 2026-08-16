@@ -24,6 +24,11 @@ import { PersonDetailDrawer } from './PersonDetailDrawer';
 import { isMobile } from '../utils/device';
 import { RelativeDirection } from '../types/graph';
 import { createRelativeSecure, linkExistingRelativeSecure } from '../lib/familyMutations';
+import {
+  BEAM_PULSE_WINDOW_MS,
+  COSMIC_FX_DURATION_MS,
+  type LinkEndpoints,
+} from '../utils/cosmicFx';
 
 export const FamilyTree: React.FC = () => {
   const { user, userProfile, isAdmin, session } = useAuth();
@@ -199,13 +204,27 @@ export const FamilyTree: React.FC = () => {
     setActivePreset(userCluster);
   }, []);
 
-  const handleAddRelativeDirect = useCallback((node: FamilyNode, _relation: RelativeDirection) => {
+  const handleAddRelativeDirect = useCallback((node: FamilyNode) => {
     setSelectedNode(node);
   }, []);
 
   // Playful Animation Pipeline State (LIN-45)
   const [newlySpawnedNodeId, setNewlySpawnedNodeId] = useState<string | null>(null);
   const [dissolvingNodeId, setDissolvingNodeId] = useState<string | null>(null);
+  /**
+   * The Kinship Link a Spawn has just created (LIN-51). Its beam pulses in the
+   * 3D view; the 2D view already grows the path itself. Direction-free, because
+   * Connect Mode may flip which end is the parent.
+   */
+  const [pulsingLink, setPulsingLink] = useState<LinkEndpoints | null>(null);
+
+  const pulseLink = useCallback((aId: string, bId: string) => {
+    setPulsingLink({ aId, bId });
+    window.setTimeout(
+      () => setPulsingLink((prev) => (prev?.aId === aId && prev?.bId === bId ? null : prev)),
+      BEAM_PULSE_WINDOW_MS
+    );
+  }, []);
 
   const handleCreateRelativeDirect = useCallback(
     async (params: { firstName: string; relation: RelativeDirection; targetNodeId: string }) => {
@@ -225,13 +244,14 @@ export const FamilyTree: React.FC = () => {
           const newId = res.new_node_id;
           setNewlySpawnedNodeId(newId);
           setTimeout(() => setNewlySpawnedNodeId(null), 3500);
+          pulseLink(params.targetNodeId, newId);
         }
       } catch (e) {
         console.error('[handleCreateRelativeDirect] Error:', e);
         window.alert(e instanceof Error ? e.message : 'Failed to create relative.');
       }
     },
-    [user, session?.access_token, refetch]
+    [user, session?.access_token, refetch, pulseLink]
   );
 
   const handleConnectExistingRelativeDirect = useCallback(
@@ -246,12 +266,13 @@ export const FamilyTree: React.FC = () => {
           sessionToken: session?.access_token,
         });
         await refetch();
+        pulseLink(params.targetNodeId, params.existingNodeId);
       } catch (e) {
         console.error('[handleConnectExistingRelativeDirect] Error:', e);
         window.alert(e instanceof Error ? e.message : 'Failed to connect relative.');
       }
     },
-    [user, session?.access_token, refetch]
+    [user, session?.access_token, refetch, pulseLink]
   );
 
   const handleConfirmDissolveDirect = useCallback(
@@ -259,6 +280,13 @@ export const FamilyTree: React.FC = () => {
       if (!isAdmin || !user) return;
       // Optimistic particle dissolve animation immediately
       setDissolvingNodeId(node.id);
+      // The 2D rendering reports its own completion; the 3D one plays out in
+      // the scene and cannot. Releasing the id on the effect's own clock keeps
+      // a finished Dissolve from shadowing the next Spawn, which loses ties.
+      window.setTimeout(
+        () => setDissolvingNodeId((prev) => (prev === node.id ? null : prev)),
+        COSMIC_FX_DURATION_MS.collapse + 500
+      );
       try {
         await adminDeleteNode({
           session,
@@ -313,12 +341,13 @@ export const FamilyTree: React.FC = () => {
           });
         }
         await refetch();
+        pulseLink(params.sourceNodeId, params.targetNodeId);
       } catch (e) {
         console.error('[handleDirectConnectNodes] Error:', e);
         window.alert(e instanceof Error ? e.message : 'Failed to create kinship link.');
       }
     },
-    [isAdmin, user, session, refetch]
+    [isAdmin, user, session, refetch, pulseLink]
   );
 
   // Visible nodes for search (depends on mode)
@@ -672,6 +701,11 @@ export const FamilyTree: React.FC = () => {
             onCreateRelative={handleCreateRelativeDirect}
             onConnectExistingRelative={handleConnectExistingRelativeDirect}
             onDirectConnectNodes={handleDirectConnectNodes}
+            newlySpawnedNodeId={newlySpawnedNodeId}
+            dissolvingNodeId={dissolvingNodeId}
+            pulsingLink={pulsingLink}
+            canDissolveSelected={isAdmin && canEditSelected}
+            onDissolveNode={handleConfirmDissolveDirect}
           />
         ) : (
           <FamilyTree2D
