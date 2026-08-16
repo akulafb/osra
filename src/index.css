@@ -74,3 +74,73 @@ div::-webkit-scrollbar-thumb {
 div::-webkit-scrollbar-thumb:hover {
   background: #555;
 }
+
+/* Playful Tree Animations (LIN-45) */
+@keyframes cardSpawnPop {
+  0% {
+    transform: scale(0.2);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.16);
+    opacity: 1;
+  }
+  85% {
+    transform: scale(0.96);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes cardShake {
+  0%, 100% {
+    transform: translate(0, 0) rotate(0deg);
+  }
+  20% {
+    transform: translate(-3.5px, 0) rotate(-1.2deg);
+  }
+  40% {
+    transform: translate(3.5px, 0) rotate(1.2deg);
+  }
+  60% {
+    transform: translate(-2.5px, 0) rotate(-0.8deg);
+  }
+  80% {
+    transform: translate(2.5px, 0) rotate(0.8deg);
+  }
+}
+
+@keyframes cardDissolve {
+  0% {
+    transform: scale(1);
+    opacity: 1;
+    filter: blur(0px);
+  }
+  50% {
+    transform: scale(0.9) translateY(-6px);
+    opacity: 0.6;
+    filter: blur(4px);
+  }
+  100% {
+    transform: scale(0.3) translateY(-16px);
+    opacity: 0;
+    filter: blur(12px);
+  }
+}
+
+@keyframes linkGrow {
+  0% {
+    stroke-dashoffset: 1000;
+    opacity: 0;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    stroke-dashoffset: 0;
+    opacity: 1;
+  }
+}
+

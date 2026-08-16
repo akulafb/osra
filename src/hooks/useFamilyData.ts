@@ -8,16 +8,16 @@ type NodeRow = Database['public']['Tables']['nodes']['Row'];
 type LinkRow = Database['public']['Tables']['links']['Row'];
 
 export function useFamilyData() {
-  const { session } = useAuth();
+  const { session, user } = useAuth();
   const [graphData, setGraphData] = useState<FamilyGraph | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (session) {
+    if (session || (import.meta.env.DEV && user)) {
       fetchFamilyData();
     }
-  }, [session]);
+  }, [session, user]);
 
   const fetchFamilyData = async (): Promise<void> => {
     try {
@@ -128,7 +128,32 @@ export function useFamilyData() {
       // Shallow-clone links so react-force-graph cannot replace string endpoints with object refs in React state.
       const linksForState = safeLinks.map((l) => ({ ...l }));
 
-      setGraphData({ nodes, links: linksForState });
+      if (nodes.length === 0 && import.meta.env.DEV) {
+        const mockNodes: FamilyNode[] = [
+          { id: 'node-1', firstName: 'Fahd', familyCluster: 'Badran', isClaimed: true },
+          { id: 'node-2', firstName: 'Ahmad', familyCluster: 'Badran' },
+          { id: 'node-3', firstName: 'Fatima', familyCluster: 'Badran' },
+          { id: 'node-4', firstName: 'Sara', familyCluster: 'Badran' },
+          { id: 'node-5', firstName: 'Mona', familyCluster: 'Badran' },
+          { id: 'node-6', firstName: 'Ali', familyCluster: 'Badran' },
+        ];
+        const mockLinks: FamilyLink[] = [
+          { id: 'l-1', source: 'node-2', target: 'node-3', type: 'marriage' },
+          { id: 'l-2', source: 'node-2', target: 'node-1', type: 'parent' },
+          { id: 'l-3', source: 'node-3', target: 'node-1', type: 'parent' },
+          { id: 'l-4', source: 'node-2', target: 'node-4', type: 'parent' },
+          { id: 'l-5', source: 'node-1', target: 'node-5', type: 'marriage' },
+          { id: 'l-6', source: 'node-1', target: 'node-6', type: 'parent' },
+        ];
+        const sanitized = dropOrphanLinks(mockNodes, mockLinks);
+        setGraphData({ nodes: mockNodes, links: sanitized });
+        setIsLoading(false);
+        return;
+      }
+
+      const rawGraph: FamilyGraph = { nodes, links: linksForState };
+      const sanitized = dropOrphanLinks(rawGraph.nodes, rawGraph.links);
+      setGraphData({ nodes, links: sanitized });
       setIsLoading(false);
     } catch (err) {
       console.error('[useFamilyData] Error fetching family data:', err);

@@ -11,7 +11,7 @@ import { useAuth } from '../contexts/AuthContext';
 import AdminManageLinksModal from './modals/AdminManageLinksModal';
 import AdminConnectLinkModal from './modals/AdminConnectLinkModal';
 import AdminAddPersonModal from './modals/AdminAddPersonModal';
-import { adminDeleteNode } from '../lib/adminSupabaseRest';
+import { adminDeleteNode, adminInsertLink } from '../lib/adminSupabaseRest';
 import { canEdit, canManageInvites } from '../lib/permissions';
 import { filterGraphData, filterGraphDataFor3D } from '../lib/filterGraphData';
 import { searchNodes } from '../utils/treeSearch';
@@ -22,6 +22,8 @@ import { FamilyChat } from './FamilyChat';
 import { NewMembersModal } from './NewMembersModal';
 import { PersonDetailDrawer } from './PersonDetailDrawer';
 import { isMobile } from '../utils/device';
+import { RelativeDirection } from './NodeCard';
+import { createRelativeSecure, linkExistingRelativeSecure } from '../lib/familyMutations';
 
 export const FamilyTree: React.FC = () => {
   const { user, userProfile, isAdmin, session } = useAuth();
@@ -196,6 +198,128 @@ export const FamilyTree: React.FC = () => {
   const handleFindMeRequest = useCallback((userCluster: string) => {
     setActivePreset(userCluster);
   }, []);
+
+  const handleAddRelativeDirect = useCallback((node: FamilyNode, _relation: RelativeDirection) => {
+    setSelectedNode(node);
+  }, []);
+
+  // Playful Animation Pipeline State (LIN-45)
+  const [newlySpawnedNodeId, setNewlySpawnedNodeId] = useState<string | null>(null);
+  const [dissolvingNodeId, setDissolvingNodeId] = useState<string | null>(null);
+
+  const handleCreateRelativeDirect = useCallback(
+    async (params: { firstName: string; relation: RelativeDirection; targetNodeId: string }) => {
+      if (!user) return;
+      try {
+        const res = await createRelativeSecure({
+          firstName: params.firstName,
+          relation: params.relation,
+          targetNodeId: params.targetNodeId,
+          userId: user.id,
+          sessionToken: session?.access_token,
+        });
+        // Refetch graph data from Supabase so the new node is present in the layout
+        await refetch();
+        // Trigger celebratory spawn burst and spring pop on the new node
+        if (res && res.new_node_id) {
+          const newId = res.new_node_id;
+          setNewlySpawnedNodeId(newId);
+          setTimeout(() => setNewlySpawnedNodeId(null), 3500);
+        }
+      } catch (e) {
+        console.error('[handleCreateRelativeDirect] Error:', e);
+        window.alert(e instanceof Error ? e.message : 'Failed to create relative.');
+      }
+    },
+    [user, session?.access_token, refetch]
+  );
+
+  const handleConnectExistingRelativeDirect = useCallback(
+    async (params: { existingNodeId: string; relation: RelativeDirection; targetNodeId: string }) => {
+      if (!user) return;
+      try {
+        await linkExistingRelativeSecure({
+          existingNodeId: params.existingNodeId,
+          relation: params.relation,
+          targetNodeId: params.targetNodeId,
+          userId: user.id,
+          sessionToken: session?.access_token,
+        });
+        await refetch();
+      } catch (e) {
+        console.error('[handleConnectExistingRelativeDirect] Error:', e);
+        window.alert(e instanceof Error ? e.message : 'Failed to connect relative.');
+      }
+    },
+    [user, session?.access_token, refetch]
+  );
+
+  const handleConfirmDissolveDirect = useCallback(
+    async (node: FamilyNode) => {
+      if (!isAdmin || !user) return;
+      // Optimistic particle dissolve animation immediately
+      setDissolvingNodeId(node.id);
+      try {
+        await adminDeleteNode({
+          session,
+          isAdmin,
+          nodeId: node.id,
+        });
+        await refetch();
+        if (selectedNode?.id === node.id) {
+          setSelectedNode(null);
+        }
+      } catch (e) {
+        console.error('[handleConfirmDissolveDirect] Error:', e);
+        // Rollback
+        setDissolvingNodeId(null);
+        window.alert(e instanceof Error ? e.message : 'Delete failed.');
+      }
+    },
+    [isAdmin, user, session, refetch, selectedNode?.id]
+  );
+
+  const handleDirectConnectNodes = useCallback(
+    async (params: {
+      sourceNodeId: string;
+      targetNodeId: string;
+      type: 'parent' | 'marriage' | 'divorce';
+      parentRole?: 'mother' | 'father' | null;
+    }) => {
+      if (!user) return;
+      try {
+        if (isAdmin) {
+          await adminInsertLink({
+            session,
+            isAdmin,
+            body: {
+              source_node_id: params.sourceNodeId,
+              target_node_id: params.targetNodeId,
+              type: params.type,
+              parent_role: params.parentRole ?? null,
+              created_by_user_id: user.id,
+            },
+          });
+        } else {
+          // Standard user: call link_existing_relative_secure
+          const relType: RelativeDirection =
+            params.type === 'parent' ? 'parent' : params.type === 'marriage' ? 'spouse' : 'child';
+          await linkExistingRelativeSecure({
+            existingNodeId: params.targetNodeId,
+            relation: relType,
+            targetNodeId: params.sourceNodeId,
+            userId: user.id,
+            sessionToken: session?.access_token,
+          });
+        }
+        await refetch();
+      } catch (e) {
+        console.error('[handleDirectConnectNodes] Error:', e);
+        window.alert(e instanceof Error ? e.message : 'Failed to create kinship link.');
+      }
+    },
+    [isAdmin, user, session, refetch]
+  );
 
   // Visible nodes for search (depends on mode)
   const visibleNodes = useMemo(() => {
@@ -579,6 +703,14 @@ export const FamilyTree: React.FC = () => {
             pendingLinkPreview={pendingLinkPreview}
             isAdmin={isAdmin}
             onAdminAddPersonClick={() => setAdminAddPersonOpen(true)}
+            onAddRelative={handleAddRelativeDirect}
+            onCreateRelative={handleCreateRelativeDirect}
+            onConnectExistingRelative={handleConnectExistingRelativeDirect}
+            onDirectConnectNodes={handleDirectConnectNodes}
+            newlySpawnedNodeId={newlySpawnedNodeId}
+            dissolvingNodeId={dissolvingNodeId}
+            onDissolveComplete={() => setDissolvingNodeId(null)}
+            onConfirmDissolve={handleConfirmDissolveDirect}
           />
         )}
       </div>
