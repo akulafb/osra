@@ -9,13 +9,14 @@ import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import Select from '@mui/material/Select';
 import MenuItem from '@mui/material/MenuItem';
-import { FamilyGraph, FamilyNode, Node2D, LayoutType } from '../types/graph';
+import { FamilyGraph, FamilyNode, FamilyLink, Node2D, LayoutType } from '../types/graph';
 import { calculateLayout, calculateBounds } from '../lib/layoutEngine';
-import { NodeCard } from './NodeCard';
+import { NodeCard, RelativeDirection } from './NodeCard';
 import { OrthogonalLinks } from './OrthogonalLinks';
 import { getNodeId } from '../utils/getNodeId';
 import { filterGraphData } from '../lib/filterGraphData';
 import { TreeSearchBar } from './TreeSearchBar';
+import { canEdit } from '../lib/permissions';
 import type { BackgroundTheme } from '../hooks/useBackgroundTheme';
 
 function getBackgroundForTheme(theme: BackgroundTheme): string {
@@ -76,6 +77,10 @@ interface FamilyTree2DProps {
   /** Admin: add standalone person (opens modal in parent) */
   isAdmin?: boolean;
   onAdminAddPersonClick?: () => void;
+  /** Action Handles event callbacks */
+  onAddRelative?: (node: Node2D, relation: RelativeDirection) => void;
+  onStartConnect?: (node: Node2D) => void;
+  onStartDissolve?: (node: Node2D) => void;
 }
 
 function ExpandableSpring({ isOpen, children }: { isOpen: boolean; children: React.ReactNode }) {
@@ -125,6 +130,9 @@ export const FamilyTree2D: React.FC<FamilyTree2DProps> = ({
   pendingLinkPreview = null,
   isAdmin = false,
   onAdminAddPersonClick,
+  onAddRelative,
+  onStartConnect,
+  onStartDissolve,
 }) => {
   const presetBackground = getBackgroundForTheme(backgroundTheme);
   const emptyBackground = getBackgroundForTheme(backgroundTheme);
@@ -417,6 +425,19 @@ export const FamilyTree2D: React.FC<FamilyTree2DProps> = ({
     onNodeDoubleClick?.(node as any);
   }, [graphData.links, onNodeDoubleClick, onToggleCollapse, onSetCollapsedNodes, collapsedNodes]);
 
+  const isNodeEditable = useMemo(() => {
+    const map = new Map<string, boolean>();
+    if (nodes && graphData?.links) {
+      for (const node of nodes) {
+        map.set(
+          node.id,
+          canEdit(node.id, userNodeId, isAdmin, graphData.links as FamilyLink[])
+        );
+      }
+    }
+    return map;
+  }, [nodes, userNodeId, isAdmin, graphData?.links]);
+
   return (
     <div style={{ position: 'relative', width: '100%', height: '100%', background: activePreset ? presetBackground : emptyBackground }}>
       {!activePreset ? (
@@ -513,6 +534,10 @@ export const FamilyTree2D: React.FC<FamilyTree2DProps> = ({
                 activePreset={activePreset}
                 isHighlighted={highlightedNodeId === node.id}
                 isSearchHighlighted={searchHighlightedNodeId === node.id}
+                canEdit={isNodeEditable.get(node.id) ?? (isAdmin ? true : false)}
+                onAddRelative={onAddRelative}
+                onStartConnect={onStartConnect}
+                onStartDissolve={onStartDissolve}
               />
             ))}
           </g>

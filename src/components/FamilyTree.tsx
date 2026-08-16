@@ -22,6 +22,7 @@ import { FamilyChat } from './FamilyChat';
 import { NewMembersModal } from './NewMembersModal';
 import { PersonDetailDrawer } from './PersonDetailDrawer';
 import { isMobile } from '../utils/device';
+import { RelativeDirection } from './NodeCard';
 
 export const FamilyTree: React.FC = () => {
   const { user, userProfile, isAdmin, session } = useAuth();
@@ -196,6 +197,41 @@ export const FamilyTree: React.FC = () => {
   const handleFindMeRequest = useCallback((userCluster: string) => {
     setActivePreset(userCluster);
   }, []);
+
+  const handleAddRelativeDirect = useCallback((node: FamilyNode, _relation: RelativeDirection) => {
+    setSelectedNode(node);
+    setIsAddModalOpen(true);
+  }, []);
+
+  const handleStartConnectDirect = useCallback((node: FamilyNode) => {
+    setSelectedNode(node);
+    setAdminConnectFirstId(node.id);
+  }, []);
+
+  const handleStartDissolveDirect = useCallback(async (node: FamilyNode) => {
+    if (!isAdmin || !user) return;
+    if (
+      !window.confirm(
+        `Delete ${node.firstName} and all their invites and links? This cannot be undone.`
+      )
+    ) {
+      return;
+    }
+    try {
+      await adminDeleteNode({
+        session,
+        isAdmin,
+        nodeId: node.id,
+      });
+      await refetch();
+      if (selectedNode?.id === node.id) {
+        setSelectedNode(null);
+      }
+    } catch (e) {
+      console.error(e);
+      window.alert(e instanceof Error ? e.message : 'Delete failed.');
+    }
+  }, [isAdmin, user, session, refetch, selectedNode?.id]);
 
   // Visible nodes for search (depends on mode)
   const visibleNodes = useMemo(() => {
@@ -579,6 +615,9 @@ export const FamilyTree: React.FC = () => {
             pendingLinkPreview={pendingLinkPreview}
             isAdmin={isAdmin}
             onAdminAddPersonClick={() => setAdminAddPersonOpen(true)}
+            onAddRelative={handleAddRelativeDirect}
+            onStartConnect={handleStartConnectDirect}
+            onStartDissolve={handleStartDissolveDirect}
           />
         )}
       </div>

@@ -2,7 +2,9 @@ import React from 'react';
 import { Node2D } from '../types/graph';
 import { getClusterColors } from '../utils/familyColors';
 
-interface NodeCardProps {
+export type RelativeDirection = 'parent' | 'child' | 'spouse';
+
+export interface NodeCardProps {
   node: Node2D;
   isSelected: boolean;
   onClick: (node: Node2D) => void;
@@ -13,6 +15,12 @@ interface NodeCardProps {
   isHighlighted?: boolean;
   /** Search match highlight (bright red glow) */
   isSearchHighlighted?: boolean;
+  /** Whether the current user has permission to edit/add/delete around this node */
+  canEdit?: boolean;
+  /** Direct Action Handle callbacks */
+  onAddRelative?: (node: Node2D, relation: RelativeDirection) => void;
+  onStartConnect?: (node: Node2D) => void;
+  onStartDissolve?: (node: Node2D) => void;
 }
 
 /** Lighten colors for maternal-only nodes (same hue, lighter tint) */
@@ -44,7 +52,13 @@ export const NodeCard: React.FC<NodeCardProps> = ({
   activePreset,
   isHighlighted = false,
   isSearchHighlighted = false,
+  canEdit = false,
+  onAddRelative,
+  onStartConnect,
+  onStartDissolve,
 }) => {
+  const [isHovered, setIsHovered] = React.useState(false);
+
   const isMaternalOnly =
     activePreset &&
     node.maternalFamilyCluster === activePreset &&
@@ -67,11 +81,15 @@ export const NodeCard: React.FC<NodeCardProps> = ({
     onDoubleClick?.(node);
   };
 
+  const showActionHandles = canEdit && (isHovered || isSelected);
+
   return (
     <g
       transform={`translate(${node.x - node.width / 2}, ${node.y})`}
       onClick={handleClick}
       onDoubleClick={handleDoubleClick}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
       style={{
         cursor: 'pointer',
       }}
@@ -197,6 +215,180 @@ export const NodeCard: React.FC<NodeCardProps> = ({
         >
           ✓
         </text>
+      )}
+
+      {/* Directional Action Handles (visible when authorized + hovered/selected) */}
+      {showActionHandles && (
+        <g className="action-handles-group" style={{ transition: 'opacity 0.2s ease' }}>
+          {/* Top Handle: + Parent */}
+          <g
+            className="action-handle handle-parent"
+            transform={`translate(${node.width / 2}, -12)`}
+            onClick={(e) => {
+              e.stopPropagation();
+              onAddRelative?.(node, 'parent');
+            }}
+            style={{ cursor: 'pointer' }}
+          >
+            <rect
+              x={-30}
+              y={-10}
+              width={60}
+              height={20}
+              rx={10}
+              fill="rgba(15, 23, 42, 0.95)"
+              stroke="rgba(212, 175, 55, 0.9)"
+              strokeWidth={1.5}
+            />
+            <text
+              x={0}
+              y={4}
+              textAnchor="middle"
+              fill="#fef08a"
+              fontSize={10}
+              fontWeight={700}
+              style={{ pointerEvents: 'none', userSelect: 'none' }}
+            >
+              + Parent
+            </text>
+          </g>
+
+          {/* Bottom Handle: + Child */}
+          <g
+            className="action-handle handle-child"
+            transform={`translate(${node.width / 2}, ${node.height + 12})`}
+            onClick={(e) => {
+              e.stopPropagation();
+              onAddRelative?.(node, 'child');
+            }}
+            style={{ cursor: 'pointer' }}
+          >
+            <rect
+              x={-28}
+              y={-10}
+              width={56}
+              height={20}
+              rx={10}
+              fill="rgba(15, 23, 42, 0.95)"
+              stroke="rgba(59, 130, 246, 0.9)"
+              strokeWidth={1.5}
+            />
+            <text
+              x={0}
+              y={4}
+              textAnchor="middle"
+              fill="#93c5fd"
+              fontSize={10}
+              fontWeight={700}
+              style={{ pointerEvents: 'none', userSelect: 'none' }}
+            >
+              + Child
+            </text>
+          </g>
+
+          {/* Side Handle: + Spouse */}
+          <g
+            className="action-handle handle-spouse"
+            transform={`translate(${node.width + 32}, ${node.height / 2})`}
+            onClick={(e) => {
+              e.stopPropagation();
+              onAddRelative?.(node, 'spouse');
+            }}
+            style={{ cursor: 'pointer' }}
+          >
+            <rect
+              x={-30}
+              y={-10}
+              width={60}
+              height={20}
+              rx={10}
+              fill="rgba(15, 23, 42, 0.95)"
+              stroke="rgba(236, 72, 153, 0.9)"
+              strokeWidth={1.5}
+            />
+            <text
+              x={0}
+              y={4}
+              textAnchor="middle"
+              fill="#f472b6"
+              fontSize={10}
+              fontWeight={700}
+              style={{ pointerEvents: 'none', userSelect: 'none' }}
+            >
+              + Spouse
+            </text>
+          </g>
+
+          {/* Action Toolbar: Connect & Dissolve */}
+          <g
+            className="action-handle-toolbar"
+            transform={`translate(${node.width / 2}, ${node.height + 34})`}
+          >
+            {/* Connect Button */}
+            <g
+              transform="translate(-30, 0)"
+              onClick={(e) => {
+                e.stopPropagation();
+                onStartConnect?.(node);
+              }}
+              style={{ cursor: 'pointer' }}
+            >
+              <rect
+                x={-25}
+                y={-8}
+                width={50}
+                height={16}
+                rx={8}
+                fill="rgba(15, 23, 42, 0.95)"
+                stroke="rgba(168, 85, 247, 0.85)"
+                strokeWidth={1.2}
+              />
+              <text
+                x={0}
+                y={4}
+                textAnchor="middle"
+                fill="#c084fc"
+                fontSize={9}
+                fontWeight={600}
+                style={{ pointerEvents: 'none', userSelect: 'none' }}
+              >
+                🔗 Link
+              </text>
+            </g>
+
+            {/* Dissolve Button */}
+            <g
+              transform="translate(30, 0)"
+              onClick={(e) => {
+                e.stopPropagation();
+                onStartDissolve?.(node);
+              }}
+              style={{ cursor: 'pointer' }}
+            >
+              <rect
+                x={-27}
+                y={-8}
+                width={54}
+                height={16}
+                rx={8}
+                fill="rgba(15, 23, 42, 0.95)"
+                stroke="rgba(239, 68, 68, 0.85)"
+                strokeWidth={1.2}
+              />
+              <text
+                x={0}
+                y={4}
+                textAnchor="middle"
+                fill="#f87171"
+                fontSize={9}
+                fontWeight={600}
+                style={{ pointerEvents: 'none', userSelect: 'none' }}
+              >
+                🗑️ Delete
+              </text>
+            </g>
+          </g>
+        </g>
       )}
     </g>
   );
