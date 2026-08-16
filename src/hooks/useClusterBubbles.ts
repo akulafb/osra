@@ -59,7 +59,11 @@ export function useClusterBubbles(params: {
   graphData: { nodes: LiveNode[]; links: unknown[] };
   visibleClusters: Set<string>;
   enabled: boolean;
-}): { detailRef: React.MutableRefObject<number>; fullyClustered: boolean } {
+}): {
+  detailRef: React.MutableRefObject<number>;
+  fullyClustered: boolean;
+  boundsRef: React.MutableRefObject<{ centroid: Vec3; radius: number }>;
+} {
   const { fgRef, graphData, visibleClusters, enabled } = params;
 
   const detailRef = useRef(0);
@@ -423,5 +427,5 @@ export function useClusterBubbles(params: {
     };
   }, [fgRef]);
 
-  return { detailRef, fullyClustered };
+  return { detailRef, fullyClustered, boundsRef };
 }

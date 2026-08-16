@@ -21,7 +21,10 @@ import { getClusterColors } from '../utils/familyColors';
 import { getNodeId } from '../utils/getNodeId';
 import { filterGraphDataFor3D } from '../lib/filterGraphData';
 import { useClusterBubbles } from '../hooks/useClusterBubbles';
+import { EXIT_MULT } from '../utils/clusterBubbles';
 import { TreeSearchBar } from './TreeSearchBar';
+// PROTOTYPE — throwaway, dev-only. Remove with the rest of src/components/prototype/.
+import { Manipulation3DPrototype } from './prototype/Manipulation3DPrototype';
 
 // V3 Shared Assets - paths resolved at runtime for WebP when supported
 const planetTexturePaths = [
@@ -382,7 +385,7 @@ export const FamilyTree3DContent: React.FC<FamilyTree3DProps> = ({
   // Family cluster view on zoom-out (LIN-32): fades individuals into per-cluster
   // bubbles when zoomed out. `detailRef` (0..1) drives the node fade below;
   // `fullyClustered` hides individuals/links entirely once fully zoomed out.
-  const { detailRef, fullyClustered } = useClusterBubbles({
+  const { detailRef, fullyClustered, boundsRef } = useClusterBubbles({
     fgRef,
     graphData: filteredGraphData,
     visibleClusters: visibleClusters3D,
@@ -426,8 +429,15 @@ export const FamilyTree3DContent: React.FC<FamilyTree3DProps> = ({
     const z = (typeof nodeData.z === 'number' && !isNaN(nodeData.z)) ? nodeData.z : 0;
     
     const nodePos = { x, y, z };
-    const distance = 120;
-    
+    // Focus distance must stay inside LIN-32's full-detail band. That band is
+    // relative to graph size (detailFactor fades individuals out past
+    // EXIT_MULT * radius), so a fixed distance fades the whole tree to opacity 0
+    // on any graph with radius < ~67. Mirrors focusCluster's clamp.
+    const graphRadius = boundsRef.current.radius;
+    const distance = graphRadius > 0
+      ? Math.max(30, Math.min(120, EXIT_MULT * graphRadius * 0.7))
+      : 120;
+
     const camera = fgRef.current.camera();
     const currentPos = camera.position;
     
@@ -474,7 +484,7 @@ export const FamilyTree3DContent: React.FC<FamilyTree3DProps> = ({
       if (progress < 1) requestAnimationFrame(animate);
     };
     animate();
-  }, [onNodeSelect]);
+  }, [onNodeSelect, boundsRef]);
 
   // Reset View functionality
   const resetView = useCallback(() => {
@@ -1750,6 +1760,16 @@ export const FamilyTree3DContent: React.FC<FamilyTree3DProps> = ({
           </>
         )}
       </div>
+
+      {/* PROTOTYPE — throwaway, dev-only. Answers: does 3D action chrome read as chrome or as a glitch? */}
+      {import.meta.env.DEV && (
+        <Manipulation3DPrototype
+          fgRef={fgRef}
+          selectedNode={selectedNode}
+          nodes={filteredGraphData.nodes}
+          detailRef={detailRef}
+        />
+      )}
     </div>
   );
 };
