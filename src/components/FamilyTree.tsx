@@ -218,11 +218,14 @@ export const FamilyTree: React.FC = () => {
           userId: user.id,
           sessionToken: session?.access_token,
         });
-        if (res && res.new_node_id) {
-          setNewlySpawnedNodeId(res.new_node_id);
-          setTimeout(() => setNewlySpawnedNodeId(null), 1200);
-        }
+        // Refetch graph data from Supabase so the new node is present in the layout
         await refetch();
+        // Trigger celebratory spawn burst and spring pop on the new node
+        if (res && res.new_node_id) {
+          const newId = res.new_node_id;
+          setNewlySpawnedNodeId(newId);
+          setTimeout(() => setNewlySpawnedNodeId(null), 3500);
+        }
       } catch (e) {
         console.error('[handleCreateRelativeDirect] Error:', e);
         window.alert(e instanceof Error ? e.message : 'Failed to create relative.');

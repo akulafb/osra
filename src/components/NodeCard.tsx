@@ -116,12 +116,18 @@ export const NodeCard: React.FC<NodeCardProps> = ({
       onMouseLeave={() => setIsHovered(false)}
       style={{
         cursor: 'pointer',
-        animation: cardAnimation,
-        transformOrigin: `${node.width / 2}px ${node.height / 2}px`,
       }}
       className={`node-card ${isSelected ? 'selected' : ''} ${isHighlighted ? 'highlighted' : ''} ${isSearchHighlighted ? 'search-highlighted' : ''} ${isNewlySpawned ? 'newly-spawned' : ''} ${isDissolving ? 'dissolving' : ''}`}
     >
-      {/* Search match highlight (red glow, takes precedence) */}
+      <g
+        className="node-card-animated-inner"
+        style={{
+          animation: cardAnimation,
+          transformOrigin: `${node.width / 2}px ${node.height / 2}px`,
+          transformBox: 'fill-box',
+        }}
+      >
+        {/* Search match highlight (red glow, takes precedence) */}
       {isSearchHighlighted && (
         <rect
           x={-10}
@@ -513,6 +519,7 @@ export const NodeCard: React.FC<NodeCardProps> = ({
           </g>
         </g>
       )}
+      </g>
     </g>
   );
 };

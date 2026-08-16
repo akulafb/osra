@@ -96,19 +96,19 @@ div::-webkit-scrollbar-thumb:hover {
 
 @keyframes cardShake {
   0%, 100% {
-    transform: rotate(0deg);
+    transform: translate(0, 0) rotate(0deg);
   }
   20% {
-    transform: rotate(-2.5deg);
+    transform: translate(-3.5px, 0) rotate(-1.2deg);
   }
   40% {
-    transform: rotate(2.5deg);
+    transform: translate(3.5px, 0) rotate(1.2deg);
   }
   60% {
-    transform: rotate(-2deg);
+    transform: translate(-2.5px, 0) rotate(-0.8deg);
   }
   80% {
-    transform: rotate(2deg);
+    transform: translate(2.5px, 0) rotate(0.8deg);
   }
 }
 

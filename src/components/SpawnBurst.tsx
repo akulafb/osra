@@ -36,24 +36,24 @@ export const SpawnBurst: React.FC<SpawnBurstProps> = ({
   height,
   onComplete,
 }) => {
-  const [ringScale, setRingScale] = useState(0.2);
+  const [ringScale, setRingScale] = useState(0.1);
   const [ringOpacity, setRingOpacity] = useState(1);
   const [sparkles, setSparkles] = useState<Sparkle[]>(() => {
-    const count = 28;
+    const count = 36;
     const items: Sparkle[] = [];
     for (let i = 0; i < count; i++) {
-      const angle = (i / count) * Math.PI * 2 + (Math.random() - 0.5) * 0.4;
-      const speed = 2.5 + Math.random() * 4.5;
+      const angle = (i / count) * Math.PI * 2 + (Math.random() - 0.5) * 0.3;
+      const speed = 2.0 + Math.random() * 5.0;
       items.push({
         id: i,
         x: x + width / 2,
         y: y + height / 2,
         vx: Math.cos(angle) * speed,
         vy: Math.sin(angle) * speed,
-        size: 2.5 + Math.random() * 3.5,
+        size: 3 + Math.random() * 4,
         color: SPAWN_COLORS[i % SPAWN_COLORS.length],
         opacity: 1,
-        decay: 0.025 + Math.random() * 0.02,
+        decay: 0.012 + Math.random() * 0.01,
       });
     }
     return items;
@@ -61,8 +61,8 @@ export const SpawnBurst: React.FC<SpawnBurstProps> = ({
 
   useEffect(() => {
     const interval = setInterval(() => {
-      setRingScale((s) => s + 0.08);
-      setRingOpacity((o) => Math.max(0, o - 0.04));
+      setRingScale((s) => s + 0.045);
+      setRingOpacity((o) => Math.max(0, o - 0.025));
 
       setSparkles((prev) => {
         const next = prev
@@ -71,7 +71,7 @@ export const SpawnBurst: React.FC<SpawnBurstProps> = ({
             x: s.x + s.vx,
             y: s.y + s.vy,
             opacity: s.opacity - s.decay,
-            size: Math.max(0, s.size - 0.06),
+            size: Math.max(0, s.size - 0.04),
           }))
           .filter((s) => s.opacity > 0 && s.size > 0);
 
