@@ -1,10 +1,16 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import * as THREE from 'three';
-import { FamilyNode, RelativeDirection } from '../types/graph';
+import { FamilyGraph, FamilyNode, RelativeDirection } from '../types/graph';
 import { ForceGraphRef, LiveNodePosition } from '../types/forceGraph';
 import { GhostNodeCard, GHOST_CARD_WIDTH } from './cards/GhostNodeCard';
-import { relationColor } from './cards/relationStyle';
+import { ConnectPickerCard, PICKER_CARD_WIDTH } from './cards/ConnectPickerCard';
+import { KinshipLinkType, ParentRole } from './cards/connectOptions';
+import { Candidacy, ConnectPair, buildTargetOptions } from './cards/connectCandidates';
+import { CONNECT_ACCENT, relationColor } from './cards/relationStyle';
+import { ConnectTargetingBody } from './ConnectTargetingBody';
+import { countUnreachable } from '../utils/connectTargeting';
 import { useGhostPreview } from '../hooks/useGhostPreview';
+import { useTargetVisibility } from '../hooks/useTargetVisibility';
 
 /**
  * Docked action panel for the 3D view (LIN-46, ADR 0002).
@@ -21,9 +27,6 @@ import { useGhostPreview } from '../hooks/useGhostPreview';
 
 const PANEL_LEFT = 24;
 const PANEL_PADDING = 12;
-const PANEL_WIDTH = GHOST_CARD_WIDTH + PANEL_PADDING * 2;
-/** Where the leader line meets the panel — derived, so resizing cannot detach it. */
-const PANEL_RIGHT_EDGE = PANEL_LEFT + PANEL_WIDTH;
 
 const HANDLES: { relation: RelativeDirection; label: string }[] = [
   { relation: 'parent', label: '+ Parent' },
@@ -31,14 +34,54 @@ const HANDLES: { relation: RelativeDirection; label: string }[] = [
   { relation: 'spouse', label: '+ Spouse' },
 ];
 
+/**
+ * Connect Mode as the panel sees it (LIN-50).
+ *
+ * The state itself lives in the host, because the scene needs it too: it rim-
+ * lights candidates, gates the camera fly-to on a target click, and draws the
+ * tractor beam. The panel owns none of it and only offers the hit targets.
+ */
+export interface Connect3DControls {
+  /** Who the link is being drawn from; null when Connect Mode is off. */
+  sourceNode: FamilyNode | null;
+  /** Both ends, once a target has been resolved. */
+  pair: ConnectPair | null;
+  /** Verdict per person currently in the scene. */
+  candidacy: Map<string, Candidacy>;
+  /** The accepted ids, already derived by the scene for its rim-lighting. */
+  candidateIds: Set<string>;
+  /** Everyone drawn in the scene — the pool offered when nothing is typed. */
+  visibleNodes: FamilyNode[];
+  /** The last aim that landed on someone who cannot be a target. */
+  rejected: { node: FamilyNode; reason: string } | null;
+  onStart: () => void;
+  onPickTarget: (node: FamilyNode) => void;
+  /** Drop the chosen pair, returning to targeting. */
+  onCancelPair: () => void;
+  /** Leave Connect Mode entirely. */
+  onExit: () => void;
+  onConfirm: (
+    type: KinshipLinkType,
+    parentRole?: ParentRole,
+    parentIsSource?: boolean
+  ) => Promise<void> | void;
+}
+
 export interface Manipulation3DPanelProps {
   selectedNode: FamilyNode | null;
   /** Action Handles appear only when the active user may edit this person. */
   canEdit: boolean;
   existingNodes: FamilyNode[];
+  graphData: FamilyGraph;
   fgRef: ForceGraphRef;
   /** Live simulated nodes — the array handed to the graphData prop. */
   nodes: LiveNodePosition[];
+  connect: Connect3DControls;
+  /** The existing search query, reused as the fallback target filter. */
+  searchQuery: string;
+  onSearchQueryChange?: (query: string) => void;
+  /** The existing `TreeSearchBar` result set. */
+  searchMatches: FamilyNode[];
   onCreateRelative?: (params: {
     firstName: string;
     relation: RelativeDirection;
@@ -64,7 +107,10 @@ const AnchorLeaderLine: React.FC<{
   nodes: LiveNodePosition[];
   nodeId: string;
   color: string;
-}> = ({ fgRef, nodes, nodeId, color }) => {
+  /** Where the line meets the panel — derived by the caller from the panel's
+   *  own width, so widening the panel for a card cannot detach it. */
+  panelRightEdge: number;
+}> = ({ fgRef, nodes, nodeId, color, panelRightEdge }) => {
   const [screen, setScreen] = useState<{ x: number; y: number } | null>(null);
 
   // Read through a ref so a new array identity does not restart the loop.
@@ -115,7 +161,7 @@ const AnchorLeaderLine: React.FC<{
       <line
         x1={screen.x}
         y1={screen.y}
-        x2={PANEL_RIGHT_EDGE}
+        x2={panelRightEdge}
         y2="50%"
         stroke={color}
         strokeWidth={1.5}
@@ -139,8 +185,13 @@ export const Manipulation3DPanel: React.FC<Manipulation3DPanelProps> = ({
   selectedNode,
   canEdit,
   existingNodes,
+  graphData,
   fgRef,
   nodes,
+  connect,
+  searchQuery,
+  onSearchQueryChange,
+  searchMatches,
   onCreateRelative,
   onConnectExistingRelative,
 }) => {
@@ -149,6 +200,7 @@ export const Manipulation3DPanel: React.FC<Manipulation3DPanelProps> = ({
 
   const selectedId = selectedNode?.id ?? null;
   const visible = Boolean(selectedNode && canEdit);
+  const isTargeting = Boolean(connect.sourceNode && !connect.pair);
 
   useGhostPreview({
     fgRef,
@@ -158,6 +210,34 @@ export const Manipulation3DPanel: React.FC<Manipulation3DPanelProps> = ({
     name: previewName,
     enabled: visible,
   });
+
+  const visibility = useTargetVisibility({
+    fgRef,
+    nodes,
+    targetIds: connect.candidateIds,
+    enabled: isTargeting,
+  });
+
+  const { options: targetOptions, total: targetOptionTotal } = useMemo(
+    () =>
+      connect.sourceNode
+        ? buildTargetOptions({
+            query: searchQuery,
+            matches: searchMatches,
+            visibleNodes: connect.visibleNodes,
+            sourceId: connect.sourceNode.id,
+            candidacy: connect.candidacy,
+            visibility,
+          })
+        : { options: [], total: 0 },
+    [connect.sourceNode, connect.candidacy, connect.visibleNodes, searchQuery, searchMatches, visibility]
+  );
+
+  // Before the first sample every candidate reads as unreachable, which would
+  // flash a misleading hint; say nothing until the scene has been measured.
+  const unreachableCount = visibility.size
+    ? countUnreachable([...connect.candidateIds].map((id) => visibility.get(id) ?? 'offscreen'))
+    : 0;
 
   // Abandon any in-flight action when the selection moves elsewhere.
   useEffect(() => {
@@ -192,13 +272,33 @@ export const Manipulation3DPanel: React.FC<Manipulation3DPanelProps> = ({
     [selectedId, relation, onConnectExistingRelative, closeGhostNode]
   );
 
+  const startConnect = useCallback(() => {
+    closeGhostNode();
+    connect.onStart();
+  }, [closeGhostNode, connect]);
+
   if (!selectedNode || !canEdit) return null;
 
-  const accent = relation ? relationColor(relation) : '#a78bfa';
+  const inConnectMode = Boolean(connect.sourceNode);
+  const accent = inConnectMode
+    ? CONNECT_ACCENT
+    : relation
+      ? relationColor(relation)
+      : '#a78bfa';
+
+  // The kinship picker is wider than the Ghost Node card, so the panel takes
+  // whichever card it is currently holding.
+  const panelWidth = (connect.pair ? PICKER_CARD_WIDTH : GHOST_CARD_WIDTH) + PANEL_PADDING * 2;
 
   return (
     <>
-      <AnchorLeaderLine fgRef={fgRef} nodes={nodes} nodeId={selectedNode.id} color={accent} />
+      <AnchorLeaderLine
+        fgRef={fgRef}
+        nodes={nodes}
+        nodeId={connect.sourceNode?.id ?? selectedNode.id}
+        color={accent}
+        panelRightEdge={PANEL_LEFT + panelWidth}
+      />
 
       <div
         style={{
@@ -207,7 +307,7 @@ export const Manipulation3DPanel: React.FC<Manipulation3DPanelProps> = ({
           top: '50%',
           transform: 'translateY(-50%)',
           zIndex: 1250,
-          width: PANEL_WIDTH,
+          width: panelWidth,
           boxSizing: 'border-box',
           background: 'rgba(15, 23, 42, 0.95)',
           backdropFilter: 'blur(16px)',
@@ -232,20 +332,39 @@ export const Manipulation3DPanel: React.FC<Manipulation3DPanelProps> = ({
             whiteSpace: 'nowrap',
           }}
         >
-          {selectedNode.firstName}
+          {connect.sourceNode?.firstName ?? selectedNode.firstName}
         </div>
 
-        {!relation &&
-          HANDLES.map(({ relation: rel, label }) => (
+        {!relation && !inConnectMode && (
+          <>
+            {HANDLES.map(({ relation: rel, label }) => (
+              <button
+                key={rel}
+                type="button"
+                onClick={() => setRelation(rel)}
+                style={{
+                  background: 'rgba(15, 23, 42, 0.92)',
+                  border: `1.5px solid ${relationColor(rel)}`,
+                  borderRadius: 999,
+                  color: relationColor(rel),
+                  cursor: 'pointer',
+                  fontSize: 11,
+                  fontWeight: 700,
+                  padding: '6px 10px',
+                  textAlign: 'left',
+                }}
+              >
+                {label}
+              </button>
+            ))}
             <button
-              key={rel}
               type="button"
-              onClick={() => setRelation(rel)}
+              onClick={startConnect}
               style={{
                 background: 'rgba(15, 23, 42, 0.92)',
-                border: `1.5px solid ${relationColor(rel)}`,
+                border: `1.5px solid ${CONNECT_ACCENT}`,
                 borderRadius: 999,
-                color: relationColor(rel),
+                color: CONNECT_ACCENT,
                 cursor: 'pointer',
                 fontSize: 11,
                 fontWeight: 700,
@@ -253,11 +372,12 @@ export const Manipulation3DPanel: React.FC<Manipulation3DPanelProps> = ({
                 textAlign: 'left',
               }}
             >
-              {label}
+              🔗 Connect
             </button>
-          ))}
+          </>
+        )}
 
-        {relation && (
+        {relation && !inConnectMode && (
           <GhostNodeCard
             relation={relation}
             anchorNodeId={selectedNode.id}
@@ -267,6 +387,33 @@ export const Manipulation3DPanel: React.FC<Manipulation3DPanelProps> = ({
             onConnectExisting={handleConnectExisting}
             onCancel={closeGhostNode}
             onNameChange={setPreviewName}
+          />
+        )}
+
+        {isTargeting && connect.sourceNode && (
+          <ConnectTargetingBody
+            sourceNode={connect.sourceNode}
+            options={targetOptions}
+            candidateCount={connect.candidateIds.size}
+            optionTotal={targetOptionTotal}
+            unreachableCount={unreachableCount}
+            rejected={connect.rejected}
+            query={searchQuery}
+            onQueryChange={onSearchQueryChange}
+            onPickTarget={connect.onPickTarget}
+            onExit={connect.onExit}
+          />
+        )}
+
+        {connect.pair && (
+          <ConnectPickerCard
+            sourceId={connect.pair.source.id}
+            sourceFirstName={connect.pair.source.firstName}
+            targetId={connect.pair.target.id}
+            targetFirstName={connect.pair.target.firstName}
+            graphData={graphData}
+            onConfirm={connect.onConfirm}
+            onCancel={connect.onCancelPair}
           />
         )}
       </div>

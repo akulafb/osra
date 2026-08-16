@@ -671,6 +671,7 @@ export const FamilyTree: React.FC = () => {
             canEditSelected={canEditSelected}
             onCreateRelative={handleCreateRelativeDirect}
             onConnectExistingRelative={handleConnectExistingRelativeDirect}
+            onDirectConnectNodes={handleDirectConnectNodes}
           />
         ) : (
           <FamilyTree2D
