@@ -1,8 +1,6 @@
 import React from 'react';
-import { Node2D } from '../types/graph';
+import { Node2D, RelativeDirection } from '../types/graph';
 import { getClusterColors } from '../utils/familyColors';
-
-export type RelativeDirection = 'parent' | 'child' | 'spouse';
 
 export interface NodeCardProps {
   node: Node2D;

@@ -21,7 +21,7 @@ _Avoid_: Edge, Connection, Wire, Branch
 ### Direct Interaction
 
 **Action Handle**:
-Directional triggers on a Tree Node (Top: Parent, Bottom: Child, Side: Spouse, Pill: Connect / Dissolve) that initiate immediate inline actions.
+A trigger that initiates an immediate inline action on a Tree Node (Parent, Child, Spouse, Connect, Dissolve). Positioned directionally on the card's edges in the 2D view, and in a screen-docked panel in the 3D view.
 _Avoid_: Modal button, Menu item, Gizmo
 
 **Ghost Node**:
@@ -32,12 +32,16 @@ _Avoid_: Dummy card, Draft node, Preview modal
 A two-click targeting state where selecting a source node and a target node interactively creates a Kinship Link on the canvas.
 _Avoid_: Linking modal, Wire mode
 
+**Ghost Preview**:
+A translucent, non-interactive marker occupying the position a new Tree Node will take, tethered to its anchor and labelled with the name as it is typed. Shows *where* a relative will land; the Ghost Node is where the name is entered.
+_Avoid_: Ghost node (that is the input card), Placeholder planet, Phantom
+
 ### Animation Lifecycles
 
 **Spawn**:
-The spring-loaded, celebratory entry animation and SVG path growth when a Tree Node or Kinship Link is created on the canvas.
-_Avoid_: Fade-in, Render, Pop-up
+The celebratory entry animation when a Tree Node or Kinship Link is created on the canvas — a spring-loaded pop with path growth in 2D, a supernova burst in 3D. One lifecycle, rendered differently per view.
+_Avoid_: Fade-in, Render, Pop-up; naming the 3D rendering ("Supernova") as a separate lifecycle
 
 **Dissolve**:
-The particle disintegration and fraying exit animation when a Tree Node or Kinship Link is removed following inline confirmation.
-_Avoid_: Hard delete, Disappear, Wipe
+The disintegration exit animation when a Tree Node or Kinship Link is removed following inline confirmation — particle fraying in 2D, a black hole collapse in 3D. One lifecycle, rendered differently per view.
+_Avoid_: Hard delete, Disappear, Wipe; naming the 3D rendering ("Black Hole") as a separate lifecycle

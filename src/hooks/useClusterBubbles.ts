@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import SpriteText from 'three-spritetext';
 import { getClusterColors } from '../utils/familyColors';
 import { isMobile } from '../utils/device';
+import { ForceGraphRef } from '../types/forceGraph';
 import {
   computeVisibleBounds,
   computeClusterCentroids,
@@ -41,21 +42,8 @@ import {
  *  - `fullyClustered`: hysteresis-gated boolean; when true the component hides
  *    individual nodes/links entirely (performance).
  */
-/** Minimal slice of the react-force-graph-3d instance this hook calls. */
-interface ForceGraphHandle {
-  scene?: () => THREE.Scene;
-  camera?: () => THREE.PerspectiveCamera;
-  controls?: () => { target?: THREE.Vector3 } | undefined;
-  renderer?: () => THREE.WebGLRenderer | undefined;
-  cameraPosition: (
-    pos: { x: number; y: number; z: number },
-    lookAt?: { x: number; y: number; z: number },
-    transitionMs?: number
-  ) => void;
-}
-
 export function useClusterBubbles(params: {
-  fgRef: React.MutableRefObject<ForceGraphHandle | null | undefined>;
+  fgRef: ForceGraphRef;
   graphData: { nodes: LiveNode[]; links: unknown[] };
   visibleClusters: Set<string>;
   enabled: boolean;
@@ -248,7 +236,7 @@ export function useClusterBubbles(params: {
       const radius = boundsRef.current.radius || 200;
       const dist = Math.max(90, EXIT_MULT * radius * 0.7);
       const newPos = centroidVec.clone().add(dir.multiplyScalar(dist));
-      fg.cameraPosition(
+      fg.cameraPosition?.(
         { x: newPos.x, y: newPos.y, z: newPos.z },
         { x: centroid.x, y: centroid.y, z: centroid.z },
         1200
