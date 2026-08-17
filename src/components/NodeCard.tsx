@@ -19,9 +19,11 @@ export interface NodeCardProps {
   onAddRelative?: (node: Node2D, relation: RelativeDirection) => void;
   onStartConnect?: (node: Node2D) => void;
   onStartDissolve?: (node: Node2D) => void;
+  onCancelDissolve?: () => void;
   /** Playful animation states */
   isNewlySpawned?: boolean;
   isDissolving?: boolean;
+  isConfirmingDissolve?: boolean;
   onConfirmDissolve?: (node: Node2D) => void;
 }
 
@@ -46,7 +48,7 @@ function lightenColors(base: { bg: string; border: string; text: string }) {
 const HIGHLIGHT_GLOW_COLOR = '#10b981';
 const SEARCH_GLOW_COLOR = '#ef4444';
 
-export const NodeCard: React.FC<NodeCardProps> = ({
+const NodeCardComponent: React.FC<NodeCardProps> = ({
   node,
   isSelected,
   onClick,
@@ -58,19 +60,13 @@ export const NodeCard: React.FC<NodeCardProps> = ({
   onAddRelative,
   onStartConnect,
   onStartDissolve,
+  onCancelDissolve,
   isNewlySpawned = false,
   isDissolving = false,
+  isConfirmingDissolve = false,
   onConfirmDissolve,
 }) => {
   const [isHovered, setIsHovered] = React.useState(false);
-  const [isConfirmingDissolve, setIsConfirmingDissolve] = React.useState(false);
-
-  // Reset dissolve confirmation if deselected or unhovered
-  React.useEffect(() => {
-    if (!isSelected && !isHovered) {
-      setIsConfirmingDissolve(false);
-    }
-  }, [isSelected, isHovered]);
 
   const isMaternalOnly =
     activePreset &&
@@ -385,7 +381,6 @@ export const NodeCard: React.FC<NodeCardProps> = ({
                   transform="translate(18, 0)"
                   onClick={(e) => {
                     e.stopPropagation();
-                    setIsConfirmingDissolve(false);
                     if (onConfirmDissolve) {
                       onConfirmDissolve(node);
                     } else {
@@ -420,7 +415,7 @@ export const NodeCard: React.FC<NodeCardProps> = ({
                   transform="translate(48, 0)"
                   onClick={(e) => {
                     e.stopPropagation();
-                    setIsConfirmingDissolve(false);
+                    onCancelDissolve?.();
                   }}
                   style={{ cursor: 'pointer' }}
                 >
@@ -486,7 +481,7 @@ export const NodeCard: React.FC<NodeCardProps> = ({
                   transform="translate(30, 0)"
                   onClick={(e) => {
                     e.stopPropagation();
-                    setIsConfirmingDissolve(true);
+                    onStartDissolve?.(node);
                   }}
                   style={{ cursor: 'pointer' }}
                 >
@@ -522,4 +517,5 @@ export const NodeCard: React.FC<NodeCardProps> = ({
   );
 };
 
-export default React.memo(NodeCard);
+export const NodeCard = React.memo(NodeCardComponent);
+export default NodeCard;

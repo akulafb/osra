@@ -11,7 +11,7 @@ import Select from '@mui/material/Select';
 import MenuItem from '@mui/material/MenuItem';
 import { FamilyGraph, FamilyNode, FamilyLink, Node2D, LayoutType } from '../types/graph';
 import { calculateLayout, calculateBounds } from '../lib/layoutEngine';
-import { NodeCard } from './NodeCard';
+import NodeCard from './NodeCard';
 import { RelativeDirection } from '../types/graph';
 import { GhostNode } from './GhostNode';
 import { InlineConnectPicker } from './InlineConnectPicker';
@@ -23,6 +23,8 @@ import { filterGraphData } from '../lib/filterGraphData';
 import { TreeSearchBar } from './TreeSearchBar';
 import { canEdit } from '../lib/permissions';
 import type { BackgroundTheme } from '../hooks/useBackgroundTheme';
+import { DirectManipulationController } from '../hooks/useDirectManipulation';
+import { candidacyFor } from './cards/connectCandidates';
 
 function getBackgroundForTheme(theme: BackgroundTheme): string {
   switch (theme) {
@@ -49,11 +51,9 @@ const THEME_LABELS: Record<BackgroundTheme, string> = {
 interface FamilyTree2DProps {
   graphData: FamilyGraph;
   layoutType: LayoutType;
+  interaction: DirectManipulationController;
   activePreset?: string | null;
-  selectedNodeId: string | null;
-  onNodeSelect: (node: FamilyNode) => void;
   onNodeDoubleClick?: (node: FamilyNode) => void;
-  onBackgroundClick?: () => void;
   collapsedNodes?: Set<string>;
   onToggleCollapse?: (nodeId: string) => void;
   onSetCollapsedNodes?: (nodes: Set<string>) => void;
@@ -82,9 +82,6 @@ interface FamilyTree2DProps {
   /** Admin: add standalone person (opens modal in parent) */
   isAdmin?: boolean;
   onAdminAddPersonClick?: () => void;
-  /** Action Handles event callbacks */
-  onAddRelative?: (node: Node2D, relation: RelativeDirection) => void;
-  onStartConnect?: (node: Node2D) => void;
   /** Direct inline Ghost Node creation and linking handlers */
   onCreateRelative?: (params: { firstName: string; relation: RelativeDirection; targetNodeId: string }) => Promise<void> | void;
   onConnectExistingRelative?: (params: { existingNodeId: string; relation: RelativeDirection; targetNodeId: string }) => Promise<void> | void;
@@ -118,11 +115,9 @@ function ExpandableSpring({ isOpen, children }: { isOpen: boolean; children: Rea
 export const FamilyTree2D: React.FC<FamilyTree2DProps> = ({
   graphData,
   layoutType,
+  interaction,
   activePreset,
-  selectedNodeId,
-  onNodeSelect,
   onNodeDoubleClick,
-  onBackgroundClick,
   collapsedNodes = new Set(),
   onToggleCollapse,
   onSetCollapsedNodes,
@@ -149,8 +144,6 @@ export const FamilyTree2D: React.FC<FamilyTree2DProps> = ({
   pendingLinkPreview = null,
   isAdmin = false,
   onAdminAddPersonClick,
-  onAddRelative,
-  onStartConnect,
   onCreateRelative,
   onConnectExistingRelative,
   onDirectConnectNodes,
@@ -172,13 +165,6 @@ export const FamilyTree2D: React.FC<FamilyTree2DProps> = ({
   const [showControls, setShowControls] = useState(false);
   const [isPresetMenuOpen, setIsPresetMenuOpen] = useState(false);
   const [highlightedNodeId, setHighlightedNodeId] = useState<string | null>(null);
-  const [ghostNodeState, setGhostNodeState] = useState<{
-    anchorNode: Node2D;
-    relation: RelativeDirection;
-  } | null>(null);
-  const [connectSourceNode, setConnectSourceNode] = useState<Node2D | null>(null);
-  const [hoveredConnectTarget, setHoveredConnectTarget] = useState<Node2D | null>(null);
-  const [connectPair, setConnectPair] = useState<{ source: Node2D; target: Node2D } | null>(null);
   const [isMobileViewport, setIsMobileViewport] = useState(
     () => typeof window !== 'undefined' && window.innerWidth <= 768
   );
@@ -266,8 +252,8 @@ export const FamilyTree2D: React.FC<FamilyTree2DProps> = ({
       if (e.key === 'Tab' && nodes.length > 0) {
         e.preventDefault();
 
-        const currentIndex = selectedNodeId
-          ? nodes.findIndex(n => n.id === selectedNodeId)
+        const currentIndex = interaction.selectedNodeId
+          ? nodes.findIndex(n => n.id === interaction.selectedNodeId)
           : -1;
 
         const nextIndex = e.shiftKey
@@ -275,7 +261,7 @@ export const FamilyTree2D: React.FC<FamilyTree2DProps> = ({
           : (currentIndex + 1) % nodes.length;
 
         const nextNode = nodes[nextIndex];
-        onNodeSelect(nextNode);
+        interaction.selectNode(nextNode.id);
 
         // Pan to the selected node
         if (svgRef.current && zoomBehaviorRef.current) {
@@ -292,22 +278,13 @@ export const FamilyTree2D: React.FC<FamilyTree2DProps> = ({
             .call(zoomBehaviorRef.current.transform as any, targetTransform);
         }
       } else if (e.key === 'Escape') {
-        if (connectPair) {
-          setConnectPair(null);
-        } else if (connectSourceNode) {
-          setConnectSourceNode(null);
-          setHoveredConnectTarget(null);
-        } else if (ghostNodeState) {
-          setGhostNodeState(null);
-        } else {
-          onBackgroundClick?.();
-        }
+        interaction.handleEscape();
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [nodes, selectedNodeId, onNodeSelect, onBackgroundClick, transform.k, ghostNodeState, connectSourceNode, connectPair]);
+  }, [nodes, interaction, transform.k]);
 
   // Focus on specific node (scale 1.25 for subtle "Find me!" zoom; duration in ms)
   const FOCUS_DURATION = 1040;
@@ -432,39 +409,19 @@ export const FamilyTree2D: React.FC<FamilyTree2DProps> = ({
   // Handle background click
   const handleBackgroundClick = useCallback((e: React.MouseEvent) => {
     if (e.target === svgRef.current || e.target === gRef.current) {
-      if (connectPair) {
-        setConnectPair(null);
-        return;
-      }
-      if (connectSourceNode) {
-        setConnectSourceNode(null);
-        setHoveredConnectTarget(null);
-        return;
-      }
-      if (ghostNodeState) {
-        setGhostNodeState(null);
-        return;
-      }
-      onBackgroundClick?.();
+      interaction.handleBackgroundClick();
     }
-  }, [connectPair, connectSourceNode, ghostNodeState, onBackgroundClick]);
+  }, [interaction]);
 
-  // Handle node click with proper selection
+  // Handle node click with proper selection & connect targeting
   const handleNodeClick = useCallback((node: Node2D) => {
-    if (connectSourceNode) {
-      if (connectSourceNode.id === node.id) {
-        // Cancel connect mode if clicked source again
-        setConnectSourceNode(null);
-        setHoveredConnectTarget(null);
-        setConnectPair(null);
-        return;
-      }
-      // Clicked candidate target node
-      setConnectPair({ source: connectSourceNode, target: node });
+    if (interaction.state.phase === 'targeting-connect') {
+      const cand = candidacyFor(graphData, interaction.connectSourceId!, node.id);
+      interaction.pickConnectTarget(node.id, cand);
       return;
     }
-    onNodeSelect(node);
-  }, [connectSourceNode, onNodeSelect]);
+    interaction.selectNode(node.id);
+  }, [interaction, graphData]);
 
   // Handle node double click for collapse toggle
   const handleNodeDoubleClick = useCallback((node: Node2D) => {
@@ -504,23 +461,15 @@ export const FamilyTree2D: React.FC<FamilyTree2DProps> = ({
     return map;
   }, [nodes, userNodeId, isAdmin, graphData?.links]);
 
-  const handleAddRelativeInternal = useCallback((node: Node2D, relation: RelativeDirection) => {
-    setGhostNodeState({ anchorNode: node, relation });
-    onAddRelative?.(node, relation);
-  }, [onAddRelative]);
-
-  const handleStartConnectInternal = useCallback((node: Node2D) => {
-    setConnectSourceNode(node);
-    setHoveredConnectTarget(null);
-    setConnectPair(null);
-    setGhostNodeState(null);
-    onStartConnect?.(node);
-  }, [onStartConnect]);
+  const connectSourceNode = useMemo(() => {
+    if (!interaction.connectSourceId) return null;
+    return nodes.find(n => n.id === interaction.connectSourceId) ?? null;
+  }, [nodes, interaction.connectSourceId]);
 
   return (
     <div style={{ position: 'relative', width: '100%', height: '100%', background: activePreset ? presetBackground : emptyBackground }}>
       {/* Connect Mode HUD Top Banner */}
-      {connectSourceNode && !connectPair && (
+      {interaction.state.phase === 'targeting-connect' && connectSourceNode && (
         <div
           style={{
             position: 'absolute',
@@ -542,12 +491,18 @@ export const FamilyTree2D: React.FC<FamilyTree2DProps> = ({
             boxShadow: '0 0 20px rgba(168, 85, 247, 0.4)',
           }}
         >
-          <span>🔗 Connect Mode: Select a relative to link with <strong style={{ color: '#c084fc' }}>{connectSourceNode.firstName}</strong></span>
+          <span>
+            🔗 Connect Mode: Select a relative to link with <strong style={{ color: '#c084fc' }}>{connectSourceNode.firstName}</strong>
+            {interaction.rejectedTarget && (
+              <span style={{ marginLeft: 8, color: '#f87171', fontSize: 11 }}>
+                ({interaction.rejectedTarget.reason})
+              </span>
+            )}
+          </span>
           <button
             type="button"
             onClick={() => {
-              setConnectSourceNode(null);
-              setHoveredConnectTarget(null);
+              interaction.handleEscape();
             }}
             style={{
               background: 'rgba(255,255,255,0.1)',
@@ -648,37 +603,25 @@ export const FamilyTree2D: React.FC<FamilyTree2DProps> = ({
                 );
               })()}
 
-            {/* Live connecting line in connect mode */}
-            {connectSourceNode && hoveredConnectTarget && !connectPair && (
-              <line
-                x1={connectSourceNode.x}
-                y1={connectSourceNode.y + connectSourceNode.height / 2}
-                x2={hoveredConnectTarget.x}
-                y2={hoveredConnectTarget.y + hoveredConnectTarget.height / 2}
-                stroke="#c084fc"
-                strokeWidth={2.5}
-                strokeDasharray="6 4"
-                opacity={0.9}
-                pointerEvents="none"
-              />
-            )}
-
             {/* Render nodes */}
             {nodes.map(node => (
               <NodeCard
                 key={node.id}
                 node={node}
-                isSelected={selectedNodeId === node.id || connectSourceNode?.id === node.id}
+                isSelected={interaction.selectedNodeId === node.id || interaction.connectSourceId === node.id}
                 onClick={handleNodeClick}
                 onDoubleClick={handleNodeDoubleClick}
                 activePreset={activePreset}
-                isHighlighted={highlightedNodeId === node.id || connectSourceNode?.id === node.id || hoveredConnectTarget?.id === node.id}
+                isHighlighted={highlightedNodeId === node.id || interaction.connectSourceId === node.id || (interaction.state.phase === 'choosing-kinship' && interaction.state.targetNodeId === node.id)}
                 isSearchHighlighted={searchHighlightedNodeId === node.id}
                 canEdit={isNodeEditable.get(node.id) ?? (isAdmin ? true : false)}
-                onAddRelative={handleAddRelativeInternal}
-                onStartConnect={handleStartConnectInternal}
+                onAddRelative={(n, relation) => interaction.startCreateRelative(n.id, relation)}
+                onStartConnect={(n) => interaction.startConnect(n.id)}
+                onStartDissolve={(n) => interaction.startDissolve(n.id)}
+                onCancelDissolve={() => interaction.handleEscape()}
                 isNewlySpawned={newlySpawnedNodeId === node.id}
                 isDissolving={dissolvingNodeId === node.id}
+                isConfirmingDissolve={interaction.confirmingDissolveId === node.id}
                 onConfirmDissolve={onConfirmDissolve}
               />
             ))}
@@ -717,64 +660,69 @@ export const FamilyTree2D: React.FC<FamilyTree2DProps> = ({
             })}
 
             {/* Transient Ghost Node */}
-            {ghostNodeState && (
-              <GhostNode
-                anchorNode={ghostNodeState.anchorNode}
-                relation={ghostNodeState.relation}
-                existingNodes={graphData?.nodes || []}
-                onSubmit={async (name) => {
-                  if (onCreateRelative) {
-                    await onCreateRelative({
-                      firstName: name,
-                      relation: ghostNodeState.relation,
-                      targetNodeId: ghostNodeState.anchorNode.id,
-                    });
-                  }
-                  setGhostNodeState(null);
-                }}
-                onConnectExisting={async (existingId) => {
-                  if (onConnectExistingRelative) {
-                    await onConnectExistingRelative({
-                      existingNodeId: existingId,
-                      relation: ghostNodeState.relation,
-                      targetNodeId: ghostNodeState.anchorNode.id,
-                    });
-                  }
-                  setGhostNodeState(null);
-                }}
-                onCancel={() => setGhostNodeState(null)}
-              />
-            )}
+            {interaction.creatingRelative && (() => {
+              const anchorNode = nodes.find(n => n.id === interaction.creatingRelative!.anchorNodeId);
+              if (!anchorNode) return null;
+              return (
+                <GhostNode
+                  anchorNode={anchorNode}
+                  relation={interaction.creatingRelative.relation}
+                  existingNodes={graphData?.nodes || []}
+                  onSubmit={async (name) => {
+                    if (onCreateRelative) {
+                      await onCreateRelative({
+                        firstName: name,
+                        relation: interaction.creatingRelative!.relation,
+                        targetNodeId: anchorNode.id,
+                      });
+                    }
+                    interaction.handleEscape();
+                  }}
+                  onConnectExisting={async (existingId) => {
+                    if (onConnectExistingRelative) {
+                      await onConnectExistingRelative({
+                        existingNodeId: existingId,
+                        relation: interaction.creatingRelative!.relation,
+                        targetNodeId: anchorNode.id,
+                      });
+                    }
+                    interaction.handleEscape();
+                  }}
+                  onCancel={() => interaction.handleEscape()}
+                />
+              );
+            })()}
 
             {/* InlineConnectPicker when a pair is chosen */}
-            {connectPair && (
-              <InlineConnectPicker
-                sourceNode={connectPair.source}
-                targetNode={connectPair.target}
-                graphData={graphData}
-                isAdmin={isAdmin}
-                onConfirm={async (type, parentRole, parentIsSource) => {
-                  const sourceId = type === 'parent' && parentIsSource === false ? connectPair.target.id : connectPair.source.id;
-                  const targetId = type === 'parent' && parentIsSource === false ? connectPair.source.id : connectPair.target.id;
-                  if (onDirectConnectNodes) {
-                    await onDirectConnectNodes({
-                      sourceNodeId: sourceId,
-                      targetNodeId: targetId,
-                      type,
-                      parentRole,
-                    });
-                  }
-                  setConnectPair(null);
-                  setConnectSourceNode(null);
-                  setHoveredConnectTarget(null);
-                }}
-                onCancel={() => {
-                  setConnectPair(null);
-                  setConnectSourceNode(null);
-                  setHoveredConnectTarget(null);
-                }}
-              />
-            )}
+            {interaction.state.phase === 'choosing-kinship' && (() => {
+              const kinshipState = interaction.state;
+              if (kinshipState.phase !== 'choosing-kinship') return null;
+              const sourceNode = nodes.find(n => n.id === kinshipState.sourceNodeId);
+              const targetNode = nodes.find(n => n.id === kinshipState.targetNodeId);
+              if (!sourceNode || !targetNode) return null;
+              return (
+                <InlineConnectPicker
+                  sourceNode={sourceNode}
+                  targetNode={targetNode}
+                  graphData={graphData}
+                  isAdmin={isAdmin}
+                  onConfirm={async (type, parentRole, parentIsSource) => {
+                    const sourceId = type === 'parent' && parentIsSource === false ? targetNode.id : sourceNode.id;
+                    const targetId = type === 'parent' && parentIsSource === false ? sourceNode.id : targetNode.id;
+                    if (onDirectConnectNodes) {
+                      await onDirectConnectNodes({
+                        sourceNodeId: sourceId,
+                        targetNodeId: targetId,
+                        type,
+                        parentRole,
+                      });
+                    }
+                    interaction.selectNode(sourceId);
+                  }}
+                  onCancel={() => interaction.handleEscape()}
+                />
+              );
+            })()}
           </g>
 
           {/* Zoom controls overlay */}
