@@ -15,8 +15,16 @@ The visual representation and interactive card of a Person positioned on the tre
 _Avoid_: Box, Vertex, Bubble
 
 **Kinship Link**:
-A typed genealogical edge connecting two Persons (`parent`, `marriage`, or `divorce`, with an optional `parent_role` for mother/father).
+A typed genealogical edge connecting two Persons (`parent`, `marriage`, or `divorce`, with an optional `parent_role` for mother/father). Expressed as an absolute edge between two IDs.
 _Avoid_: Edge, Connection, Wire, Branch
+
+**Tree Record**:
+The single source of truth and deep write module (`src/lib/treeRecord.ts`) that owns every mutation to Persons and Kinship Links in the tree archive.
+_Avoid_: Mutation service, REST helpers, Direct fetch
+
+**Relative Direction**:
+A relative relation framed from the perspective of an anchor Person (`parent`, `child`, `spouse`, `sibling`). Converted at module edges into an absolute Kinship Link.
+_Avoid_: Edge type (when referring to directional intent)
 
 ### Direct Interaction
 
