@@ -3,6 +3,7 @@ import Button from '@mui/material/Button';
 import { useAuth } from '../../contexts/AuthContext';
 import { FamilyNode } from '../../types/graph';
 import { formatNodeDisplayName } from '../../utils/nodeDisplayName';
+import { createTreeRecord } from '../../lib/treeRecord';
 
 const MAX_NAME_LENGTH = 200;
 const MAX_CLUSTER_LENGTH = 100;
@@ -75,44 +76,18 @@ export default function EditNodeModal({
     setSuccessMessage(null);
 
     try {
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-      const authToken = session?.access_token || supabaseKey;
+      const record = createTreeRecord({
+        userId: user.id,
+        isAdmin,
+        sessionToken: session?.access_token,
+      });
 
-      const updateData: {
-        first_name: string;
-        paternal_family_cluster?: string | null;
-        maternal_family_cluster?: string | null;
-      } = {
-        first_name: sanitizedName,
-      };
-
-      // Only include clusters if admin (regular users shouldn't change clusters)
-      const sanitizedPaternal = familyCluster.trim().slice(0, MAX_CLUSTER_LENGTH);
-      const sanitizedMaternal = maternalFamilyCluster.trim().slice(0, MAX_CLUSTER_LENGTH);
-      if (isAdmin) {
-        updateData.paternal_family_cluster = sanitizedPaternal || null;
-        updateData.maternal_family_cluster = sanitizedMaternal || null;
-      }
-
-      const response = await fetch(
-        `${supabaseUrl}/rest/v1/nodes?id=eq.${targetNode.id}`,
-        {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-            apikey: supabaseKey,
-            Authorization: `Bearer ${authToken}`,
-            Prefer: 'return=representation',
-          },
-          body: JSON.stringify(updateData),
-        }
-      );
-
-      if (!response.ok) {
-        const errData = await response.json().catch(() => ({}));
-        throw new Error(errData.message || `Update failed with status ${response.status}`);
-      }
+      await record.editPerson({
+        id: targetNode.id,
+        firstName: sanitizedName,
+        paternalCluster: isAdmin ? familyCluster : undefined,
+        maternalCluster: isAdmin ? maternalFamilyCluster : undefined,
+      });
 
       setSuccessMessage('Changes saved successfully!');
       onSuccess();
@@ -123,7 +98,7 @@ export default function EditNodeModal({
       }, 1500);
     } catch (err) {
       console.error('[EditNodeModal] Error:', err);
-      setError('Something went wrong. Please try again.');
+      setError(err instanceof Error ? err.message : 'Something went wrong. Please try again.');
     } finally {
       setIsSubmitting(false);
     }

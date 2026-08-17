@@ -3,7 +3,7 @@ import Button from '@mui/material/Button';
 import Alert from '@mui/material/Alert';
 import type { Session } from '@supabase/supabase-js';
 import { validateOrphanNodeName } from '../../lib/adminGraphValidation';
-import { adminInsertNode } from '../../lib/adminSupabaseRest';
+import { createTreeRecord } from '../../lib/treeRecord';
 
 const MAX_NAME = 200;
 const MAX_CLUSTER = 100;
@@ -54,15 +54,15 @@ export default function AdminAddPersonModal({
     setSubmitting(true);
     setError(null);
     try {
-      await adminInsertNode({
-        session,
+      const record = createTreeRecord({
+        userId,
         isAdmin,
-        body: {
-          first_name: name.trim().slice(0, MAX_NAME),
-          paternal_family_cluster: paternal.trim().slice(0, MAX_CLUSTER) || null,
-          maternal_family_cluster: maternal.trim().slice(0, MAX_CLUSTER) || null,
-          created_by_user_id: userId,
-        },
+        sessionToken: session?.access_token,
+      });
+      await record.addPerson({
+        firstName: name.trim().slice(0, MAX_NAME),
+        paternalCluster: paternal.trim().slice(0, MAX_CLUSTER) || null,
+        maternalCluster: maternal.trim().slice(0, MAX_CLUSTER) || null,
       });
       onSuccess();
       onClose();

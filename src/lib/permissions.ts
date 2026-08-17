@@ -221,33 +221,3 @@ export function get1DegreeNodesSync(
 
   return Array.from(oneDegreeIds);
 }
-
-/**
- * Check if a link can be created between two nodes
- */
-export function canCreateLink(
-  sourceNodeId: string,
-  targetNodeId: string,
-  _linkType: 'parent' | 'sibling' | 'marriage' | 'divorce', // Prefix with underscore to ignore unused
-  userNodeId: string | null | undefined,
-  isAdmin: boolean,
-  existingLinks: FamilyLink[]
-): { allowed: boolean; reason?: string } {
-  if (sourceNodeId === targetNodeId) return { allowed: false, reason: 'Self-link' };
-
-  const exists = existingLinks.some((link: any) => {
-    const s = getSafeId(link.source);
-    const t = getSafeId(link.target);
-    return (s === sourceNodeId && t === targetNodeId) || (s === targetNodeId && t === sourceNodeId);
-  });
-  if (exists) return { allowed: false, reason: 'Exists' };
-
-  if (isAdmin) return { allowed: true };
-  if (!userNodeId) return { allowed: false };
-
-  if (!isWithin1Degree(sourceNodeId, userNodeId, existingLinks) && !isWithin1Degree(targetNodeId, userNodeId, existingLinks)) {
-    return { allowed: false, reason: 'Not in network' };
-  }
-
-  return { allowed: true };
-}

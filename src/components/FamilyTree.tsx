@@ -11,7 +11,6 @@ import { useAuth } from '../contexts/AuthContext';
 import AdminManageLinksModal from './modals/AdminManageLinksModal';
 import AdminConnectLinkModal from './modals/AdminConnectLinkModal';
 import AdminAddPersonModal from './modals/AdminAddPersonModal';
-import { adminDeleteNode, adminInsertLink } from '../lib/adminSupabaseRest';
 import { canEdit, canManageInvites } from '../lib/permissions';
 import { filterGraphData, filterGraphDataFor3D } from '../lib/filterGraphData';
 import { searchNodes } from '../utils/treeSearch';
@@ -23,7 +22,7 @@ import { NewMembersModal } from './NewMembersModal';
 import { PersonDetailDrawer } from './PersonDetailDrawer';
 import { isMobile } from '../utils/device';
 import { RelativeDirection } from '../types/graph';
-import { createRelativeSecure, linkExistingRelativeSecure } from '../lib/familyMutations';
+import { createTreeRecord, relativeToKinshipLink } from '../lib/treeRecord';
 import {
   BEAM_PULSE_WINDOW_MS,
   COSMIC_FX_DURATION_MS,
@@ -163,10 +162,13 @@ export const FamilyTree: React.FC = () => {
       return;
     }
     try {
-      await adminDeleteNode({
-        session,
+      const record = createTreeRecord({
+        userId: user.id,
         isAdmin,
-        nodeId: selectedNode.id,
+        sessionToken: session?.access_token,
+      });
+      await record.removePerson({
+        id: selectedNode.id,
       });
       await refetch();
       setSelectedNode(null);
@@ -230,18 +232,23 @@ export const FamilyTree: React.FC = () => {
     async (params: { firstName: string; relation: RelativeDirection; targetNodeId: string }) => {
       if (!user) return;
       try {
-        const res = await createRelativeSecure({
-          firstName: params.firstName,
-          relation: params.relation,
-          targetNodeId: params.targetNodeId,
+        const record = createTreeRecord({
           userId: user.id,
+          isAdmin,
           sessionToken: session?.access_token,
+        });
+        const res = await record.addPerson({
+          firstName: params.firstName,
+          link: {
+            targetId: params.targetNodeId,
+            relation: params.relation,
+          },
         });
         // Refetch graph data from Supabase so the new node is present in the layout
         await refetch();
         // Trigger celebratory spawn burst and spring pop on the new node
-        if (res && res.new_node_id) {
-          const newId = res.new_node_id;
+        if (res && res.id) {
+          const newId = res.id;
           setNewlySpawnedNodeId(newId);
           setTimeout(() => setNewlySpawnedNodeId(null), 3500);
           pulseLink(params.targetNodeId, newId);
@@ -251,20 +258,24 @@ export const FamilyTree: React.FC = () => {
         window.alert(e instanceof Error ? e.message : 'Failed to create relative.');
       }
     },
-    [user, session?.access_token, refetch, pulseLink]
+    [user, isAdmin, session?.access_token, refetch, pulseLink]
   );
 
   const handleConnectExistingRelativeDirect = useCallback(
     async (params: { existingNodeId: string; relation: RelativeDirection; targetNodeId: string }) => {
       if (!user) return;
       try {
-        await linkExistingRelativeSecure({
-          existingNodeId: params.existingNodeId,
-          relation: params.relation,
-          targetNodeId: params.targetNodeId,
+        const record = createTreeRecord({
           userId: user.id,
+          isAdmin,
           sessionToken: session?.access_token,
         });
+        const kinship = relativeToKinshipLink(
+          params.targetNodeId,
+          params.existingNodeId,
+          params.relation
+        );
+        await record.addLink(kinship);
         await refetch();
         pulseLink(params.targetNodeId, params.existingNodeId);
       } catch (e) {
@@ -272,7 +283,7 @@ export const FamilyTree: React.FC = () => {
         window.alert(e instanceof Error ? e.message : 'Failed to connect relative.');
       }
     },
-    [user, session?.access_token, refetch, pulseLink]
+    [user, isAdmin, session?.access_token, refetch, pulseLink]
   );
 
   const handleConfirmDissolveDirect = useCallback(
@@ -288,10 +299,13 @@ export const FamilyTree: React.FC = () => {
         COSMIC_FX_DURATION_MS.collapse + 500
       );
       try {
-        await adminDeleteNode({
-          session,
+        const record = createTreeRecord({
+          userId: user.id,
           isAdmin,
-          nodeId: node.id,
+          sessionToken: session?.access_token,
+        });
+        await record.removePerson({
+          id: node.id,
         });
         await refetch();
         if (selectedNode?.id === node.id) {
@@ -316,30 +330,17 @@ export const FamilyTree: React.FC = () => {
     }) => {
       if (!user) return;
       try {
-        if (isAdmin) {
-          await adminInsertLink({
-            session,
-            isAdmin,
-            body: {
-              source_node_id: params.sourceNodeId,
-              target_node_id: params.targetNodeId,
-              type: params.type,
-              parent_role: params.parentRole ?? null,
-              created_by_user_id: user.id,
-            },
-          });
-        } else {
-          // Standard user: call link_existing_relative_secure
-          const relType: RelativeDirection =
-            params.type === 'parent' ? 'parent' : params.type === 'marriage' ? 'spouse' : 'child';
-          await linkExistingRelativeSecure({
-            existingNodeId: params.targetNodeId,
-            relation: relType,
-            targetNodeId: params.sourceNodeId,
-            userId: user.id,
-            sessionToken: session?.access_token,
-          });
-        }
+        const record = createTreeRecord({
+          userId: user.id,
+          isAdmin,
+          sessionToken: session?.access_token,
+        });
+        await record.addLink({
+          sourceId: params.sourceNodeId,
+          targetId: params.targetNodeId,
+          type: params.type,
+          parentRole: params.parentRole,
+        });
         await refetch();
         pulseLink(params.sourceNodeId, params.targetNodeId);
       } catch (e) {

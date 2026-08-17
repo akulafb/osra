@@ -3,6 +3,7 @@ import Button from '@mui/material/Button';
 import { useAuth } from '../../contexts/AuthContext';
 import { FamilyNode } from '../../types/graph';
 import { formatNodeDisplayName, nodeSearchHaystack } from '../../utils/nodeDisplayName';
+import { createTreeRecord, relativeToKinshipLink } from '../../lib/treeRecord';
 
 interface AddRelativeModalProps {
   isOpen: boolean;
@@ -51,7 +52,7 @@ export default function AddRelativeModal({
   existingNodes,
   onPendingConnectTargetChange,
 }: AddRelativeModalProps) {
-  const { user, session } = useAuth();
+  const { user, isAdmin, session } = useAuth();
   const [name, setName] = useState('');
   const [relationship, setRelationship] = useState<RelationshipType>('child');
   const [parentRole, setParentRole] = useState<'mother' | 'father' | null>(null);
@@ -105,66 +106,42 @@ export default function AddRelativeModal({
 
   const callLinkExisting = async (existingId: string) => {
     if (!user) return;
-    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-    const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-    const authToken = session?.access_token || supabaseKey;
-    const response = await fetch(`${supabaseUrl}/rest/v1/rpc/link_existing_relative_secure`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        apikey: supabaseKey,
-        Authorization: `Bearer ${authToken}`,
-      },
-      body: JSON.stringify({
-        existing_node_id: existingId,
-        rel_type: relationship,
-        target_node_id: targetNode.id,
-        creator_id: user.id,
-        ...(relationship === 'child' && parentRole && { p_parent_role: parentRole }),
-      }),
+    const record = createTreeRecord({
+      userId: user.id,
+      isAdmin,
+      sessionToken: session?.access_token,
     });
-
-    if (!response.ok) {
-      const errData = await response.json().catch(() => ({}));
-      throw new Error(errData.message || `RPC failed with status ${response.status}`);
-    }
-
-    const result = await response.json();
-    if (!result.success) {
-      throw new Error(result.message || 'Failed to link relative');
+    if (relationship === 'sibling') {
+      // Direct kinship mapping for sibling is handled via parent links or link_existing_relative_secure
+      // Since treeRecord handles spouse/child/parent, relativeToKinshipLink converts relative to kinship
+      // For sibling, link_existing_relative_secure is used internally by addLink if needed or through custom spec
+      await record.addLink({
+        sourceId: targetNode.id,
+        targetId: existingId,
+        type: 'parent',
+        parentRole: null,
+      });
+    } else {
+      const kinship = relativeToKinshipLink(targetNode.id, existingId, relationship, parentRole);
+      await record.addLink(kinship);
     }
   };
 
   const callCreateNew = async (sanitizedName: string) => {
     if (!user) return;
-    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-    const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-    const authToken = session?.access_token || supabaseKey;
-    const response = await fetch(`${supabaseUrl}/rest/v1/rpc/create_relative_secure`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        apikey: supabaseKey,
-        Authorization: `Bearer ${authToken}`,
-      },
-      body: JSON.stringify({
-        new_first_name: sanitizedName,
-        rel_type: relationship,
-        target_node_id: targetNode.id,
-        creator_id: user.id,
-        ...(relationship === 'child' && parentRole && { p_parent_role: parentRole }),
-      }),
+    const record = createTreeRecord({
+      userId: user.id,
+      isAdmin,
+      sessionToken: session?.access_token,
     });
-
-    if (!response.ok) {
-      const errData = await response.json().catch(() => ({}));
-      throw new Error(errData.message || `RPC failed with status ${response.status}`);
-    }
-
-    const result = await response.json();
-    if (!result.success) {
-      throw new Error(result.message || 'Failed to create relative');
-    }
+    await record.addPerson({
+      firstName: sanitizedName,
+      link: {
+        targetId: targetNode.id,
+        relation: relationship,
+        parentRole,
+      },
+    });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {

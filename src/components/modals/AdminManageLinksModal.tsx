@@ -14,7 +14,7 @@ import {
   type ExcludeLinkSpec,
   type ProposedLink,
 } from '../../lib/adminGraphValidation';
-import { adminPatchLink, adminDeleteLink } from '../../lib/adminSupabaseRest';
+import { createTreeRecord } from '../../lib/treeRecord';
 
 interface AdminManageLinksModalProps {
   isOpen: boolean;
@@ -132,7 +132,12 @@ export default function AdminManageLinksModal({
     setSubmitting(true);
     setError(null);
     try {
-      await adminDeleteLink({ session, isAdmin, linkId: link.id });
+      const record = createTreeRecord({
+        userId: session?.user?.id || '',
+        isAdmin,
+        sessionToken: session?.access_token,
+      });
+      await record.removeLink({ id: link.id });
       onSuccess();
       setEditing(null);
     } catch (e) {
@@ -148,17 +153,18 @@ export default function AdminManageLinksModal({
     setSubmitting(true);
     setError(null);
     try {
-      await adminPatchLink({
-        session,
+      const record = createTreeRecord({
+        userId: session?.user?.id || '',
         isAdmin,
-        linkId: editing.id,
-        body: {
-          source_node_id: proposedEdit.source,
-          target_node_id: proposedEdit.target,
-          type: proposedEdit.type,
-          parent_role:
-            proposedEdit.type === 'parent' ? proposedEdit.parentRole ?? null : null,
-        },
+        sessionToken: session?.access_token,
+      });
+      await record.editLink({
+        id: editing.id,
+        sourceId: proposedEdit.source,
+        targetId: proposedEdit.target,
+        type: proposedEdit.type,
+        parentRole:
+          proposedEdit.type === 'parent' ? proposedEdit.parentRole ?? null : null,
       });
       onSuccess();
       setEditing(null);

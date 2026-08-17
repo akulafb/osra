@@ -752,6 +752,7 @@ export const FamilyTree2D: React.FC<FamilyTree2DProps> = ({
                 sourceNode={connectPair.source}
                 targetNode={connectPair.target}
                 graphData={graphData}
+                isAdmin={isAdmin}
                 onConfirm={async (type, parentRole, parentIsSource) => {
                   const sourceId = type === 'parent' && parentIsSource === false ? connectPair.target.id : connectPair.source.id;
                   const targetId = type === 'parent' && parentIsSource === false ? connectPair.source.id : connectPair.target.id;

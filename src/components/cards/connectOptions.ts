@@ -35,7 +35,8 @@ export function buildConnectOptions(
   graphData: FamilyGraph,
   sourceId: string,
   targetId: string,
-  parentRole: ParentRole
+  parentRole: ParentRole,
+  isAdmin: boolean = true
 ): ConnectOptions {
   return {
     sourceParent: validateProposedLink(graphData, {
@@ -55,11 +56,13 @@ export function buildConnectOptions(
       target: targetId,
       type: 'marriage',
     }),
-    divorce: validateProposedLink(graphData, {
-      source: sourceId,
-      target: targetId,
-      type: 'divorce',
-    }),
+    divorce: !isAdmin
+      ? { ok: false, message: 'Only administrators can record a divorce.' }
+      : validateProposedLink(graphData, {
+          source: sourceId,
+          target: targetId,
+          type: 'divorce',
+        }),
   };
 }
 

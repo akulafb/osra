@@ -22,6 +22,7 @@ export interface ConnectPickerCardProps {
   targetId: string;
   targetFirstName: string;
   graphData: FamilyGraph;
+  isAdmin?: boolean;
   onConfirm: (
     type: KinshipLinkType,
     parentRole?: ParentRole,
@@ -38,6 +39,7 @@ export const ConnectPickerCard: React.FC<ConnectPickerCardProps> = ({
   targetId,
   targetFirstName,
   graphData,
+  isAdmin = true,
   onConfirm,
   onCancel,
 }) => {
@@ -47,8 +49,8 @@ export const ConnectPickerCard: React.FC<ConnectPickerCardProps> = ({
   const [submitError, setSubmitError] = useState<string | null>(null);
 
   const options = useMemo(
-    () => buildConnectOptions(graphData, sourceId, targetId, parentRole),
-    [graphData, sourceId, targetId, parentRole]
+    () => buildConnectOptions(graphData, sourceId, targetId, parentRole, isAdmin),
+    [graphData, sourceId, targetId, parentRole, isAdmin]
   );
 
   useEffect(() => {

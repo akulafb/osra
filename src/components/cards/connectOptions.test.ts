@@ -44,6 +44,22 @@ describe('buildConnectOptions', () => {
     expect(options.marriage.ok).toBe(false);
     expect(options.divorce.ok).toBe(false);
   });
+
+  it('disables divorce for non-admin users', () => {
+    const options = buildConnectOptions(graph, 'p1', 'p3', null, false);
+    expect(options.sourceParent.ok).toBe(true);
+    expect(options.targetParent.ok).toBe(true);
+    expect(options.marriage.ok).toBe(true);
+    expect(options.divorce.ok).toBe(false);
+    if (!options.divorce.ok) {
+      expect(options.divorce.message).toBe('Only administrators can record a divorce.');
+    }
+  });
+
+  it('enables divorce for admin users when structurally valid', () => {
+    const options = buildConnectOptions(graph, 'p1', 'p3', null, true);
+    expect(options.divorce.ok).toBe(true);
+  });
 });
 
 describe('resolveConnectSelection', () => {

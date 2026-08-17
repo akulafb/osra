@@ -11,6 +11,7 @@ export interface InlineConnectPickerProps {
   sourceNode: Node2D;
   targetNode: Node2D;
   graphData: FamilyGraph;
+  isAdmin?: boolean;
   onConfirm: (
     type: 'parent' | 'marriage' | 'divorce',
     parentRole?: 'mother' | 'father' | null,
@@ -26,6 +27,7 @@ export const InlineConnectPicker: React.FC<InlineConnectPickerProps> = ({
   sourceNode,
   targetNode,
   graphData,
+  isAdmin,
   onConfirm,
   onCancel,
 }) => {
@@ -60,6 +62,7 @@ export const InlineConnectPicker: React.FC<InlineConnectPickerProps> = ({
           targetId={targetNode.id}
           targetFirstName={targetNode.firstName}
           graphData={graphData}
+          isAdmin={isAdmin}
           onConfirm={onConfirm}
           onCancel={onCancel}
         />

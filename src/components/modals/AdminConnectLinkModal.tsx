@@ -13,7 +13,7 @@ import type { Session } from '@supabase/supabase-js';
 import type { FamilyGraph } from '../../types/graph';
 import { formatNodeDisplayName } from '../../utils/nodeDisplayName';
 import { validateProposedLink, type ProposedLink } from '../../lib/adminGraphValidation';
-import { adminInsertLink } from '../../lib/adminSupabaseRest';
+import { createTreeRecord } from '../../lib/treeRecord';
 
 type RelChoice = 'marriage' | 'divorce' | 'parent';
 
@@ -91,16 +91,16 @@ export default function AdminConnectLinkModal({
     setSubmitting(true);
     setError(null);
     try {
-      await adminInsertLink({
-        session,
+      const record = createTreeRecord({
+        userId,
         isAdmin,
-        body: {
-          source_node_id: proposed.source,
-          target_node_id: proposed.target,
-          type: proposed.type,
-          parent_role: proposed.parentRole ?? null,
-          created_by_user_id: userId,
-        },
+        sessionToken: session?.access_token,
+      });
+      await record.addLink({
+        sourceId: proposed.source,
+        targetId: proposed.target,
+        type: proposed.type,
+        parentRole: proposed.parentRole ?? null,
       });
       onSuccess();
       onClose();
