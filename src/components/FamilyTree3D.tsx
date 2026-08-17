@@ -43,6 +43,7 @@ import {
 } from './cards/connectCandidates';
 import { KinshipLinkType, ParentRole } from './cards/connectOptions';
 import { CONNECT_ACCENT } from './cards/relationStyle';
+import { DirectManipulationController } from '../hooks/useDirectManipulation';
 
 // V3 Shared Assets - paths resolved at runtime for WebP when supported
 const planetTexturePaths = [
@@ -197,6 +198,7 @@ function TextureMenuSpring({
 // Props interface for the refactored component
 interface FamilyTree3DProps {
   graphData: FamilyGraph;
+  interaction: DirectManipulationController;
   selectedNode: FamilyNode | null;
   onNodeSelect: (node: FamilyNode) => void;
   onBackgroundClick?: () => void;
@@ -268,6 +270,7 @@ interface FamilyTree3DProps {
 
 export const FamilyTree3DContent: React.FC<FamilyTree3DProps> = ({
   graphData,
+  interaction,
   selectedNode,
   onNodeSelect,
   onBackgroundClick,
@@ -335,32 +338,32 @@ export const FamilyTree3DContent: React.FC<FamilyTree3DProps> = ({
   const hasIntroPlayed = useRef(false);
   const rotationRef = useRef(0);
 
-  // Connect Mode (LIN-50): two-click targeting, source first.
-  const [connectSource, setConnectSource] = useState<FamilyNode | null>(null);
-  const [connectPair, setConnectPair] = useState<ConnectPair | null>(null);
-  const [rejectedTarget, setRejectedTarget] = useState<{ node: FamilyNode; reason: string } | null>(
-    null
-  );
-  /**
-   * Mirrors the source id for the graph's click handler.
-   *
-   * `onNodeClick` otherwise always launches a camera fly-to, which would rip
-   * the viewport away the instant a target is clicked. Nothing else holds the
-   * camera still — Manipulation Freeze was dropped after prototyping (ADR 0002)
-   * — so this gate is the whole of that guarantee, and a ref keeps it correct
-   * even if the graph is holding an older handler.
-   */
-  const connectModeRef = useRef<string | null>(null);
-  connectModeRef.current = connectSource?.id ?? null;
+  // Connect Mode (LIN-50): driven by unified DirectManipulationController
+  const connectSource = useMemo(() => {
+    if (!interaction.connectSourceId || !graphData?.nodes) return null;
+    return graphData.nodes.find(n => n.id === interaction.connectSourceId) ?? null;
+  }, [interaction.connectSourceId, graphData?.nodes]);
 
-  /**
-   * Delete confirmation (LIN-51): whose aura is pulsing red.
-   *
-   * Held here rather than in the panel because the scene needs it — the pulse
-   * is on the planet, while the ✓ / ✕ hit targets are DOM in the docked panel.
-   * Same split as Connect Mode.
-   */
-  const [confirmingDissolveId, setConfirmingDissolveId] = useState<string | null>(null);
+  const connectPair = useMemo<ConnectPair | null>(() => {
+    if (interaction.state.phase !== 'choosing-kinship' || !graphData?.nodes) return null;
+    const kinshipState = interaction.state;
+    const source = graphData.nodes.find(n => n.id === kinshipState.sourceNodeId);
+    const target = graphData.nodes.find(n => n.id === kinshipState.targetNodeId);
+    if (!source || !target) return null;
+    return { source, target };
+  }, [interaction.state, graphData?.nodes]);
+
+  const rejectedTarget = useMemo(() => {
+    if (!interaction.rejectedTarget || !graphData?.nodes) return null;
+    const node = graphData.nodes.find(n => n.id === interaction.rejectedTarget!.nodeId);
+    if (!node) return null;
+    return { node, reason: interaction.rejectedTarget!.reason };
+  }, [interaction.rejectedTarget, graphData?.nodes]);
+
+  const connectModeRef = useRef<string | null>(null);
+  connectModeRef.current = interaction.connectSourceId;
+
+  const confirmingDissolveId = interaction.confirmingDissolveId;
 
   // Internal state for modals
   const [initialCameraPos, setInitialCameraPos] = useState<{ x: number; y: number; z: number } | null>(null);
@@ -645,43 +648,25 @@ export const FamilyTree3DContent: React.FC<FamilyTree3DProps> = ({
   }, [onNodeSelect, boundsRef]);
 
   const exitConnectMode = useCallback(() => {
-    setConnectSource(null);
-    setConnectPair(null);
-    setRejectedTarget(null);
-  }, []);
+    interaction.handleEscape();
+  }, [interaction]);
 
   const startConnectMode = useCallback(() => {
     if (!selectedNode) return;
-    setConfirmingDissolveId(null);
-    setConnectSource(selectedNode);
-    setConnectPair(null);
-    setRejectedTarget(null);
-  }, [selectedNode]);
+    interaction.startConnect(selectedNode.id);
+  }, [selectedNode, interaction]);
 
   /**
    * Resolve the second click of the pair.
-   *
-   * A refused target says why rather than doing nothing: in a crowded scene an
-   * inert click is indistinguishable from a miss, and the user would keep
-   * aiming at someone who can never be linked.
    */
   const pickConnectTarget = useCallback(
     (node: FamilyNode) => {
-      const source = connectSource;
-      if (!source) return;
-      if (source.id === node.id) {
-        exitConnectMode();
-        return;
-      }
-      const verdict = candidacyFor(graphData, source.id, node.id);
-      if (!verdict.ok) {
-        setRejectedTarget({ node, reason: verdict.reason });
-        return;
-      }
-      setRejectedTarget(null);
-      setConnectPair({ source, target: node });
+      const sourceId = interaction.connectSourceId;
+      if (!sourceId) return;
+      const verdict = candidacyFor(graphData, sourceId, node.id);
+      interaction.pickConnectTarget(node.id, verdict);
     },
-    [connectSource, graphData, exitConnectMode]
+    [interaction, graphData]
   );
 
   const handleGraphNodeClick = useCallback(
@@ -714,23 +699,8 @@ export const FamilyTree3DContent: React.FC<FamilyTree3DProps> = ({
   );
 
   const handleGraphBackgroundClick = useCallback(() => {
-    if (connectPair) {
-      setConnectPair(null);
-      return;
-    }
-    if (connectSource) {
-      exitConnectMode();
-      return;
-    }
-    onBackgroundClick?.();
-  }, [connectPair, connectSource, exitConnectMode, onBackgroundClick]);
-
-  // Connect Mode is anchored to the selection it started from; if that moves
-  // out from under it the docked panel goes with it, so the state has nothing
-  // left to sit on.
-  useEffect(() => {
-    if (connectSource && selectedNode?.id !== connectSource.id) exitConnectMode();
-  }, [selectedNode, connectSource, exitConnectMode]);
+    interaction.handleBackgroundClick();
+  }, [interaction]);
 
   const connectControls = useMemo<Connect3DControls>(
     () => ({
@@ -742,7 +712,7 @@ export const FamilyTree3DContent: React.FC<FamilyTree3DProps> = ({
       rejected: rejectedTarget,
       onStart: startConnectMode,
       onPickTarget: pickConnectTarget,
-      onCancelPair: () => setConnectPair(null),
+      onCancelPair: () => interaction.handleEscape(),
       onExit: exitConnectMode,
       onConfirm: handleConnectConfirm,
     }),
@@ -757,6 +727,7 @@ export const FamilyTree3DContent: React.FC<FamilyTree3DProps> = ({
       pickConnectTarget,
       exitConnectMode,
       handleConnectConfirm,
+      interaction,
     ]
   );
 
@@ -766,29 +737,20 @@ export const FamilyTree3DContent: React.FC<FamilyTree3DProps> = ({
    */
   const handleDissolveConfirm = useCallback(async () => {
     const node = selectedNode;
-    setConfirmingDissolveId(null);
     if (!node) return;
     await Promise.resolve(onDissolveNode?.(node));
   }, [selectedNode, onDissolveNode]);
 
   const dissolveControls = useMemo<Dissolve3DControls>(
     () => ({
-      canDissolve: canDissolveSelected && Boolean(onDissolveNode),
-      isConfirming: Boolean(selectedNode && confirmingDissolveId === selectedNode.id),
-      onStart: () => setConfirmingDissolveId(selectedNode?.id ?? null),
-      onCancel: () => setConfirmingDissolveId(null),
+      canDissolve: !!canDissolveSelected,
+      isConfirming: confirmingDissolveId === selectedNode?.id,
+      onStart: () => selectedNode && interaction.startDissolve(selectedNode.id),
+      onCancel: () => interaction.handleEscape(),
       onConfirm: handleDissolveConfirm,
     }),
-    [canDissolveSelected, onDissolveNode, selectedNode, confirmingDissolveId, handleDissolveConfirm]
+    [canDissolveSelected, confirmingDissolveId, selectedNode, interaction, handleDissolveConfirm]
   );
-
-  // A confirmation belongs to the node it was raised on; if the selection moves
-  // the docked panel goes with it, so the question no longer has a subject.
-  useEffect(() => {
-    if (confirmingDissolveId && selectedNode?.id !== confirmingDissolveId) {
-      setConfirmingDissolveId(null);
-    }
-  }, [selectedNode, confirmingDissolveId]);
 
   // Reset View functionality
   const resetView = useCallback(() => {
@@ -1223,28 +1185,12 @@ export const FamilyTree3DContent: React.FC<FamilyTree3DProps> = ({
           document.activeElement?.tagName === 'INPUT' || 
           document.activeElement?.tagName === 'TEXTAREA') return;
       
-      // A raised delete confirmation is the innermost state, so Escape answers
-      // that one first rather than deselecting out from under it.
-      if (key === 'escape' && confirmingDissolveId) {
+      // Escape answers along the unified unwinding hierarchy
+      if (key === 'escape') {
         e.preventDefault();
-        setConfirmingDissolveId(null);
+        interaction.handleEscape();
         return;
       }
-
-      // Connect Mode is a targeting state: Escape steps back out of it, and the
-      // selection shortcuts are held back so the docked panel cannot be pulled
-      // out from under a half-made link.
-      if (key === 'escape' && connectPair) {
-        e.preventDefault();
-        setConnectPair(null);
-        return;
-      }
-      if (key === 'escape' && connectSource) {
-        e.preventDefault();
-        exitConnectMode();
-        return;
-      }
-      if (connectSource) return;
 
       if (key === 'r') {
         setIsSteeringActive(prev => !prev);

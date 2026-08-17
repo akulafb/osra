@@ -9,11 +9,11 @@ import { useNewNodesSinceSignIn } from '../hooks/useNewNodesSinceSignIn';
 import { FamilyNode, FamilyLink } from '../types/graph';
 import { useAuth } from '../contexts/AuthContext';
 import AdminManageLinksModal from './modals/AdminManageLinksModal';
-import AdminConnectLinkModal from './modals/AdminConnectLinkModal';
 import AdminAddPersonModal from './modals/AdminAddPersonModal';
 import { canEdit, canManageInvites } from '../lib/permissions';
 import { filterGraphData, filterGraphDataFor3D } from '../lib/filterGraphData';
 import { searchNodes } from '../utils/treeSearch';
+import { useDirectManipulation } from '../hooks/useDirectManipulation';
 import AddRelativeModal from './modals/AddRelativeModal';
 import EditNodeModal from './modals/EditNodeModal';
 import BulkInviteModal from './modals/BulkInviteModal';
@@ -40,7 +40,12 @@ export const FamilyTree: React.FC = () => {
     buttonGlowActive,
   } = useNewNodesSinceSignIn(user?.id, graphData);
 
-  const [selectedNode, setSelectedNode] = useState<FamilyNode | null>(null);
+  const interaction = useDirectManipulation();
+  const selectedNode = useMemo(() => {
+    if (!interaction.selectedNodeId || !graphData?.nodes) return null;
+    return graphData.nodes.find((n) => n.id === interaction.selectedNodeId) ?? null;
+  }, [interaction.selectedNodeId, graphData?.nodes]);
+
   const [newMembersModalOpen, setNewMembersModalOpen] = useState(false);
   const [collapsedNodes, setCollapsedNodes] = useState<Set<string>>(new Set());
   const [activePreset, setActivePreset] = useState<string | null>(null);
@@ -54,8 +59,6 @@ export const FamilyTree: React.FC = () => {
   const [canEditSelected, setCanEditSelected] = useState(false);
   const [pendingConnectExistingId, setPendingConnectExistingId] = useState<string | null>(null);
 
-  const [adminConnectFirstId, setAdminConnectFirstId] = useState<string | null>(null);
-  const [adminConnectPair, setAdminConnectPair] = useState<{ fromId: string; toId: string } | null>(null);
   const [adminManageLinksOpen, setAdminManageLinksOpen] = useState(false);
   const [adminAddPersonOpen, setAdminAddPersonOpen] = useState(false);
 
@@ -130,28 +133,6 @@ export const FamilyTree: React.FC = () => {
     });
   }, []);
 
-  const handleNodeSelect = useCallback(
-    (node: FamilyNode) => {
-      if (isAdmin && adminConnectFirstId) {
-        if (node.id === adminConnectFirstId) {
-          setAdminConnectFirstId(null);
-          return;
-        }
-        setAdminConnectPair({ fromId: adminConnectFirstId, toId: node.id });
-        setAdminConnectFirstId(null);
-        setSelectedNode(node);
-        return;
-      }
-      setSelectedNode((prev) => (prev?.id === node.id ? null : node));
-    },
-    [isAdmin, adminConnectFirstId]
-  );
-
-  const handleBackgroundClick = useCallback(() => {
-    setAdminConnectFirstId(null);
-    setSelectedNode(null);
-  }, []);
-
   const handleAdminDeleteSelectedNode = useCallback(async () => {
     if (!selectedNode || !isAdmin || !user) return;
     if (
@@ -171,12 +152,12 @@ export const FamilyTree: React.FC = () => {
         id: selectedNode.id,
       });
       await refetch();
-      setSelectedNode(null);
+      interaction.deselect();
     } catch (e) {
       console.error(e);
       window.alert(e instanceof Error ? e.message : 'Delete failed.');
     }
-  }, [selectedNode, isAdmin, user, session, refetch]);
+  }, [selectedNode, isAdmin, user, session, refetch, interaction]);
 
   const handleToggleCollapse = useCallback((nodeId: string) => {
     setCollapsedNodes(prev => {
@@ -204,10 +185,6 @@ export const FamilyTree: React.FC = () => {
 
   const handleFindMeRequest = useCallback((userCluster: string) => {
     setActivePreset(userCluster);
-  }, []);
-
-  const handleAddRelativeDirect = useCallback((node: FamilyNode) => {
-    setSelectedNode(node);
   }, []);
 
   // Playful Animation Pipeline State (LIN-45)
@@ -309,7 +286,7 @@ export const FamilyTree: React.FC = () => {
         });
         await refetch();
         if (selectedNode?.id === node.id) {
-          setSelectedNode(null);
+          interaction.deselect();
         }
       } catch (e) {
         console.error('[handleConfirmDissolveDirect] Error:', e);
@@ -318,7 +295,7 @@ export const FamilyTree: React.FC = () => {
         window.alert(e instanceof Error ? e.message : 'Delete failed.');
       }
     },
-    [isAdmin, user, session, refetch, selectedNode?.id]
+    [isAdmin, user, session, refetch, selectedNode?.id, interaction]
   );
 
   const handleDirectConnectNodes = useCallback(
@@ -508,28 +485,6 @@ export const FamilyTree: React.FC = () => {
       overflow: 'hidden',
       background: '#0a0a0a',
     }}>
-      {isAdmin && adminConnectFirstId && (
-        <div
-          style={{
-            position: 'absolute',
-            top: 16,
-            left: '50%',
-            transform: 'translateX(-50%)',
-            zIndex: 1500,
-            background: 'rgba(30, 40, 80, 0.95)',
-            color: '#e0e7ff',
-            padding: '10px 16px',
-            borderRadius: 8,
-            border: '1px solid rgba(129, 140, 248, 0.4)',
-            fontSize: '0.9rem',
-            maxWidth: 'min(92vw, 420px)',
-            textAlign: 'center',
-          }}
-        >
-          Tap another person to connect them, or tap the same person again to cancel.
-        </div>
-      )}
-
       {mode === '2D' && showSeeWhosNewButton && newMembers.length > 0 && (
         <div
           style={{
@@ -561,7 +516,7 @@ export const FamilyTree: React.FC = () => {
 
       <PersonDetailDrawer
         selectedNode={selectedNode}
-        onClose={() => setSelectedNode(null)}
+        onClose={() => interaction.deselect()}
         canEditSelected={canEditSelected}
         isAdmin={isAdmin}
         userProfile={userProfile}
@@ -569,7 +524,7 @@ export const FamilyTree: React.FC = () => {
         onEdit={() => setIsEditModalOpen(true)}
         onAdd={() => setIsAddModalOpen(true)}
         onInvite={() => setIsBulkInviteOpen(true)}
-        onConnect={() => setAdminConnectFirstId(selectedNode?.id || null)}
+        onConnect={() => selectedNode && interaction.startConnect(selectedNode.id)}
         onManageLinks={() => setAdminManageLinksOpen(true)}
         onDelete={handleAdminDeleteSelectedNode}
       />
@@ -593,21 +548,6 @@ export const FamilyTree: React.FC = () => {
             existingNodes={graphData?.nodes || []} 
           />
         </>
-      )}
-      {isAdmin && graphData && user && adminConnectPair && (
-        <AdminConnectLinkModal
-          isOpen
-          onClose={() => setAdminConnectPair(null)}
-          graph={graphData}
-          fromId={adminConnectPair.fromId}
-          toId={adminConnectPair.toId}
-          session={session}
-          isAdmin={isAdmin}
-          userId={user.id}
-          onSuccess={() => {
-            void refetch();
-          }}
-        />
       )}
       {isAdmin && graphData && selectedNode && (
         <AdminManageLinksModal
@@ -654,11 +594,12 @@ export const FamilyTree: React.FC = () => {
         {mode === '3D' ? (
           <FamilyTree3D
             graphData={graphData}
+            interaction={interaction}
             selectedNode={selectedNode}
-            onNodeSelect={handleNodeSelect}
+            onNodeSelect={(node) => interaction.selectNode(node.id)}
             backgroundTheme={backgroundTheme}
             onBackgroundThemeChange={setBackgroundTheme}
-            onBackgroundClick={handleBackgroundClick}
+            onBackgroundClick={() => interaction.handleBackgroundClick()}
             collapsedNodes={collapsedNodes}
             onToggleCollapse={handleToggleCollapse}
             onSetCollapsedNodes={handleSetCollapsedNodes}
@@ -711,14 +652,12 @@ export const FamilyTree: React.FC = () => {
         ) : (
           <FamilyTree2D
             graphData={graphData}
+            interaction={interaction}
             layoutType="tree"
             activePreset={activePreset}
             backgroundTheme={backgroundTheme}
             onBackgroundThemeChange={setBackgroundTheme}
             isMobile={isMobile()}
-            selectedNodeId={selectedNode?.id || null}
-            onNodeSelect={handleNodeSelect}
-            onBackgroundClick={handleBackgroundClick}
             collapsedNodes={collapsedNodes}
             onToggleCollapse={handleToggleCollapse}
             onSetCollapsedNodes={handleSetCollapsedNodes}
@@ -742,7 +681,6 @@ export const FamilyTree: React.FC = () => {
             pendingLinkPreview={pendingLinkPreview}
             isAdmin={isAdmin}
             onAdminAddPersonClick={() => setAdminAddPersonOpen(true)}
-            onAddRelative={handleAddRelativeDirect}
             onCreateRelative={handleCreateRelativeDirect}
             onConnectExistingRelative={handleConnectExistingRelativeDirect}
             onDirectConnectNodes={handleDirectConnectNodes}
