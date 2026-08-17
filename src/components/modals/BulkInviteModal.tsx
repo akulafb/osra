@@ -143,7 +143,8 @@ export default function BulkInviteModal({
     if (!relativesData.length) return;
     const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
     const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-    const authToken = session?.access_token || supabaseKey;
+    const authToken = session?.access_token;
+    if (!authToken) return;
 
     try {
       const nodeIds = relativesData.map(r => r.node.id).join(',');
@@ -190,7 +191,7 @@ export default function BulkInviteModal({
     try {
       const selectedNodeIds = selected.map(r => r.node.id).join(',');
       const nowIso = new Date().toISOString();
-      await fetch(
+      const patchRes = await fetch(
         `${supabaseUrl}/rest/v1/node_invites?node_id=in.(${selectedNodeIds})&claimed_by_user_id=is.null`,
         {
           method: 'PATCH',
@@ -205,6 +206,9 @@ export default function BulkInviteModal({
           }),
         }
       );
+      if (!patchRes.ok) {
+        console.warn(`[BulkInvite] Failed to invalidate existing invites (status ${patchRes.status})`);
+      }
     } catch (err) {
       console.error('[BulkInvite] Failed to invalidate existing invites:', err);
       // Continue anyway; failure to invalidate should not block new invites
