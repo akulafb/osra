@@ -88,14 +88,22 @@ CREATE POLICY links_delete_admin_only ON public.links
 -- ============================================================================
 -- NODE_INVITES
 -- ============================================================================
-CREATE POLICY node_invites_select ON public.node_invites
-  FOR SELECT TO public
-  USING (true);
+-- LIN-60: Scoped to authenticated users who can manage the node (or admin)
+CREATE POLICY node_invites_select_1degree_or_admin ON public.node_invites
+  FOR SELECT TO authenticated
+  USING (can_manage_invites_for_node(node_id));
 
 CREATE POLICY node_invites_insert_1degree ON public.node_invites
   FOR INSERT TO authenticated
   WITH CHECK (can_manage_invites_for_node(node_id));
 
+-- LIN-60: Allows bulk invalidation of prior unclaimed invites
+CREATE POLICY node_invites_update_1degree ON public.node_invites
+  FOR UPDATE TO authenticated
+  USING (can_manage_invites_for_node(node_id))
+  WITH CHECK (can_manage_invites_for_node(node_id));
+
 CREATE POLICY node_invites_delete_1degree ON public.node_invites
   FOR DELETE TO authenticated
   USING (can_manage_invites_for_node(node_id));
+

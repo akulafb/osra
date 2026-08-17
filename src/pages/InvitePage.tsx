@@ -191,6 +191,10 @@ export default function InvitePage() {
             setInviteStatus('claimed');
             setErrorMessage('This invite has already been claimed.');
             break;
+          case 'expired_invite':
+            setInviteStatus('expired');
+            setErrorMessage('This invite has expired.');
+            break;
           case 'already_bound':
             setErrorMessage('You are already bound to a node in the family tree.');
             break;
