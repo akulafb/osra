@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import { FamilyGraph } from '../../types/graph';
 import {
   buildConnectOptions,
@@ -52,17 +52,6 @@ export const ConnectPickerCard: React.FC<ConnectPickerCardProps> = ({
     () => buildConnectOptions(graphData, sourceId, targetId, parentRole, isAdmin),
     [graphData, sourceId, targetId, parentRole, isAdmin]
   );
-
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        e.stopPropagation();
-        onCancel();
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onCancel]);
 
   const handleConfirm = async () => {
     const resolved = resolveConnectSelection(selectedRel, options, parentRole);

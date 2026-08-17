@@ -596,10 +596,8 @@ export const FamilyTree: React.FC = () => {
             graphData={graphData}
             interaction={interaction}
             selectedNode={selectedNode}
-            onNodeSelect={(node) => interaction.selectNode(node.id)}
             backgroundTheme={backgroundTheme}
             onBackgroundThemeChange={setBackgroundTheme}
-            onBackgroundClick={() => interaction.handleBackgroundClick()}
             collapsedNodes={collapsedNodes}
             onToggleCollapse={handleToggleCollapse}
             onSetCollapsedNodes={handleSetCollapsedNodes}

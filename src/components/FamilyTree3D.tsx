@@ -200,8 +200,6 @@ interface FamilyTree3DProps {
   graphData: FamilyGraph;
   interaction: DirectManipulationController;
   selectedNode: FamilyNode | null;
-  onNodeSelect: (node: FamilyNode) => void;
-  onBackgroundClick?: () => void;
   collapsedNodes?: Set<string>;
   onToggleCollapse?: (nodeId: string) => void;
   onSetCollapsedNodes?: (nodes: Set<string>) => void;
@@ -272,8 +270,6 @@ export const FamilyTree3DContent: React.FC<FamilyTree3DProps> = ({
   graphData,
   interaction,
   selectedNode,
-  onNodeSelect,
-  onBackgroundClick,
   collapsedNodes: externalCollapsedNodes,
   onToggleCollapse: externalToggleCollapse,
   onSetCollapsedNodes: externalSetCollapsedNodes,
@@ -583,7 +579,7 @@ export const FamilyTree3DContent: React.FC<FamilyTree3DProps> = ({
     if (!fgRef.current) return;
     
     const nodeData = node as any;
-    onNodeSelect(node);
+    interaction.selectNode(node.id);
     
     const x = (typeof nodeData.x === 'number' && !isNaN(nodeData.x)) ? nodeData.x : 0;
     const y = (typeof nodeData.y === 'number' && !isNaN(nodeData.y)) ? nodeData.y : 0;
@@ -598,15 +594,10 @@ export const FamilyTree3DContent: React.FC<FamilyTree3DProps> = ({
     const distance = graphRadius > 0
       ? Math.max(30, Math.min(120, EXIT_MULT * graphRadius * 0.7))
       : 120;
-
-    const camera = fgRef.current.camera();
-    const currentPos = camera.position;
-    
-    let direction = new THREE.Vector3(currentPos.x - x, currentPos.y - y, currentPos.z - z);
-    if (isNaN(direction.x) || isNaN(direction.y) || isNaN(direction.z) || direction.lengthSq() < 0.0001) {
+    const direction = new THREE.Vector3(x, y, z).normalize();
+    // Fallback if node is at origin
+    if (direction.lengthSq() === 0) {
       direction.set(0, 0, 1);
-    } else {
-      direction.normalize();
     }
     
     const targetPos = {
@@ -615,8 +606,9 @@ export const FamilyTree3DContent: React.FC<FamilyTree3DProps> = ({
       z: z + direction.z * distance
     };
     const controls = fgRef.current.controls();
+    const camera = fgRef.current.camera();
 
-    if (!controls) return;
+    if (!controls || !camera) return;
     const focusDuration = typeof durationMs === 'number' && Number.isFinite(durationMs)
       ? durationMs
       : FOCUS_DURATION;
@@ -645,7 +637,7 @@ export const FamilyTree3DContent: React.FC<FamilyTree3DProps> = ({
       if (progress < 1) requestAnimationFrame(animate);
     };
     animate();
-  }, [onNodeSelect, boundsRef]);
+  }, [interaction, boundsRef]);
 
   const exitConnectMode = useCallback(() => {
     interaction.handleEscape();
@@ -769,7 +761,7 @@ export const FamilyTree3DContent: React.FC<FamilyTree3DProps> = ({
     if (!camera || !controls) return;
     
     setActivePreset(null);
-    onBackgroundClick?.();
+    interaction.handleBackgroundClick();
 
     const duration = 1500;
     const startTime = Date.now();
@@ -803,7 +795,7 @@ export const FamilyTree3DContent: React.FC<FamilyTree3DProps> = ({
     };
     
     animate();
-  }, [initialCameraPos, graphData, onBackgroundClick]);
+  }, [initialCameraPos, graphData, interaction]);
 
   // Preset Focus Logic
   const focusNodeById = useCallback((nodeId: string, durationMs = FOCUS_DURATION) => {
@@ -1209,11 +1201,6 @@ export const FamilyTree3DContent: React.FC<FamilyTree3DProps> = ({
           e.preventDefault();
           handleNodeClick(selectedNode);
         }
-      } else if (key === 'escape') {
-        if (selectedNode) {
-          e.preventDefault();
-          onBackgroundClick?.();
-        }
       }
     };
 
@@ -1256,7 +1243,7 @@ export const FamilyTree3DContent: React.FC<FamilyTree3DProps> = ({
     connectPair,
     confirmingDissolveId,
     exitConnectMode,
-    onBackgroundClick,
+    interaction,
   ]);
 
   // Node UI
