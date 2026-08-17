@@ -49,8 +49,31 @@ This fragmentation produced:
    - Retained `canEdit` for UI render gating.
    - Replaced all 13 call sites and deleted `familyMutations.ts` and `adminSupabaseRest.ts`.
 
+## The division of authorization labour
+
+The module checks **admin-ness**. It does not check **1-degree kinship**, and it deliberately does not receive the Kinship Links needed to compute it. This looks wrong — `canEdit` is sitting right there in `permissions.ts` — so the reasoning is recorded here.
+
+The split follows what each side can actually enforce:
+
+- The three `*_secure` RPCs are `SECURITY DEFINER` and self-authorizing — they verify `auth.uid() = creator_id` and then `is_admin() OR is_within_1_degree()`. The database does 1-degree well; duplicating it client-side would be decoration.
+- The four raw REST paths are **not** admin-gated by the database. `POST /nodes` is satisfied by `nodes_insert_by_bound_users` for any bound user; `POST /links` and `PATCH /links` treat `is_admin()` as one disjunct of three; `PATCH /nodes` allows any 1-degree update. Only `DELETE /links` genuinely requires admin. For those four paths a client-side boolean was the *only* gate, distributed across React props.
+
+So the module checks the thing the database doesn't, and leaves the database the thing it already enforces.
+
+**The module's check is a UI affordance, not a security boundary.** It runs in the browser and is forgeable. It exists so the gate is singular and visible rather than scattered, not because it protects anything. The real fix is DB-side and is tracked in LIN-59.
+
+## Considered and rejected
+
+- **Passing the full `{ userId, isAdmin, userNodeId, links }` so the module could run `canEdit` properly.** Rejected: `canEdit` needs the entire Kinship Link array, which would drag the Tree Record's read model into the interface of a module that exists to narrow it. Depth is a property of the interface; this would have widened it.
+- **Two adapters, admin and non-admin, chosen by the caller.** Rejected: caller-chosen routing is what produced the Connect Mode defect. The caller should not need to know which transport its write takes.
+- **Leaving the raw REST writes outside the module and absorbing only the RPC-backed paths.** Rejected: that leaves precisely the four ungated paths outside the seam.
+- **An in-memory fake as the test double.** Rejected: the drift that actually occurred was in *request bodies* — `familyMutations.ts` and `AddRelativeModal.tsx` built the same RPC body with different trims and different error text. A fake at the module interface cannot see that; an injected `fetch` can.
+
 ## Consequences
 
 - All tree writes now share uniform error handling, telemetry potential, and identity routing.
 - The defect where non-admins could create faulty parent links via divorce is closed at both the UI picker level and module level.
 - Server-side RLS gaps for raw REST endpoints remain documented under LIN-59.
+- **Recording a divorce is admin-only.** This was previously an accident — the non-admin RPC takes a Relative Direction, and `divorce` has none — but it is now a deliberate product rule (LIN-61). Connect Mode disables the option for non-admins rather than letting the module refuse after the fact, and the module refuses as a backstop. Expect this to be re-proposed: `marriage` is unrestricted for the same users, so "why can they record the marriage but not the divorce?" is the obvious question. The answer is that a divorce is a claim about two living relatives that the tree should not let an arbitrary 1-degree relative assert unilaterally. Reversing it means a migration, not a client change.
+- That rule is **not yet enforced by the database**. `links_insert_1degree_or_admin` permits a non-admin to create a `divorce` link by going straight at `POST /rest/v1/links`, since admin is only one disjunct of three. Until LIN-59 lands, the restriction lives entirely in the client — exactly like the admin gate described above.
+- The interface is the test surface. Six operations behind one injected `fetch`.
