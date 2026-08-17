@@ -19,12 +19,12 @@ A typed genealogical edge connecting two Persons (`parent`, `marriage`, or `divo
 _Avoid_: Edge, Connection, Wire, Branch
 
 **Tree Record**:
-The single source of truth and deep write module (`src/lib/treeRecord.ts`) that owns every mutation to Persons and Kinship Links in the tree archive.
-_Avoid_: Mutation service, REST helpers, Direct fetch
+The persisted set of Persons and Kinship Links — the authoritative family tree, as distinct from the Tree Nodes drawn on a canvas.
+_Avoid_: Family tree (already names three view components), Graph, Store, Database
 
 **Relative Direction**:
-A relative relation framed from the perspective of an anchor Person (`parent`, `child`, `spouse`, `sibling`). Converted at module edges into an absolute Kinship Link.
-_Avoid_: Edge type (when referring to directional intent)
+The direction an Action Handle points — Parent, Child, Spouse or Sibling — expressed relative to an anchor Person. It is not a Kinship Link type: Parent and Child both resolve to a `parent` link with the endpoints reversed, Spouse resolves to `marriage`, Sibling resolves to a `parent` link from the anchor's own parents, and `divorce` has no Relative Direction at all.
+_Avoid_: Relation type, Link type, Relationship
 
 ### Direct Interaction
 

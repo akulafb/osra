@@ -6,7 +6,10 @@ Issues and specs for this repo live in the **LinearFB** workspace on Linear, und
 
 - **Workspace**: LinearFB (`https://linear.app/linearfb`)
 - **Team**: LinearFB (ID: `e54a1a9e-9b96-447a-8f6a-b8f1dd6b40d2`)
+- **Project**: Osra (ID: `4896eba0-6f46-411f-ab1d-4bdd0353c6cd`)
 - **Issue prefix**: `LIN-`
+
+**Every issue created from this repo belongs to the Osra project.** Always pass `project: "Osra"` to `save_issue` — it is not applied by default, and issues created without it land loose in the team.
 
 ## Existing labels
 
@@ -31,7 +34,7 @@ Issues and specs for this repo live in the **LinearFB** workspace on Linear, und
 
 ## Conventions
 
-- **Create an issue**: Use `save_issue` with `title`, `team: "LinearFB"`, and `description` (Markdown). Add labels, priority, and state as needed.
+- **Create an issue**: Use `save_issue` with `title`, `team: "LinearFB"`, `project: "Osra"`, and `description` (Markdown). Add labels, priority, and state as needed.
 - **Read an issue**: Use `get_issue` with the identifier (e.g. `LIN-123`). Pass `includeRelations: true` for blocking/related edges.
 - **List issues**: Use `list_issues` with filters (`team`, `status`, `label`, `assignee`, `query`).
 - **Update an issue**: Use `save_issue` with `id: "LIN-123"` plus the fields to change.
@@ -41,7 +44,7 @@ Issues and specs for this repo live in the **LinearFB** workspace on Linear, und
 
 ## When a skill says "publish to the issue tracker"
 
-Create a Linear issue via `save_issue` with `team: "LinearFB"`.
+Create a Linear issue via `save_issue` with `team: "LinearFB"` and `project: "Osra"`.
 
 ## When a skill says "fetch the relevant ticket"
 
