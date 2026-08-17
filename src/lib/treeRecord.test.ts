@@ -453,6 +453,49 @@ describe('treeRecord module', () => {
       });
     });
 
+    it('categorizes RPC unauthorized response as not-authorized', async () => {
+      const mockFetch = vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ success: false, message: 'Unauthorized' }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      );
+      const record = createTreeRecord(
+        { userId: 'user-1', isAdmin: false },
+        { ...TEST_CONFIG, fetch: mockFetch }
+      );
+
+      await expect(
+        record.addLink({ sourceId: 'p1', targetId: 'p2', type: 'marriage' })
+      ).rejects.toMatchObject({
+        kind: 'not-authorized',
+        message: 'Unauthorized',
+      });
+    });
+
+    it('categorizes RPC create_relative unauthorized response as not-authorized', async () => {
+      const mockFetch = vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ success: false, message: 'Unauthorized' }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      );
+      const record = createTreeRecord(
+        { userId: 'user-1', isAdmin: false },
+        { ...TEST_CONFIG, fetch: mockFetch }
+      );
+
+      await expect(
+        record.addPerson({
+          firstName: 'Farah',
+          link: { targetId: 'p1', relation: 'child' },
+        })
+      ).rejects.toMatchObject({
+        kind: 'not-authorized',
+        message: 'Unauthorized',
+      });
+    });
+
     it('categorizes network/fetch failures as network', async () => {
       const mockFetch = vi.fn().mockRejectedValue(new Error('Failed to fetch'));
       const record = createTreeRecord(
