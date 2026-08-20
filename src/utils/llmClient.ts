@@ -9,15 +9,15 @@ const LLM_MODE = import.meta.env.VITE_LLM_MODE || 'cloud';
 const OPENROUTER_API_KEY = import.meta.env.VITE_OPENROUTER_API_KEY;
 const OLLAMA_URL = 'http://127.0.0.1:11434/api/chat';
 
-export async function callLLM(messages: Message[]): Promise<string> {
+export const callLLM = async function callLLM(messages: Message[]): Promise<string> {
   if (LLM_MODE === 'cloud') {
     return callOpenRouter(messages);
   } else {
     return callOllama(messages);
   }
-}
+};
 
-async function callOpenRouter(messages: Message[]): Promise<string> {
+export const callOpenRouter = async function callOpenRouter(messages: Message[]): Promise<string> {
   if (!OPENROUTER_API_KEY) {
     throw new Error('OpenRouter API key is missing. Set VITE_OPENROUTER_API_KEY.');
   }
@@ -32,7 +32,7 @@ async function callOpenRouter(messages: Message[]): Promise<string> {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        model: 'x-ai/grok-4-fast', 
+        model: 'x-ai/grok-4.3', 
         messages: messages
       })
     });
@@ -50,9 +50,9 @@ async function callOpenRouter(messages: Message[]): Promise<string> {
     console.error('Error calling OpenRouter:', err);
     throw new Error('Unable to get a response. Please try again.');
   }
-}
+};
 
-async function callOllama(messages: Message[]): Promise<string> {
+export const callOllama = async function callOllama(messages: Message[]): Promise<string> {
   try {
     const response = await fetch(OLLAMA_URL, {
       method: 'POST',
@@ -77,4 +77,4 @@ async function callOllama(messages: Message[]): Promise<string> {
     console.error('Error calling Ollama:', err);
     throw new Error('Unable to get a response. Please try again.');
   }
-}
+};
