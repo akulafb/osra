@@ -118,7 +118,7 @@ Each solution unlocked the next challenge, building from a simple graph into a f
 
 ### AI & LLM
 
-- **OpenRouter**: Cloud-based LLM access (Grok-4-Fast)
+- **OpenRouter**: Cloud-based LLM access (Grok 4.3)
 - **Ollama**: Local LLM support (Qwen 2.5 Coder)
 - **Custom Reasoning Engine**: Person-centric context generation from graph data
 
