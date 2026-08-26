@@ -26,6 +26,19 @@ _Avoid_: Family tree (already names three view components), Graph, Store, Databa
 The direction an Action Handle points — Parent, Child, Spouse or Sibling — expressed relative to an anchor Person. It is not a Kinship Link type: Parent and Child both resolve to a `parent` link with the endpoints reversed, Spouse resolves to `marriage`, Sibling resolves to a `parent` link from the anchor's own parents, and `divorce` has no Relative Direction at all.
 _Avoid_: Relation type, Link type, Relationship
 
+**Person Match**:
+An existing Person who might be the one currently being described, together with why we think so: whether the given name matches exactly, whether they are currently drawn, and whether they are already linked to the anchor.
+_Avoid_: Duplicate, Suggestion, Autocomplete result
+
+**Match Resolution**:
+What a Person Match obliges the caller to do: nothing, offer the matches, or require the user to resolve before writing.
+_Avoid_: Validation, Conflict, Duplicate check
+
+**1-Degree Network**:
+The immediate family boundary around an anchor Person — self, parents, children, spouses, siblings, and blended family equivalents (stepparents, stepchildren, co-parents) — used for permission scopes and invite management.
+_Avoid_: Immediate family, Close relatives, Permission group
+
+
 ### Direct Interaction
 
 **Action Handle**:

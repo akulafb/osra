@@ -496,6 +496,13 @@ export const FamilyTree3DContent: React.FC<FamilyTree3DProps> = ({
     connectPair,
   ]);
 
+  // Who the 3D filter is currently drawing. Person Matching searches the whole
+  // Tree Record regardless and labels the rest as hidden.
+  const visibleIds3D = useMemo(
+    () => new Set(filteredGraphData.nodes.map((n) => n.id)),
+    [filteredGraphData.nodes]
+  );
+
   const connectCandidacy = useMemo<Map<string, Candidacy>>(
     () =>
       connectSource
@@ -2124,6 +2131,7 @@ export const FamilyTree3DContent: React.FC<FamilyTree3DProps> = ({
         selectedNode={selectedNode}
         canEdit={canEditSelected && !isMobileDevice}
         existingNodes={graphData?.nodes ?? []}
+        visibleIds={visibleIds3D}
         graphData={graphData}
         fgRef={fgRef}
         nodes={filteredGraphData.nodes}

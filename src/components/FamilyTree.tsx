@@ -343,6 +343,10 @@ export const FamilyTree: React.FC = () => {
     return filtered.nodes;
   }, [graphData, mode, collapsedNodes, activePreset, visibleClusters3D, uniqueClusters]);
 
+  // Person Matching searches the whole Tree Record and labels the rest as
+  // hidden, so the modals need to know what the active filter is drawing.
+  const visibleIds = useMemo(() => new Set(visibleNodes.map((n) => n.id)), [visibleNodes]);
+
   const searchMatches = useMemo(
     () => searchNodes(visibleNodes, searchQuery),
     [visibleNodes, searchQuery]
@@ -538,6 +542,8 @@ export const FamilyTree: React.FC = () => {
             targetNode={selectedNode} 
             onSuccess={refetch} 
             existingNodes={graphData?.nodes || []} 
+            visibleIds={visibleIds}
+            existingLinks={graphData?.links || []}
             onPendingConnectTargetChange={handlePendingConnectTargetChange}
           />
           <EditNodeModal 
@@ -546,6 +552,7 @@ export const FamilyTree: React.FC = () => {
             targetNode={selectedNode} 
             onSuccess={refetch} 
             existingNodes={graphData?.nodes || []} 
+            visibleIds={visibleIds}
           />
         </>
       )}

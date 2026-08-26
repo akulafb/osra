@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useMemo, useSyncExternalStore } from 'react';
 import Button from '@mui/material/Button';
 import { useAuth } from '../../contexts/AuthContext';
-import { FamilyNode } from '../../types/graph';
-import { formatNodeDisplayName, nodeSearchHaystack } from '../../utils/nodeDisplayName';
+import { FamilyLink, FamilyNode } from '../../types/graph';
+import { formatNodeDisplayName } from '../../utils/nodeDisplayName';
+import { connectedPersonIds, matchExistingPersons, readMatchResolution } from '../../lib/personMatch';
 import { createTreeRecord, relativeToKinshipLink } from '../../lib/treeRecord';
 
 interface AddRelativeModalProps {
@@ -11,7 +12,12 @@ interface AddRelativeModalProps {
   targetNode: FamilyNode;
   /** Called after a successful add/link; awaited before closing so the tree shows the real edge before the cyan preview is removed. */
   onSuccess: () => void | Promise<void>;
+  /** The whole Tree Record, unfiltered — a filter must not hide a Person Match. */
   existingNodes: FamilyNode[];
+  /** Ids currently drawn, so matches the filter is hiding can say so. */
+  visibleIds?: ReadonlySet<string>;
+  /** Every Kinship Link in the Tree Record; already-linked matches are marked. */
+  existingLinks?: FamilyLink[];
   /** Called when user selects/clears a connect-to-existing target (for tree preview). */
   onPendingConnectTargetChange?: (existingNodeId: string | null) => void;
 }
@@ -34,22 +40,14 @@ function getPreviewNarrowServer() {
   return false;
 }
 
-function sortDuplicateCandidates(trimmedName: string, candidates: FamilyNode[]): FamilyNode[] {
-  const lower = trimmedName.toLowerCase();
-  return [...candidates].sort((a, b) => {
-    const ae = a.firstName.trim().toLowerCase() === lower ? 0 : 1;
-    const be = b.firstName.trim().toLowerCase() === lower ? 0 : 1;
-    if (ae !== be) return ae - be;
-    return a.firstName.localeCompare(b.firstName);
-  });
-}
-
 export default function AddRelativeModal({
   isOpen,
   onClose,
   targetNode,
   onSuccess,
   existingNodes,
+  visibleIds,
+  existingLinks,
   onPendingConnectTargetChange,
 }: AddRelativeModalProps) {
   const { user, isAdmin, session } = useAuth();
@@ -61,18 +59,28 @@ export default function AddRelativeModal({
   const [confirmedDifferentPerson, setConfirmedDifferentPerson] = useState(false);
   const [selectedExistingId, setSelectedExistingId] = useState<string | null>(null);
 
-  const duplicateCandidates = useMemo(() => {
-    const t = name.trim();
-    if (t.length <= 2) return [];
-    const matches = existingNodes.filter(
-      (node) =>
-        node.id !== targetNode.id &&
-        nodeSearchHaystack(node).toLowerCase().includes(t.toLowerCase())
-    );
-    return sortDuplicateCandidates(t, matches);
-  }, [name, existingNodes, targetNode.id]);
+  const connectedIds = useMemo(
+    () => connectedPersonIds(existingLinks ?? [], targetNode.id),
+    [existingLinks, targetNode.id]
+  );
 
-  const hasDuplicateConflict = duplicateCandidates.length > 0;
+  const resolution = useMemo(
+    () =>
+      matchExistingPersons({
+        query: name,
+        intent: 'creating',
+        pool: existingNodes,
+        excludePersonId: targetNode.id,
+        visibleIds,
+        connectedIds,
+      }),
+    [name, existingNodes, targetNode.id, visibleIds, connectedIds]
+  );
+
+  // Only an exact given-name collision is a question worth blocking on; the
+  // old guard fired on any substring, so "Bad" stopped the Badran cluster.
+  const { matches, hiddenMatchCount, mustConfirm: mustConfirmMatch } =
+    readMatchResolution(resolution);
   const isPreviewConnectMode = Boolean(selectedExistingId);
   const previewNarrow = useSyncExternalStore(
     subscribePreviewNarrow,
@@ -149,7 +157,7 @@ export default function AddRelativeModal({
     const sanitizedName = name.trim().slice(0, MAX_NAME_LENGTH);
     if (!user || !sanitizedName) return;
 
-    if (hasDuplicateConflict && !confirmedDifferentPerson && !selectedExistingId) {
+    if (mustConfirmMatch && !confirmedDifferentPerson && !selectedExistingId) {
       setError('Choose an existing person to connect to, or confirm this is a different person.');
       return;
     }
@@ -218,7 +226,7 @@ export default function AddRelativeModal({
   const primaryDisabled =
     isSubmitting ||
     !name.trim() ||
-    (hasDuplicateConflict && !confirmedDifferentPerson && !selectedExistingId);
+    (mustConfirmMatch && !confirmedDifferentPerson && !selectedExistingId);
 
   const primaryLabel = isSubmitting
     ? 'Working…'
@@ -295,27 +303,53 @@ export default function AddRelativeModal({
             </div>
           )}
 
-          {duplicateCandidates.length > 0 && (
+          {matches.length > 0 && (
             <div style={warningStyle}>
               <strong style={{ fontSize: '0.75rem', letterSpacing: '0.05em' }}>MATCHES DETECTED IN ARCHIVE</strong>
               <p style={{ fontSize: '0.8rem', margin: '8px 0', color: 'rgba(255,255,255,0.7)' }}>
-                Select someone to connect, or confirm this is a new entry.
+                {mustConfirmMatch
+                  ? 'Select someone to connect, or confirm this is a new entry.'
+                  : 'Someone here may already be this person. Connecting is optional.'}
               </p>
               <ul style={{ margin: '12px 0', paddingLeft: '0', listStyle: 'none' }}>
-                {duplicateCandidates.map((m) => (
-                  <li key={m.id} style={{ marginBottom: '8px' }}>
+                {matches.map(({ person, isVisible, isAlreadyConnected }) => (
+                  <li key={person.id} style={{ marginBottom: '8px' }}>
                     <button
                       type="button"
-                      onClick={() => selectExisting(m.id)}
+                      onClick={() => selectExisting(person.id)}
+                      disabled={isAlreadyConnected}
                       style={{
                         ...matchRowStyle,
+                        cursor: isAlreadyConnected ? 'default' : 'pointer',
+                        opacity: isAlreadyConnected ? 0.55 : 1,
                         borderColor:
-                          selectedExistingId === m.id ? '#D4AF37' : 'rgba(255,255,255,0.1)',
+                          selectedExistingId === person.id ? '#D4AF37' : 'rgba(255,255,255,0.1)',
                         backgroundColor:
-                          selectedExistingId === m.id ? 'rgba(212, 175, 55, 0.1)' : 'rgba(0,0,0,0.2)',
+                          selectedExistingId === person.id
+                            ? 'rgba(212, 175, 55, 0.1)'
+                            : 'rgba(0,0,0,0.2)',
                       }}
                     >
-                      <span style={{ fontWeight: 600, color: 'white' }}>{formatNodeDisplayName(m)}</span>
+                      <span style={{ fontWeight: 600, color: 'white' }}>
+                        {formatNodeDisplayName(person)}
+                      </span>
+                      {(!isVisible || isAlreadyConnected) && (
+                        <span
+                          style={{
+                            fontSize: '0.65rem',
+                            color: 'rgba(255,255,255,0.55)',
+                            display: 'block',
+                            marginTop: '2px',
+                          }}
+                        >
+                          {[
+                            !isVisible ? 'hidden by filter' : null,
+                            isAlreadyConnected ? 'already connected' : null,
+                          ]
+                            .filter(Boolean)
+                            .join(' · ')}
+                        </span>
+                      )}
                       <span
                         style={{
                           fontSize: '0.65rem',
@@ -326,12 +360,19 @@ export default function AddRelativeModal({
                           marginTop: '2px'
                         }}
                       >
-                        {m.id}
+                        {person.id}
                       </span>
                     </button>
                   </li>
                 ))}
               </ul>
+              {hiddenMatchCount > 0 && (
+                <p style={{ fontSize: '0.7rem', margin: '0 0 8px 0', color: 'rgba(255,255,255,0.5)' }}>
+                  +{hiddenMatchCount} more match{hiddenMatchCount === 1 ? '' : 'es'} not shown.
+                </p>
+              )}
+              {/* Only a must-confirm resolution blocks submit, so only it needs an answer. */}
+              {mustConfirmMatch && (
               <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', marginTop: '16px' }}>
                 <input
                   type="checkbox"
@@ -347,6 +388,7 @@ export default function AddRelativeModal({
                 />
                 <span style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.8)' }}>I am adding a totally different person</span>
               </label>
+              )}
             </div>
           )}
 
