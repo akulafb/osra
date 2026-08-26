@@ -170,6 +170,9 @@ export const FamilyTree2D: React.FC<FamilyTree2DProps> = ({
   const highlightTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [transform, setTransform] = useState({ x: 0, y: 0, k: 1 });
+  // Read by the layout pin, which must not re-run when the user pans.
+  const transformRef = useRef(transform);
+  transformRef.current = transform;
   const [isDragging, setIsDragging] = useState(false);
   const [showControls, setShowControls] = useState(false);
   const [isPresetMenuOpen, setIsPresetMenuOpen] = useState(false);
@@ -232,6 +235,8 @@ export const FamilyTree2D: React.FC<FamilyTree2DProps> = ({
     [collapsedNodes]
   );
   const isEmpty = nodes.length === 0;
+  // Set by the fit below, so the pin further down does not fight it.
+  const justFittedRef = useRef(false);
 
   // Setup zoom behavior
   useEffect(() => {
@@ -281,10 +286,63 @@ export const FamilyTree2D: React.FC<FamilyTree2DProps> = ({
     const initialTransform = zoomIdentity.translate(centerX, centerY).scale(scale);
 
     if (zoomBehaviorRef.current) {
+      justFittedRef.current = true;
       select(svgRef.current)
         .call(zoomBehaviorRef.current.transform as any, initialTransform);
     }
   }, [activePreset, layoutType, collapsedKey, isEmpty]);
+
+  // Keep the viewport pinned to whatever was at its centre when the layout
+  // reflows. Adding a person re-tidies the entire tree, so every node moves —
+  // the camera never budged, but the tree slid out from under it just as the
+  // Spawn started playing (LIN-55). Pinning a node that survived the reflow
+  // holds the picture still and lets the tree rearrange around it.
+  const previousLayoutRef = useRef<Map<string, { x: number; y: number }>>(new Map());
+  useEffect(() => {
+    const previous = previousLayoutRef.current;
+    const current = new Map(nodes.map((n) => [n.id, { x: n.x, y: n.y }]));
+    previousLayoutRef.current = current;
+
+    if (justFittedRef.current) {
+      justFittedRef.current = false;
+      return;
+    }
+    if (previous.size === 0 || current.size === 0) return;
+    if (!svgRef.current || !zoomBehaviorRef.current) return;
+
+    const svg = svgRef.current;
+    const rect = svg.getBoundingClientRect();
+    const t = transformRef.current;
+
+    // Viewport centre, in layout coordinates.
+    const centreX = (rect.width / 2 - t.x) / t.k;
+    const centreY = (rect.height / 2 - t.y) / t.k;
+
+    let pin: { before: { x: number; y: number }; after: { x: number; y: number } } | null = null;
+    let nearest = Infinity;
+    previous.forEach((before, id) => {
+      const after = current.get(id);
+      if (!after) return;
+      const distance = (before.x - centreX) ** 2 + (before.y - centreY) ** 2;
+      if (distance < nearest) {
+        nearest = distance;
+        pin = { before, after };
+      }
+    });
+    if (!pin) return;
+
+    const { before, after } = pin as { before: { x: number; y: number }; after: { x: number; y: number } };
+    const dx = (before.x - after.x) * t.k;
+    const dy = (before.y - after.y) * t.k;
+    if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) return;
+
+    // No transition: this is a correction, not a movement. It should be
+    // invisible, so that the reflow reads as the tree making room.
+    select(svg).call(
+      zoomBehaviorRef.current.transform as any,
+      zoomIdentity.translate(t.x + dx, t.y + dy).scale(t.k)
+    );
+  }, [nodes]);
 
   // Handle keyboard navigation
   useEffect(() => {

@@ -7,6 +7,9 @@ import type { Database } from '../types/database';
 type NodeRow = Database['public']['Tables']['nodes']['Row'];
 type LinkRow = Database['public']['Tables']['links']['Row'];
 
+/** How far from their relatives a newly Spawned person is seeded, in graph units. */
+const SEED_RADIUS = 40;
+
 export function useFamilyData() {
   const { session, user } = useAuth();
   const [graphData, setGraphData] = useState<FamilyGraph | null>(null);
@@ -29,7 +32,7 @@ export function useFamilyData() {
    * whole tree flies to a new arrangement. Carrying the coordinates over keeps
    * a Spawn or Dissolve visible where it happened (LIN-55).
    */
-  const carryPositions = (next: FamilyNode[]): FamilyNode[] => {
+  const carryPositions = (next: FamilyNode[], links: FamilyLink[]): FamilyNode[] => {
     const previous = new Map(previousNodesRef.current.map((n) => [n.id, n]));
     const carried = next.map((node) => {
       const prior = previous.get(node.id);
@@ -44,6 +47,39 @@ export function useFamilyData() {
         fz: prior.fz,
       };
     });
+
+    // A just-Spawned person has no position at all, so the simulation drops
+    // them somewhere arbitrary and then shoves the rest of the tree aside
+    // making room — which is the jolt, and why it only happened on Spawn.
+    // Start them beside the relative they were added to instead.
+    const idOf = (endpoint: FamilyLink['source']): string =>
+      typeof endpoint === 'string' ? endpoint : endpoint.id;
+    const byId = new Map(carried.map((n) => [n.id, n]));
+    const neighbours = new Map<string, string[]>();
+    for (const link of links) {
+      const a = idOf(link.source);
+      const b = idOf(link.target);
+      neighbours.set(a, [...(neighbours.get(a) ?? []), b]);
+      neighbours.set(b, [...(neighbours.get(b) ?? []), a]);
+    }
+
+    carried.forEach((node, index) => {
+      if (node.x !== undefined) return;
+      const anchors = (neighbours.get(node.id) ?? [])
+        .map((id) => byId.get(id))
+        .filter((n): n is FamilyNode => !!n && n.x !== undefined);
+      if (anchors.length === 0) return;
+
+      const mean = (pick: (n: FamilyNode) => number | undefined) =>
+        anchors.reduce((sum, n) => sum + (pick(n) ?? 0), 0) / anchors.length;
+      // Golden angle, so several new people in one fetch fan out rather than
+      // landing on top of each other. Deterministic: no randomness to chase.
+      const angle = index * 2.39996;
+      node.x = mean((n) => n.x) + Math.cos(angle) * SEED_RADIUS;
+      node.y = mean((n) => n.y) + Math.sin(angle) * SEED_RADIUS;
+      node.z = mean((n) => n.z);
+    });
+
     previousNodesRef.current = carried;
     return carried;
   };
@@ -177,14 +213,14 @@ export function useFamilyData() {
           { id: 'l-6', source: 'node-1', target: 'node-6', type: 'parent' },
         ];
         const sanitized = dropOrphanLinks(mockNodes, mockLinks);
-        setGraphData({ nodes: carryPositions(mockNodes), links: sanitized });
+        setGraphData({ nodes: carryPositions(mockNodes, sanitized), links: sanitized });
         setIsLoading(false);
         return;
       }
 
       const rawGraph: FamilyGraph = { nodes, links: linksForState };
       const sanitized = dropOrphanLinks(rawGraph.nodes, rawGraph.links);
-      setGraphData({ nodes: carryPositions(nodes), links: sanitized });
+      setGraphData({ nodes: carryPositions(nodes, sanitized), links: sanitized });
       setIsLoading(false);
     } catch (err) {
       console.error('[useFamilyData] Error fetching family data:', err);
