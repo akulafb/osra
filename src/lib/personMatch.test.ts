@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   connectedPersonIds,
   matchExistingPersons,
+  readMatchResolution,
   MATCH_CANDIDATE_LIMIT,
   MIN_MATCH_QUERY_LENGTH,
 } from './personMatch';
@@ -216,5 +217,26 @@ describe('connectedPersonIds', () => {
 
   it('is empty for a Person with no links', () => {
     expect(connectedPersonIds(links, 'lonely')).toEqual(new Set());
+  });
+});
+
+describe('readMatchResolution', () => {
+  it('reads a none resolution as nothing to show and nothing to answer', () => {
+    expect(readMatchResolution({ kind: 'none' })).toEqual({
+      matches: [],
+      hiddenMatchCount: 0,
+      mustConfirm: false,
+    });
+  });
+
+  it('reports what the cap left out', () => {
+    const read = readMatchResolution(creating('badran'));
+    expect(read.hiddenMatchCount).toBe(1);
+    expect(read.mustConfirm).toBe(false);
+  });
+
+  it('reports must-confirm only for the resolution that blocks', () => {
+    expect(readMatchResolution(creating('Ahmad')).mustConfirm).toBe(true);
+    expect(readMatchResolution(creating('Bad')).mustConfirm).toBe(false);
   });
 });

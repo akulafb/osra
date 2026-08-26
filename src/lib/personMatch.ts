@@ -105,6 +105,29 @@ export function matchExistingPersons({
 }
 
 /**
+ * What a caller renders and enforces, without re-branching on `kind`.
+ *
+ * Every caller wants the same three things out of a Match Resolution, and doing
+ * that unwrapping at three call sites is how the policy leaked out last time.
+ */
+export function readMatchResolution(resolution: MatchResolution): {
+  matches: PersonMatch[];
+  /** Matches the cap left out, so a caller can stay honest about what it hides. */
+  hiddenMatchCount: number;
+  /** The user has to resolve this before the write is allowed. */
+  mustConfirm: boolean;
+} {
+  if (resolution.kind === 'none') {
+    return { matches: [], hiddenMatchCount: 0, mustConfirm: false };
+  }
+  return {
+    matches: resolution.matches,
+    hiddenMatchCount: resolution.totalMatchCount - resolution.matches.length,
+    mustConfirm: resolution.kind === 'must-confirm',
+  };
+}
+
+/**
  * Ids sharing a Kinship Link with the anchor, for `connectedIds`.
  *
  * Endpoints arrive as ids from the Tree Record and as node objects once the

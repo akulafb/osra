@@ -3,7 +3,7 @@ import Button from '@mui/material/Button';
 import { useAuth } from '../../contexts/AuthContext';
 import { FamilyLink, FamilyNode } from '../../types/graph';
 import { formatNodeDisplayName } from '../../utils/nodeDisplayName';
-import { connectedPersonIds, matchExistingPersons } from '../../lib/personMatch';
+import { connectedPersonIds, matchExistingPersons, readMatchResolution } from '../../lib/personMatch';
 import { createTreeRecord, relativeToKinshipLink } from '../../lib/treeRecord';
 
 interface AddRelativeModalProps {
@@ -12,7 +12,7 @@ interface AddRelativeModalProps {
   targetNode: FamilyNode;
   /** Called after a successful add/link; awaited before closing so the tree shows the real edge before the cyan preview is removed. */
   onSuccess: () => void | Promise<void>;
-  /** The whole Tree Record, unfiltered — a filter must not hide a duplicate. */
+  /** The whole Tree Record, unfiltered — a filter must not hide a Person Match. */
   existingNodes: FamilyNode[];
   /** Ids currently drawn, so matches the filter is hiding can say so. */
   visibleIds?: ReadonlySet<string>;
@@ -77,12 +77,10 @@ export default function AddRelativeModal({
     [name, existingNodes, targetNode.id, visibleIds, connectedIds]
   );
 
-  const matches = resolution.kind === 'none' ? [] : resolution.matches;
-  const hiddenMatchCount =
-    resolution.kind === 'none' ? 0 : resolution.totalMatchCount - matches.length;
   // Only an exact given-name collision is a question worth blocking on; the
   // old guard fired on any substring, so "Bad" stopped the Badran cluster.
-  const hasDuplicateConflict = resolution.kind === 'must-confirm';
+  const { matches, hiddenMatchCount, mustConfirm: mustConfirmMatch } =
+    readMatchResolution(resolution);
   const isPreviewConnectMode = Boolean(selectedExistingId);
   const previewNarrow = useSyncExternalStore(
     subscribePreviewNarrow,
@@ -159,7 +157,7 @@ export default function AddRelativeModal({
     const sanitizedName = name.trim().slice(0, MAX_NAME_LENGTH);
     if (!user || !sanitizedName) return;
 
-    if (hasDuplicateConflict && !confirmedDifferentPerson && !selectedExistingId) {
+    if (mustConfirmMatch && !confirmedDifferentPerson && !selectedExistingId) {
       setError('Choose an existing person to connect to, or confirm this is a different person.');
       return;
     }
@@ -228,7 +226,7 @@ export default function AddRelativeModal({
   const primaryDisabled =
     isSubmitting ||
     !name.trim() ||
-    (hasDuplicateConflict && !confirmedDifferentPerson && !selectedExistingId);
+    (mustConfirmMatch && !confirmedDifferentPerson && !selectedExistingId);
 
   const primaryLabel = isSubmitting
     ? 'Working…'
@@ -309,7 +307,7 @@ export default function AddRelativeModal({
             <div style={warningStyle}>
               <strong style={{ fontSize: '0.75rem', letterSpacing: '0.05em' }}>MATCHES DETECTED IN ARCHIVE</strong>
               <p style={{ fontSize: '0.8rem', margin: '8px 0', color: 'rgba(255,255,255,0.7)' }}>
-                {hasDuplicateConflict
+                {mustConfirmMatch
                   ? 'Select someone to connect, or confirm this is a new entry.'
                   : 'Someone here may already be this person. Connecting is optional.'}
               </p>
@@ -374,7 +372,7 @@ export default function AddRelativeModal({
                 </p>
               )}
               {/* Only a must-confirm resolution blocks submit, so only it needs an answer. */}
-              {hasDuplicateConflict && (
+              {mustConfirmMatch && (
               <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', marginTop: '16px' }}>
                 <input
                   type="checkbox"

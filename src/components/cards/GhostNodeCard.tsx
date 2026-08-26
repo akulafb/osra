@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { FamilyNode, RelativeDirection } from '../../types/graph';
-import { matchExistingPersons } from '../../lib/personMatch';
+import { matchExistingPersons, readMatchResolution } from '../../lib/personMatch';
 import { relationColor, relationLabel } from './relationStyle';
 
 /**
- * The Ghost Node card: name input, duplicate autocomplete, submit and cancel.
+ * The Ghost Node card: name input, Person Match dropdown, submit and cancel.
  *
  * Presentational and unpositioned — it renders at whatever origin its host
  * gives it. The 2D view mounts it inside an SVG `<foreignObject>` in graph
@@ -17,7 +17,7 @@ export interface GhostNodeCardProps {
   anchorNodeId: string;
   /** Shown in the header, e.g. "+ Parent of Fahd". */
   anchorFirstName: string;
-  /** The whole Tree Record, unfiltered — a filter must not hide a duplicate. */
+  /** The whole Tree Record, unfiltered — a filter must not hide a Person Match. */
   existingNodes: FamilyNode[];
   /** Ids currently drawn, so matches the filter is hiding can say so. */
   visibleIds?: ReadonlySet<string>;
@@ -74,11 +74,10 @@ export const GhostNodeCard: React.FC<GhostNodeCardProps> = ({
     [name, existingNodes, anchorNodeId, visibleIds, connectedIds]
   );
 
-  const matches = resolution.kind === 'none' ? [] : resolution.matches;
-  const hiddenMatchCount = resolution.kind === 'none' ? 0 : resolution.totalMatchCount - matches.length;
   // An exact given-name collision is a real question, so Enter waits for an
   // answer. Anything looser stays advisory — see ADR-0005.
-  const mustConfirm = resolution.kind === 'must-confirm' && !confirmedDifferentPerson;
+  const { matches, hiddenMatchCount, mustConfirm: unresolved } = readMatchResolution(resolution);
+  const mustConfirm = unresolved && !confirmedDifferentPerson;
   const exactMatchName = matches.find((m) => m.isExactGivenName)?.person.firstName ?? name.trim();
 
   const handleSubmit = async (e?: React.FormEvent) => {
@@ -242,7 +241,7 @@ export const GhostNodeCard: React.FC<GhostNodeCardProps> = ({
             <span style={{ fontSize: '9px', color: '#c084fc', fontWeight: 600 }}>
               Existing relative matches:
             </span>
-            {resolution.kind === 'must-confirm' && (
+            {unresolved && (
               <button
                 type="button"
                 onClick={() => setConfirmedDifferentPerson(true)}

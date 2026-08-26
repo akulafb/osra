@@ -45,7 +45,7 @@ export function getGhostNodePosition(anchorNode: Node2D, relation: RelativeDirec
 }
 
 /**
- * Tall enough for the card with its duplicate dropdown open. Safe to fix at the
+ * Tall enough for the card with its Person Match dropdown open. Safe to fix at the
  * maximum because the viewport is click-transparent (see `pointerEvents` below),
  * so an oversized box costs nothing.
  */
