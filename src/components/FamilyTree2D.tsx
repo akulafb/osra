@@ -18,7 +18,7 @@ import { InlineConnectPicker } from './InlineConnectPicker';
 import { ParticleDissolve } from './ParticleDissolve';
 import { SpawnBurst } from './SpawnBurst';
 import { OrthogonalLinks } from './OrthogonalLinks';
-import { getNodeId } from '../utils/getNodeId';
+import { getNodeId } from '../lib/familyGraph';
 import { filterGraphData } from '../lib/filterGraphData';
 import { connectedPersonIds } from '../lib/personMatch';
 import { TreeSearchBar } from './TreeSearchBar';

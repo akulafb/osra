@@ -12,11 +12,13 @@ export interface FamilyNode {
   isClaimed?: boolean;
 }
 
+export type LinkEndpoint = string | FamilyNode;
+
 export interface FamilyLink {
   /** DB row id when loaded from Supabase (needed for admin PATCH/DELETE) */
   id?: string;
-  source: string;  // UUID
-  target: string;  // UUID
+  source: LinkEndpoint;
+  target: LinkEndpoint;
   type: 'parent' | 'marriage' | 'divorce';
   parentRole?: 'mother' | 'father' | null;
 }
@@ -27,7 +29,7 @@ export interface FamilyGraph {
 }
 
 /** Direction of a relative being added, relative to the anchor Tree Node. */
-export type RelativeDirection = 'parent' | 'child' | 'spouse';
+export type RelativeDirection = 'parent' | 'child' | 'spouse' | 'sibling';
 
 // 2D View Types
 export interface Node2D extends FamilyNode {

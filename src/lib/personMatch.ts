@@ -1,5 +1,5 @@
 import { FamilyLink, FamilyNode } from '../types/graph';
-import { getNodeId } from '../utils/getNodeId';
+import { getNodeId } from './familyGraph';
 import { nodeSearchHaystack } from '../utils/nodeDisplayName';
 
 /**

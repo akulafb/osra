@@ -18,7 +18,7 @@ import { isMobile } from '../utils/device';
 import type { BackgroundTheme } from '../hooks/useBackgroundTheme';
 import { getTexturePath } from '../utils/imageFormat';
 import { getClusterColors } from '../utils/familyColors';
-import { getNodeId } from '../utils/getNodeId';
+import { getNodeId } from '../lib/familyGraph';
 import { filterGraphDataFor3D } from '../lib/filterGraphData';
 import { useClusterBubbles } from '../hooks/useClusterBubbles';
 import { EXIT_MULT } from '../utils/clusterBubbles';
@@ -333,6 +333,12 @@ export const FamilyTree3DContent: React.FC<FamilyTree3DProps> = ({
   const envInitializedRef = useRef(false);
   const hasIntroPlayed = useRef(false);
   const rotationRef = useRef(0);
+
+  const nodeMap = useMemo(() => {
+    const map = new Map<string, FamilyNode>();
+    (graphData?.nodes || []).forEach(n => map.set(n.id, n));
+    return map;
+  }, [graphData?.nodes]);
 
   // Connect Mode (LIN-50): driven by unified DirectManipulationController
   const connectSource = useMemo(() => {
@@ -816,18 +822,11 @@ export const FamilyTree3DContent: React.FC<FamilyTree3DProps> = ({
     const nodesInCluster = graphData.nodes.filter(n => n.familyCluster === clusterName);
     const clusterNodeIds = new Set(nodesInCluster.map(n => n.id));
     
-    const getSafeId = (val: any) => {
-      if (!val) return null;
-      if (typeof val === 'string') return val;
-      if (typeof val === 'object' && val.id) return val.id;
-      return null;
-    };
-
     const roots = nodesInCluster.filter(node => {
       const hasParentInCluster = graphData.links.some(link => {
-        const s = getSafeId(link.source);
-        const t = getSafeId(link.target);
-        return t === node.id && link.type === 'parent' && clusterNodeIds.has(s || '');
+        const s = getNodeId(link.source);
+        const t = getNodeId(link.target);
+        return t === node.id && link.type === 'parent' && clusterNodeIds.has(s);
       });
       return !hasParentInCluster;
     });
@@ -845,8 +844,8 @@ export const FamilyTree3DContent: React.FC<FamilyTree3DProps> = ({
       const { id, level } = queue[head++];
 
       graphData.links.forEach(link => {
-        const s = getSafeId(link.source);
-        const t = getSafeId(link.target);
+        const s = getNodeId(link.source);
+        const t = getNodeId(link.target);
 
         if (s === id && t && clusterNodeIds.has(t)) {
           if (!levels.has(t)) {
@@ -905,8 +904,8 @@ export const FamilyTree3DContent: React.FC<FamilyTree3DProps> = ({
     const childrenMap = new Map<string, string[]>();
     graphData.links.forEach(link => {
       if (link.type === 'parent') {
-        const s = typeof link.source === 'object' ? (link.source as any).id : link.source;
-        const t = typeof link.target === 'object' ? (link.target as any).id : link.target;
+        const s = getNodeId(link.source);
+        const t = getNodeId(link.target);
         if (clusterNodeIds.has(s) && clusterNodeIds.has(t)) {
           const list = childrenMap.get(s) || [];
           list.push(t);
@@ -931,8 +930,8 @@ export const FamilyTree3DContent: React.FC<FamilyTree3DProps> = ({
     // 3. Find roots (nodes with no parents in the cluster)
     const roots = nodesInCluster.filter(node => {
       const hasParentInCluster = graphData.links.some(link => {
-        const t = typeof link.target === 'object' ? (link.target as any).id : link.target;
-        const s = typeof link.source === 'object' ? (link.source as any).id : link.source;
+        const t = getNodeId(link.target);
+        const s = getNodeId(link.source);
         return t === node.id && link.type === 'parent' && clusterNodeIds.has(s);
       });
       return !hasParentInCluster;
@@ -1517,8 +1516,8 @@ export const FamilyTree3DContent: React.FC<FamilyTree3DProps> = ({
     // Preview links must use default rendering so linkColor / linkDashArray / linkWidth apply (custom object bypasses them).
     // When showArrows is on, use default links so linkDirectionalArrowLength / linkDirectionalArrowColor apply (custom THREE.Line has no arrows).
     if (activePreset && link.type === 'parent' && !showArrows) {
-      const sourceCluster = typeof link.source === 'object' ? link.source.familyCluster : null;
-      const targetCluster = typeof link.target === 'object' ? link.target.familyCluster : null;
+      const sourceCluster = nodeMap.get(getNodeId(link.source))?.familyCluster ?? null;
+      const targetCluster = nodeMap.get(getNodeId(link.target))?.familyCluster ?? null;
       
       if (sourceCluster === activePreset && targetCluster === activePreset) {
         const geometry = new THREE.BufferGeometry();
@@ -1528,15 +1527,15 @@ export const FamilyTree3DContent: React.FC<FamilyTree3DProps> = ({
       }
     }
     return null;
-  }, [activePreset, showArrows]);
+  }, [activePreset, showArrows, nodeMap]);
 
   const linkPositionUpdate = useCallback((line: any, { start, end }: any, link: any) => {
     if (activePreset && link.type === 'parent' && line instanceof THREE.Line) {
-      const sourceCluster = typeof link.source === 'object' ? link.source.familyCluster : null;
-      const targetCluster = typeof link.target === 'object' ? link.target.familyCluster : null;
+      const sourceCluster = nodeMap.get(getNodeId(link.source))?.familyCluster ?? null;
+      const targetCluster = nodeMap.get(getNodeId(link.target))?.familyCluster ?? null;
 
       if (sourceCluster === activePreset && targetCluster === activePreset) {
-        const sourceId = typeof link.source === 'object' && link.source !== null ? (link.source as any).id : link.source;
+        const sourceId = getNodeId(link.source);
         let hash = 0;
         const idStr = String(sourceId);
         for (let i = 0; i < idStr.length; i++) {
@@ -1557,7 +1556,7 @@ export const FamilyTree3DContent: React.FC<FamilyTree3DProps> = ({
       }
     }
     return false;
-  }, [activePreset]);
+  }, [activePreset, nodeMap]);
 
   useEffect(() => {
     if (fgRef.current && !initialCameraPos && graphData?.nodes?.length) {
@@ -1725,8 +1724,8 @@ export const FamilyTree3DContent: React.FC<FamilyTree3DProps> = ({
           if (isPreviewLink(l)) return 0;
           if (!activePreset) return (l.type === 'marriage' || l.type === 'divorce') ? 0.3 : 0;
           
-          const sourceCluster = typeof l.source === 'object' ? l.source.familyCluster : null;
-          const targetCluster = typeof l.target === 'object' ? l.target.familyCluster : null;
+          const sourceCluster = nodeMap.get(getNodeId(l.source))?.familyCluster ?? null;
+          const targetCluster = nodeMap.get(getNodeId(l.target))?.familyCluster ?? null;
           
           // Only parent links WITHIN the active preset family should be straight
           if (l.type === 'parent' && sourceCluster === activePreset && targetCluster === activePreset) {

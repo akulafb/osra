@@ -9,6 +9,7 @@ const RELATION_COLORS: Record<RelativeDirection, string> = {
   parent: '#fef08a',
   spouse: '#f472b6',
   child: '#93c5fd',
+  sibling: '#86efac',
 };
 
 /**
@@ -28,6 +29,8 @@ export function relationLabel(relation: RelativeDirection, anchorFirstName: stri
       return `+ Parent of ${anchorFirstName}`;
     case 'spouse':
       return `+ Spouse of ${anchorFirstName}`;
+    case 'sibling':
+      return `+ Sibling of ${anchorFirstName}`;
     case 'child':
     default:
       return `+ Child of ${anchorFirstName}`;

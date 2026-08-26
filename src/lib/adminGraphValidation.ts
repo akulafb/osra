@@ -1,5 +1,5 @@
 import type { FamilyGraph, FamilyLink } from '../types/graph';
-import { getNodeId } from '../utils/getNodeId';
+import { getNodeId } from './familyGraph';
 
 export const MSG_SELF = "A person can't be linked to themselves.";
 export const MSG_DUPLICATE = 'These two people are already connected.';

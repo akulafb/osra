@@ -32,7 +32,7 @@ export interface TreeRecordConfig {
 
 export interface AddPersonLinkSpec {
   targetId: string;
-  relation: RelativeDirection | 'sibling';
+  relation: RelativeDirection;
   parentRole?: 'mother' | 'father' | null;
 }
 
@@ -118,6 +118,11 @@ export function relativeToKinshipLink(
         type: 'marriage',
         parentRole: null,
       };
+    case 'sibling':
+      throw new TreeRecordError(
+        'refused',
+        'Sibling is a composite relationship derived from shared parents; it cannot be converted to a single direct Kinship Link.'
+      );
   }
 }
 
