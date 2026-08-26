@@ -170,7 +170,7 @@ Three clocks for one Dissolve:
 
 Four parallel shapes for one thing: DB row (`database.ts:42`), domain `FamilyNode`/`FamilyLink` (`graph.ts:3`), `Node2D`/`Link2D` whose endpoints are *objects* (`graph.ts:33`), and the force-graph runtime shape that `LiveNodePosition` (`forceGraph.ts:26`) describes but is never used as.
 
-Related: `parentRole` is `null` in the DB, converted to `undefined` at `useFamilyData.ts:118`, and papered over at `adminGraphValidation.ts:43` with `(a.parentRole ?? null) === (b.parentRole ?? null)`. `FamilyLink.id` is optional (`graph.ts:17`) because `filterGraphData.ts:71` pushes synthetic parent links without one — which then appear in Manage Links as permanently un-editable rows.
+Related: `parentRole` is `null` in the DB, converted to `undefined` at `useFamilyData.ts:118` (that file is `src/contexts/FamilyDataContext.tsx` since LIN-63; line citations here are as of 2026-08-17), and papered over at `adminGraphValidation.ts:43` with `(a.parentRole ?? null) === (b.parentRole ?? null)`. `FamilyLink.id` is optional (`graph.ts:17`) because `filterGraphData.ts:71` pushes synthetic parent links without one — which then appear in Manage Links as permanently un-editable rows.
 
 **Wins** — deletes ~20 inline re-reads · 3 `any` escapes removed from the security-relevant module · locality: one place d3 leaks.
 
@@ -225,7 +225,7 @@ Separately, the candidate pool is wrong on the primary path: `FamilyTree2D.tsx:7
 
 - `refetch()` fires from 11 sites: `FamilyTree.tsx:171,241,268,296,343,474,583,591,607,620,632`.
 - The Spawn animation waits on three network round-trips before it can start (`FamilyTree.tsx:241` then `:245`).
-- **Pinned positions are destroyed.** `FamilyTree3D.tsx:988–999` and `:1095–1111` write `fx/fy/fz` onto the node objects held in React state, in place. `useFamilyData.ts:130` shallow-clones *links* to survive exactly this problem — nodes get no such treatment, so `:158` replaces them and every pin is silently discarded.
+- **Pinned positions are destroyed.** `FamilyTree3D.tsx:988–999` and `:1095–1111` write `fx/fy/fz` onto the node objects held in React state, in place. `useFamilyData.ts:130` shallow-clones *links* to survive exactly this problem — nodes get no such treatment, so `:158` replaces them and every pin is silently discarded. *(LIN-55 fixed this with `carryPositions`; `useFamilyData.ts` is `src/contexts/FamilyDataContext.tsx` since LIN-63, where the clone is `:220`.)*
 - **The 2D viewport recentres mid-animation.** `FamilyTree2D.tsx:237–261` depends on `bounds`, rebuilt on every refetch. The comment claims "only re-center on initial load"; the dep array `[bounds, nodes.length === 0]` does not implement that.
 - **Two copies of the graph.** ~~`useFamilyChat.ts:16` calls `useFamilyData()` a second time, and `FamilyChat` mounts unconditionally at `FamilyTree.tsx:757`. The chat copy has no `refetch` wiring and goes stale on the first write.~~ **Closed by LIN-63** — one provider owns the graph, six requests per load became three, and the chat answers from the Persons on the canvas.
 

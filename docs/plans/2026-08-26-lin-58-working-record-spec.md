@@ -21,6 +21,11 @@ and the two facts that actually decide the design were not in the issue at all.
 | 4 | 2D viewport recentres mid-animation | **False — fixed** | Fit effect reads `boundsRef`, deps `[activePreset, layoutType, collapsedKey, isEmpty]`; a layout-pin effect counter-translates the zoom transform (`FamilyTree2D.tsx:267-345`). |
 | 5 | Two copies of the graph; chat goes stale | **Was true — LIN-63 fixed it** | One provider owns the graph (`src/contexts/FamilyDataContext.tsx`); the chat consumes it. Load went from 6 requests to 3, and a Spawned Person now reaches the LLM. See [ADR-0009](../adr/0009-one-owner-of-the-graph-in-memory.md). |
 
+**Where the citations above now live.** LIN-63 moved `src/hooks/useFamilyData.ts` to
+`src/contexts/FamilyDataContext.tsx` (row 5). Line references in this table are as of
+2026-08-26 and were not rewritten; in the new file `carryPositions` is `:59-109` (row 3) and the
+three sequential fetches are `:125, :144, :166` (row 2).
+
 **Four findings the issue does not record, in descending order of how much they changed the design:**
 
 1. **The write seam returns almost nothing.** `addPerson` → `{ id?: string }`; the other five →

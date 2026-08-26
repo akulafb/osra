@@ -32,14 +32,23 @@ production):
    `carryPositions`. It is mounted around `<FamilyTree />` in `HomePage` — the narrowest scope
    that covers every reader, and one that leaves the landing page holding no graph at all.
 2. **`useFamilyData()` is now a consumer**, returning the same
-   `{ graphData, isLoading, error, refetch }` shape. Call sites are unchanged; the second copy is
-   not merely deleted but unreachable — reading the graph from somewhere new shares the owner
-   instead of minting a rival. Used outside the provider it throws, because the symptom of a
-   missing provider (a tree that renders nothing) is indistinguishable from an empty family.
-3. **No vocabulary change.** The names `useFamilyData` / `graphData` stay as they are. LIN-58
-   replaces this shape with the Working Record controller (`working`, `confirmedLinks`, `write`,
-   `reload`); renaming twice would be churn, and pre-empting that contract with a third name
-   would collide with it.
+   `{ graphData, isLoading, error, refetch }` shape. Call sites are unchanged, and a *reader* can
+   no longer mint a rival copy: there is nothing to call but the consumer, and it fetches nothing.
+   Used outside the provider it throws, because the symptom of a missing provider (a tree that
+   renders nothing) is indistinguishable from an empty family.
+
+   The precise limit of what this enforces: nesting a second `<FamilyDataProvider>` inside the
+   first would still fetch again and shadow the owner for its subtree, silently. That is a
+   deliberate act at a mount point, not the accidental second `useFamilyData()` call that caused
+   this bug, and it is visible in the one place providers are mounted — so it is left unguarded.
+3. **No vocabulary change.** The names `useFamilyData` / `graphData` stay as they are, and the
+   new identifiers (`FamilyDataContext`, `FamilyDataProvider`) are named to match them rather
+   than to introduce a third vocabulary alongside them. `CONTEXT.md` documents the browser-held
+   set as the **Working Record**, and that is the name this should eventually carry — but
+   `useWorkingRecord` is already reserved by LIN-58's spec for a *different* contract
+   (`working`, `confirmedLinks`, `write`, `reload`), so taking the name now would collide with
+   it, and renaming only the file and provider would leave two vocabularies inside one module.
+   One rename, in the commit that changes the shape.
 
 ## Considered and Rejected
 
@@ -49,9 +58,10 @@ production):
   bug it guards against already shipped once. LIN-58 also adds four more readers of this state
   (the modals that currently take `onSuccess={refetch}`), which is the shape a provider serves
   and prop-drilling does not.
-- **A dev-only "more than one owner" assertion inside the hook.** Rejected: a module-level
-  counter that catches the mistake at runtime, in dev, is strictly weaker than an interface that
-  cannot express it — and it is untestable in this repo's harness.
+- **A dev-only "more than one owner" assertion inside the hook.** Rejected: with the fetch behind
+  a provider, the only way to get a second owner is to mount a second provider, and a
+  module-level counter that notices that at runtime, in dev, buys little over reading the one
+  file where providers are mounted. It is also untestable in this repo's harness.
 - **A cache library (React Query, SWR, Zustand).** Rejected for the reason LIN-58 records in D3:
   the precious state is mutable simulation state living on the node objects themselves, and
   replacing those objects is a cache library's core competence and our core hazard.
@@ -69,3 +79,7 @@ production):
   `docs/plans/2026-08-17-architecture-review.md` under "Not candidates — deliberately".
 - LIN-58 now has one seam to replace instead of two call sites to keep in step: the provider's
   internals become `useWorkingRecord`, and `write` reaches the modals through the same context.
+- `carryPositions` (`:59-109`) is pure and therefore the one part of this module the `.test.ts`
+  harness could reach if it lived in `src/lib/`. It stays where it is: LIN-58's D7 folds it into
+  `projectWorkingRecord`, narrowing it from every node on every fetch to the one node that
+  changed, so a module and a test suite extracted now would be rewritten by the next ticket.
