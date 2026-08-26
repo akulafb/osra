@@ -3,11 +3,11 @@
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { useAuth } from './AuthContext';
 import { dropOrphanLinks } from '../lib/sanitizeFamilyGraph';
+import { kinshipLinksFromRows, personFromRow } from '../lib/treeRecordRows';
 import { FamilyGraph, FamilyNode, FamilyLink } from '../types/graph';
 import type { Database } from '../types/database';
 
 type NodeRow = Database['public']['Tables']['nodes']['Row'];
-type LinkRow = Database['public']['Tables']['links']['Row'];
 
 /** How far from their relatives a newly Spawned person is seeded, in graph units. */
 const SEED_RADIUS = 40;
@@ -189,23 +189,23 @@ export function FamilyDataProvider({ children }: { children: React.ReactNode }) 
         console.warn('[FamilyDataProvider] No nodes returned from Supabase');
       }
 
-      // Transform Supabase data to FamilyGraph format
-      const nodes: FamilyNode[] = ((nodesData ?? []) as NodeRow[]).map((node) => ({
-        id: node.id,
-        firstName: node.first_name,
-        createdAt: typeof node.created_at === 'string' ? node.created_at : undefined,
-        familyCluster: node.paternal_family_cluster ?? undefined,
-        maternalFamilyCluster: node.maternal_family_cluster || undefined,
-        isClaimed: claimedNodeIds.has(String(node.id)),
-      }));
+      // Transform Supabase rows into Persons and Kinship Links. The write seam
+      // decodes the rows it writes with the same functions (LIN-64), so a
+      // confirmed write and a fresh fetch cannot disagree about a row's facts.
+      //
+      // The claim flag is stamped on here rather than passed into the decoder:
+      // it is not on a `nodes` row, and a decoder that always emitted the key
+      // would put `isClaimed: undefined` on every row a *write* returns, which
+      // erases a Person's claim the moment such a row is merged over the old
+      // one. The object being stamped was minted one line above and is not yet
+      // shared with anything.
+      const nodes: FamilyNode[] = ((nodesData ?? []) as NodeRow[]).map((row) => {
+        const person = personFromRow(row);
+        person.isClaimed = claimedNodeIds.has(String(row.id));
+        return person;
+      });
 
-      const links: FamilyLink[] = ((linksData ?? []) as LinkRow[]).map((link) => ({
-        id: String(link.id),
-        source: link.source_node_id,
-        target: link.target_node_id,
-        type: link.type as 'parent' | 'marriage' | 'divorce',
-        parentRole: link.parent_role || undefined,
-      }));
+      const links: FamilyLink[] = kinshipLinksFromRows(linksData);
 
       const safeLinks = dropOrphanLinks(nodes, links);
       if (safeLinks.length < links.length) {

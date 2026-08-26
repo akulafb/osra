@@ -206,7 +206,7 @@ export const FamilyTree: React.FC = () => {
           isAdmin,
           sessionToken: session?.access_token,
         });
-        const res = await record.addPerson({
+        const rows = await record.addPerson({
           firstName: params.firstName,
           link: {
             targetId: params.targetNodeId,
@@ -217,12 +217,13 @@ export const FamilyTree: React.FC = () => {
         await refetch();
         // The Person and the Kinship Link that carried them in are two
         // subjects of the same Spawn, on the same clock.
-        if (res && res.id) {
-          lifecycles.start('spawn', { kind: 'node', id: res.id });
+        const personId = rows.persons?.[0]?.id;
+        if (personId) {
+          lifecycles.start('spawn', { kind: 'node', id: personId });
           lifecycles.start('spawn', {
             kind: 'link',
             aId: params.targetNodeId,
-            bId: res.id,
+            bId: personId,
           });
         }
       } catch (e) {

@@ -190,12 +190,18 @@ export interface Database {
           target_node_id: string;
           creator_id: string;
           p_parent_role?: string | null;
+          /** Caller-supplied Person uuid; the database mints one when omitted. */
+          p_new_node_id?: string | null;
         };
         Returns: {
           success: boolean;
           error?: string;
           message?: string;
           new_node_id?: string;
+          /** The `public.nodes` row written, so the caller can confirm it. */
+          nodes?: Database['public']['Tables']['nodes']['Row'][];
+          /** Every `public.links` row written — `sibling` writes one per parent. */
+          links?: Database['public']['Tables']['links']['Row'][];
         };
       };
       link_existing_relative_secure: {
@@ -211,7 +217,20 @@ export interface Database {
           error?: string;
           message?: string;
           new_node_id?: string;
+          /** Accepted having inserted nothing; `links` is then empty. */
           already_connected?: boolean;
+          links?: Database['public']['Tables']['links']['Row'][];
+        };
+      };
+      admin_delete_node_secure: {
+        Args: {
+          p_node_id: string;
+        };
+        Returns: {
+          success: boolean;
+          message?: string;
+          /** The Kinship Links the FK cascade took with the Person. */
+          removed_link_ids?: string[];
         };
       };
     };

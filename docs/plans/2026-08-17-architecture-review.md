@@ -214,6 +214,13 @@ Separately, the candidate pool is wrong on the primary path: `FamilyTree2D.tsx:7
 > **A third bullet is now closed.** LIN-63 landed the single owner: the graph lives in
 > `src/contexts/FamilyDataContext.tsx` and the chat reads it instead of fetching its own copy
 > ([ADR-0009](../adr/0009-one-owner-of-the-graph-in-memory.md)). What remains of 06 is optimism.
+>
+> **The write seam's return contract is now complete.** LIN-64 made all six operations return the
+> rows they wrote, so an optimistic write can be confirmed from its response
+> ([ADR-0010](../adr/0010-write-seam-return-contract.md)). It also found that
+> `link_existing_relative_secure` had never worked for `parent`, `child` or `spouse` — an
+> ambiguous `target_node_id` between parameter and column — so every non-admin "connect an
+> existing relative" was failing.
 
 **Files** — `src/contexts/FamilyDataContext.tsx` (was `src/hooks/useFamilyData.ts:22–167`), `FamilyTree.tsx` (11 refetch sites)
 
