@@ -4,7 +4,7 @@ import FamilyTree3D from './FamilyTree3D';
 import { FamilyTree2D } from './FamilyTree2D';
 import { useViewMode } from '../hooks/useViewMode';
 import { useBackgroundTheme } from '../hooks/useBackgroundTheme';
-import { useFamilyData } from '../hooks/useFamilyData';
+import { useFamilyData } from '../contexts/FamilyDataContext';
 import { useNewNodesSinceSignIn } from '../hooks/useNewNodesSinceSignIn';
 import { FamilyNode, FamilyLink } from '../types/graph';
 import { useAuth } from '../contexts/AuthContext';

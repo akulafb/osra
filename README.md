@@ -147,9 +147,9 @@ src/
 │       ├── HowItWorks.tsx        # 3-step section
 │       └── HangarTransition.tsx  # CTA
 ├── contexts/
-│   └── AuthContext.tsx           # Authentication state management
+│   ├── AuthContext.tsx           # Authentication state management
+│   └── FamilyDataContext.tsx     # The one owner of the graph in memory
 ├── hooks/
-│   ├── useFamilyData.ts          # Family tree data fetching logic
 │   └── useFamilyChat.ts          # Chatbot logic and LLM orchestration
 ├── lib/
 │   ├── supabase.ts               # Supabase client configuration

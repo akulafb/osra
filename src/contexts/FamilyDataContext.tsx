@@ -1,5 +1,7 @@
-import { useEffect, useRef, useState } from 'react';
-import { useAuth } from '../contexts/AuthContext';
+// src/contexts/FamilyDataContext.tsx
+
+import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
+import { useAuth } from './AuthContext';
 import { dropOrphanLinks } from '../lib/sanitizeFamilyGraph';
 import { FamilyGraph, FamilyNode, FamilyLink } from '../types/graph';
 import type { Database } from '../types/database';
@@ -10,7 +12,29 @@ type LinkRow = Database['public']['Tables']['links']['Row'];
 /** How far from their relatives a newly Spawned person is seeded, in graph units. */
 const SEED_RADIUS = 40;
 
-export function useFamilyData() {
+interface FamilyDataContextType {
+  /** The Persons and Kinship Links currently held in the browser. */
+  graphData: FamilyGraph | null;
+  isLoading: boolean;
+  error: string | null;
+  /** Full re-read of the Tree Record. */
+  refetch: () => Promise<void>;
+}
+
+const FamilyDataContext = createContext<FamilyDataContextType | undefined>(undefined);
+
+/**
+ * The one owner of the graph in memory (LIN-63).
+ *
+ * This was a hook, and two components called it: `FamilyTree` and, through
+ * `useFamilyChat`, the unconditionally mounted `FamilyChat`. That is two
+ * independent copies of the same family tree — six requests per page load — and
+ * only the tree's copy was ever refetched, so a Person Spawned after load stayed
+ * invisible to every answer the chat gave for the rest of the session. A
+ * provider makes the second copy unreachable rather than merely absent: reading
+ * the graph from somewhere new now shares this owner instead of minting a rival.
+ */
+export function FamilyDataProvider({ children }: { children: React.ReactNode }) {
   const { session, user } = useAuth();
   const [graphData, setGraphData] = useState<FamilyGraph | null>(null);
   // The node objects we last handed out. react-force-graph mutates them in
@@ -110,7 +134,7 @@ export function useFamilyData() {
       );
 
       if (!nodesResponse.ok) {
-        console.error('[useFamilyData] Nodes fetch failed:', nodesResponse.status, nodesResponse.statusText);
+        console.error('[FamilyDataProvider] Nodes fetch failed:', nodesResponse.status, nodesResponse.statusText);
         throw new Error('Failed to load family data');
       }
 
@@ -130,7 +154,7 @@ export function useFamilyData() {
       
       if (!linksResponse.ok) {
         const errorText = await linksResponse.text();
-        console.error('[useFamilyData] Links fetch failed:', linksResponse.status, errorText);
+        console.error('[FamilyDataProvider] Links fetch failed:', linksResponse.status, errorText);
         throw new Error('Failed to load family data');
       }
 
@@ -162,7 +186,7 @@ export function useFamilyData() {
       }
 
       if (!nodesData || nodesData.length === 0) {
-        console.warn('[useFamilyData] No nodes returned from Supabase');
+        console.warn('[FamilyDataProvider] No nodes returned from Supabase');
       }
 
       // Transform Supabase data to FamilyGraph format
@@ -186,7 +210,7 @@ export function useFamilyData() {
       const safeLinks = dropOrphanLinks(nodes, links);
       if (safeLinks.length < links.length) {
         console.warn(
-          '[useFamilyData] Removed',
+          '[FamilyDataProvider] Removed',
           links.length - safeLinks.length,
           'orphan link(s) (endpoint missing from nodes). Check DB integrity.'
         );
@@ -223,7 +247,7 @@ export function useFamilyData() {
       setGraphData({ nodes: carryPositions(nodes, sanitized), links: sanitized });
       setIsLoading(false);
     } catch (err) {
-      console.error('[useFamilyData] Error fetching family data:', err);
+      console.error('[FamilyDataProvider] Error fetching family data:', err);
       setError('Failed to load family data');
       setIsLoading(false);
     }
@@ -231,5 +255,20 @@ export function useFamilyData() {
 
   const refetch = (): Promise<void> => fetchFamilyData(true);
 
-  return { graphData, isLoading, error, refetch };
+  const value: FamilyDataContextType = { graphData, isLoading, error, refetch };
+
+  return <FamilyDataContext.Provider value={value}>{children}</FamilyDataContext.Provider>;
+}
+
+/**
+ * Read the owner's copy of the graph. Throws rather than quietly handing back an
+ * empty graph, because a missing provider is a wiring mistake and the symptom —
+ * a tree that renders nothing — looks exactly like an empty family.
+ */
+export function useFamilyData(): FamilyDataContextType {
+  const context = useContext(FamilyDataContext);
+  if (context === undefined) {
+    throw new Error('useFamilyData must be used within a FamilyDataProvider');
+  }
+  return context;
 }
