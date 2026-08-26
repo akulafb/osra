@@ -4,7 +4,7 @@ import { useState, useCallback, useMemo } from 'react';
 import { Message, callLLM } from '../utils/llmClient';
 import { formatFamilyData } from '../utils/familyContext';
 import { formatNodeDisplayName } from '../utils/nodeDisplayName';
-import { useFamilyData } from './useFamilyData';
+import { useFamilyData } from '../contexts/FamilyDataContext';
 import { useAuth } from '../contexts/AuthContext';
 
 const MAX_DISPLAYED_MESSAGES = 50;

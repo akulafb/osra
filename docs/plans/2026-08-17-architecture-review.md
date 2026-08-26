@@ -210,8 +210,12 @@ Separately, the candidate pool is wrong on the primary path: `FamilyTree2D.tsx:7
 > the destroyed pins (`carryPositions`) and the mid-animation recentre. The blockers (LIN-53,
 > LIN-55) have both landed. See [`2026-08-26-lin-58-working-record-spec.md`](./2026-08-26-lin-58-working-record-spec.md)
 > for the current evidence and [ADR-0008](../adr/0008-working-record-representation.md) for the decision.
+>
+> **A third bullet is now closed.** LIN-63 landed the single owner: the graph lives in
+> `src/contexts/FamilyDataContext.tsx` and the chat reads it instead of fetching its own copy
+> ([ADR-0009](../adr/0009-one-owner-of-the-graph-in-memory.md)). What remains of 06 is optimism.
 
-**Files** — `src/hooks/useFamilyData.ts:22–167`, `FamilyTree.tsx` (11 refetch sites), `hooks/useFamilyChat.ts:16`
+**Files** — `src/contexts/FamilyDataContext.tsx` (was `src/hooks/useFamilyData.ts:22–167`), `FamilyTree.tsx` (11 refetch sites)
 
 **Problem** — Every write is `await write; await refetch()` — a full re-download of every Person and Kinship Link plus the claimed-ids RPC. There is no optimistic update anywhere in the codebase.
 
@@ -223,7 +227,7 @@ Separately, the candidate pool is wrong on the primary path: `FamilyTree2D.tsx:7
 - The Spawn animation waits on three network round-trips before it can start (`FamilyTree.tsx:241` then `:245`).
 - **Pinned positions are destroyed.** `FamilyTree3D.tsx:988–999` and `:1095–1111` write `fx/fy/fz` onto the node objects held in React state, in place. `useFamilyData.ts:130` shallow-clones *links* to survive exactly this problem — nodes get no such treatment, so `:158` replaces them and every pin is silently discarded.
 - **The 2D viewport recentres mid-animation.** `FamilyTree2D.tsx:237–261` depends on `bounds`, rebuilt on every refetch. The comment claims "only re-center on initial load"; the dep array `[bounds, nodes.length === 0]` does not implement that.
-- **Two copies of the graph.** `useFamilyChat.ts:16` calls `useFamilyData()` a second time, and `FamilyChat` mounts unconditionally at `FamilyTree.tsx:757`. The chat copy has no `refetch` wiring and goes stale on the first write.
+- **Two copies of the graph.** ~~`useFamilyChat.ts:16` calls `useFamilyData()` a second time, and `FamilyChat` mounts unconditionally at `FamilyTree.tsx:757`. The chat copy has no `refetch` wiring and goes stale on the first write.~~ **Closed by LIN-63** — one provider owns the graph, six requests per load became three, and the chat answers from the Persons on the canvas.
 
 **Why speculative** — largest change here, depends on 01 and 03 landing first, and its payoff is partly performance, which nobody has complained about.
 

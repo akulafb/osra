@@ -19,7 +19,7 @@ and the two facts that actually decide the design were not in the issue at all.
 | 2 | Spawn waits three round-trips before it can start | **True, understated — four** | `record.addPerson` (`FamilyTree.tsx:207`) → `await refetch()` (`:217`) = 3 sequential fetches (`useFamilyData.ts:102, 121, 143`) → `lifecycles.start` (`:221`). |
 | 3 | Pinned positions destroyed on refetch | **False — LIN-55 fixed it** | `carryPositions` copies `x/y/z/fx/fy/fz` onto every re-minted node (`useFamilyData.ts:37-82`). |
 | 4 | 2D viewport recentres mid-animation | **False — fixed** | Fit effect reads `boundsRef`, deps `[activePreset, layoutType, collapsedKey, isEmpty]`; a layout-pin effect counter-translates the zoom transform (`FamilyTree2D.tsx:267-345`). |
-| 5 | Two copies of the graph; chat goes stale | **True, untouched** | `useFamilyChat.ts:16` + unconditional `<FamilyChat />` (`FamilyTree.tsx:727`). Page load is **6 requests**. Chat re-reads only on `[session, user]`, so a Spawned Person is invisible to the LLM for the session. |
+| 5 | Two copies of the graph; chat goes stale | **Was true — LIN-63 fixed it** | One provider owns the graph (`src/contexts/FamilyDataContext.tsx`); the chat consumes it. Load went from 6 requests to 3, and a Spawned Person now reaches the LLM. See [ADR-0009](../adr/0009-one-owner-of-the-graph-in-memory.md). |
 
 **Four findings the issue does not record, in descending order of how much they changed the design:**
 
@@ -268,14 +268,24 @@ prematurely (`:24-25`).
 
 ## Spin-off tickets — filed, and they land first (D1)
 
-### [LIN-63](https://linear.app/linearfb/issue/LIN-63) — Arch 06a: One owner of the graph in memory
+### [LIN-63](https://linear.app/linearfb/issue/LIN-63) — Arch 06a: One owner of the graph in memory — **shipped**
 
-`useFamilyChat.ts:16` calls `useFamilyData()` a second time and `<FamilyChat />` mounts
-unconditionally (`FamilyTree.tsx:727`), so the page makes **6 requests** on load and the chat's
-copy re-reads only on `[session, user]`. A Person Spawned after load is invisible to every
-answer the LLM gives for the rest of the session. Fix: one owner, shared with the chat. Needs no
-Working Record, no changeset, no reconciler — and it is the only user-visible *bug* left in the
-original issue's evidence. Independently shippable.
+`useFamilyChat.ts:16` called `useFamilyData()` a second time and `<FamilyChat />` mounts
+unconditionally (`FamilyTree.tsx:727`), so the page made **6 requests** on load and the chat's
+copy re-read only on `[session, user]`. A Person Spawned after load was invisible to every
+answer the LLM gave for the rest of the session. Needed no Working Record, no changeset, no
+reconciler — and it was the only user-visible *bug* left in the original issue's evidence.
+
+Landed as a provider: `FamilyDataProvider` in `src/contexts/FamilyDataContext.tsx` owns the state
+and the fetch, `useFamilyData()` is a consumer with the same
+`{ graphData, isLoading, error, refetch }` shape, and it is mounted around `<FamilyTree />` in
+`HomePage`. Load is 3 requests; the chat answers from the Persons on the canvas.
+[ADR-0009](../adr/0009-one-owner-of-the-graph-in-memory.md).
+
+**What this changes for LIN-58.** Commit 2 replaces the *provider's* internals rather than a
+hook two components call, so there is one seam to convert, and `write` can reach the four modals
+through the same context instead of four new props. The `useFamilyData` / `graphData` names were
+deliberately left alone for LIN-58 to rename to the Working Record vocabulary.
 
 ### [LIN-64](https://linear.app/linearfb/issue/LIN-64) — Arch 06b: Complete the write seam's return contract
 
