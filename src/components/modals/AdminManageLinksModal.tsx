@@ -8,7 +8,7 @@ import Select from '@mui/material/Select';
 import type { Session } from '@supabase/supabase-js';
 import type { FamilyGraph, FamilyLink, FamilyNode } from '../../types/graph';
 import { formatNodeDisplayName } from '../../utils/nodeDisplayName';
-import { getNodeId } from '../../utils/getNodeId';
+import { getNodeId } from '../../lib/familyGraph';
 import {
   validateProposedLink,
   type ExcludeLinkSpec,

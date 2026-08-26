@@ -1,6 +1,6 @@
 import { hierarchy, tree, cluster } from 'd3-hierarchy';
 import { FamilyNode, FamilyLink, Node2D, Link2D, LayoutType, LayoutConfig } from '../types/graph';
-import { getNodeId } from '../utils/getNodeId';
+import { getNodeId } from './familyGraph';
 
 // Default layout configuration
 const DEFAULT_CONFIG: LayoutConfig = {

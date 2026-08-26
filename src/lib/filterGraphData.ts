@@ -1,5 +1,5 @@
 import type { FamilyGraph, FamilyLink } from '../types/graph';
-import { getNodeId } from '../utils/getNodeId';
+import { getNodeId } from './familyGraph';
 
 /**
  * Filter graph data by preset (cluster) and collapsed nodes.

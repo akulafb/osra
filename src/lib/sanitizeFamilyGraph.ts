@@ -1,4 +1,5 @@
 import type { FamilyLink, FamilyNode } from '../types/graph';
+import { getLinkEndpoints } from './familyGraph';
 
 /**
  * Drop links whose source or target is not present in `nodes`.
@@ -7,5 +8,8 @@ import type { FamilyLink, FamilyNode } from '../types/graph';
  */
 export function dropOrphanLinks(nodes: FamilyNode[], links: FamilyLink[]): FamilyLink[] {
   const ids = new Set(nodes.map((n) => n.id));
-  return links.filter((l) => ids.has(l.source) && ids.has(l.target));
+  return links.filter((l) => {
+    const { sourceId, targetId } = getLinkEndpoints(l);
+    return ids.has(sourceId) && ids.has(targetId);
+  });
 }

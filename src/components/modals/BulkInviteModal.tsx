@@ -3,7 +3,7 @@ import Button from '@mui/material/Button';
 import { useAuth } from '../../contexts/AuthContext';
 import { FamilyNode, FamilyLink } from '../../types/graph';
 import { formatNodeDisplayName } from '../../utils/nodeDisplayName';
-import { get1DegreeNodesSync } from '../../lib/permissions';
+import { get1DegreeRelatives, KinshipDegree1Category } from '../../lib/familyGraph';
 
 interface BulkInviteModalProps {
   isOpen: boolean;
@@ -61,67 +61,27 @@ export default function BulkInviteModal({
       if (!userNodeId) return;
 
       const linksCopy = Array.isArray(allLinks) ? [...allLinks] : [];
-      const oneDegreeIds = get1DegreeNodesSync(userNodeId, allNodes, linksCopy);
-      const relativeIds = oneDegreeIds.filter(id => id !== userNodeId);
+      const degree1Relatives = get1DegreeRelatives(userNodeId, linksCopy);
 
-      const relativesData = relativeIds.map(nodeId => {
-        const node = allNodes.find(n => n.id === nodeId);
-        if (!node) return null;
+      const relationshipLabelMap: Record<KinshipDegree1Category, string> = {
+        parent: 'Parent',
+        child: 'Child',
+        spouse: 'Spouse',
+        sibling: 'Sibling',
+      };
 
-        let relationship = 'Family';
-        const link = linksCopy.find((l: any) => {
-          const s = typeof l.source === 'object' ? l.source.id : l.source;
-          const t = typeof l.target === 'object' ? l.target.id : l.target;
-          return (s === userNodeId && t === nodeId) || (t === userNodeId && s === nodeId);
-        }) as any;
-
-        if (link) {
-          if (link.type === 'marriage' || link.type === 'divorce') relationship = 'Spouse';
-          else if (link.type === 'parent') {
-            const sourceId = typeof link.source === 'object' ? link.source.id : link.source;
-            relationship = sourceId === nodeId ? 'Parent' : 'Child';
-          }
-        } else {
-          const userParents = linksCopy.filter((l: any) => {
-            const t = typeof l.target === 'object' ? l.target.id : l.target;
-            return t === userNodeId && l.type === 'parent';
-          }).map((l: any) => typeof l.source === 'object' ? l.source.id : l.source);
-
-          const theirParents = linksCopy.filter((l: any) => {
-            const t = typeof l.target === 'object' ? l.target.id : l.target;
-            return t === nodeId && l.type === 'parent';
-          }).map((l: any) => typeof l.source === 'object' ? l.source.id : l.source);
-
-          if (userParents.some(p => theirParents.includes(p))) relationship = 'Sibling';
-          else {
-            const isParentsSpouse = userParents.some(parentId =>
-              linksCopy.some((l: any) => {
-                const s = typeof l.source === 'object' ? l.source.id : l.source;
-                const t = typeof l.target === 'object' ? l.target.id : l.target;
-                return (l.type === 'marriage' || l.type === 'divorce') && ((s === parentId && t === nodeId) || (t === parentId && s === nodeId));
-              })
-            );
-            if (isParentsSpouse) relationship = 'Parent';
-            else {
-              const userChildren = linksCopy.filter((l: any) => {
-                const s = typeof l.source === 'object' ? l.source.id : l.source;
-                return s === userNodeId && l.type === 'parent';
-              }).map((l: any) => typeof l.target === 'object' ? l.target.id : l.target);
-
-              const isChildsParent = userChildren.some(childId =>
-                linksCopy.some((l: any) => {
-                  const s = typeof l.source === 'object' ? l.source.id : l.source;
-                  const t = typeof l.target === 'object' ? l.target.id : l.target;
-                  return l.type === 'parent' && t === childId && s === nodeId;
-                })
-              );
-              if (isChildsParent) relationship = 'Spouse';
-            }
-          }
-        }
-
-        return { node, relationship, existingInvites: 0, selected: false };
-      }).filter(Boolean) as RelativeWithInvite[];
+      const relativesData = degree1Relatives
+        .map(rel => {
+          const node = allNodes.find(n => n.id === rel.nodeId);
+          if (!node) return null;
+          return {
+            node,
+            relationship: relationshipLabelMap[rel.relationship] || 'Family',
+            existingInvites: 0,
+            selected: false,
+          };
+        })
+        .filter(Boolean) as RelativeWithInvite[];
 
       const order = ['Parent', 'Child', 'Spouse', 'Sibling'];
       relativesData.sort((a, b) => {
