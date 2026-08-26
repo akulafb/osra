@@ -12,6 +12,9 @@ export interface GhostNodeProps {
   anchorNode: Node2D;
   relation: RelativeDirection;
   existingNodes: FamilyNode[];
+  /** Passed straight to the card; see `GhostNodeCardProps`. */
+  visibleIds?: ReadonlySet<string>;
+  connectedIds?: ReadonlySet<string>;
   onSubmit: (name: string) => Promise<void> | void;
   onConnectExisting: (existingNodeId: string) => Promise<void> | void;
   onCancel: () => void;
@@ -52,6 +55,8 @@ export const GhostNode: React.FC<GhostNodeProps> = ({
   anchorNode,
   relation,
   existingNodes,
+  visibleIds,
+  connectedIds,
   onSubmit,
   onConnectExisting,
   onCancel,
@@ -99,6 +104,8 @@ export const GhostNode: React.FC<GhostNodeProps> = ({
             anchorNodeId={anchorNode.id}
             anchorFirstName={anchorNode.firstName}
             existingNodes={existingNodes}
+            visibleIds={visibleIds}
+            connectedIds={connectedIds}
             onSubmit={onSubmit}
             onConnectExisting={onConnectExisting}
             onCancel={onCancel}

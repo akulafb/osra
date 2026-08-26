@@ -1,10 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import {
+  connectedPersonIds,
   matchExistingPersons,
   MATCH_CANDIDATE_LIMIT,
   MIN_MATCH_QUERY_LENGTH,
 } from './personMatch';
-import { FamilyNode } from '../types/graph';
+import { FamilyLink, FamilyNode } from '../types/graph';
 
 const nodes: FamilyNode[] = [
   { id: 'a', firstName: 'Ahmad', familyCluster: 'Badran' },
@@ -30,7 +31,7 @@ function creating(query: string, overrides: Partial<Parameters<typeof matchExist
   });
 }
 
-describe('matchExistingPersons — query length (inherited from findDuplicateCandidates)', () => {
+describe('matchExistingPersons — query length', () => {
   it('resolves to none until the query has at least two characters', () => {
     expect(creating('').kind).toBe('none');
     expect(creating('a').kind).toBe('none');
@@ -44,7 +45,7 @@ describe('matchExistingPersons — query length (inherited from findDuplicateCan
   });
 });
 
-describe('matchExistingPersons — what counts as a match', () => {
+describe('matchExistingPersons — what counts as a match (the cases the deleted ghost-node lookup carried)', () => {
   it('matches case-insensitively on the given name', () => {
     expect(matchIds(creating('SARA'))).toEqual(['b']);
   });
@@ -192,5 +193,28 @@ describe('matchExistingPersons — renaming', () => {
   it('matches on cluster too, not just the given name', () => {
     // The widening: EditNodeModal used to match on firstName alone.
     expect(matchIds(renaming('haddad', 'Fahd'))).toEqual(['b']);
+  });
+});
+
+describe('connectedPersonIds', () => {
+  const links: FamilyLink[] = [
+    { source: 'anchor', target: 'a', type: 'parent' },
+    { source: 'b', target: 'anchor', type: 'marriage' },
+    { source: 'c', target: 'd', type: 'parent' },
+  ];
+
+  it('collects the other end of every link touching the anchor', () => {
+    expect(connectedPersonIds(links, 'anchor')).toEqual(new Set(['a', 'b']));
+  });
+
+  it('reads endpoints that the force simulation has replaced with node objects', () => {
+    const simulated = [
+      { source: { id: 'anchor' }, target: { id: 'a' }, type: 'parent' },
+    ] as unknown as FamilyLink[];
+    expect(connectedPersonIds(simulated, 'anchor')).toEqual(new Set(['a']));
+  });
+
+  it('is empty for a Person with no links', () => {
+    expect(connectedPersonIds(links, 'lonely')).toEqual(new Set());
   });
 });

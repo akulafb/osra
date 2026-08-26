@@ -1,4 +1,5 @@
-import { FamilyNode } from '../types/graph';
+import { FamilyLink, FamilyNode } from '../types/graph';
+import { getNodeId } from '../utils/getNodeId';
 import { nodeSearchHaystack } from '../utils/nodeDisplayName';
 
 /**
@@ -101,4 +102,21 @@ export function matchExistingPersons({
   const kind = matches.some((m) => m.isExactGivenName) ? 'must-confirm' : 'candidates';
 
   return { kind, matches: matches.slice(0, limit), totalMatchCount: matches.length };
+}
+
+/**
+ * Ids sharing a Kinship Link with the anchor, for `connectedIds`.
+ *
+ * Endpoints arrive as ids from the Tree Record and as node objects once the
+ * force simulation has mutated them, so both are read through `getNodeId`.
+ */
+export function connectedPersonIds(links: FamilyLink[], anchorId: string): Set<string> {
+  const connected = new Set<string>();
+  for (const link of links) {
+    const sourceId = getNodeId(link.source);
+    const targetId = getNodeId(link.target);
+    if (sourceId === anchorId) connected.add(targetId);
+    else if (targetId === anchorId) connected.add(sourceId);
+  }
+  return connected;
 }

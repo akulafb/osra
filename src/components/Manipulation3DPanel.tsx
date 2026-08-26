@@ -8,6 +8,7 @@ import { KinshipLinkType, ParentRole } from './cards/connectOptions';
 import { Candidacy, ConnectPair, buildTargetOptions } from './cards/connectCandidates';
 import { CONNECT_ACCENT, relationColor } from './cards/relationStyle';
 import { ConnectTargetingBody } from './ConnectTargetingBody';
+import { connectedPersonIds } from '../lib/personMatch';
 import { countUnreachable } from '../utils/connectTargeting';
 import { CONFIRM_PULSE_COLOR } from '../utils/cosmicFx';
 import { useGhostPreview } from '../hooks/useGhostPreview';
@@ -94,6 +95,8 @@ export interface Manipulation3DPanelProps {
   /** Action Handles appear only when the active user may edit this person. */
   canEdit: boolean;
   existingNodes: FamilyNode[];
+  /** Ids the 3D filter is currently drawing, so Person Matches it hides say so. */
+  visibleIds?: ReadonlySet<string>;
   graphData: FamilyGraph;
   fgRef: ForceGraphRef;
   /** Live simulated nodes — the array handed to the graphData prop. */
@@ -208,6 +211,7 @@ export const Manipulation3DPanel: React.FC<Manipulation3DPanelProps> = ({
   selectedNode,
   canEdit,
   existingNodes,
+  visibleIds,
   graphData,
   fgRef,
   nodes,
@@ -223,6 +227,12 @@ export const Manipulation3DPanel: React.FC<Manipulation3DPanelProps> = ({
   const [previewName, setPreviewName] = useState('');
 
   const selectedId = selectedNode?.id ?? null;
+  // People already linked to the anchor: a Person Match may name them, but
+  // linking them again would write a duplicate Kinship Link.
+  const connectedIds = useMemo(
+    () => (selectedId ? connectedPersonIds(graphData?.links ?? [], selectedId) : undefined),
+    [graphData?.links, selectedId]
+  );
   const visible = Boolean(selectedNode && canEdit);
   const isTargeting = Boolean(connect.sourceNode && !connect.pair);
 
@@ -486,6 +496,8 @@ export const Manipulation3DPanel: React.FC<Manipulation3DPanelProps> = ({
             anchorNodeId={selectedNode.id}
             anchorFirstName={selectedNode.firstName}
             existingNodes={existingNodes}
+            visibleIds={visibleIds}
+            connectedIds={connectedIds}
             onSubmit={handleSubmit}
             onConnectExisting={handleConnectExisting}
             onCancel={closeGhostNode}

@@ -20,6 +20,7 @@ import { SpawnBurst } from './SpawnBurst';
 import { OrthogonalLinks } from './OrthogonalLinks';
 import { getNodeId } from '../utils/getNodeId';
 import { filterGraphData } from '../lib/filterGraphData';
+import { connectedPersonIds } from '../lib/personMatch';
 import { TreeSearchBar } from './TreeSearchBar';
 import { canEdit } from '../lib/permissions';
 import type { BackgroundTheme } from '../hooks/useBackgroundTheme';
@@ -182,6 +183,14 @@ export const FamilyTree2D: React.FC<FamilyTree2DProps> = ({
     if (!activePreset) return { nodes: [], links: [] };
     return filterGraphData(graphData, collapsedNodes, activePreset);
   }, [graphData, collapsedNodes, activePreset]);
+
+  // Who is currently drawn. Person Matching keeps searching the whole Tree
+  // Record and labels the rest as hidden, rather than letting a filter make a
+  // duplicate look like a new person.
+  const visibleIds = useMemo(
+    () => new Set(filteredGraphData.nodes.map((n) => n.id)),
+    [filteredGraphData]
+  );
 
   // Calculate layout
   const { nodes, links } = useMemo(() => {
@@ -668,6 +677,8 @@ export const FamilyTree2D: React.FC<FamilyTree2DProps> = ({
                   anchorNode={anchorNode}
                   relation={interaction.creatingRelative.relation}
                   existingNodes={graphData?.nodes || []}
+                  visibleIds={visibleIds}
+                  connectedIds={connectedPersonIds(graphData?.links || [], anchorNode.id)}
                   onSubmit={async (name) => {
                     if (onCreateRelative) {
                       await onCreateRelative({

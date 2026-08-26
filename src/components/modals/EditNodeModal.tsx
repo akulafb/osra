@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import Button from '@mui/material/Button';
 import { useAuth } from '../../contexts/AuthContext';
 import { FamilyNode } from '../../types/graph';
 import { formatNodeDisplayName } from '../../utils/nodeDisplayName';
 import { createTreeRecord } from '../../lib/treeRecord';
+import { matchExistingPersons } from '../../lib/personMatch';
 
 const MAX_NAME_LENGTH = 200;
 const MAX_CLUSTER_LENGTH = 100;
@@ -13,7 +14,10 @@ interface EditNodeModalProps {
   onClose: () => void;
   targetNode: FamilyNode;
   onSuccess: () => void;
+  /** The whole Tree Record, unfiltered — a filter must not hide a collision. */
   existingNodes: FamilyNode[];
+  /** Ids currently drawn, so matches the filter is hiding can say so. */
+  visibleIds?: ReadonlySet<string>;
 }
 
 export default function EditNodeModal({
@@ -22,6 +26,7 @@ export default function EditNodeModal({
   targetNode,
   onSuccess,
   existingNodes,
+  visibleIds,
 }: EditNodeModalProps) {
   const { user, isAdmin, session } = useAuth();
   const [name, setName] = useState('');
@@ -30,7 +35,7 @@ export default function EditNodeModal({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
-  const [duplicateWarning, setDuplicateWarning] = useState<FamilyNode[]>([]);
+  const [confirmedDifferentPerson, setConfirmedDifferentPerson] = useState(false);
 
   // Reset state when modal opens with target node data
   useEffect(() => {
@@ -40,23 +45,35 @@ export default function EditNodeModal({
       setMaternalFamilyCluster(targetNode.maternalFamilyCluster || '');
       setError(null);
       setSuccessMessage(null);
-      setDuplicateWarning([]);
+      setConfirmedDifferentPerson(false);
     }
   }, [isOpen, targetNode]);
 
-  // Check for duplicates when name changes
+  // Renaming asks "am I colliding with someone?" — the same matching every other
+  // path uses, so a rename can no longer miss a cluster match the Ghost Node sees.
+  const resolution = useMemo(
+    () =>
+      matchExistingPersons({
+        query: name,
+        intent: 'renaming',
+        pool: existingNodes,
+        excludePersonId: targetNode.id,
+        visibleIds,
+        currentGivenName: targetNode.firstName,
+      }),
+    [name, existingNodes, targetNode.id, targetNode.firstName, visibleIds]
+  );
+
+  const matches = resolution.kind === 'none' ? [] : resolution.matches;
+  const hiddenMatchCount =
+    resolution.kind === 'none' ? 0 : resolution.totalMatchCount - matches.length;
+  // An exact collision has to be answered before Save; anything looser stays advisory.
+  const mustConfirm = resolution.kind === 'must-confirm' && !confirmedDifferentPerson;
+
+  // A confirmation answers a question about one name, not about the next one typed.
   useEffect(() => {
-    if (name.trim().length > 2 && name.trim() !== targetNode.firstName) {
-      const matches = existingNodes.filter(
-        (node) =>
-          node.firstName.toLowerCase().includes(name.toLowerCase()) &&
-          node.id !== targetNode.id
-      );
-      setDuplicateWarning(matches);
-    } else {
-      setDuplicateWarning([]);
-    }
-  }, [name, existingNodes, targetNode.id, targetNode.firstName]);
+    setConfirmedDifferentPerson(false);
+  }, [name]);
 
   // Clear success message after 3 seconds
   useEffect(() => {
@@ -70,6 +87,11 @@ export default function EditNodeModal({
     e.preventDefault();
     const sanitizedName = name.trim().slice(0, MAX_NAME_LENGTH);
     if (!user || !sanitizedName) return;
+
+    if (mustConfirm) {
+      setError('Someone else is already called that — confirm this is a different person.');
+      return;
+    }
 
     setIsSubmitting(true);
     setError(null);
@@ -185,17 +207,42 @@ export default function EditNodeModal({
             </div>
           )}
 
-          {duplicateWarning.length > 0 && (
+          {matches.length > 0 && (
             <div style={warningStyle}>
               <strong style={{ fontSize: '0.75rem', letterSpacing: '0.05em' }}>SIMILAR NAMES IN ARCHIVE</strong>
               <ul style={{ margin: '12px 0', paddingLeft: '20px', color: 'rgba(255,255,255,0.8)' }}>
-                {duplicateWarning.map((m) => (
-                  <li key={m.id} style={{ fontSize: '0.85rem' }}>{formatNodeDisplayName(m)}</li>
+                {matches.map(({ person, isVisible }) => (
+                  <li key={person.id} style={{ fontSize: '0.85rem' }}>
+                    {formatNodeDisplayName(person)}
+                    {!isVisible && (
+                      <span style={{ color: 'rgba(255,255,255,0.5)' }}> · hidden by filter</span>
+                    )}
+                  </li>
                 ))}
               </ul>
-              <p style={{ fontSize: '0.75rem', margin: 0, fontStyle: 'italic', color: 'rgba(255,255,255,0.6)' }}>
-                Please ensure you&apos;re not creating a duplicate entry.
-              </p>
+              {hiddenMatchCount > 0 && (
+                <p style={{ fontSize: '0.75rem', margin: '0 0 8px 0', color: 'rgba(255,255,255,0.5)' }}>
+                  +{hiddenMatchCount} more match{hiddenMatchCount === 1 ? '' : 'es'} not shown.
+                </p>
+              )}
+              {resolution.kind === 'must-confirm' ? (
+                <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={confirmedDifferentPerson}
+                    onChange={(e) => setConfirmedDifferentPerson(e.target.checked)}
+                    style={{ accentColor: '#D4AF37' }}
+                    disabled={isSubmitting}
+                  />
+                  <span style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.8)' }}>
+                    This is a different person from the one above
+                  </span>
+                </label>
+              ) : (
+                <p style={{ fontSize: '0.75rem', margin: 0, fontStyle: 'italic', color: 'rgba(255,255,255,0.6)' }}>
+                  Please ensure you&apos;re not creating a duplicate entry.
+                </p>
+              )}
             </div>
           )}
 
@@ -214,7 +261,7 @@ export default function EditNodeModal({
             <Button
               type="submit"
               variant="contained"
-              disabled={isSubmitting || !name.trim()}
+              disabled={isSubmitting || !name.trim() || mustConfirm}
               sx={{ 
                 background: 'linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)',
                 fontWeight: 700,
