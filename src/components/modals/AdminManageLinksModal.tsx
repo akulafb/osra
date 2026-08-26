@@ -24,6 +24,11 @@ interface AdminManageLinksModalProps {
   session: Session | null;
   isAdmin: boolean;
   onSuccess: () => void;
+  /**
+   * Dissolve a Kinship Link. Owned by the host so the deletion runs inside the
+   * Dissolve lifecycle rather than as a second, unanimated delete path.
+   */
+  onDissolveLink: (params: { id: string; aId: string; bId: string }) => Promise<void>;
 }
 
 function toExcludeSpec(link: FamilyLink): ExcludeLinkSpec {
@@ -43,6 +48,7 @@ export default function AdminManageLinksModal({
   session,
   isAdmin,
   onSuccess,
+  onDissolveLink,
 }: AdminManageLinksModalProps) {
   const [editing, setEditing] = useState<FamilyLink | null>(null);
   const [editSource, setEditSource] = useState('');
@@ -132,13 +138,13 @@ export default function AdminManageLinksModal({
     setSubmitting(true);
     setError(null);
     try {
-      const record = createTreeRecord({
-        userId: session?.user?.id || '',
-        isAdmin,
-        sessionToken: session?.access_token,
+      // The host runs the write inside a Dissolve, so a link deleted here
+      // frays on the canvas exactly as one deleted in the tree does (LIN-55).
+      await onDissolveLink({
+        id: link.id,
+        aId: getNodeId(link.source),
+        bId: getNodeId(link.target),
       });
-      await record.removeLink({ id: link.id });
-      onSuccess();
       setEditing(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Delete failed.');

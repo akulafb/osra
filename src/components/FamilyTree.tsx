@@ -23,11 +23,7 @@ import { PersonDetailDrawer } from './PersonDetailDrawer';
 import { isMobile } from '../utils/device';
 import { RelativeDirection } from '../types/graph';
 import { createTreeRecord, relativeToKinshipLink } from '../lib/treeRecord';
-import {
-  BEAM_PULSE_WINDOW_MS,
-  COSMIC_FX_DURATION_MS,
-  type LinkEndpoints,
-} from '../utils/cosmicFx';
+import { useLifecycles } from '../hooks/useLifecycles';
 
 export const FamilyTree: React.FC = () => {
   const { user, userProfile, isAdmin, session } = useAuth();
@@ -133,32 +129,6 @@ export const FamilyTree: React.FC = () => {
     });
   }, []);
 
-  const handleAdminDeleteSelectedNode = useCallback(async () => {
-    if (!selectedNode || !isAdmin || !user) return;
-    if (
-      !window.confirm(
-        `Delete ${selectedNode.firstName} and all their invites and links? This cannot be undone.`
-      )
-    ) {
-      return;
-    }
-    try {
-      const record = createTreeRecord({
-        userId: user.id,
-        isAdmin,
-        sessionToken: session?.access_token,
-      });
-      await record.removePerson({
-        id: selectedNode.id,
-      });
-      await refetch();
-      interaction.deselect();
-    } catch (e) {
-      console.error(e);
-      window.alert(e instanceof Error ? e.message : 'Delete failed.');
-    }
-  }, [selectedNode, isAdmin, user, session, refetch, interaction]);
-
   const handleToggleCollapse = useCallback((nodeId: string) => {
     setCollapsedNodes(prev => {
       const next = new Set(prev);
@@ -187,23 +157,45 @@ export const FamilyTree: React.FC = () => {
     setActivePreset(userCluster);
   }, []);
 
-  // Playful Animation Pipeline State (LIN-45)
-  const [newlySpawnedNodeId, setNewlySpawnedNodeId] = useState<string | null>(null);
-  const [dissolvingNodeId, setDissolvingNodeId] = useState<string | null>(null);
   /**
-   * The Kinship Link a Spawn has just created (LIN-51). Its beam pulses in the
-   * 3D view; the 2D view already grows the path itself. Direction-free, because
-   * Connect Mode may flip which end is the parent.
+   * Spawn and Dissolve (LIN-55, ADR-0007).
+   *
+   * One module owns the phase, the clock and the unwind for both lifecycles
+   * and both subjects. What used to be here — three ids, three `setTimeout`s
+   * on three durations that disagreed, and a rollback that cleared a flag — is
+   * gone; this component only says *what* happened and to *whom*.
    */
-  const [pulsingLink, setPulsingLink] = useState<LinkEndpoints | null>(null);
+  const lifecycles = useLifecycles(mode === '3D' ? '3d' : '2d');
 
-  const pulseLink = useCallback((aId: string, bId: string) => {
-    setPulsingLink({ aId, bId });
-    window.setTimeout(
-      () => setPulsingLink((prev) => (prev?.aId === aId && prev?.bId === bId ? null : prev)),
-      BEAM_PULSE_WINDOW_MS
-    );
-  }, []);
+  /**
+   * Whether this user may dissolve a given Tree Node.
+   *
+   * Asked per node rather than only of the selection, because the 2D view
+   * offers a handle on every card: gating the handle on edit rights alone let
+   * a 1-degree relative click ✓ and get silence.
+   */
+  const canDissolveNode = useCallback(
+    (nodeId: string): boolean => {
+      if (!isAdmin || !user || !graphData?.links) return false;
+      return canEdit(
+        nodeId,
+        userProfile?.node_id ?? null,
+        isAdmin,
+        graphData.links as FamilyLink[]
+      );
+    },
+    [isAdmin, user, userProfile?.node_id, graphData?.links]
+  );
+
+  /**
+   * The drawer's Delete. It used to be a second delete path with a native
+   * `window.confirm` and no animation; it now asks the same question the
+   * canvas does, and the same Dissolve answers it (LIN-55).
+   */
+  const handleAdminDeleteSelectedNode = useCallback(() => {
+    if (!selectedNode || !canDissolveNode(selectedNode.id)) return;
+    interaction.startDissolve(selectedNode.id);
+  }, [selectedNode, canDissolveNode, interaction]);
 
   const handleCreateRelativeDirect = useCallback(
     async (params: { firstName: string; relation: RelativeDirection; targetNodeId: string }) => {
@@ -223,19 +215,22 @@ export const FamilyTree: React.FC = () => {
         });
         // Refetch graph data from Supabase so the new node is present in the layout
         await refetch();
-        // Trigger celebratory spawn burst and spring pop on the new node
+        // The Person and the Kinship Link that carried them in are two
+        // subjects of the same Spawn, on the same clock.
         if (res && res.id) {
-          const newId = res.id;
-          setNewlySpawnedNodeId(newId);
-          setTimeout(() => setNewlySpawnedNodeId(null), 3500);
-          pulseLink(params.targetNodeId, newId);
+          lifecycles.start('spawn', { kind: 'node', id: res.id });
+          lifecycles.start('spawn', {
+            kind: 'link',
+            aId: params.targetNodeId,
+            bId: res.id,
+          });
         }
       } catch (e) {
         console.error('[handleCreateRelativeDirect] Error:', e);
         window.alert(e instanceof Error ? e.message : 'Failed to create relative.');
       }
     },
-    [user, isAdmin, session?.access_token, refetch, pulseLink]
+    [user, isAdmin, session?.access_token, refetch, lifecycles]
   );
 
   const handleConnectExistingRelativeDirect = useCallback(
@@ -254,35 +249,34 @@ export const FamilyTree: React.FC = () => {
         );
         await record.addLink(kinship);
         await refetch();
-        pulseLink(params.targetNodeId, params.existingNodeId);
+        lifecycles.start('spawn', {
+          kind: 'link',
+          aId: params.targetNodeId,
+          bId: params.existingNodeId,
+        });
       } catch (e) {
         console.error('[handleConnectExistingRelativeDirect] Error:', e);
         window.alert(e instanceof Error ? e.message : 'Failed to connect relative.');
       }
     },
-    [user, isAdmin, session?.access_token, refetch, pulseLink]
+    [user, isAdmin, session?.access_token, refetch, lifecycles]
   );
 
   const handleConfirmDissolveDirect = useCallback(
     async (node: FamilyNode) => {
-      if (!isAdmin || !user) return;
-      // Optimistic particle dissolve animation immediately
-      setDissolvingNodeId(node.id);
-      // The 2D rendering reports its own completion; the 3D one plays out in
-      // the scene and cannot. Releasing the id on the effect's own clock keeps
-      // a finished Dissolve from shadowing the next Spawn, which loses ties.
-      window.setTimeout(
-        () => setDissolvingNodeId((prev) => (prev === node.id ? null : prev)),
-        COSMIC_FX_DURATION_MS.collapse + 500
-      );
+      if (!user || !canDissolveNode(node.id)) return;
+      const record = createTreeRecord({
+        userId: user.id,
+        isAdmin,
+        sessionToken: session?.access_token,
+      });
       try {
-        const record = createTreeRecord({
-          userId: user.id,
-          isAdmin,
-          sessionToken: session?.access_token,
-        });
-        await record.removePerson({
-          id: node.id,
+        // Optimistic: the Dissolve starts now and the write runs underneath
+        // it. The lifecycle unwinds itself if the write rejects.
+        await lifecycles.run({
+          kind: 'dissolve',
+          subject: { kind: 'node', id: node.id },
+          commit: () => record.removePerson({ id: node.id }),
         });
         await refetch();
         if (selectedNode?.id === node.id) {
@@ -290,12 +284,42 @@ export const FamilyTree: React.FC = () => {
         }
       } catch (e) {
         console.error('[handleConfirmDissolveDirect] Error:', e);
-        // Rollback
-        setDissolvingNodeId(null);
+        // The lifecycle has already unwound the visual. Restoring the *data*
+        // is a refetch until LIN-58 provides a store that can be updated
+        // rather than only re-downloaded (ADR-0007).
+        await refetch();
         window.alert(e instanceof Error ? e.message : 'Delete failed.');
       }
     },
-    [isAdmin, user, session, refetch, selectedNode?.id, interaction]
+    [user, isAdmin, session, refetch, selectedNode?.id, interaction, lifecycles, canDissolveNode]
+  );
+
+  /**
+   * Dissolve a Kinship Link, for the admin link manager. Same lifecycle as an
+   * in-canvas Dissolve — the modal supplies the confirmation, the canvas plays
+   * the animation.
+   */
+  const handleDissolveLink = useCallback(
+    async (params: { id: string; aId: string; bId: string }) => {
+      if (!user) return;
+      const record = createTreeRecord({
+        userId: user.id,
+        isAdmin,
+        sessionToken: session?.access_token,
+      });
+      try {
+        await lifecycles.run({
+          kind: 'dissolve',
+          subject: { kind: 'link', aId: params.aId, bId: params.bId },
+          commit: () => record.removeLink({ id: params.id }),
+        });
+        await refetch();
+      } catch (e) {
+        await refetch();
+        throw e;
+      }
+    },
+    [user, isAdmin, session, refetch, lifecycles]
   );
 
   const handleDirectConnectNodes = useCallback(
@@ -319,13 +343,17 @@ export const FamilyTree: React.FC = () => {
           parentRole: params.parentRole,
         });
         await refetch();
-        pulseLink(params.sourceNodeId, params.targetNodeId);
+        lifecycles.start('spawn', {
+          kind: 'link',
+          aId: params.sourceNodeId,
+          bId: params.targetNodeId,
+        });
       } catch (e) {
         console.error('[handleDirectConnectNodes] Error:', e);
         window.alert(e instanceof Error ? e.message : 'Failed to create kinship link.');
       }
     },
-    [isAdmin, user, session, refetch, pulseLink]
+    [isAdmin, user, session, refetch, lifecycles]
   );
 
   // Visible nodes for search (depends on mode)
@@ -567,6 +595,7 @@ export const FamilyTree: React.FC = () => {
           onSuccess={() => {
             void refetch();
           }}
+          onDissolveLink={handleDissolveLink}
         />
       )}
       {isAdmin && user && (
@@ -648,10 +677,8 @@ export const FamilyTree: React.FC = () => {
             onCreateRelative={handleCreateRelativeDirect}
             onConnectExistingRelative={handleConnectExistingRelativeDirect}
             onDirectConnectNodes={handleDirectConnectNodes}
-            newlySpawnedNodeId={newlySpawnedNodeId}
-            dissolvingNodeId={dissolvingNodeId}
-            pulsingLink={pulsingLink}
-            canDissolveSelected={isAdmin && canEditSelected}
+            lifecycles={lifecycles}
+            canDissolveSelected={!!selectedNode && canDissolveNode(selectedNode.id)}
             onDissolveNode={handleConfirmDissolveDirect}
           />
         ) : (
@@ -689,9 +716,8 @@ export const FamilyTree: React.FC = () => {
             onCreateRelative={handleCreateRelativeDirect}
             onConnectExistingRelative={handleConnectExistingRelativeDirect}
             onDirectConnectNodes={handleDirectConnectNodes}
-            newlySpawnedNodeId={newlySpawnedNodeId}
-            dissolvingNodeId={dissolvingNodeId}
-            onDissolveComplete={() => setDissolvingNodeId(null)}
+            lifecycles={lifecycles}
+            canDissolveNode={canDissolveNode}
             onConfirmDissolve={handleConfirmDissolveDirect}
           />
         )}

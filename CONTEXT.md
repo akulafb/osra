@@ -66,3 +66,7 @@ _Avoid_: Fade-in, Render, Pop-up; naming the 3D rendering ("Supernova") as a sep
 **Dissolve**:
 The disintegration exit animation when a Tree Node or Kinship Link is removed following inline confirmation — particle fraying in 2D, a black hole collapse in 3D. One lifecycle, rendered differently per view.
 _Avoid_: Hard delete, Disappear, Wipe; naming the 3D rendering ("Black Hole") as a separate lifecycle
+
+**Lifecycle Subject**:
+The Tree Node or Kinship Link a Spawn or Dissolve is happening to, captured when the lifecycle starts so it survives the Tree Record changing underneath it. A Dissolve outlives the thing it is dissolving.
+_Avoid_: Target, Animated node, Payload

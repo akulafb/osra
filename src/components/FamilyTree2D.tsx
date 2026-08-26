@@ -15,8 +15,9 @@ import NodeCard from './NodeCard';
 import { RelativeDirection } from '../types/graph';
 import { GhostNode } from './GhostNode';
 import { InlineConnectPicker } from './InlineConnectPicker';
-import { ParticleDissolve } from './ParticleDissolve';
-import { SpawnBurst } from './SpawnBurst';
+import { NodeLifecycleFx } from './NodeLifecycleFx';
+import { LifecycleController } from '../hooks/useLifecycles';
+import { lifecyclesOfKind } from '../lib/lifecycle';
 import { OrthogonalLinks } from './OrthogonalLinks';
 import { getNodeId } from '../lib/familyGraph';
 import { filterGraphData } from '../lib/filterGraphData';
@@ -93,10 +94,18 @@ interface FamilyTree2DProps {
     type: 'parent' | 'marriage' | 'divorce';
     parentRole?: 'mother' | 'father' | null;
   }) => Promise<void> | void;
-  /** Animation Pipeline states (LIN-45) */
-  newlySpawnedNodeId?: string | null;
-  dissolvingNodeId?: string | null;
-  onDissolveComplete?: (nodeId: string) => void;
+  /**
+   * Spawn and Dissolve (LIN-55, ADR-0007). One controller replaces the loose
+   * animation ids and the dead completion callback: the lifecycle owns the
+   * clock, and this view is one of its two renderings.
+   */
+  lifecycles: LifecycleController;
+  /**
+   * Whether this user may dissolve a given Tree Node. 3D asks the same question
+   * of the selected node (`canDissolveSelected`); 2D has a handle per card, so
+   * it asks per node rather than showing one that does nothing (LIN-55).
+   */
+  canDissolveNode?: (nodeId: string) => boolean;
   onConfirmDissolve?: (node: Node2D) => void;
 }
 
@@ -148,9 +157,8 @@ export const FamilyTree2D: React.FC<FamilyTree2DProps> = ({
   onCreateRelative,
   onConnectExistingRelative,
   onDirectConnectNodes,
-  newlySpawnedNodeId = null,
-  dissolvingNodeId = null,
-  onDissolveComplete,
+  lifecycles,
+  canDissolveNode,
   onConfirmDissolve,
 }) => {
   const presetBackground = getBackgroundForTheme(backgroundTheme);
@@ -592,7 +600,7 @@ export const FamilyTree2D: React.FC<FamilyTree2DProps> = ({
             style={{ transition: isDragging ? 'none' : 'transform 0.1s ease-out' }}
           >
             {/* Render links first (behind nodes) */}
-            <OrthogonalLinks links={links} activePreset={activePreset} />
+            <OrthogonalLinks links={links} activePreset={activePreset} lifecycles={lifecycles} />
 
             {pendingLinkPreview &&
               (() => {
@@ -632,49 +640,37 @@ export const FamilyTree2D: React.FC<FamilyTree2DProps> = ({
                 isHighlighted={highlightedNodeId === node.id || interaction.connectSourceId === node.id || (interaction.state.phase === 'choosing-kinship' && interaction.state.targetNodeId === node.id)}
                 isSearchHighlighted={searchHighlightedNodeId === node.id}
                 canEdit={isNodeEditable.get(node.id) ?? (isAdmin ? true : false)}
+                canDissolve={canDissolveNode?.(node.id) ?? false}
                 onAddRelative={(n, relation) => interaction.startCreateRelative(n.id, relation)}
                 onStartConnect={(n) => interaction.startConnect(n.id)}
                 onStartDissolve={(n) => interaction.startDissolve(n.id)}
                 onCancelDissolve={() => interaction.handleEscape()}
-                isNewlySpawned={newlySpawnedNodeId === node.id}
-                isDissolving={dissolvingNodeId === node.id}
+                lifecycles={lifecycles}
                 isConfirmingDissolve={interaction.confirmingDissolveId === node.id}
                 onConfirmDissolve={onConfirmDissolve}
               />
             ))}
 
-            {/* Celebratory Spawn Burst Animation */}
-            {nodes.map(node => {
-              if (newlySpawnedNodeId === node.id) {
-                return (
-                  <SpawnBurst
-                    key={`spawn-burst-${node.id}`}
-                    x={node.x - node.width / 2}
-                    y={node.y}
-                    width={node.width}
-                    height={node.height}
-                  />
-                );
-              }
-              return null;
-            })}
-
-            {/* Particle Dissolve Disintegration Animation */}
-            {nodes.map(node => {
-              if (dissolvingNodeId === node.id) {
-                return (
-                  <ParticleDissolve
-                    key={`dissolve-${node.id}`}
-                    x={node.x}
-                    y={node.y + node.height / 2}
-                    width={node.width}
-                    height={node.height}
-                    onComplete={() => onDissolveComplete?.(node.id)}
-                  />
-                );
-              }
-              return null;
-            })}
+            {/* Spawn and Dissolve, drawn from the lifecycle's own snapshot.
+                Deliberately not from `nodes`: a Dissolve outlives the node it
+                is dissolving, and iterating the post-refetch list is what used
+                to cut the animation off mid-flight (LIN-55). */}
+            {lifecyclesOfKind(lifecycles.lifecycles, 'spawn').map((lifecycle) => (
+              <NodeLifecycleFx
+                key={lifecycle.key}
+                lifecycle={lifecycle}
+                lifecycles={lifecycles}
+                nodes={nodes}
+              />
+            ))}
+            {lifecyclesOfKind(lifecycles.lifecycles, 'dissolve').map((lifecycle) => (
+              <NodeLifecycleFx
+                key={lifecycle.key}
+                lifecycle={lifecycle}
+                lifecycles={lifecycles}
+                nodes={nodes}
+              />
+            ))}
 
             {/* Transient Ghost Node */}
             {interaction.creatingRelative && (() => {
