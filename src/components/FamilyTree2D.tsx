@@ -192,6 +192,14 @@ export const FamilyTree2D: React.FC<FamilyTree2DProps> = ({
     [filteredGraphData]
   );
 
+  // People already linked to the Ghost Node's anchor: a Person Match may name
+  // them, but linking them again would write a duplicate Kinship Link.
+  const ghostAnchorId = interaction.creatingRelative?.anchorNodeId ?? null;
+  const ghostConnectedIds = useMemo(
+    () => (ghostAnchorId ? connectedPersonIds(graphData?.links || [], ghostAnchorId) : undefined),
+    [graphData?.links, ghostAnchorId]
+  );
+
   // Calculate layout
   const { nodes, links } = useMemo(() => {
     if (filteredGraphData.nodes.length === 0) return { nodes: [], links: [] };
@@ -678,7 +686,7 @@ export const FamilyTree2D: React.FC<FamilyTree2DProps> = ({
                   relation={interaction.creatingRelative.relation}
                   existingNodes={graphData?.nodes || []}
                   visibleIds={visibleIds}
-                  connectedIds={connectedPersonIds(graphData?.links || [], anchorNode.id)}
+                  connectedIds={ghostConnectedIds}
                   onSubmit={async (name) => {
                     if (onCreateRelative) {
                       await onCreateRelative({
