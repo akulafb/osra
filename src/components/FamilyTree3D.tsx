@@ -23,6 +23,8 @@ import { filterGraphDataFor3D } from '../lib/filterGraphData';
 import { useClusterBubbles } from '../hooks/useClusterBubbles';
 import { EXIT_MULT } from '../utils/clusterBubbles';
 import { useCosmicFx } from '../hooks/useCosmicFx';
+import { LifecycleController } from '../hooks/useLifecycles';
+import { linkInLifecycle, nodeIdInLifecycle } from '../lib/lifecycle';
 import {
   beamPulseParticleCount,
   confirmPulseOpacity,
@@ -253,14 +255,12 @@ interface FamilyTree3DProps {
     parentRole?: 'mother' | 'father' | null;
   }) => Promise<void> | void;
   /**
-   * Cosmic FX (LIN-51). These name the node a **Spawn** or **Dissolve** is
-   * happening to, not a separate animation state: the host owns the triggers
-   * and the rollback, exactly as it does for the 2D renderings.
+   * Spawn and Dissolve (LIN-55, ADR-0007). Cosmic FX are the 3D *renderings*
+   * of these lifecycles, not lifecycles of their own: the module owns the
+   * phase, the clock and the unwind, and this view reads them out of it —
+   * which supernova plays, which beam pulses, and for how long.
    */
-  newlySpawnedNodeId?: string | null;
-  dissolvingNodeId?: string | null;
-  /** The Kinship Link just created, whose beam pulses. Direction-free. */
-  pulsingLink?: LinkEndpoints | null;
+  lifecycles: LifecycleController;
   /** Dissolve is admin-only, so the handle is not offered to anyone else. */
   canDissolveSelected?: boolean;
   onDissolveNode?: (node: FamilyNode) => Promise<void> | void;
@@ -303,14 +303,18 @@ export const FamilyTree3DContent: React.FC<FamilyTree3DProps> = ({
   onCreateRelative,
   onConnectExistingRelative,
   onDirectConnectNodes,
-  newlySpawnedNodeId = null,
-  dissolvingNodeId = null,
-  pulsingLink = null,
+  lifecycles,
   canDissolveSelected = false,
   onDissolveNode,
 }) => {
   const ForceGraph3DAny = ForceGraph3D as unknown as React.ComponentType<any>;
   const { userProfile } = useAuth();
+
+  // Which subject is in which lifecycle right now. Ids rather than subjects,
+  // because the scene addresses its meshes by node id.
+  const newlySpawnedNodeId = nodeIdInLifecycle(lifecycles.lifecycles, 'spawn');
+  const dissolvingNodeId = nodeIdInLifecycle(lifecycles.lifecycles, 'dissolve');
+  const pulsingLink: LinkEndpoints | null = linkInLifecycle(lifecycles.lifecycles, 'spawn');
 
   const geometries = useMemo(() => {
     const isMob = isMobile();

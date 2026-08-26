@@ -1,6 +1,8 @@
 import React from 'react';
 import { Node2D, RelativeDirection } from '../types/graph';
 import { getClusterColors } from '../utils/familyColors';
+import { LifecycleController, useLifecycleProgress } from '../hooks/useLifecycles';
+import { cardDissolveAt, cardSpawnAt } from '../utils/canvasFx';
 
 export interface NodeCardProps {
   node: Node2D;
@@ -15,14 +17,23 @@ export interface NodeCardProps {
   isSearchHighlighted?: boolean;
   /** Whether the current user has permission to edit/add/delete around this node */
   canEdit?: boolean;
+  /**
+   * Whether this user may actually dissolve this node. Separate from `canEdit`
+   * because they differ: a 1-degree relative may add relatives but not delete
+   * people. The handle used to appear for anyone who could edit and then do
+   * nothing at all when clicked (LIN-55).
+   */
+  canDissolve?: boolean;
   /** Direct Action Handle callbacks */
   onAddRelative?: (node: Node2D, relation: RelativeDirection) => void;
   onStartConnect?: (node: Node2D) => void;
   onStartDissolve?: (node: Node2D) => void;
   onCancelDissolve?: () => void;
-  /** Playful animation states */
-  isNewlySpawned?: boolean;
-  isDissolving?: boolean;
+  /**
+   * Spawn and Dissolve for this card. The card reads its own progress out of
+   * the lifecycle rather than being told a boolean and timing itself (LIN-55).
+   */
+  lifecycles: LifecycleController;
   isConfirmingDissolve?: boolean;
   onConfirmDissolve?: (node: Node2D) => void;
 }
@@ -57,12 +68,12 @@ const NodeCardComponent: React.FC<NodeCardProps> = ({
   isHighlighted = false,
   isSearchHighlighted = false,
   canEdit = false,
+  canDissolve = false,
   onAddRelative,
   onStartConnect,
   onStartDissolve,
   onCancelDissolve,
-  isNewlySpawned = false,
-  isDissolving = false,
+  lifecycles,
   isConfirmingDissolve = false,
   onConfirmDissolve,
 }) => {
@@ -92,14 +103,22 @@ const NodeCardComponent: React.FC<NodeCardProps> = ({
 
   const showActionHandles = canEdit && (isHovered || isSelected || isConfirmingDissolve);
 
-  // Animation style
-  const cardAnimation = isDissolving
-    ? 'cardDissolve 0.45s cubic-bezier(0.4, 0, 0.2, 1) forwards'
-    : isConfirmingDissolve
-    ? 'cardShake 0.35s ease-in-out infinite'
+  // Spawn and Dissolve, on the lifecycle's clock. Confirmation is not a
+  // lifecycle — it is an interaction phase — so the shake stays in CSS.
+  const subject = React.useMemo(() => ({ kind: 'node' as const, id: node.id }), [node.id]);
+  const spawnProgress = useLifecycleProgress(lifecycles, 'spawn', subject);
+  const dissolveProgress = useLifecycleProgress(lifecycles, 'dissolve', subject);
+  const isDissolving = dissolveProgress !== null;
+  const isNewlySpawned = spawnProgress !== null;
+
+  const cardFx = isDissolving
+    ? cardDissolveAt(dissolveProgress)
     : isNewlySpawned
-    ? 'cardSpawnPop 0.55s cubic-bezier(0.34, 1.56, 0.64, 1) forwards'
-    : undefined;
+    ? cardSpawnAt(spawnProgress)
+    : null;
+
+  const cardAnimation =
+    !cardFx && isConfirmingDissolve ? 'cardShake 0.35s ease-in-out infinite' : undefined;
 
   return (
     <g
@@ -117,6 +136,11 @@ const NodeCardComponent: React.FC<NodeCardProps> = ({
         className="node-card-animated-inner"
         style={{
           animation: cardAnimation,
+          transform: cardFx
+            ? `translate(0px, ${cardFx.translateY}px) scale(${cardFx.scale})`
+            : undefined,
+          opacity: cardFx ? cardFx.opacity : undefined,
+          filter: cardFx && cardFx.blur > 0 ? `blur(${cardFx.blur}px)` : undefined,
           transformOrigin: `${node.width / 2}px ${node.height / 2}px`,
           transformBox: 'fill-box',
         }}
@@ -475,7 +499,8 @@ const NodeCardComponent: React.FC<NodeCardProps> = ({
                   </text>
                 </g>
 
-                {/* Dissolve Button */}
+                {/* Dissolve Button — shown only to someone who may use it. */}
+                {canDissolve && (
                 <g
                   className="action-handle handle-dissolve"
                   transform="translate(30, 0)"
@@ -507,6 +532,7 @@ const NodeCardComponent: React.FC<NodeCardProps> = ({
                     🗑️ Delete
                   </text>
                 </g>
+                )}
               </>
             )}
           </g>

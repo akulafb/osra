@@ -13,6 +13,8 @@
  * than tuned by eye.
  */
 
+import { LIFECYCLE_DURATION_MS } from '../lib/lifecycle';
+
 export type CosmicEffectKind = 'supernova' | 'collapse';
 
 /**
@@ -30,9 +32,14 @@ export const COSMIC_FX_PARTICLES: Record<CosmicEffectKind, number> = {
   collapse: 140,
 };
 
+/**
+ * The 3D renderings run on the lifecycle's clock, not their own (LIN-55,
+ * ADR-0007). These are re-exports under the scene's vocabulary, so a supernova
+ * and the Spawn it renders cannot drift apart.
+ */
 export const COSMIC_FX_DURATION_MS: Record<CosmicEffectKind, number> = {
-  supernova: 1400,
-  collapse: 1100,
+  supernova: LIFECYCLE_DURATION_MS['3d'].spawn.node,
+  collapse: LIFECYCLE_DURATION_MS['3d'].dissolve.node,
 };
 
 /** How far particles travel, in world units. A node sphere has radius 10. */
@@ -228,9 +235,6 @@ export interface LinkEndpoints {
  * rather than a hand-written effect: it is already integrated, costs nothing to
  * maintain, and does not spend any of the budget above.
  */
-/** How long a newly grown link keeps its beads, matching the Spawn window. */
-export const BEAM_PULSE_WINDOW_MS = 3500;
-
 export const BEAM_PULSE_PARTICLES = 6;
 export const BEAM_PULSE_PARTICLES_MOBILE = 3;
 export const BEAM_PULSE_SPEED = 0.012;

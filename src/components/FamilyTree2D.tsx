@@ -15,8 +15,9 @@ import NodeCard from './NodeCard';
 import { RelativeDirection } from '../types/graph';
 import { GhostNode } from './GhostNode';
 import { InlineConnectPicker } from './InlineConnectPicker';
-import { ParticleDissolve } from './ParticleDissolve';
-import { SpawnBurst } from './SpawnBurst';
+import { NodeLifecycleFx } from './NodeLifecycleFx';
+import { LifecycleController } from '../hooks/useLifecycles';
+import { lifecyclesOfKind } from '../lib/lifecycle';
 import { OrthogonalLinks } from './OrthogonalLinks';
 import { getNodeId } from '../lib/familyGraph';
 import { filterGraphData } from '../lib/filterGraphData';
@@ -93,10 +94,18 @@ interface FamilyTree2DProps {
     type: 'parent' | 'marriage' | 'divorce';
     parentRole?: 'mother' | 'father' | null;
   }) => Promise<void> | void;
-  /** Animation Pipeline states (LIN-45) */
-  newlySpawnedNodeId?: string | null;
-  dissolvingNodeId?: string | null;
-  onDissolveComplete?: (nodeId: string) => void;
+  /**
+   * Spawn and Dissolve (LIN-55, ADR-0007). One controller replaces the loose
+   * animation ids and the dead completion callback: the lifecycle owns the
+   * clock, and this view is one of its two renderings.
+   */
+  lifecycles: LifecycleController;
+  /**
+   * Whether this user may dissolve a given Tree Node. 3D asks the same question
+   * of the selected node (`canDissolveSelected`); 2D has a handle per card, so
+   * it asks per node rather than showing one that does nothing (LIN-55).
+   */
+  canDissolveNode?: (nodeId: string) => boolean;
   onConfirmDissolve?: (node: Node2D) => void;
 }
 
@@ -148,9 +157,8 @@ export const FamilyTree2D: React.FC<FamilyTree2DProps> = ({
   onCreateRelative,
   onConnectExistingRelative,
   onDirectConnectNodes,
-  newlySpawnedNodeId = null,
-  dissolvingNodeId = null,
-  onDissolveComplete,
+  lifecycles,
+  canDissolveNode,
   onConfirmDissolve,
 }) => {
   const presetBackground = getBackgroundForTheme(backgroundTheme);
@@ -162,6 +170,9 @@ export const FamilyTree2D: React.FC<FamilyTree2DProps> = ({
   const highlightTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [transform, setTransform] = useState({ x: 0, y: 0, k: 1 });
+  // Read by the layout pin, which must not re-run when the user pans.
+  const transformRef = useRef(transform);
+  transformRef.current = transform;
   const [isDragging, setIsDragging] = useState(false);
   const [showControls, setShowControls] = useState(false);
   const [isPresetMenuOpen, setIsPresetMenuOpen] = useState(false);
@@ -213,6 +224,19 @@ export const FamilyTree2D: React.FC<FamilyTree2DProps> = ({
 
   // Calculate bounds and center the view
   const bounds = useMemo(() => calculateBounds(nodes), [nodes]);
+  // Read inside the fit effect without making a layout change re-trigger it.
+  const boundsRef = useRef(bounds);
+  boundsRef.current = bounds;
+
+  // Which nodes are hidden, as a value rather than a Set identity, so the fit
+  // below reacts to a collapse and not to a re-render.
+  const collapsedKey = useMemo(
+    () => Array.from(collapsedNodes).sort().join(','),
+    [collapsedNodes]
+  );
+  const isEmpty = nodes.length === 0;
+  // Set by the fit below, so the pin further down does not fight it.
+  const justFittedRef = useRef(false);
 
   // Setup zoom behavior
   useEffect(() => {
@@ -236,9 +260,13 @@ export const FamilyTree2D: React.FC<FamilyTree2DProps> = ({
     };
   }, [activePreset]); // Re-attach zoom behavior when SVG is rendered after preset selection
 
-  // Center view when data changes significantly
+  // Fit the view to the tree when the *view* changes — a preset, a layout, a
+  // collapse, or the first load. Deliberately not when the node set changes
+  // underneath a stable view: a Spawn or Dissolve refetches, and refitting on
+  // that threw the camera off the thing the user had just acted on (LIN-55).
   useEffect(() => {
-    if (!svgRef.current || !bounds || nodes.length === 0) return;
+    const bounds = boundsRef.current;
+    if (!svgRef.current || !bounds || isEmpty) return;
 
     const svg = svgRef.current;
     const rect = svg.getBoundingClientRect();
@@ -258,10 +286,63 @@ export const FamilyTree2D: React.FC<FamilyTree2DProps> = ({
     const initialTransform = zoomIdentity.translate(centerX, centerY).scale(scale);
 
     if (zoomBehaviorRef.current) {
+      justFittedRef.current = true;
       select(svgRef.current)
         .call(zoomBehaviorRef.current.transform as any, initialTransform);
     }
-  }, [bounds, nodes.length === 0]); // Only re-center on initial load or empty state
+  }, [activePreset, layoutType, collapsedKey, isEmpty]);
+
+  // Keep the viewport pinned to whatever was at its centre when the layout
+  // reflows. Adding a person re-tidies the entire tree, so every node moves —
+  // the camera never budged, but the tree slid out from under it just as the
+  // Spawn started playing (LIN-55). Pinning a node that survived the reflow
+  // holds the picture still and lets the tree rearrange around it.
+  const previousLayoutRef = useRef<Map<string, { x: number; y: number }>>(new Map());
+  useEffect(() => {
+    const previous = previousLayoutRef.current;
+    const current = new Map(nodes.map((n) => [n.id, { x: n.x, y: n.y }]));
+    previousLayoutRef.current = current;
+
+    if (justFittedRef.current) {
+      justFittedRef.current = false;
+      return;
+    }
+    if (previous.size === 0 || current.size === 0) return;
+    if (!svgRef.current || !zoomBehaviorRef.current) return;
+
+    const svg = svgRef.current;
+    const rect = svg.getBoundingClientRect();
+    const t = transformRef.current;
+
+    // Viewport centre, in layout coordinates.
+    const centreX = (rect.width / 2 - t.x) / t.k;
+    const centreY = (rect.height / 2 - t.y) / t.k;
+
+    let pin: { before: { x: number; y: number }; after: { x: number; y: number } } | null = null;
+    let nearest = Infinity;
+    previous.forEach((before, id) => {
+      const after = current.get(id);
+      if (!after) return;
+      const distance = (before.x - centreX) ** 2 + (before.y - centreY) ** 2;
+      if (distance < nearest) {
+        nearest = distance;
+        pin = { before, after };
+      }
+    });
+    if (!pin) return;
+
+    const { before, after } = pin as { before: { x: number; y: number }; after: { x: number; y: number } };
+    const dx = (before.x - after.x) * t.k;
+    const dy = (before.y - after.y) * t.k;
+    if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) return;
+
+    // No transition: this is a correction, not a movement. It should be
+    // invisible, so that the reflow reads as the tree making room.
+    select(svg).call(
+      zoomBehaviorRef.current.transform as any,
+      zoomIdentity.translate(t.x + dx, t.y + dy).scale(t.k)
+    );
+  }, [nodes]);
 
   // Handle keyboard navigation
   useEffect(() => {
@@ -592,7 +673,7 @@ export const FamilyTree2D: React.FC<FamilyTree2DProps> = ({
             style={{ transition: isDragging ? 'none' : 'transform 0.1s ease-out' }}
           >
             {/* Render links first (behind nodes) */}
-            <OrthogonalLinks links={links} activePreset={activePreset} />
+            <OrthogonalLinks links={links} activePreset={activePreset} lifecycles={lifecycles} />
 
             {pendingLinkPreview &&
               (() => {
@@ -632,49 +713,37 @@ export const FamilyTree2D: React.FC<FamilyTree2DProps> = ({
                 isHighlighted={highlightedNodeId === node.id || interaction.connectSourceId === node.id || (interaction.state.phase === 'choosing-kinship' && interaction.state.targetNodeId === node.id)}
                 isSearchHighlighted={searchHighlightedNodeId === node.id}
                 canEdit={isNodeEditable.get(node.id) ?? (isAdmin ? true : false)}
+                canDissolve={canDissolveNode?.(node.id) ?? false}
                 onAddRelative={(n, relation) => interaction.startCreateRelative(n.id, relation)}
                 onStartConnect={(n) => interaction.startConnect(n.id)}
                 onStartDissolve={(n) => interaction.startDissolve(n.id)}
                 onCancelDissolve={() => interaction.handleEscape()}
-                isNewlySpawned={newlySpawnedNodeId === node.id}
-                isDissolving={dissolvingNodeId === node.id}
+                lifecycles={lifecycles}
                 isConfirmingDissolve={interaction.confirmingDissolveId === node.id}
                 onConfirmDissolve={onConfirmDissolve}
               />
             ))}
 
-            {/* Celebratory Spawn Burst Animation */}
-            {nodes.map(node => {
-              if (newlySpawnedNodeId === node.id) {
-                return (
-                  <SpawnBurst
-                    key={`spawn-burst-${node.id}`}
-                    x={node.x - node.width / 2}
-                    y={node.y}
-                    width={node.width}
-                    height={node.height}
-                  />
-                );
-              }
-              return null;
-            })}
-
-            {/* Particle Dissolve Disintegration Animation */}
-            {nodes.map(node => {
-              if (dissolvingNodeId === node.id) {
-                return (
-                  <ParticleDissolve
-                    key={`dissolve-${node.id}`}
-                    x={node.x}
-                    y={node.y + node.height / 2}
-                    width={node.width}
-                    height={node.height}
-                    onComplete={() => onDissolveComplete?.(node.id)}
-                  />
-                );
-              }
-              return null;
-            })}
+            {/* Spawn and Dissolve, drawn from the lifecycle's own snapshot.
+                Deliberately not from `nodes`: a Dissolve outlives the node it
+                is dissolving, and iterating the post-refetch list is what used
+                to cut the animation off mid-flight (LIN-55). */}
+            {lifecyclesOfKind(lifecycles.lifecycles, 'spawn').map((lifecycle) => (
+              <NodeLifecycleFx
+                key={lifecycle.key}
+                lifecycle={lifecycle}
+                lifecycles={lifecycles}
+                nodes={nodes}
+              />
+            ))}
+            {lifecyclesOfKind(lifecycles.lifecycles, 'dissolve').map((lifecycle) => (
+              <NodeLifecycleFx
+                key={lifecycle.key}
+                lifecycle={lifecycle}
+                lifecycles={lifecycles}
+                nodes={nodes}
+              />
+            ))}
 
             {/* Transient Ghost Node */}
             {interaction.creatingRelative && (() => {
