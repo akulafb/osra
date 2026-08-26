@@ -5,7 +5,7 @@
 **Branch**: `akulafb/lin-58-arch-06-a-graph-store-that-can-be-updated-not-only-refetched`
 **Depends on**: [LIN-63](https://linear.app/linearfb/issue/LIN-63) *one owner of the graph in
 memory* and [LIN-64](https://linear.app/linearfb/issue/LIN-64) *complete the write seam's return
-contract* — both filed, both must land first.
+contract* — **both shipped**.
 
 Produced by grilling the issue. The issue said "re-verify the problem still exists before
 grilling this; 01 and 03 may have moved it." They had: two of its five evidence claims are dead,
@@ -33,7 +33,9 @@ three sequential fetches are `:125, :144, :166` (row 2).
    `addLink` never yields a Kinship Link id; `removePerson` never reports its cascade. Nothing
    optimistic can be confirmed from a response today. ADR-0003 specified the six operations and
    the error kinds and simply never specified return values — an unfinished contract, not a
-   violated one.
+   violated one. **Closed by LIN-64**: all six return `ConfirmedRows`, `addLink` also returns
+   `alreadyConnected`, and `src/lib/treeRecordRows.ts` decodes rows for both directions of the
+   seam ([ADR-0010](../adr/0010-write-seam-return-contract.md)).
 2. **Preserving node object identity does not avoid the 3D re-warm.** The re-heat and the
    `warmupTicks` loop are gated on the `graphData` *prop reference* changing, never on contents
    (`three-forcegraph.mjs:1399, 1413, 1475`), and re-passing the same reference is invisible to
@@ -292,22 +294,38 @@ hook two components call, so there is one seam to convert, and `write` can reach
 through the same context instead of four new props. The `useFamilyData` / `graphData` names were
 deliberately left alone for LIN-58 to rename to the Working Record vocabulary.
 
-### [LIN-64](https://linear.app/linearfb/issue/LIN-64) — Arch 06b: Complete the write seam's return contract
+### [LIN-64](https://linear.app/linearfb/issue/LIN-64) — Arch 06b: Complete the write seam's return contract — **shipped**
 
-ADR-0003 fixed the six operations and the error kinds and left return values unspecified. Make
-each write return what it wrote:
+ADR-0003 fixed the six operations and the error kinds and left return values unspecified. Every
+write now returns what it wrote:
 
-- flip `Prefer: return=minimal` → `return=representation` on `POST /links`, `PATCH /nodes`,
-  `PATCH /links` (`treeRecord.ts:290, 389, 419`) — client-only, no migration
-- `create_relative_secure`: accept a caller-supplied Person uuid (D11) and return the created
-  Kinship Link ids alongside `new_node_id` — the `sibling` branch creates several
-- `admin_delete_node_secure`: return the cascaded link ids
-- `removeLink` already receives the deleted rows under `return=representation` and discards them
-  (`treeRecord.ts:487-508`) — return them
-- surface `already_connected` from `link_existing_relative_secure` so D10's third outcome is
+- `Prefer: return=minimal` → `return=representation` on `POST /links`, `PATCH /nodes`,
+  `PATCH /links` — client-only, no migration
+- `create_relative_secure`: accepts a caller-supplied Person uuid (D11) and returns the `nodes`
+  row and every `links` row it wrote — the `sibling` branch writes one per parent, and the
+  Person's two cluster fields are derived server-side from the anchor and the anchor's spouse, so
+  the client could never have predicted them
+- `admin_delete_node_secure`: returns the cascaded link ids
+- `removeLink` already received the deleted rows under `return=representation` and discarded them
+  — it returns them
+- `already_connected` is surfaced from `link_existing_relative_secure`, so D10's third outcome is
   reachable
 
-Requires a SQL migration. LIN-58's D12 is unimplementable without it.
+Landed as one shape for all six operations — `ConfirmedRows` — plus `alreadyConnected` on
+`addLink`, and one decoder (`src/lib/treeRecordRows.ts`) shared with the read path in
+`FamilyDataContext`. [ADR-0010](../adr/0010-write-seam-return-contract.md).
+
+**Two things LIN-58 should know.**
+
+1. `link_existing_relative_secure` had **never worked** for `parent`, `child` or `spouse`:
+   `target_node_id` is both a parameter and a column of `public.links`, the duplicate-guard
+   `EXISTS` blocks referenced it unqualified, and plpgsql raised `column reference
+   "target_node_id" is ambiguous` into the function's own `EXCEPTION WHEN OTHERS`. So
+   `already_connected` was unreachable rather than merely unread, and every non-admin "connect an
+   existing relative" failed. Fixed by qualifying the columns.
+2. `isClaimed` is not on a `nodes` row — it comes from a separate RPC over `public.users.node_id`.
+   Under D12's "server row wins wholesale", confirming an `editPerson` will drop a Person's claim
+   indicator unless `confirmPending` carries it across.
 
 ## Risks
 
@@ -327,4 +345,10 @@ Requires a SQL migration. LIN-58's D12 is unimplementable without it.
 - **Client-supplied Person uuids change an RPC's trust surface.** Not a security change — RLS
   still governs whether the insert is permitted, and a colliding uuid fails on the primary key
   — but it is a signature change to a `SECURITY DEFINER` function and belongs in (B)'s review,
-  not LIN-58's.
+  not LIN-58's. **Shipped in LIN-64** as `p_new_node_id uuid DEFAULT NULL`; a collision arrives as
+  `TreeRecordError('conflict')`. Nothing sends it yet, so LIN-58's callers are the first.
+- **`is_within_1_degree` cannot work against the schema as declared, and LIN-64 deliberately did
+  not fix it.** `20260817140000_lin59...` compares `public.users.id` to text while `is_admin()`
+  compares it to `uuid`; both cannot hold, so one of the two raises on every call. The live
+  definitions may have been hand-edited. This gates every non-admin write, so establish which
+  before relying on optimism for non-admin users — see ADR-0010's last consequence.

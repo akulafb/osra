@@ -72,3 +72,7 @@ creation path — the Ghost Node — did not guard at all. Two further problems:
   unique constraint) and `already_connected` is still read by nothing. The
   `isAlreadyConnected` marking hides both in the UI without fixing either; they
   are write-path bugs and are tracked separately.
+  *(LIN-64 closed the second half: `addLink` now returns `alreadyConnected`, and the flag turned
+  out to be unreachable rather than merely unread — `link_existing_relative_secure` raised
+  `column reference "target_node_id" is ambiguous` before it could ever be returned. See
+  [ADR-0010](0010-write-seam-return-contract.md).)*
