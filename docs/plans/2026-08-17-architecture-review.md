@@ -4,7 +4,7 @@ Survey output from `/improve-codebase-architecture`. Six **deepening opportuniti
 
 Vocabulary is `/codebase-design` (module, interface, implementation, depth, seam, adapter, leverage, locality) for architecture, and [`CONTEXT.md`](../../CONTEXT.md) (Tree Record, Person, Tree Node, Kinship Link, Relative Direction, Action Handle, Ghost Node, Connect Mode, Ghost Preview, Spawn, Dissolve) for the domain.
 
-**Tracker**: LIN-53 … LIN-58 (see each candidate). **LIN-53 is done** — see [Outcome: candidate 01](#outcome-candidate-01--shipped) at the end of this file. Candidates 02–06 remain open.
+**Tracker**: LIN-53 … LIN-58 (see each candidate). **Candidates 01–05 are done** — 01/LIN-53 (see [Outcome: candidate 01](#outcome-candidate-01--shipped) at the end of this file), 02/LIN-54 ([ADR-0004 direct-manipulation](../adr/0004-direct-manipulation-state-machine.md)), 03/LIN-55 ([ADR-0007](../adr/0007-one-lifecycle-one-clock.md)), 04/LIN-56 ([ADR-0006](../adr/0006-live-graph-endpoints-and-traversal.md)), 05/LIN-57 ([ADR-0005](../adr/0005-person-match-resolution.md)). Only **candidate 06 / LIN-58** remains open.
 
 ## Scope
 
@@ -205,6 +205,11 @@ Separately, the candidate pool is wrong on the primary path: `FamilyTree2D.tsx:7
 ## 06 — A graph store that can be updated, not only refetched
 
 **Speculative** · local-substitutable · `LIN-58` · blocked by `LIN-53`, `LIN-55`
+
+> **Re-verified 2026-08-26 — two of the five evidence bullets below are now false.** LIN-55 fixed
+> the destroyed pins (`carryPositions`) and the mid-animation recentre. The blockers (LIN-53,
+> LIN-55) have both landed. See [`2026-08-26-lin-58-working-record-spec.md`](./2026-08-26-lin-58-working-record-spec.md)
+> for the current evidence and [ADR-0008](../adr/0008-working-record-representation.md) for the decision.
 
 **Files** — `src/hooks/useFamilyData.ts:22–167`, `FamilyTree.tsx` (11 refetch sites), `hooks/useFamilyChat.ts:16`
 
