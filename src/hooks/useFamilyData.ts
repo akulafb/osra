@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { dropOrphanLinks } from '../lib/sanitizeFamilyGraph';
 import { FamilyGraph, FamilyNode, FamilyLink } from '../types/graph';
@@ -10,6 +10,10 @@ type LinkRow = Database['public']['Tables']['links']['Row'];
 export function useFamilyData() {
   const { session, user } = useAuth();
   const [graphData, setGraphData] = useState<FamilyGraph | null>(null);
+  // The node objects we last handed out. react-force-graph mutates them in
+  // place with simulation coordinates, so they are where the current positions
+  // actually live.
+  const previousNodesRef = useRef<FamilyNode[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -18,6 +22,31 @@ export function useFamilyData() {
       fetchFamilyData();
     }
   }, [session, user]);
+
+  /**
+   * A refetch mints brand-new node objects, which drops the positions the 3D
+   * force simulation had settled on: the graph re-warms from scratch and the
+   * whole tree flies to a new arrangement. Carrying the coordinates over keeps
+   * a Spawn or Dissolve visible where it happened (LIN-55).
+   */
+  const carryPositions = (next: FamilyNode[]): FamilyNode[] => {
+    const previous = new Map(previousNodesRef.current.map((n) => [n.id, n]));
+    const carried = next.map((node) => {
+      const prior = previous.get(node.id);
+      if (!prior) return node;
+      return {
+        ...node,
+        x: prior.x,
+        y: prior.y,
+        z: prior.z,
+        fx: prior.fx,
+        fy: prior.fy,
+        fz: prior.fz,
+      };
+    });
+    previousNodesRef.current = carried;
+    return carried;
+  };
 
   const fetchFamilyData = async (isBackground = false): Promise<void> => {
     try {
@@ -148,14 +177,14 @@ export function useFamilyData() {
           { id: 'l-6', source: 'node-1', target: 'node-6', type: 'parent' },
         ];
         const sanitized = dropOrphanLinks(mockNodes, mockLinks);
-        setGraphData({ nodes: mockNodes, links: sanitized });
+        setGraphData({ nodes: carryPositions(mockNodes), links: sanitized });
         setIsLoading(false);
         return;
       }
 
       const rawGraph: FamilyGraph = { nodes, links: linksForState };
       const sanitized = dropOrphanLinks(rawGraph.nodes, rawGraph.links);
-      setGraphData({ nodes, links: sanitized });
+      setGraphData({ nodes: carryPositions(nodes), links: sanitized });
       setIsLoading(false);
     } catch (err) {
       console.error('[useFamilyData] Error fetching family data:', err);

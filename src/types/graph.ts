@@ -10,6 +10,18 @@ export interface FamilyNode {
   familyCluster?: string;  // paternal (display)
   maternalFamilyCluster?: string;
   isClaimed?: boolean;
+  /**
+   * Simulation position, written onto the node by react-force-graph in the 3D
+   * view. Carried across a refetch so a Spawn or Dissolve does not restart the
+   * whole simulation and throw the tree across the screen (LIN-55).
+   */
+  x?: number;
+  y?: number;
+  z?: number;
+  /** Pinned position, set when a node is dragged. Carried for the same reason. */
+  fx?: number;
+  fy?: number;
+  fz?: number;
 }
 
 export type LinkEndpoint = string | FamilyNode;

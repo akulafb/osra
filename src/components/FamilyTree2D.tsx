@@ -221,6 +221,17 @@ export const FamilyTree2D: React.FC<FamilyTree2DProps> = ({
 
   // Calculate bounds and center the view
   const bounds = useMemo(() => calculateBounds(nodes), [nodes]);
+  // Read inside the fit effect without making a layout change re-trigger it.
+  const boundsRef = useRef(bounds);
+  boundsRef.current = bounds;
+
+  // Which nodes are hidden, as a value rather than a Set identity, so the fit
+  // below reacts to a collapse and not to a re-render.
+  const collapsedKey = useMemo(
+    () => Array.from(collapsedNodes).sort().join(','),
+    [collapsedNodes]
+  );
+  const isEmpty = nodes.length === 0;
 
   // Setup zoom behavior
   useEffect(() => {
@@ -244,9 +255,13 @@ export const FamilyTree2D: React.FC<FamilyTree2DProps> = ({
     };
   }, [activePreset]); // Re-attach zoom behavior when SVG is rendered after preset selection
 
-  // Center view when data changes significantly
+  // Fit the view to the tree when the *view* changes — a preset, a layout, a
+  // collapse, or the first load. Deliberately not when the node set changes
+  // underneath a stable view: a Spawn or Dissolve refetches, and refitting on
+  // that threw the camera off the thing the user had just acted on (LIN-55).
   useEffect(() => {
-    if (!svgRef.current || !bounds || nodes.length === 0) return;
+    const bounds = boundsRef.current;
+    if (!svgRef.current || !bounds || isEmpty) return;
 
     const svg = svgRef.current;
     const rect = svg.getBoundingClientRect();
@@ -269,7 +284,7 @@ export const FamilyTree2D: React.FC<FamilyTree2DProps> = ({
       select(svgRef.current)
         .call(zoomBehaviorRef.current.transform as any, initialTransform);
     }
-  }, [bounds, nodes.length === 0]); // Only re-center on initial load or empty state
+  }, [activePreset, layoutType, collapsedKey, isEmpty]);
 
   // Handle keyboard navigation
   useEffect(() => {
