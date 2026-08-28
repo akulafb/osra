@@ -40,3 +40,8 @@ supabase/scripts/
 scripts/generate-badran-additions.mjs
 .aidesigner/*
 !.aidesigner/.gitkeep
+
+# Agent skill deployments (symlinks into local skills-manager library)
+  .agents/skills/
+  .claude/skills/
+  .omp/skills/
