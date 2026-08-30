@@ -44,6 +44,54 @@ Supabase applies **Postgres `GRANT`s** plus **RLS policies** together: the JWT r
 
 If a grant is missing, PostgREST returns `42501` with a suggested `GRANT` in the error detail.
 
+## Migration history: repaired 2026-08-30
+
+Every migration in this directory was applied to both hosted projects by hand
+through the dashboard SQL editor, which stamps its own version number. The
+remote `supabase_migrations.schema_migrations` table therefore recorded the same
+work under numbers that matched no local filename: 25 such rows on dev, 7 on
+production. `supabase db push` read that as "almost nothing here is applied" and
+would have replayed the 22KB initial schema over a live database.
+
+The history was rebuilt from the live schema rather than from migration names,
+because names lie in both directions. Production carried
+`is_within_1_degree(uuid)` while missing the migration that rewrote it, and its
+`lin59` row was absent although several of its siblings were present. Each local
+file was instead reduced to catalogue predicates — a trigger's attachment, a
+policy name, a `proconfig` entry, a constraint's `confdeltype` — and only
+versions whose predicates held were recorded as applied. The pre-repair rows are
+archived in `reference/migration-history-before-repair-2026-08-30.json`.
+
+Two traps are worth knowing before writing such a predicate again:
+
+- **`pg_get_function_identity_arguments` includes parameter names** on this
+  server, returning `p_node_id uuid` rather than `uuid`. Comparing it to a bare
+  type list silently reports every function as missing.
+- **A later migration erases the evidence of an earlier one.** `20260826120000`
+  does `CREATE OR REPLACE` on `link_existing_relative_secure`, so nothing in
+  that body can attest to `20260817140000`. Prefer discriminators no later file
+  touches: triggers, policy names, and grants.
+
+### Production is behind by two migrations
+
+The repair recorded the truth rather than papering over it, so
+`supabase migration list` now shows `20260407220000` (`lin33_admin_node_insert_users_fk`)
+and `20260817140000` (`lin59_server_side_admin_write_gates`) as local-only on
+production. Both are genuinely unapplied there:
+
+| Effect | Dev | Production |
+| --- | --- | --- |
+| `users_node_id_fkey` on `public.users` | present | **absent** |
+| `nodes` INSERT policy | `nodes_insert_admin_only` | `nodes_insert_by_bound_users` |
+| `trg_guard_node_cluster_updates` on `public.nodes` | present | **absent** |
+| `divorce` excluded from the `links` write policies | yes | **no** |
+| `is_within_1_degree` resolves `auth.jwt() ->> 'sub'` | yes | **no** |
+
+`db push` against production is now the correct instrument for closing that gap,
+which is the point of the repair. Read `20260817140000` first: it replaces a
+policy that lets any node-bound user insert into `public.nodes` with one that
+admits admins only, so applying it changes who can write.
+
 ## Using another Postgres provider
 
 The migration SQL is standard Postgres and can be run on Neon, Railway, RDS, etc. However, `auth.uid()` and `auth.jwt()` are Supabase-specific. You will need to replace them with your own auth mechanism (e.g. JWT claims, custom functions) and swap the Supabase client for another Postgres client. The app is built for Supabase; using another database requires adapting auth and the data layer.
