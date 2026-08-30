@@ -1,4 +1,4 @@
-# Working Record Representation
+# 0008 Working Record Representation
 
 Optimistic writes need an in-browser set of Persons and Kinship Links that can be updated
 rather than re-downloaded. We hold it as an **immutable confirmed snapshot plus an ordered list
@@ -6,12 +6,17 @@ of Pending Changes**, derive the Working Record from those two, and project it i
 whose identity is reused whenever a Person's facts are unchanged. Changes go *in*; only a
 snapshot comes *out*.
 
+**Issue**: [LIN-58](https://linear.app/linearfb/issue/LIN-58) — Arch 06, from
+`docs/plans/2026-08-17-architecture-review.md`. Shipped on
+`akulafb/lin-58-arch-06-a-graph-store-that-can-be-updated-not-only-refetched`; the module is
+`src/lib/workingRecord.ts` and its owner is `src/hooks/useWorkingRecord.ts`.
+
 ## Decision
 
 1. **Changeset in, snapshot out.** A change enters the Working Record as a value
    (`person-upsert`, `person-remove`, `link-upsert`, `link-remove`). The only thing that comes
-   out is an immutable `{ nodes, links }` snapshot of the same shape `useFamilyData` returns
-   today, so every existing reader keeps working. Nothing outside the module applies changes to
+   out is an immutable `{ nodes, links }` snapshot of the shape the read path already returned,
+   so every existing reader kept working. Nothing outside the module applies changes to
    anything.
 
 2. **State is `{ confirmed, pending }`; the Working Record is derived.** `confirmed` is the last
@@ -68,6 +73,16 @@ settle, not an explosion, and pinned Tree Nodes do not move at all.
   above shows the cost is paid on prop identity, so a stable array is either invisible to the
   library or costs exactly the same as a fresh one. This was the first design and it does not
   work.
+- **Reusing a Kinship Link object whose endpoint node object was replaced.** Rejected:
+  `initialize()` resolves an endpoint id into a node object *on the link object itself* and skips
+  any endpoint that is already an object — `if (typeof link.source !== "object") link.source = …`
+  (`d3-force-3d/src/link.js:66-67`). A link object that survives a projection therefore
+  keeps the node object it was first bound to, and goes on pulling towards the Person the
+  projection just discarded. `projectLinks` reuses a Kinship Link only while each of its endpoints
+  is either still an unresolved id or the very node object this projection is handing out, and
+  re-mints one whose endpoint identity is stale (`workingRecord.ts:339-362`). This is the price of
+  decision 3, and it is why link reuse is conditioned on node reuse rather than decided
+  independently.
 - **A changeset as the module's *output*, applied incrementally by each view.** Rejected: an
   incrementally patched array drifts permanently if a change is dropped, re-ordered or applied
   twice, and nothing can detect the drift. Deriving from `{ confirmed, pending }` cannot drift.
@@ -86,29 +101,50 @@ settle, not an explosion, and pinned Tree Nodes do not move at all.
 - **Enabling Supabase Realtime in this change.** Rejected for now, but decision 1 is chosen so
   it is additive: a Postgres `INSERT`/`UPDATE`/`DELETE` is already the same
   `person-upsert`/`link-remove` vocabulary a local write speaks. `realtime.eventsPerSecond` is
-  `0` and `useFamilyData` uses raw `fetch` to avoid a websocket hang; inheriting that problem
+  `0` and the read path uses raw `fetch` to avoid a websocket hang; inheriting that problem
   would sink this change.
 - **Background refresh on window focus or an interval.** Rejected: "when should we re-read the
   server" is the realtime question wearing a smaller hat.
 
 ## Consequences
 
-- **The tree no longer picks up other people's writes.** Today a post-write `refetch()`
-  incidentally refreshes everything; removing it makes the canvas stale for the session, as the
-  chat copy already is. This is the strongest argument for a change feed and is recorded as
-  such rather than mitigated here.
-- **`carryPositions` narrows rather than disappears.** It stops running over every node on every
-  fetch and applies only to a Person whose facts changed.
+- **The tree no longer picks up other people's writes.** The post-write `refetch()` incidentally
+  refreshed everything; removing it leaves the canvas stale for the session, as the chat copy
+  already was. This is the strongest argument for a change feed and is recorded as such rather
+  than mitigated here.
+- **`carryPositions` narrowed into the projection rather than disappearing.** It no longer runs
+  over every node on every fetch: `projectWorkingRecord` carries `x/y/z/fx/fy/fz` across only for
+  a Person whose facts changed, and the standalone helper is gone (`workingRecord.ts:142-155`).
 - **A pending Kinship Link has no id**, so the one operation it cannot serve is its own
   deletion, for about one round-trip.
-- **`useNewNodesSinceSignIn` needs hardening.** Its fingerprint is
-  `${userId}|${nodes.length}|${maxTs}` and it filters on `createdAt` (`:80`, `:107`), so a
-  pending Person churns it without being counted. Its own comment records that a duplicate
-  `graphData` commit already caused it to clear the button prematurely.
-- **`already_connected` becomes load-bearing.** `link_existing_relative_secure` can return
+- **`useNewNodesSinceSignIn` is fed the confirmed Persons, not the Working Record.** Its
+  fingerprint is `${userId}|${nodes.length}|${maxTs}` and it filters on `createdAt`
+  (`useNewNodesSinceSignIn.ts:87`, `:114`), and an optimistic Person has no `createdAt` until the
+  database assigns one — so a pending Person would churn the fingerprint the guard exists to hold
+  still, without ever being counted. Its own comment records that a duplicate commit already
+  caused it to clear the button prematurely.
+- **`already_connected` is load-bearing.** `link_existing_relative_secure` can return
   success having inserted nothing, so a write has three outcomes, not two: confirmed, reverted,
   and accepted-but-empty. Reading it closes a real duplicate-link defect that ADR-0005 recorded
   as unread.
+- **An optimistic Person carries no family cluster.** `create_relative_secure` derives
+  `paternal_family_cluster` and `maternal_family_cluster` from the anchor and the anchor's spouse,
+  so the client cannot predict either and leaves both absent rather than guessing
+  (`AddRelativeModal.tsx:166`). The visible cost is that while the view is narrowed to a subset of
+  clusters, a pending Person is not drawn at all: both cluster filters exclude a Person with no
+  cluster (`filterGraphData.ts:173` for 3D, `:20-22` for the 2D preset). The Person appears when
+  the server answers. The admin path is unaffected — there the user typed the clusters, so the
+  optimistic Person carries them (`AdminAddPersonModal.tsx:73-78`).
+- **An id-less pending Kinship Link that duplicates one the record already holds is not folded in
+  at all.** A pending link is keyed by `source|target|type`, so the fold can see that the record
+  already carries that pair and drops the pending one (`workingRecord.ts:185-189`). This is
+  `already_connected` a round-trip before the server says so, and it is what keeps the canvas from
+  drawing a duplicate edge in between.
+- **`isClaimed` is carried across confirmation.** It is derived from `public.users.node_id` by a
+  separate RPC, so no `nodes` row can report it. Letting the server row win wholesale would
+  therefore clear a Person's claim indicator on every rename, so the fold keeps the held value
+  when the reported row has none (`workingRecord.ts:231-242`). It is the one exception to that
+  rule, and it is a carry, not a merge.
 
 Numbering note: `docs/adr/` contains two files numbered 0004
 (`0004-direct-manipulation-state-machine.md`, `0004-server-side-write-authorization.md`),

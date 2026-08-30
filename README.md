@@ -148,11 +148,13 @@ src/
 │       └── HangarTransition.tsx  # CTA
 ├── contexts/
 │   ├── AuthContext.tsx           # Authentication state management
-│   └── FamilyDataContext.tsx     # The one owner of the graph in memory
+│   └── WorkingRecordContext.tsx  # The one owner of the Working Record
 ├── hooks/
+│   ├── useWorkingRecord.ts       # Working Record state and the write sequencer
 │   └── useFamilyChat.ts          # Chatbot logic and LLM orchestration
 ├── lib/
 │   ├── supabase.ts               # Supabase client configuration
+│   ├── workingRecord.ts          # Confirmed snapshot + pending changes, projected
 │   └── permissions.ts            # 1-degree permission helpers
 ├── utils/
 │   ├── llmClient.ts              # OpenRouter/Ollama dual-mode client

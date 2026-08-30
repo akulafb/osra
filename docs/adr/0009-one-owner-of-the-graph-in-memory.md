@@ -50,6 +50,10 @@ production):
    it, and renaming only the file and provider would leave two vocabularies inside one module.
    One rename, in the commit that changes the shape.
 
+   **LIN-58 did that rename.** `FamilyDataContext` is `src/contexts/WorkingRecordContext.tsx`,
+   `FamilyDataProvider` is `WorkingRecordProvider`, `useFamilyData()` is `useWorkingRecord()`,
+   and `graphData` is `working`. Every name in this ADR below this line is the one it had then.
+
 ## Considered and Rejected
 
 - **Prop-drill the graph into `<FamilyChat graphData={…} />` and `useFamilyChat(graph)`.** One
