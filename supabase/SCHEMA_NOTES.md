@@ -62,6 +62,10 @@ policy name, a `proconfig` entry, a constraint's `confdeltype` — and only
 versions whose predicates held were recorded as applied. The pre-repair rows are
 archived in `reference/migration-history-before-repair-2026-08-30.json`.
 
+Both projects now record the same eleven versions as the files on disk, so
+`supabase migration list --linked` matches row for row and `db push` is a no-op
+against either.
+
 Two traps are worth knowing before writing such a predicate again:
 
 - **`pg_get_function_identity_arguments` includes parameter names** on this
@@ -72,25 +76,87 @@ Two traps are worth knowing before writing such a predicate again:
   that body can attest to `20260817140000`. Prefer discriminators no later file
   touches: triggers, policy names, and grants.
 
-### Production is behind by two migrations
+### Production was behind by two migrations — closed 2026-08-30
 
-The repair recorded the truth rather than papering over it, so
-`supabase migration list` now shows `20260407220000` (`lin33_admin_node_insert_users_fk`)
-and `20260817140000` (`lin59_server_side_admin_write_gates`) as local-only on
-production. Both are genuinely unapplied there:
+`20260407220000` (`lin33_admin_node_insert_users_fk`) and `20260817140000`
+(`lin59_server_side_admin_write_gates`) were genuinely unapplied to production,
+which had been running without the server-side write gates. Both are applied
+now, and every effect was verified individually:
 
-| Effect | Dev | Production |
+| Effect | Before | After |
 | --- | --- | --- |
-| `users_node_id_fkey` on `public.users` | present | **absent** |
-| `nodes` INSERT policy | `nodes_insert_admin_only` | `nodes_insert_by_bound_users` |
-| `trg_guard_node_cluster_updates` on `public.nodes` | present | **absent** |
-| `divorce` excluded from the `links` write policies | yes | **no** |
-| `is_within_1_degree` resolves `auth.jwt() ->> 'sub'` | yes | **no** |
+| `users_node_id_fkey` on `public.users` | absent | present, `ON DELETE SET NULL` |
+| `nodes` INSERT policy | `nodes_insert_by_bound_users` | `nodes_insert_admin_only` |
+| `trg_guard_node_cluster_updates` on `public.nodes` | absent | present |
+| `divorce` excluded from the `links` write policies | no | yes |
+| `is_within_1_degree` resolves `auth.jwt() ->> 'sub'` | no | yes |
 
-`db push` against production is now the correct instrument for closing that gap,
-which is the point of the repair. Read `20260817140000` first: it replaces a
-policy that lets any node-bound user insert into `public.nodes` with one that
-admits admins only, so applying it changes who can write.
+Row counts were unchanged across the whole operation: 77 nodes, 82 links, 9
+users. Gates were then proved behaviourally under a real non-admin JWT, inside
+`BEGIN`/`ROLLBACK`: a name edit on the caller's own node succeeds, a cluster edit
+raises `Only administrators can update paternal_family_cluster`, a direct
+`INSERT` into `public.nodes` is refused by RLS, and `create_relative_secure`
+still returns the full `{success, new_node_id, nodes, links, message}` envelope.
+
+Applying these needed no application change: the client already gated direct
+`POST /nodes` and `POST /links` behind `identity.isAdmin`, and already refused
+non-admin divorce, so the migrations only moved that enforcement server-side.
+
+**`db push` alone would have broken production.** `20260817140000` is timestamped
+before `20260826120000` but was applied after it, and both do
+`CREATE OR REPLACE` on `link_existing_relative_secure`. Pushing the older file
+against a database already holding the newer one silently reverts that function
+to its pre-`written_links` body, breaking the write seam with no error. The
+ordering hazard is general: **when a migration lands out of timestamp order,
+replay every later migration that touches the same object.** Here the newer
+definition was re-applied in the same transaction.
+
+### `users.id` and `created_by_user_id`: text/uuid divergence closed 2026-08-30
+
+The two databases used to disagree on the type of six identity columns. Dev
+stored them as `text`, production as `uuid`. Every column in every `public`
+table was compared across both databases; these six were the whole of it:
+
+| Column | Dev (before) | Production | Both (now) |
+| --- | --- | --- | --- |
+| `users.id` | `text` | `uuid` | `uuid` |
+| `nodes.created_by_user_id` | `text` | `uuid` | `uuid` |
+| `links.created_by_user_id` | `text` | `uuid` | `uuid` |
+| `node_invites.created_by_user_id` | `text` | `uuid` | `uuid` |
+| `node_invites.claimed_by_user_id` | `text` | `uuid` | `uuid` |
+| `audit_log.actor_user_id` | `text` | `uuid` | `uuid` |
+
+That divergence cost real uptime. A predicate authored against dev compares one
+of these columns to a text expression, which production rejects with
+`42883: operator does not exist: uuid = text`. Note that this is not a
+compile-time error: the policy or function is created successfully and fails
+only when a request evaluates it. Both migrations above shipped with dev-shaped
+comparisons; the failure landed mid-migration and briefly took production's
+non-admin write path down until the comparisons were corrected.
+
+`20260830120000_reconcile_identity_column_types.sql` resolves it in the
+direction production already pointed, and that `20260101_initial_schema.sql`
+specified all along: dev's six columns were converted to `uuid`, matching
+`auth.users.id`. Production needed no column change. Every value in the dev
+columns was already a valid UUID, so the conversion was a pure type change, and
+the five nullable columns stayed nullable.
+
+Two policies named one of these columns directly and so blocked `ALTER TYPE`
+with `cannot alter type of a column used in a policy definition`. Both were
+dropped and recreated in production's shape around the conversion:
+`users_select_own_or_admin` on `public.users` and `audit_log_insert_authenticated`
+on `public.audit_log`.
+
+The same migration reconciles the functions that had drifted with the columns.
+`is_admin` and `is_bound` had grown different definitions on the two databases —
+dev's carried the casts its `text` columns required — and now share a single
+cast-free definition. `is_within_1_degree` compares `uuid` to `uuid` with no
+`::text`.
+
+**These columns are `uuid` in every environment, so compare them to `auth.uid()`
+directly and do not cast.** A `::text` cast on an indexed identity column makes
+the predicate non-sargable and defeats the index. There is no longer a
+dev-versus-production shape to write around.
 
 ## Using another Postgres provider
 
