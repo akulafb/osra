@@ -111,28 +111,52 @@ ordering hazard is general: **when a migration lands out of timestamp order,
 replay every later migration that touches the same object.** Here the newer
 definition was re-applied in the same transaction.
 
-### `users.id` and `created_by_user_id` are `text` on dev, `uuid` on production
+### `users.id` and `created_by_user_id`: text/uuid divergence closed 2026-08-30
 
-The two databases genuinely diverge on column types:
+The two databases used to disagree on the type of six identity columns. Dev
+stored them as `text`, production as `uuid`. Every column in every `public`
+table was compared across both databases; these six were the whole of it:
 
-| Column | Dev | Production |
-| --- | --- | --- |
-| `users.id` | `text` | `uuid` |
-| `nodes.created_by_user_id` | `text` | `uuid` |
-| `links.created_by_user_id` | `text` | `uuid` |
-| `users.node_id` | `uuid` | `uuid` |
+| Column | Dev (before) | Production | Both (now) |
+| --- | --- | --- | --- |
+| `users.id` | `text` | `uuid` | `uuid` |
+| `nodes.created_by_user_id` | `text` | `uuid` | `uuid` |
+| `links.created_by_user_id` | `text` | `uuid` | `uuid` |
+| `node_invites.created_by_user_id` | `text` | `uuid` | `uuid` |
+| `node_invites.claimed_by_user_id` | `text` | `uuid` | `uuid` |
+| `audit_log.actor_user_id` | `text` | `uuid` | `uuid` |
 
-So does `is_admin()`: production compares `id = auth.uid()` while dev must cast.
-Any predicate written against one database and compared to a text expression
-fails on the other with `42883: operator does not exist: uuid = text`. Both
-migrations above shipped with dev-shaped comparisons and had to be corrected
-before production would take them — `lin33`'s policy and `lin59`'s
-`is_within_1_degree` lookup now cast the *column* to text, which is valid on
-either type.
+That divergence cost real uptime. A predicate authored against dev compares one
+of these columns to a text expression, which production rejects with
+`42883: operator does not exist: uuid = text`. Note that this is not a
+compile-time error: the policy or function is created successfully and fails
+only when a request evaluates it. Both migrations above shipped with dev-shaped
+comparisons; the failure landed mid-migration and briefly took production's
+non-admin write path down until the comparisons were corrected.
 
-Until the types are reconciled, **write `column::text = <text expression>`**
-whenever a migration touches these columns, and check any new predicate against
-both databases rather than only the one in front of you.
+`20260830120000_reconcile_identity_column_types.sql` resolves it in the
+direction production already pointed, and that `20260101_initial_schema.sql`
+specified all along: dev's six columns were converted to `uuid`, matching
+`auth.users.id`. Production needed no column change. Every value in the dev
+columns was already a valid UUID, so the conversion was a pure type change, and
+the five nullable columns stayed nullable.
+
+Two policies named one of these columns directly and so blocked `ALTER TYPE`
+with `cannot alter type of a column used in a policy definition`. Both were
+dropped and recreated in production's shape around the conversion:
+`users_select_own_or_admin` on `public.users` and `audit_log_insert_authenticated`
+on `public.audit_log`.
+
+The same migration reconciles the functions that had drifted with the columns.
+`is_admin` and `is_bound` had grown different definitions on the two databases —
+dev's carried the casts its `text` columns required — and now share a single
+cast-free definition. `is_within_1_degree` compares `uuid` to `uuid` with no
+`::text`.
+
+**These columns are `uuid` in every environment, so compare them to `auth.uid()`
+directly and do not cast.** A `::text` cast on an indexed identity column makes
+the predicate non-sargable and defeats the index. There is no longer a
+dev-versus-production shape to write around.
 
 ## Using another Postgres provider
 
