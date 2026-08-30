@@ -158,6 +158,78 @@ directly and do not cast.** A `::text` cast on an indexed identity column makes
 the predicate non-sargable and defeats the index. There is no longer a
 dev-versus-production shape to write around.
 
+### Missing `ON DELETE CASCADE` foreign keys on production — closed 2026-08-30
+
+`20260101_initial_schema.sql` declares three foreign keys onto `public.nodes`,
+all `ON DELETE CASCADE`: `links.source_node_id` (line 32),
+`links.target_node_id` (line 33), and `node_invites.node_id` (line 42). Dev had
+all three. Production had none of them — further evidence that production's
+schema was never built from that file.
+
+| Constraint | Dev (before) | Production (before) | Both (now) |
+| --- | --- | --- | --- |
+| `links_source_node_id_fkey` | present, `ON DELETE CASCADE` | absent | present, `ON DELETE CASCADE` |
+| `links_target_node_id_fkey` | present, `ON DELETE CASCADE` | absent | present, `ON DELETE CASCADE` |
+| `node_invites_node_id_fkey` | present, `ON DELETE CASCADE` | absent | present, `ON DELETE CASCADE` |
+
+**Why it mattered.** `admin_delete_node_secure(p_node_id uuid)` collects the ids
+of every Kinship Link touching the Person, runs a single
+`DELETE FROM public.nodes`, and returns those ids as `removed_link_ids`. It never
+deletes from `public.links`: the cascade is the entire mechanism that makes that
+return value true. The assumption is written down at
+`20260826120000_lin64_write_seam_return_contract.sql:353-356`. On production the
+assumption was false, so the function returned `success: true` and named the
+Kinship Link ids while leaving the rows in place. The Write Outcome was
+confirmed, the Confirmed Snapshot dropped those Kinship Links, and the database
+silently disagreed.
+
+No user ever saw a problem because `dropOrphanLinks`
+(`src/lib/sanitizeFamilyGraph.ts`) filters any Kinship Link whose endpoints are
+absent, and it runs on both client paths: the Tree Record fetch at
+`src/hooks/useWorkingRecord.ts:246` and the Working Record projection at
+`src/lib/workingRecord.ts:133`. That is the lesson worth carrying: **a
+client-side safety net can hide a false server contract indefinitely.** Two
+independent nets masked this one for roughly a fortnight, and only a
+column-by-column schema comparison surfaced it.
+
+The residue was 5 orphan rows on production, all `type = 'parent'`, each with a
+live source Person and a deleted target, written 2026-08-17 and 2026-08-18. The
+target Persons are gone from `public.nodes`, so no facts about them survive and
+there is nothing to restore. The rows are archived verbatim in
+`reference/orphan-links-before-delete-2026-08-30.json` and were then deleted.
+
+`20260830140000_restore_links_nodes_fk_cascade.sql` deletes orphan Kinship Links
+and orphan invites, adds the three constraints guarded on `pg_constraint`, and
+ends in a `DO $verify$` block that aborts unless all three exist with
+`confdeltype = 'c'`, no orphans remain, and the endpoint columns are still
+`NOT NULL`. **The deletes must precede `ADD CONSTRAINT`**, or FK validation fails
+with `23503`. Dev was a pure no-op; production went from 82 Kinship Links to 77,
+with nodes, invites, and users unchanged. All four foreign keys onto `nodes` are
+now present, including the pre-existing `users_node_id_fkey ... ON DELETE SET
+NULL`.
+
+**Two hardening findings were recorded and deliberately not applied.** An
+applied migration is immutable: editing `20260830140000` now would leave the
+committed text different from what executed on both databases, which is the
+exact class of mismatch this branch exists to remove. Fold them into the next
+migration that touches these constraints.
+
+- The verify block matches constraints by name, `confrelid` and `confdeltype`.
+  It checks neither `convalidated` nor `conkey`, so a pre-existing `NOT VALID`
+  constraint, or one whose name and column disagree, would satisfy it. Match on
+  `(conrelid, conname, attname)` with `convalidated` instead.
+- `SET LOCAL lock_timeout` is not set. `ADD CONSTRAINT` takes ACCESS EXCLUSIVE
+  on the referencing table, and that request queues behind any open transaction
+  touching it while blocking every reader arriving after it. Table size is not
+  the risk here; lock queueing is.
+
+Separately, `20260826120000_lin64_write_seam_return_contract.sql:356` states
+"Same transaction, so nothing can be added in between", which is stronger than
+READ COMMITTED provides: a Kinship Link committed between the `SELECT` and the
+`DELETE` would be removed by the cascade without appearing in
+`removed_link_ids`. The foreign key narrows that window, because inserting a
+Kinship Link now takes `FOR KEY SHARE` on the parent Person's row.
+
 ## Using another Postgres provider
 
 The migration SQL is standard Postgres and can be run on Neon, Railway, RDS, etc. However, `auth.uid()` and `auth.jwt()` are Supabase-specific. You will need to replace them with your own auth mechanism (e.g. JWT claims, custom functions) and swap the Supabase client for another Postgres client. The app is built for Supabase; using another database requires adapting auth and the data layer.

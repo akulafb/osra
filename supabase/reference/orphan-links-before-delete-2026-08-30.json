@@ -1,0 +1,59 @@
+{
+  "captured_at": "2026-08-30T13:38:25.888Z",
+  "project_ref": "henhqxosjbrvwceuvtyk",
+  "environment": "production",
+  "reason": "Orphan Kinship Links: live source Person, target Person deleted. Production lacked the links->nodes ON DELETE CASCADE foreign keys declared in 20260101_initial_schema.sql, so admin_delete_node_secure deleted each Person but left its links behind. Deleted by migration 20260830140000. The target Persons no longer exist in public.nodes, so no facts about them survive; these rows record only the ids.",
+  "row_count": 5,
+  "rows": [
+    {
+      "id": "3b2f1692-4656-4d9d-b88b-4bfdcd29bce4",
+      "type": "parent",
+      "parent_role": null,
+      "source_node_id": "10000000-1000-4000-8000-000000000003",
+      "target_node_id": "40b4309c-9016-4bb5-bc01-eca698766517",
+      "source_first_name": "Fahd",
+      "created_by_user_id": "952db081-34ec-41a1-bf97-332867926b63",
+      "created_at": "2026-08-17 14:01:11.571282+00"
+    },
+    {
+      "id": "d6012e73-574a-4599-85b7-e1ed0d4d06be",
+      "type": "parent",
+      "parent_role": null,
+      "source_node_id": "10000000-1000-4000-8000-000000000003",
+      "target_node_id": "80f2af88-1f55-42e5-9772-ac71ea24c65c",
+      "source_first_name": "Fahd",
+      "created_by_user_id": "952db081-34ec-41a1-bf97-332867926b63",
+      "created_at": "2026-08-17 14:02:06.594337+00"
+    },
+    {
+      "id": "9c513063-49df-45ab-b03c-941965222dcf",
+      "type": "parent",
+      "parent_role": null,
+      "source_node_id": "10000000-1000-4000-8000-000000000003",
+      "target_node_id": "3be582f5-cd98-4154-96d9-589b1faf9031",
+      "source_first_name": "Fahd",
+      "created_by_user_id": "952db081-34ec-41a1-bf97-332867926b63",
+      "created_at": "2026-08-17 14:10:57.489367+00"
+    },
+    {
+      "id": "5c424a39-8e8f-43b2-9af1-6cf868fe630f",
+      "type": "parent",
+      "parent_role": null,
+      "source_node_id": "10000000-1000-4000-8000-000000000003",
+      "target_node_id": "6a8c0008-b1d1-4307-98fb-36183e5da774",
+      "source_first_name": "Fahd",
+      "created_by_user_id": "952db081-34ec-41a1-bf97-332867926b63",
+      "created_at": "2026-08-17 14:12:08.393585+00"
+    },
+    {
+      "id": "12945e62-4047-4be8-bd5f-9de406caea76",
+      "type": "parent",
+      "parent_role": null,
+      "source_node_id": "10000000-1000-4000-8000-00000000000e",
+      "target_node_id": "aea41b17-ac28-4737-8ffe-5d1cb2f98cc8",
+      "source_first_name": "Noora",
+      "created_by_user_id": "952db081-34ec-41a1-bf97-332867926b63",
+      "created_at": "2026-08-18 14:01:40.295795+00"
+    }
+  ]
+}
