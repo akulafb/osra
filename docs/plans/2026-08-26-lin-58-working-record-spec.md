@@ -347,8 +347,11 @@ Landed as one shape for all six operations — `ConfirmedRows` — plus `already
   — but it is a signature change to a `SECURITY DEFINER` function and belongs in (B)'s review,
   not LIN-58's. **Shipped in LIN-64** as `p_new_node_id uuid DEFAULT NULL`; a collision arrives as
   `TreeRecordError('conflict')`. Nothing sends it yet, so LIN-58's callers are the first.
-- **`is_within_1_degree` cannot work against the schema as declared, and LIN-64 deliberately did
+- ~~**`is_within_1_degree` cannot work against the schema as declared, and LIN-64 deliberately did
   not fix it.** `20260817140000_lin59...` compares `public.users.id` to text while `is_admin()`
   compares it to `uuid`; both cannot hold, so one of the two raises on every call. The live
   definitions may have been hand-edited. This gates every non-admin write, so establish which
-  before relying on optimism for non-admin users — see ADR-0010's last consequence.
+  before relying on optimism for non-admin users — see ADR-0010's last consequence.~~
+  **Closed 2026-08-30** by `20260830120000_reconcile_identity_column_types.sql`: dev was the
+  database that had drifted, all six identity columns are `uuid`, and the `id::text` stopgap is
+  gone. Optimism is safe for non-admin users.

@@ -1,3 +1,10 @@
+// The starfield and nebulae are hand-rolled against THREE directly, with the Perlin
+// implementation below. This replaced the `three-nebula` dependency, which was dropped on
+// 2026-02-23 after verifying nothing here ever used it — the custom noise and materials were
+// already doing all the work. It is a deliberate replacement, not a partial migration.
+//
+// Nothing in this file sets `frustumCulled = false` or `fog: false`. Both were tried as
+// speculative fixes for a black-screen bug and reverted; see ADR-0011.
 import * as THREE from 'three';
 
 // Perlin noise implementation for detailed textures

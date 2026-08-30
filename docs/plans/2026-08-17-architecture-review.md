@@ -4,7 +4,9 @@ Survey output from `/improve-codebase-architecture`. Six **deepening opportuniti
 
 Vocabulary is `/codebase-design` (module, interface, implementation, depth, seam, adapter, leverage, locality) for architecture, and [`CONTEXT.md`](../../CONTEXT.md) (Tree Record, Person, Tree Node, Kinship Link, Relative Direction, Action Handle, Ghost Node, Connect Mode, Ghost Preview, Spawn, Dissolve) for the domain.
 
-**Tracker**: LIN-53 … LIN-58 (see each candidate). **Candidates 01–05 are done** — 01/LIN-53 (see [Outcome: candidate 01](#outcome-candidate-01--shipped) at the end of this file), 02/LIN-54 ([ADR-0004 direct-manipulation](../adr/0004-direct-manipulation-state-machine.md)), 03/LIN-55 ([ADR-0007](../adr/0007-one-lifecycle-one-clock.md)), 04/LIN-56 ([ADR-0006](../adr/0006-live-graph-endpoints-and-traversal.md)), 05/LIN-57 ([ADR-0005](../adr/0005-person-match-resolution.md)). Only **candidate 06 / LIN-58** remains open.
+**Tracker**: LIN-53 … LIN-58. **All six candidates are done** — 01/LIN-53 (see [Outcome: candidate 01](#outcome-candidate-01--shipped) at the end of this file), 02/LIN-54 ([ADR-0004 direct-manipulation](../adr/0004-direct-manipulation-state-machine.md)), 03/LIN-55 ([ADR-0007](../adr/0007-one-lifecycle-one-clock.md)), 04/LIN-56 ([ADR-0006](../adr/0006-live-graph-endpoints-and-traversal.md)), 05/LIN-57 ([ADR-0005](../adr/0005-person-match-resolution.md)), 06/LIN-58 ([ADR-0008](../adr/0008-working-record-representation.md)), plus its two spin-offs LIN-63 ([ADR-0009](../adr/0009-one-owner-of-the-graph-in-memory.md)) and LIN-64 ([ADR-0010](../adr/0010-write-seam-return-contract.md)).
+
+> **This file is now a *before* picture, not a plan.** Every candidate shipped; the survey below is kept for what a re-run cannot reproduce — which candidates were considered, and the baseline the work moved from. The decisions themselves live in the ADRs linked above. The per-candidate specs for 04 and 05 were retired on 2026-08-30 once ADR-0006 and ADR-0005 carried their decisions; 06's spec is still here because two of its risks are unmeasured.
 
 ## Scope
 

@@ -27,6 +27,19 @@ Users can view and edit only their **1-degree network**:
 
 `is_within_1_degree` implements this logic.
 
+**Why the last three cases exist.** They are not symmetry for its own sake — they were added to
+fix a reported bug (2026-03-12). A mother could not invite her own children, while the father
+could. The children were linked to the father by `parent` links and to the mother by nothing:
+she reached the family through a `marriage` link to him. A perimeter built only from direct
+links therefore excluded her children from her own 1-degree network. **Spouse's children** closes
+that; **Parent's spouse** and **Child's other parent** close the same gap from the other two
+directions. Any change that narrows the perimeter back to direct links reopens the bug.
+
+The TypeScript equivalent is `get1DegreeRelatives` in `src/lib/familyGraph.ts`, which classifies
+these three as blended relatives (ADR-0006). The two must agree: the client derives edit
+affordances from it and the server derives authorization from `is_within_1_degree`, so a
+divergence shows up as the client offering writes the server refuses.
+
 ### Audit log
 
 `audit_log` has RLS disabled (empty table, no policies). Re-enable and add policies if you implement audit logging. Migration `20260514120000_data_api_public_table_grants.sql` revokes `anon`/`authenticated` on this table (to drop legacy defaults) and grants DML only to `service_role` for PostgREST. Do not extend `anon`/`authenticated` here without enabling RLS and policies first.
