@@ -4,6 +4,7 @@ import Alert from '@mui/material/Alert';
 import type { Session } from '@supabase/supabase-js';
 import { validateOrphanNodeName } from '../../lib/adminGraphValidation';
 import { createTreeRecord } from '../../lib/treeRecord';
+import { useWorkingRecord } from '../../contexts/WorkingRecordContext';
 
 const MAX_NAME = 200;
 const MAX_CLUSTER = 100;
@@ -14,7 +15,6 @@ interface AdminAddPersonModalProps {
   session: Session | null;
   isAdmin: boolean;
   userId: string;
-  onSuccess: () => void;
 }
 
 export default function AdminAddPersonModal({
@@ -23,8 +23,8 @@ export default function AdminAddPersonModal({
   session,
   isAdmin,
   userId,
-  onSuccess,
 }: AdminAddPersonModalProps) {
+  const { write } = useWorkingRecord();
   const [name, setName] = useState('');
   const [paternal, setPaternal] = useState('');
   const [maternal, setMaternal] = useState('');
@@ -59,12 +59,35 @@ export default function AdminAddPersonModal({
         isAdmin,
         sessionToken: session?.access_token,
       });
-      await record.addPerson({
-        firstName: name.trim().slice(0, MAX_NAME),
-        paternalCluster: paternal.trim().slice(0, MAX_CLUSTER) || null,
-        maternalCluster: maternal.trim().slice(0, MAX_CLUSTER) || null,
-      });
-      onSuccess();
+      const personId = crypto.randomUUID();
+      const firstName = name.trim().slice(0, MAX_NAME);
+      const paternalCluster = paternal.trim().slice(0, MAX_CLUSTER) || null;
+      const maternalCluster = maternal.trim().slice(0, MAX_CLUSTER) || null;
+
+      // A standalone Person has no Kinship Link, so nothing but the Person
+      // itself is optimistic here.
+      await write(
+        [
+          {
+            kind: 'person-upsert',
+            person: {
+              id: personId,
+              firstName,
+              familyCluster: paternalCluster ?? undefined,
+              maternalFamilyCluster: maternalCluster ?? undefined,
+            },
+          },
+        ],
+        async () => ({
+          kind: 'confirmed',
+          rows: await record.addPerson({
+            id: personId,
+            firstName,
+            paternalCluster,
+            maternalCluster,
+          }),
+        })
+      );
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong.');

@@ -1,3 +1,4 @@
+import { getParents } from './familyGraph';
 import { FamilyLink, FamilyNode, RelativeDirection } from '../types/graph';
 import { kinshipLinksFromRows, personsFromRows } from './treeRecordRows';
 
@@ -158,6 +159,42 @@ export function relativeToKinshipLink(
         'Sibling is a composite relationship derived from shared parents; it cannot be converted to a single direct Kinship Link.'
       );
   }
+}
+
+/**
+ * The Kinship Links a relative addition creates, as Working Record values, so
+ * an optimistic apply and the write it is optimistic about cannot disagree
+ * about what "add a sibling" means (LIN-58).
+ *
+ * Id-less: a pending Kinship Link has no row yet (D11). `sibling` is the
+ * composite the singular helper refuses — `create_relative_secure` inserts one
+ * link per parent of the anchor, in a loop — so this returns a list.
+ */
+export function relativeToKinshipLinks(
+  anchorTargetId: string,
+  otherNodeId: string,
+  relation: RelativeDirection,
+  links: readonly FamilyLink[],
+  parentRole?: 'mother' | 'father' | null
+): FamilyLink[] {
+  if (relation === 'sibling') {
+    return getParents(anchorTargetId, links).map((parentId) => ({
+      source: parentId,
+      target: otherNodeId,
+      type: 'parent',
+      parentRole: null,
+    }));
+  }
+
+  const spec = relativeToKinshipLink(anchorTargetId, otherNodeId, relation, parentRole);
+  return [
+    {
+      source: spec.sourceId,
+      target: spec.targetId,
+      type: spec.type,
+      parentRole: spec.parentRole,
+    },
+  ];
 }
 
 function resolveEnv(config?: TreeRecordConfig) {

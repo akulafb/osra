@@ -4,7 +4,7 @@ import { useState, useCallback, useMemo } from 'react';
 import { Message, callLLM } from '../utils/llmClient';
 import { formatFamilyData } from '../utils/familyContext';
 import { formatNodeDisplayName } from '../utils/nodeDisplayName';
-import { useFamilyData } from '../contexts/FamilyDataContext';
+import { useWorkingRecord } from '../contexts/WorkingRecordContext';
 import { useAuth } from '../contexts/AuthContext';
 
 const MAX_DISPLAYED_MESSAGES = 50;
@@ -13,7 +13,7 @@ export function useFamilyChat() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { graphData } = useFamilyData();
+  const { working: graphData } = useWorkingRecord();
   const { userProfile } = useAuth();
 
   const currentUserName = useMemo(() => {

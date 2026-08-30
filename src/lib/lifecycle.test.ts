@@ -131,9 +131,10 @@ describe('lifecycle — geometry snapshot', () => {
   const geometry = { x: 10, y: 20, width: 100, height: 40 };
 
   it('survives the subject disappearing from the Tree Record', () => {
-    // The regression this module exists for: a Dissolve starts, the write
-    // lands, the refetch drops the node — and the lifecycle still plays out
-    // because it holds its own snapshot rather than reading the node list.
+    // The regression this module exists for: a Dissolve starts, the change
+    // applies, the Working Record rebuilds without the Person — and the
+    // lifecycle still plays out because it holds its own snapshot rather than
+    // reading the node list.
     let state = start(initialLifecycleState, 'dissolve', NODE, 0);
     const key = lifecycleKey('dissolve', NODE);
     state = lifecycleReducer(state, captureGeometryAction(key, geometry));

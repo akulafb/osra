@@ -18,8 +18,8 @@ import {
 /**
  * How long to wait for the anchor to acquire simulated coordinates.
  *
- * A Spawn fires as soon as the mutation returns, which is often before the
- * refetched node has been through a simulation tick and has an x/y/z at all.
+ * A Spawn fires the instant the Person joins the Working Record, which is
+ * before the node has been through a simulation tick and has an x/y/z at all.
  * Giving up immediately would drop most supernovae; waiting forever would leak
  * an effect for a node that never arrives.
  */
@@ -175,7 +175,7 @@ export function useCosmicFx(params: {
       if (waitingSince === null) waitingSince = now;
 
       // Ride the simulation while the node is there. A Dissolve outlives its
-      // node — the delete lands and the refetch removes it mid-flight — so once
+      // node — the Person leaves the Working Record mid-flight — so once
       // started, a missing anchor means hold the last known position.
       const anchor = anchorOf(nodeId);
       if (anchor) {

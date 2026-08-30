@@ -65,6 +65,12 @@ interface FamilyTree2DProps {
   onPresetSelect: (preset: string | null) => void;
   isMobile?: boolean;
   userNodeId?: string | null;
+  /**
+   * The *confirmed* Kinship Links, for the per-card edit affordance. The server
+   * derives the same 1-degree perimeter from persisted rows, so a pending link
+   * would offer a handle for a write it refuses (LIN-58's D13).
+   */
+  confirmedLinks: readonly FamilyLink[];
   onFindMeRequest?: (userCluster: string) => void;
   searchHighlightedNodeId?: string | null;
   searchQuery?: string;
@@ -137,6 +143,7 @@ export const FamilyTree2D: React.FC<FamilyTree2DProps> = ({
   onPresetSelect,
   isMobile = false,
   userNodeId = null,
+  confirmedLinks,
   onFindMeRequest,
   searchHighlightedNodeId = null,
   searchQuery = '',
@@ -261,9 +268,9 @@ export const FamilyTree2D: React.FC<FamilyTree2DProps> = ({
   }, [activePreset]); // Re-attach zoom behavior when SVG is rendered after preset selection
 
   // Fit the view to the tree when the *view* changes — a preset, a layout, a
-  // collapse, or the first load. Deliberately not when the node set changes
-  // underneath a stable view: a Spawn or Dissolve refetches, and refitting on
-  // that threw the camera off the thing the user had just acted on (LIN-55).
+  // collapse, or the first load. Deliberately not when a Spawn or Dissolve
+  // changes the node set underneath a stable view: refitting on that threw the
+  // camera off the thing the user had just acted on (LIN-55).
   useEffect(() => {
     const bounds = boundsRef.current;
     if (!svgRef.current || !bounds || isEmpty) return;
@@ -548,16 +555,11 @@ export const FamilyTree2D: React.FC<FamilyTree2DProps> = ({
 
   const isNodeEditable = useMemo(() => {
     const map = new Map<string, boolean>();
-    if (nodes && graphData?.links) {
-      for (const node of nodes) {
-        map.set(
-          node.id,
-          canEdit(node.id, userNodeId, isAdmin, graphData.links as FamilyLink[])
-        );
-      }
+    for (const node of nodes) {
+      map.set(node.id, canEdit(node.id, userNodeId, isAdmin, confirmedLinks));
     }
     return map;
-  }, [nodes, userNodeId, isAdmin, graphData?.links]);
+  }, [nodes, userNodeId, isAdmin, confirmedLinks]);
 
   const connectSourceNode = useMemo(() => {
     if (!interaction.connectSourceId) return null;
@@ -726,8 +728,9 @@ export const FamilyTree2D: React.FC<FamilyTree2DProps> = ({
 
             {/* Spawn and Dissolve, drawn from the lifecycle's own snapshot.
                 Deliberately not from `nodes`: a Dissolve outlives the node it
-                is dissolving, and iterating the post-refetch list is what used
-                to cut the animation off mid-flight (LIN-55). */}
+                is dissolving — the Person leaves the Working Record when the
+                change applies — and iterating the live list is what used to cut
+                the animation off mid-flight (LIN-55). */}
             {lifecyclesOfKind(lifecycles.lifecycles, 'spawn').map((lifecycle) => (
               <NodeLifecycleFx
                 key={lifecycle.key}
