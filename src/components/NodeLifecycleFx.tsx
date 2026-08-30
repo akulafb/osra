@@ -17,8 +17,9 @@ interface NodeLifecycleFxProps {
  *
  * It draws from the lifecycle's geometry snapshot rather than from the live
  * layout. That is the whole point: a Dissolve outlives the node it is
- * dissolving, so anything keyed off the post-refetch node list unmounts
- * mid-animation — which is exactly how the old `onComplete` became unreachable.
+ * dissolving — the Person leaves the Working Record the moment the change
+ * applies — so anything keyed off the live node list unmounts mid-animation,
+ * which is exactly how the old `onComplete` became unreachable.
  */
 export const NodeLifecycleFx: React.FC<NodeLifecycleFxProps> = ({
   lifecycle,

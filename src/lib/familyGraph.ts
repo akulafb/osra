@@ -30,7 +30,7 @@ export function getLinkEndpoints(link: FamilyLink): { sourceId: string; targetId
  * Checks if two nodes are directly connected by a link of a given type (or any type if omitted).
  */
 export function isDirectlyLinked(
-  links: FamilyLink[],
+  links: readonly FamilyLink[],
   aId: string,
   bId: string,
   type?: FamilyLink['type']
@@ -46,7 +46,7 @@ export function isDirectlyLinked(
 /**
  * Returns the parent IDs for a given node.
  */
-export function getParents(nodeId: string, links: FamilyLink[]): string[] {
+export function getParents(nodeId: string, links: readonly FamilyLink[]): string[] {
   if (!nodeId || !links || !Array.isArray(links)) return [];
   const parentIds = new Set<string>();
   links.forEach(link => {
@@ -63,7 +63,7 @@ export function getParents(nodeId: string, links: FamilyLink[]): string[] {
 /**
  * Returns the child IDs for a given node.
  */
-export function getChildren(nodeId: string, links: FamilyLink[]): string[] {
+export function getChildren(nodeId: string, links: readonly FamilyLink[]): string[] {
   if (!nodeId || !links || !Array.isArray(links)) return [];
   const childIds = new Set<string>();
   links.forEach(link => {
@@ -80,7 +80,7 @@ export function getChildren(nodeId: string, links: FamilyLink[]): string[] {
 /**
  * Returns the spouse IDs (marriage or divorce) for a given node.
  */
-export function getSpouses(nodeId: string, links: FamilyLink[]): string[] {
+export function getSpouses(nodeId: string, links: readonly FamilyLink[]): string[] {
   if (!nodeId || !links || !Array.isArray(links)) return [];
   const spouseIds = new Set<string>();
   links.forEach(link => {
@@ -99,7 +99,7 @@ export function getSpouses(nodeId: string, links: FamilyLink[]): string[] {
 /**
  * Returns the sibling IDs (sharing at least one parent) for a given node.
  */
-export function getSiblings(nodeId: string, links: FamilyLink[]): string[] {
+export function getSiblings(nodeId: string, links: readonly FamilyLink[]): string[] {
   if (!nodeId || !links || !Array.isArray(links)) return [];
   const parents = getParents(nodeId, links);
   const siblingIds = new Set<string>();
@@ -133,7 +133,7 @@ export interface Degree1Relative {
  */
 export function get1DegreeRelatives(
   anchorNodeId: string,
-  links: FamilyLink[]
+  links: readonly FamilyLink[]
 ): Degree1Relative[] {
   if (!anchorNodeId || !links || !Array.isArray(links)) return [];
 
@@ -209,7 +209,7 @@ export function get1DegreeRelatives(
  */
 export function get1DegreeNodeIds(
   anchorNodeId: string | null | undefined,
-  links: FamilyLink[]
+  links: readonly FamilyLink[]
 ): string[] {
   if (!anchorNodeId || !links || !Array.isArray(links)) return [];
   const relatives = get1DegreeRelatives(anchorNodeId, links);

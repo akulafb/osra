@@ -19,7 +19,7 @@ export function canEdit(
   nodeId: string,
   userNodeId: string | null | undefined,
   isAdmin: boolean,
-  links: FamilyLink[]
+  links: readonly FamilyLink[]
 ): boolean {
   // Admins can edit anything
   if (isAdmin) return true;
@@ -42,7 +42,7 @@ export function canManageInvites(
   nodeId: string,
   userNodeId: string | null | undefined,
   isAdmin: boolean,
-  links: FamilyLink[]
+  links: readonly FamilyLink[]
 ): boolean {
   // Same permissions as edit - 1-degree network control
   return canEdit(nodeId, userNodeId, isAdmin, links);
@@ -55,7 +55,7 @@ export function canManageInvites(
 export function isWithin1Degree(
   targetNodeId: string,
   userNodeId: string,
-  links: FamilyLink[]
+  links: readonly FamilyLink[]
 ): boolean {
   if (!userNodeId || !targetNodeId || !links || !Array.isArray(links)) return false;
   return get1DegreeNodeIds(userNodeId, links).includes(targetNodeId);
@@ -67,7 +67,7 @@ export function isWithin1Degree(
 export function get1DegreeNodesSync(
   userNodeId: string | null | undefined,
   _nodes: FamilyNode[], // Kept for backwards compatibility
-  links: FamilyLink[]
+  links: readonly FamilyLink[]
 ): string[] {
   return get1DegreeNodeIds(userNodeId, links);
 }

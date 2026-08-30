@@ -11,14 +11,21 @@ import {
 import CloseIcon from '@mui/icons-material/Close';
 import { FamilyNode, FamilyLink } from '../types/graph';
 import { canManageInvites } from '../lib/permissions';
+import type { Database } from '../types/database';
+
+type UserProfile = Database['public']['Tables']['users']['Row'];
 
 interface PersonDetailDrawerProps {
   selectedNode: FamilyNode | null;
   onClose: () => void;
   canEditSelected: boolean;
   isAdmin: boolean;
-  userProfile: any;
-  graphData: any;
+  userProfile: UserProfile | null;
+  /**
+   * The *confirmed* Kinship Links. An affordance derived from a pending link
+   * is an affordance for a write the server refuses (LIN-58's D13).
+   */
+  confirmedLinks: readonly FamilyLink[];
   onEdit: () => void;
   onAdd: () => void;
   onInvite: () => void;
@@ -33,7 +40,7 @@ export const PersonDetailDrawer: React.FC<PersonDetailDrawerProps> = ({
   canEditSelected,
   isAdmin,
   userProfile,
-  graphData,
+  confirmedLinks,
   onEdit,
   onAdd,
   onInvite,
@@ -49,7 +56,7 @@ export const PersonDetailDrawer: React.FC<PersonDetailDrawerProps> = ({
     selectedNode.id, 
     userProfile?.node_id, 
     userProfile?.role === 'admin', 
-    (graphData?.links ?? []) as FamilyLink[]
+    confirmedLinks
   );
 
   return (

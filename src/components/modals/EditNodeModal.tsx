@@ -5,6 +5,7 @@ import { FamilyNode } from '../../types/graph';
 import { formatNodeDisplayName } from '../../utils/nodeDisplayName';
 import { createTreeRecord } from '../../lib/treeRecord';
 import { matchExistingPersons, readMatchResolution } from '../../lib/personMatch';
+import { useWorkingRecord } from '../../contexts/WorkingRecordContext';
 
 const MAX_NAME_LENGTH = 200;
 const MAX_CLUSTER_LENGTH = 100;
@@ -13,7 +14,6 @@ interface EditNodeModalProps {
   isOpen: boolean;
   onClose: () => void;
   targetNode: FamilyNode;
-  onSuccess: () => void;
   /** The whole Tree Record, unfiltered — a filter must not hide a Person Match. */
   existingNodes: FamilyNode[];
   /** Ids currently drawn, so matches the filter is hiding can say so. */
@@ -24,11 +24,11 @@ export default function EditNodeModal({
   isOpen,
   onClose,
   targetNode,
-  onSuccess,
   existingNodes,
   visibleIds,
 }: EditNodeModalProps) {
   const { user, isAdmin, session } = useAuth();
+  const { write } = useWorkingRecord();
   const [name, setName] = useState('');
   const [familyCluster, setFamilyCluster] = useState('');
   const [maternalFamilyCluster, setMaternalFamilyCluster] = useState('');
@@ -101,16 +101,37 @@ export default function EditNodeModal({
         isAdmin,
         sessionToken: session?.access_token,
       });
+      const paternalCluster = isAdmin ? familyCluster : undefined;
+      const maternalCluster = isAdmin ? maternalFamilyCluster : undefined;
 
-      await record.editPerson({
-        id: targetNode.id,
-        firstName: sanitizedName,
-        paternalCluster: isAdmin ? familyCluster : undefined,
-        maternalCluster: isAdmin ? maternalFamilyCluster : undefined,
-      });
+      // The edited Person goes onto the canvas now and the server row replaces
+      // them wholesale on confirmation (D12) — including the two cluster fields
+      // an admin left alone, which is why the unedited values are carried here
+      // rather than dropped.
+      await write(
+        [
+          {
+            kind: 'person-upsert',
+            person: {
+              ...targetNode,
+              firstName: sanitizedName,
+              familyCluster: paternalCluster ?? targetNode.familyCluster,
+              maternalFamilyCluster: maternalCluster ?? targetNode.maternalFamilyCluster,
+            },
+          },
+        ],
+        async () => ({
+          kind: 'confirmed',
+          rows: await record.editPerson({
+            id: targetNode.id,
+            firstName: sanitizedName,
+            paternalCluster,
+            maternalCluster,
+          }),
+        })
+      );
 
       setSuccessMessage('Changes saved successfully!');
-      onSuccess();
 
       // Close modal after a brief delay so user sees success message
       setTimeout(() => {

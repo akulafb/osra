@@ -34,9 +34,10 @@ export type LifecycleSubject =
  * Where the subject was on the 2D canvas when the lifecycle started.
  *
  * This is the snapshot that makes a Dissolve survivable. The animation used to
- * be rendered by iterating the *post-refetch* node list, so the node vanished
- * out from under its own particles; holding the geometry here decouples the
- * playing lifecycle from the Tree Record changing underneath it.
+ * be rendered by iterating the live node list, so the node vanished out from
+ * under its own particles as soon as the Working Record rebuilt without that
+ * Person; holding the geometry here decouples the playing lifecycle from the
+ * Tree Record changing underneath it.
  */
 export interface SubjectGeometry {
   x: number;
@@ -195,7 +196,7 @@ export const lifecycleReducer = (
     case 'CAPTURE_GEOMETRY': {
       const existing = state.lifecycles[action.key];
       // First capture wins: the point of the snapshot is that later layouts —
-      // in particular the post-write refetch — cannot move a playing lifecycle.
+      // in particular the rebuild a write triggers — cannot move a lifecycle.
       if (!existing || existing.geometry) return state;
       return {
         lifecycles: {

@@ -15,6 +15,7 @@ import {
   type ProposedLink,
 } from '../../lib/adminGraphValidation';
 import { createTreeRecord } from '../../lib/treeRecord';
+import { useWorkingRecord } from '../../contexts/WorkingRecordContext';
 
 interface AdminManageLinksModalProps {
   isOpen: boolean;
@@ -23,7 +24,6 @@ interface AdminManageLinksModalProps {
   nodeId: string;
   session: Session | null;
   isAdmin: boolean;
-  onSuccess: () => void;
   /**
    * Dissolve a Kinship Link. Owned by the host so the deletion runs inside the
    * Dissolve lifecycle rather than as a second, unanimated delete path.
@@ -47,9 +47,9 @@ export default function AdminManageLinksModal({
   nodeId,
   session,
   isAdmin,
-  onSuccess,
   onDissolveLink,
 }: AdminManageLinksModalProps) {
+  const { write } = useWorkingRecord();
   const [editing, setEditing] = useState<FamilyLink | null>(null);
   const [editSource, setEditSource] = useState('');
   const [editTarget, setEditTarget] = useState('');
@@ -156,6 +156,9 @@ export default function AdminManageLinksModal({
   const handleSaveEdit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editing?.id || !proposedEdit || !editValidation.ok) return;
+    const linkId = editing.id;
+    const parentRole =
+      proposedEdit.type === 'parent' ? proposedEdit.parentRole ?? null : null;
     setSubmitting(true);
     setError(null);
     try {
@@ -164,15 +167,32 @@ export default function AdminManageLinksModal({
         isAdmin,
         sessionToken: session?.access_token,
       });
-      await record.editLink({
-        id: editing.id,
-        sourceId: proposedEdit.source,
-        targetId: proposedEdit.target,
-        type: proposedEdit.type,
-        parentRole:
-          proposedEdit.type === 'parent' ? proposedEdit.parentRole ?? null : null,
-      });
-      onSuccess();
+      // The re-pointed Kinship Link redraws now and the server row replaces it
+      // on confirmation (D9, D12).
+      await write(
+        [
+          {
+            kind: 'link-upsert',
+            link: {
+              id: linkId,
+              source: proposedEdit.source,
+              target: proposedEdit.target,
+              type: proposedEdit.type,
+              parentRole,
+            },
+          },
+        ],
+        async () => ({
+          kind: 'confirmed',
+          rows: await record.editLink({
+            id: linkId,
+            sourceId: proposedEdit.source,
+            targetId: proposedEdit.target,
+            type: proposedEdit.type,
+            parentRole,
+          }),
+        })
+      );
       setEditing(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Update failed.');

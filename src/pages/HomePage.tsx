@@ -2,7 +2,7 @@ import { lazy, Suspense } from 'react';
 import Button from '@mui/material/Button';
 import { FamilyTree } from '../components/FamilyTree';
 import { useAuth } from '../contexts/AuthContext';
-import { FamilyDataProvider } from '../contexts/FamilyDataContext';
+import { WorkingRecordProvider } from '../contexts/WorkingRecordContext';
 
 const LandingPage = lazy(() => import('../landing/LandingPage'));
 
@@ -75,9 +75,9 @@ export default function HomePage() {
       {/* Scoped to the signed-in tree: the landing page has no reason to hold a
           family graph, and this is the narrowest mount that still covers every
           reader — FamilyChat included, since it renders inside FamilyTree. */}
-      <FamilyDataProvider>
+      <WorkingRecordProvider>
         <FamilyTree />
-      </FamilyDataProvider>
+      </WorkingRecordProvider>
     </div>
   );
 }

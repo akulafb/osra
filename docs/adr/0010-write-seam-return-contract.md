@@ -40,11 +40,11 @@ the four REST writes. An unfinished contract, not a violated one — but the con
    alone cannot distinguish "already connected, nothing written" from "wrote something and declined
    to say what". Only this operation has the outcome, so only this operation carries the flag.
 
-3. **One decoder for both directions of the seam** (`src/lib/treeRecordRows.ts`). The read path in
-   `FamilyDataContext` and all six writes decode `nodes` and `links` rows through
-   `personFromRow` / `kinshipLinkFromRow`. Two decoders would be two answers to "what Person is
-   this row", and under LIN-58 the write path's answer overwrites the read path's on every
-   confirmation.
+3. **One decoder for both directions of the seam** (`src/lib/treeRecordRows.ts`). The read path —
+   `FamilyDataContext` then, `useWorkingRecord` since LIN-58 — and all six writes decode `nodes`
+   and `links` rows through `personFromRow` / `kinshipLinkFromRow`. Two decoders would be two
+   answers to "what Person is this row", and under LIN-58 the write path's answer overwrites the
+   read path's on every confirmation.
 
 4. **The three RPCs return the rows they wrote; the three REST writes flip to
    `Prefer: return=representation`.** `create_relative_secure` returns `nodes` and `links` arrays,

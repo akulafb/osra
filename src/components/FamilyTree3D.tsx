@@ -69,7 +69,7 @@ const planetTexturePaths = [
 const textureLoader = new THREE.TextureLoader();
 const planetMaterialCache = new Map<string, THREE.Material>();
 
-/** Synthetic link while Add Relative “connect to existing” preview is active; removed after success + refetch. */
+/** Synthetic link while Add Relative “connect to existing” preview is active; removed once the real Kinship Link joins the Working Record. */
 function isPreviewLink(l: { type?: string }): boolean {
   return l.type === 'preview';
 }
@@ -467,8 +467,9 @@ export const FamilyTree3DContent: React.FC<FamilyTree3DProps> = ({
 
       // Synthetic dashed edges. Both reuse the same `isPreviewLink` rendering
       // path, which is also why the Connect Mode beam appears only once a pair
-      // is chosen and not under the pointer: every one of these rebuilds
-      // graphData, and the graph re-runs its warmup ticks when it does.
+      // is chosen and not under the pointer: every one of these hands the graph
+      // a new `graphData` reference, and each one costs an `alpha(1)` re-heat
+      // (not the warmup loop — see `hasWarmedUpRef` below, ADR-0008 decision 4).
       const previewLinks: { source: string; target: string; type: string }[] = [];
       const bothVisible = (a: string, b: string) =>
         filtered.nodes.some(n => n.id === a) && filtered.nodes.some(n => n.id === b);
@@ -505,6 +506,24 @@ export const FamilyTree3DContent: React.FC<FamilyTree3DProps> = ({
     pendingLinkPreview,
     connectPair,
   ]);
+
+  /**
+   * 160 synchronous layout ticks for the initial load, and none thereafter
+   * (LIN-58's D8, ADR-0008).
+   *
+   * The warmup is what arranges a tree that has no positions at all. Every
+   * rebuild after that starts from positions the simulation already settled,
+   * so re-running it buys nothing — and it is the whole cost of an optimistic
+   * write, because `three-forcegraph` re-runs the loop on every `graphData`
+   * *reference* change without ever inspecting the contents. `warmupTicks` is
+   * declared `triggerUpdate: false`, so lowering it does not itself trigger
+   * one.
+   */
+  const hasWarmedUpRef = useRef(false);
+  const warmupTicks = hasWarmedUpRef.current ? 0 : 160;
+  useEffect(() => {
+    if (filteredGraphData.nodes.length > 0) hasWarmedUpRef.current = true;
+  }, [filteredGraphData]);
 
   // Who the 3D filter is currently drawing. Person Matching searches the whole
   // Tree Record regardless and labels the rest as hidden.
@@ -1689,7 +1708,7 @@ export const FamilyTree3DContent: React.FC<FamilyTree3DProps> = ({
           isPreviewLink(l) ? 0 : activePreset ? 0.1 : (l.type === 'marriage' || l.type === 'divorce' ? 0.3 : 0.8)}
         ref={fgRef}
         nodeVisibility={nodeVisibility}
-        warmupTicks={160}
+        warmupTicks={warmupTicks}
         d3AlphaDecay={0.01}
         d3VelocityDecay={0.1}
         cooldownTicks={activePreset ? 1000 : 1000}

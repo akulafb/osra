@@ -23,12 +23,20 @@ The persisted set of Persons and Kinship Links — the authoritative family tree
 _Avoid_: Family tree (already names three view components), Graph, Store, Database
 
 **Working Record**:
-The set of Persons and Kinship Links currently held in the browser, which may contain changes the Tree Record has not yet accepted.
+The browser's derived view of the Tree Record: the last Confirmed Snapshot folded with the ordered Pending Changes. It is recomputed from those two, never patched in place, so it cannot drift.
 _Avoid_: Cache, Local state, Store, Snapshot
 
+**Confirmed Snapshot**:
+The last thing the Tree Record said. Replaced by the rows a write reports back, and re-read in full only on initial load and Retry.
+_Avoid_: Server state, Baseline, Source of truth, Cache
+
 **Pending Change**:
-An addition, edit or removal that is already visible on the canvas and not yet accepted by the Tree Record.
+One thing the user did, and the primitive changes it makes to the record — held from the moment it is drawn until the Tree Record accepts or refuses it. Reverting drops it and recomputes the Working Record; there are no inverse operations.
 _Avoid_: Optimistic update, In-flight write, Draft
+
+**Write Outcome**:
+What the Tree Record did with a write, in one of three forms: *confirmed* — rows came back and fold into the Confirmed Snapshot; *reverted* — refused, so the Pending Change is dropped and nothing else moves; *accepted-but-empty* — accepted having written nothing, because the Kinship Link already existed. The third is dropped like a revert but is not a failure, so nothing is reported to the user.
+_Avoid_: Success/failure, Error, Result, No-op
 
 **Relative Direction**:
 The direction an Action Handle points — Parent, Child, Spouse or Sibling — expressed relative to an anchor Person. It is not a Kinship Link type: Parent and Child both resolve to a `parent` link with the endpoints reversed, Spouse resolves to `marriage`, Sibling resolves to a `parent` link from the anchor's own parents, and `divorce` has no Relative Direction at all.

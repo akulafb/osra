@@ -4,14 +4,20 @@ import { useAuth } from '../../contexts/AuthContext';
 import { FamilyLink, FamilyNode } from '../../types/graph';
 import { formatNodeDisplayName } from '../../utils/nodeDisplayName';
 import { connectedPersonIds, matchExistingPersons, readMatchResolution } from '../../lib/personMatch';
-import { createTreeRecord, relativeToKinshipLink } from '../../lib/treeRecord';
+import {
+  createTreeRecord,
+  pendingKinshipLink,
+  relativeToKinshipLink,
+  relativeToKinshipLinks,
+  type AddLinkParams,
+} from '../../lib/treeRecord';
+import { useWorkingRecord } from '../../contexts/WorkingRecordContext';
+import { linkWriteOutcome } from '../../hooks/useWorkingRecord';
 
 interface AddRelativeModalProps {
   isOpen: boolean;
   onClose: () => void;
   targetNode: FamilyNode;
-  /** Called after a successful add/link; awaited before closing so the tree shows the real edge before the cyan preview is removed. */
-  onSuccess: () => void | Promise<void>;
   /** The whole Tree Record, unfiltered — a filter must not hide a Person Match. */
   existingNodes: FamilyNode[];
   /** Ids currently drawn, so matches the filter is hiding can say so. */
@@ -44,13 +50,13 @@ export default function AddRelativeModal({
   isOpen,
   onClose,
   targetNode,
-  onSuccess,
   existingNodes,
   visibleIds,
   existingLinks,
   onPendingConnectTargetChange,
 }: AddRelativeModalProps) {
   const { user, isAdmin, session } = useAuth();
+  const { write } = useWorkingRecord();
   const [name, setName] = useState('');
   const [relationship, setRelationship] = useState<RelationshipType>('child');
   const [parentRole, setParentRole] = useState<'mother' | 'father' | null>(null);
@@ -112,44 +118,64 @@ export default function AddRelativeModal({
     setSelectedExistingId(null);
   }, [name, relationship, parentRole, isOpen]);
 
-  const callLinkExisting = async (existingId: string) => {
+  /**
+   * Both paths apply to the Working Record before the request goes out, and
+   * confirm, revert or drop against what it answers (D9). The modal still
+   * awaits: it is the one surface that reports a rejection inline rather than
+   * through a browser alert.
+   */
+  const linkExisting = async (existingId: string) => {
     if (!user) return;
     const record = createTreeRecord({
       userId: user.id,
       isAdmin,
       sessionToken: session?.access_token,
     });
-    if (relationship === 'sibling') {
-      // Direct kinship mapping for sibling is handled via parent links or link_existing_relative_secure
-      // Since treeRecord handles spouse/child/parent, relativeToKinshipLink converts relative to kinship
-      // For sibling, link_existing_relative_secure is used internally by addLink if needed or through custom spec
-      await record.addLink({
-        sourceId: targetNode.id,
-        targetId: existingId,
-        type: 'parent',
-        parentRole: null,
-      });
-    } else {
-      const kinship = relativeToKinshipLink(targetNode.id, existingId, relationship, parentRole);
-      await record.addLink(kinship);
-    }
+    // A sibling shares parents rather than being linked to the anchor, so no
+    // single Kinship Link says it; this is the long-standing approximation,
+    // unchanged.
+    const kinship: AddLinkParams =
+      relationship === 'sibling'
+        ? { sourceId: targetNode.id, targetId: existingId, type: 'parent', parentRole: null }
+        : relativeToKinshipLink(targetNode.id, existingId, relationship, parentRole);
+
+    await write(
+      [{ kind: 'link-upsert', link: pendingKinshipLink(kinship) }],
+      async () => linkWriteOutcome(await record.addLink(kinship))
+    );
   };
 
-  const callCreateNew = async (sanitizedName: string) => {
+  const createNew = async (sanitizedName: string) => {
     if (!user) return;
     const record = createTreeRecord({
       userId: user.id,
       isAdmin,
       sessionToken: session?.access_token,
     });
-    await record.addPerson({
-      firstName: sanitizedName,
-      link: {
-        targetId: targetNode.id,
-        relation: relationship,
-        parentRole,
-      },
-    });
+    // The Person's uuid is minted here so the optimistic Person and the row
+    // the server writes are the same Person (D11).
+    const personId = crypto.randomUUID();
+
+    await write(
+      [
+        { kind: 'person-upsert', person: { id: personId, firstName: sanitizedName } },
+        ...relativeToKinshipLinks(
+          targetNode.id,
+          personId,
+          relationship,
+          existingLinks ?? [],
+          parentRole
+        ).map((link) => ({ kind: 'link-upsert' as const, link })),
+      ],
+      async () => ({
+        kind: 'confirmed',
+        rows: await record.addPerson({
+          id: personId,
+          firstName: sanitizedName,
+          link: { targetId: targetNode.id, relation: relationship, parentRole },
+        }),
+      })
+    );
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -167,11 +193,10 @@ export default function AddRelativeModal({
 
     try {
       if (selectedExistingId) {
-        await callLinkExisting(selectedExistingId);
+        await linkExisting(selectedExistingId);
       } else {
-        await callCreateNew(sanitizedName);
+        await createNew(sanitizedName);
       }
-      await Promise.resolve(onSuccess());
       onClose();
     } catch (err) {
       console.error('[AddRelativeModal] Error:', err);

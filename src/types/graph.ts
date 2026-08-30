@@ -12,8 +12,10 @@ export interface FamilyNode {
   isClaimed?: boolean;
   /**
    * Simulation position, written onto the node by react-force-graph in the 3D
-   * view. Carried across a refetch so a Spawn or Dissolve does not restart the
-   * whole simulation and throw the tree across the screen (LIN-55).
+   * view. `projectWorkingRecord` reuses the node object outright when a Person's
+   * facts are unchanged and carries these six fields onto the new object when
+   * they changed (LIN-58 D7), so a Spawn or Dissolve does not restart the whole
+   * simulation and throw the tree across the screen (LIN-55).
    */
   x?: number;
   y?: number;

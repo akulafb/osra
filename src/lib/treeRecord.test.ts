@@ -2,9 +2,11 @@ import { describe, it, expect, vi } from 'vitest';
 import {
   createTreeRecord,
   relativeToKinshipLink,
+  relativeToKinshipLinks,
   TreeRecordError,
   isTreeRecordError,
 } from './treeRecord';
+import type { FamilyLink, FamilyNode } from '../types/graph';
 
 const TEST_CONFIG = {
   supabaseUrl: 'https://example.supabase.co',
@@ -720,6 +722,94 @@ describe('treeRecord module', () => {
       expect(() => relativeToKinshipLink('anchor-1', 'sibling-1', 'sibling')).toThrowError(
         /Sibling is a composite relationship/
       );
+    });
+  });
+
+  describe('relativeToKinshipLinks pending edge conversion', () => {
+    /** The anchor has two parents, so `sibling` fans out over both. */
+    const TWO_PARENT_LINKS: FamilyLink[] = [
+      { id: 'link-1', source: 'father', target: 'anchor-1', type: 'parent', parentRole: 'father' },
+      { id: 'link-2', source: 'mother', target: 'anchor-1', type: 'parent', parentRole: 'mother' },
+      { id: 'link-3', source: 'father', target: 'mother', type: 'marriage' },
+    ];
+
+    it('converts relative child to the same single link the singular helper produces', () => {
+      const links = relativeToKinshipLinks('anchor-1', 'child-1', 'child', TWO_PARENT_LINKS, 'father');
+      const spec = relativeToKinshipLink('anchor-1', 'child-1', 'child', 'father');
+      expect(links).toHaveLength(1);
+      expect(links[0]).toEqual({
+        source: spec.sourceId,
+        target: spec.targetId,
+        type: spec.type,
+        parentRole: spec.parentRole,
+      });
+    });
+
+    it('converts relative parent to the same single link the singular helper produces', () => {
+      const links = relativeToKinshipLinks('anchor-1', 'parent-1', 'parent', TWO_PARENT_LINKS, 'mother');
+      const spec = relativeToKinshipLink('anchor-1', 'parent-1', 'parent', 'mother');
+      expect(links).toHaveLength(1);
+      expect(links[0]).toEqual({
+        source: spec.sourceId,
+        target: spec.targetId,
+        type: spec.type,
+        parentRole: spec.parentRole,
+      });
+    });
+
+    it('converts relative spouse to the same single link the singular helper produces', () => {
+      const links = relativeToKinshipLinks('anchor-1', 'spouse-1', 'spouse', TWO_PARENT_LINKS, 'father');
+      const spec = relativeToKinshipLink('anchor-1', 'spouse-1', 'spouse', 'father');
+      expect(links).toHaveLength(1);
+      expect(links[0]).toEqual({
+        source: spec.sourceId,
+        target: spec.targetId,
+        type: spec.type,
+        parentRole: spec.parentRole,
+      });
+    });
+
+    it('leaves every pending kinship link without an id', () => {
+      const relations = ['child', 'parent', 'spouse', 'sibling'] as const;
+      for (const relation of relations) {
+        const links = relativeToKinshipLinks('anchor-1', 'new-1', relation, TWO_PARENT_LINKS, 'father');
+        expect(links.length).toBeGreaterThan(0);
+        for (const link of links) {
+          expect(link.id).toBeUndefined();
+        }
+      }
+    });
+
+    it('converts relative sibling to one parent link per parent of the anchor', () => {
+      const links = relativeToKinshipLinks('anchor-1', 'sibling-1', 'sibling', TWO_PARENT_LINKS);
+      expect(links).toHaveLength(2);
+      expect(links).toEqual([
+        { source: 'father', target: 'sibling-1', type: 'parent', parentRole: null },
+        { source: 'mother', target: 'sibling-1', type: 'parent', parentRole: null },
+      ]);
+    });
+
+    it('returns no links for a sibling of an anchor with no parents', () => {
+      const links = relativeToKinshipLinks(
+        'anchor-1',
+        'sibling-1',
+        'sibling',
+        [{ id: 'link-4', source: 'anchor-1', target: 'spouse-1', type: 'marriage' }],
+      );
+      expect(links).toEqual([]);
+    });
+
+    it('resolves a parent whose endpoint the simulation already rewrote into a node object', () => {
+      const father: FamilyNode = { id: 'father', firstName: 'Ahmad' };
+      const links = relativeToKinshipLinks(
+        'anchor-1',
+        'sibling-1',
+        'sibling',
+        [{ id: 'link-1', source: father, target: 'anchor-1', type: 'parent', parentRole: 'father' }],
+      );
+      expect(links).toEqual([
+        { source: 'father', target: 'sibling-1', type: 'parent', parentRole: null },
+      ]);
     });
   });
 

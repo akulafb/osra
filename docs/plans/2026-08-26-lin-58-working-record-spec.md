@@ -1,6 +1,6 @@
 # LIN-58 — A Working Record that can be updated, not only refetched
 
-**Status**: spec, awaiting implementation
+**Status**: shipped
 **Issue**: [LIN-58](https://linear.app/linearfb/issue/LIN-58) — Arch 06, from `docs/plans/2026-08-17-architecture-review.md`
 **Branch**: `akulafb/lin-58-arch-06-a-graph-store-that-can-be-updated-not-only-refetched`
 **Depends on**: [LIN-63](https://linear.app/linearfb/issue/LIN-63) *one owner of the graph in
