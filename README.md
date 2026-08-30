@@ -81,8 +81,9 @@ Each solution unlocked the next challenge, building from a simple graph into a f
 
 ### Navigation Controls
 
-- **E**: Toggle Steering Engine (Enable/Disable Mouse Look)
+- **R**: Toggle Steering Engine (Enable/Disable Mouse Look)
 - **WASD / Arrows**: Forward/Backward thrust and Strafe Left/Right
+- **Q / E**: Roll view left / right
 - **Shift**: Speed Boost
 - **Tab / Shift-Tab**: Cycle through family members
 - **Enter / Space**: Precision warp to selected node
@@ -140,12 +141,13 @@ src/
 ├── components/
 │   ├── FamilyTree3D.tsx          # Main 3D visualization component
 │   ├── FamilyChat.tsx            # AI Chatbot UI component
-│   ├── modals/                   # AddRelative, EditNode, BulkInvite modals
-│   └── landing/                  # Landing page (osra.cc)
-│       ├── LandingPage.tsx       # Orchestrator, hero track, spacers
-│       ├── MeetOsraHero.tsx      # Scroll-driven 3D node graph
-│       ├── HowItWorks.tsx        # 3-step section
-│       └── HangarTransition.tsx  # CTA
+│   └── modals/                   # AddRelative, EditNode, BulkInvite modals
+├── landing/                      # Landing page (osra.cc)
+│   ├── LandingPage.tsx           # Orchestrator, hero track, spacers
+│   ├── MeetOsraHero.tsx          # Scroll-driven 3D node graph
+│   ├── HowItWorks.tsx            # 3-step section
+│   ├── MetricsSection.tsx        # Public tree metrics
+│   └── HangarTransition.tsx      # CTA
 ├── contexts/
 │   ├── AuthContext.tsx           # Authentication state management
 │   └── WorkingRecordContext.tsx  # The one owner of the Working Record
@@ -168,11 +170,11 @@ src/
 ├── App.tsx                       # Route definitions
 └── main.tsx                      # Application entry point
 supabase/
-│   ├── migrations/               # Single schema migration
-│   ├── seed/                     # Seed data (run in SQL Editor)
-│   └── reference/                # Reference SQL (not run directly)
-│       ├── policies.sql          # RLS policies
-│       └── public-metrics.sql    # get_public_metrics RPC
+│   ├── migrations/               # Ordered schema migrations
+│   ├── reference/                # Reference SQL (not run directly)
+│   │   ├── policies.sql          # RLS policies
+│   │   └── public-metrics.sql    # get_public_metrics RPC
+│   └── SCHEMA_NOTES.md           # Schema conventions and migration history
 ```
 
 ## Getting Started
@@ -233,7 +235,7 @@ npm run dev
    - Authentication → Providers → Google → Enable and add OAuth credentials
    - Add redirect URLs: `http://localhost:5173`, `http://127.0.0.1:5173`
 
-**Alternative:** Run `supabase/migrations/20260101_initial_schema.sql` in the Supabase SQL Editor if you prefer not to use the CLI.
+**Alternative:** Run every file in `supabase/migrations/` in filename order in the Supabase SQL Editor if you prefer not to use the CLI. `20260101_initial_schema.sql` is the starting point, not the whole schema — applying it alone leaves out the server-side write gates, the invite hardening and the write seam's return contract. See [`supabase/SCHEMA_NOTES.md`](supabase/SCHEMA_NOTES.md) for why hand-applying migrations needs care.
 
 ## Development Workflow
 

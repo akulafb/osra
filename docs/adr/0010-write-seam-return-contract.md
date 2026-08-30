@@ -172,3 +172,10 @@ fails; and the non-admin and 1-degree gates still refuse.
   the dev database stores `created_by_user_id` as `text` while the declared schema says `uuid`.
   Resolving that drift needs the live column types and belongs to its own change; a blind cast here
   would risk breaking the half that currently works.
+
+  *Closed on 2026-08-30 by `20260830120000_reconcile_identity_column_types.sql`, which is the
+  "own change" this consequence asked for. Dev was the database that had drifted: all six
+  identity columns were converged onto production's declared `uuid`, and `is_within_1_degree` was
+  rewritten without the `WHERE id::text = …` stopgap — a cast that had also made `users_pkey`
+  unusable inside a function every RLS policy on `nodes` and `links` calls. Both halves now hold
+  at once, so optimism is safe for non-admin users.*
