@@ -24,7 +24,9 @@ DECLARE
   v_current_user_id text := COALESCE(auth.jwt() ->> 'sub', auth.uid()::text);
 BEGIN
   IF v_current_user_id IS NULL THEN RETURN FALSE; END IF;
-  SELECT node_id INTO v_user_node_id FROM public.users WHERE id = v_current_user_id;
+  -- users.id is text on some environments and uuid on others, so the column is
+  -- cast to text rather than assuming it matches v_current_user_id's type.
+  SELECT node_id INTO v_user_node_id FROM public.users WHERE id::text = v_current_user_id;
   IF v_user_node_id IS NULL THEN RETURN FALSE; END IF;
   IF p_target_node_id = v_user_node_id THEN RETURN TRUE; END IF;
 

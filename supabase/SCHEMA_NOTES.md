@@ -62,6 +62,10 @@ policy name, a `proconfig` entry, a constraint's `confdeltype` — and only
 versions whose predicates held were recorded as applied. The pre-repair rows are
 archived in `reference/migration-history-before-repair-2026-08-30.json`.
 
+Both projects now record the same eleven versions as the files on disk, so
+`supabase migration list --linked` matches row for row and `db push` is a no-op
+against either.
+
 Two traps are worth knowing before writing such a predicate again:
 
 - **`pg_get_function_identity_arguments` includes parameter names** on this
@@ -72,25 +76,63 @@ Two traps are worth knowing before writing such a predicate again:
   that body can attest to `20260817140000`. Prefer discriminators no later file
   touches: triggers, policy names, and grants.
 
-### Production is behind by two migrations
+### Production was behind by two migrations — closed 2026-08-30
 
-The repair recorded the truth rather than papering over it, so
-`supabase migration list` now shows `20260407220000` (`lin33_admin_node_insert_users_fk`)
-and `20260817140000` (`lin59_server_side_admin_write_gates`) as local-only on
-production. Both are genuinely unapplied there:
+`20260407220000` (`lin33_admin_node_insert_users_fk`) and `20260817140000`
+(`lin59_server_side_admin_write_gates`) were genuinely unapplied to production,
+which had been running without the server-side write gates. Both are applied
+now, and every effect was verified individually:
 
-| Effect | Dev | Production |
+| Effect | Before | After |
 | --- | --- | --- |
-| `users_node_id_fkey` on `public.users` | present | **absent** |
-| `nodes` INSERT policy | `nodes_insert_admin_only` | `nodes_insert_by_bound_users` |
-| `trg_guard_node_cluster_updates` on `public.nodes` | present | **absent** |
-| `divorce` excluded from the `links` write policies | yes | **no** |
-| `is_within_1_degree` resolves `auth.jwt() ->> 'sub'` | yes | **no** |
+| `users_node_id_fkey` on `public.users` | absent | present, `ON DELETE SET NULL` |
+| `nodes` INSERT policy | `nodes_insert_by_bound_users` | `nodes_insert_admin_only` |
+| `trg_guard_node_cluster_updates` on `public.nodes` | absent | present |
+| `divorce` excluded from the `links` write policies | no | yes |
+| `is_within_1_degree` resolves `auth.jwt() ->> 'sub'` | no | yes |
 
-`db push` against production is now the correct instrument for closing that gap,
-which is the point of the repair. Read `20260817140000` first: it replaces a
-policy that lets any node-bound user insert into `public.nodes` with one that
-admits admins only, so applying it changes who can write.
+Row counts were unchanged across the whole operation: 77 nodes, 82 links, 9
+users. Gates were then proved behaviourally under a real non-admin JWT, inside
+`BEGIN`/`ROLLBACK`: a name edit on the caller's own node succeeds, a cluster edit
+raises `Only administrators can update paternal_family_cluster`, a direct
+`INSERT` into `public.nodes` is refused by RLS, and `create_relative_secure`
+still returns the full `{success, new_node_id, nodes, links, message}` envelope.
+
+Applying these needed no application change: the client already gated direct
+`POST /nodes` and `POST /links` behind `identity.isAdmin`, and already refused
+non-admin divorce, so the migrations only moved that enforcement server-side.
+
+**`db push` alone would have broken production.** `20260817140000` is timestamped
+before `20260826120000` but was applied after it, and both do
+`CREATE OR REPLACE` on `link_existing_relative_secure`. Pushing the older file
+against a database already holding the newer one silently reverts that function
+to its pre-`written_links` body, breaking the write seam with no error. The
+ordering hazard is general: **when a migration lands out of timestamp order,
+replay every later migration that touches the same object.** Here the newer
+definition was re-applied in the same transaction.
+
+### `users.id` and `created_by_user_id` are `text` on dev, `uuid` on production
+
+The two databases genuinely diverge on column types:
+
+| Column | Dev | Production |
+| --- | --- | --- |
+| `users.id` | `text` | `uuid` |
+| `nodes.created_by_user_id` | `text` | `uuid` |
+| `links.created_by_user_id` | `text` | `uuid` |
+| `users.node_id` | `uuid` | `uuid` |
+
+So does `is_admin()`: production compares `id = auth.uid()` while dev must cast.
+Any predicate written against one database and compared to a text expression
+fails on the other with `42883: operator does not exist: uuid = text`. Both
+migrations above shipped with dev-shaped comparisons and had to be corrected
+before production would take them — `lin33`'s policy and `lin59`'s
+`is_within_1_degree` lookup now cast the *column* to text, which is valid on
+either type.
+
+Until the types are reconciled, **write `column::text = <text expression>`**
+whenever a migration touches these columns, and check any new predicate against
+both databases rather than only the one in front of you.
 
 ## Using another Postgres provider
 
