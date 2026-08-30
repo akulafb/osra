@@ -4,8 +4,13 @@ import { useAuth } from '../../contexts/AuthContext';
 import { FamilyLink, FamilyNode } from '../../types/graph';
 import { formatNodeDisplayName } from '../../utils/nodeDisplayName';
 import { connectedPersonIds, matchExistingPersons, readMatchResolution } from '../../lib/personMatch';
-import { createTreeRecord, relativeToKinshipLink, relativeToKinshipLinks } from '../../lib/treeRecord';
-import type { AddLinkParams } from '../../lib/treeRecord';
+import {
+  createTreeRecord,
+  pendingKinshipLink,
+  relativeToKinshipLink,
+  relativeToKinshipLinks,
+  type AddLinkParams,
+} from '../../lib/treeRecord';
 import { useWorkingRecord } from '../../contexts/WorkingRecordContext';
 import { linkWriteOutcome } from '../../hooks/useWorkingRecord';
 
@@ -135,17 +140,7 @@ export default function AddRelativeModal({
         : relativeToKinshipLink(targetNode.id, existingId, relationship, parentRole);
 
     await write(
-      [
-        {
-          kind: 'link-upsert',
-          link: {
-            source: kinship.sourceId,
-            target: kinship.targetId,
-            type: kinship.type,
-            parentRole: kinship.parentRole,
-          },
-        },
-      ],
+      [{ kind: 'link-upsert', link: pendingKinshipLink(kinship) }],
       async () => linkWriteOutcome(await record.addLink(kinship))
     );
   };

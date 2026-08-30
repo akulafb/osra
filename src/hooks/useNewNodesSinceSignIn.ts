@@ -31,7 +31,7 @@ function sortByCreatedDesc(nodes: readonly FamilyNode[]): FamilyNode[] {
  */
 export function useNewNodesSinceSignIn(
   userId: string | undefined,
-  confirmedNodes: readonly FamilyNode[]
+  confirmedNodes: readonly FamilyNode[] | null
 ) {
   const [newMembers, setNewMembers] = useState<FamilyNode[]>([]);
   const [showSeeWhosNewButton, setShowSeeWhosNewButton] = useState(false);
@@ -76,7 +76,10 @@ export function useNewNodesSinceSignIn(
   }, [showSeeWhosNewButton, newMembersKey]);
 
   useEffect(() => {
-    if (!userId) {
+    // `null` is "not read yet", not "nobody in the tree". Advancing `lastAck`
+    // on the former overwrites a returning user's mark with the current time
+    // and the button never fires for them again.
+    if (!userId || !confirmedNodes) {
       processedFingerprintRef.current = null;
       setNewMembers([]);
       setShowSeeWhosNewButton(false);

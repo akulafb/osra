@@ -162,6 +162,22 @@ export function relativeToKinshipLink(
 }
 
 /**
+ * The Kinship Link a write is about to create, as the Working Record value
+ * that stands in for it until the server answers (LIN-58's D9).
+ *
+ * Id-less: a pending Kinship Link has no row yet (D11). One translation, so an
+ * optimistic edge cannot drift from the edge the write actually asks for.
+ */
+export function pendingKinshipLink(spec: AddLinkParams): FamilyLink {
+  return {
+    source: spec.sourceId,
+    target: spec.targetId,
+    type: spec.type,
+    parentRole: spec.parentRole,
+  };
+}
+
+/**
  * The Kinship Links a relative addition creates, as Working Record values, so
  * an optimistic apply and the write it is optimistic about cannot disagree
  * about what "add a sibling" means (LIN-58).
@@ -186,15 +202,7 @@ export function relativeToKinshipLinks(
     }));
   }
 
-  const spec = relativeToKinshipLink(anchorTargetId, otherNodeId, relation, parentRole);
-  return [
-    {
-      source: spec.sourceId,
-      target: spec.targetId,
-      type: spec.type,
-      parentRole: spec.parentRole,
-    },
-  ];
+  return [pendingKinshipLink(relativeToKinshipLink(anchorTargetId, otherNodeId, relation, parentRole))];
 }
 
 function resolveEnv(config?: TreeRecordConfig) {

@@ -7,7 +7,7 @@ import { useBackgroundTheme } from '../hooks/useBackgroundTheme';
 import { useWorkingRecord } from '../contexts/WorkingRecordContext';
 import { linkWriteOutcome } from '../hooks/useWorkingRecord';
 import { useNewNodesSinceSignIn } from '../hooks/useNewNodesSinceSignIn';
-import { FamilyNode } from '../types/graph';
+import { FamilyNode, RelativeDirection } from '../types/graph';
 import { useAuth } from '../contexts/AuthContext';
 import AdminManageLinksModal from './modals/AdminManageLinksModal';
 import AdminAddPersonModal from './modals/AdminAddPersonModal';
@@ -22,8 +22,13 @@ import { FamilyChat } from './FamilyChat';
 import { NewMembersModal } from './NewMembersModal';
 import { PersonDetailDrawer } from './PersonDetailDrawer';
 import { isMobile } from '../utils/device';
-import { RelativeDirection } from '../types/graph';
-import { createTreeRecord, relativeToKinshipLink, relativeToKinshipLinks } from '../lib/treeRecord';
+import {
+  createTreeRecord,
+  pendingKinshipLink,
+  relativeToKinshipLink,
+  relativeToKinshipLinks,
+  type AddLinkParams,
+} from '../lib/treeRecord';
 import { useLifecycles } from '../hooks/useLifecycles';
 
 /** What `treeRecord` sanitises a name to, so an optimistic Person reads the same as the confirmed one. */
@@ -294,17 +299,7 @@ export const FamilyTree: React.FC = () => {
         });
         lifecycles.start('spawn', subject);
         void write(
-          [
-            {
-              kind: 'link-upsert',
-              link: {
-                source: kinship.sourceId,
-                target: kinship.targetId,
-                type: kinship.type,
-                parentRole: kinship.parentRole,
-              },
-            },
-          ],
+          [{ kind: 'link-upsert', link: pendingKinshipLink(kinship) }],
           async () => linkWriteOutcome(await record.addLink(kinship))
         ).catch((e) => {
           lifecycles.abort('spawn', subject);
@@ -393,30 +388,17 @@ export const FamilyTree: React.FC = () => {
         aId: params.sourceNodeId,
         bId: params.targetNodeId,
       };
-      const parentRole = params.type === 'parent' ? params.parentRole ?? null : null;
+      const kinship: AddLinkParams = {
+        sourceId: params.sourceNodeId,
+        targetId: params.targetNodeId,
+        type: params.type,
+        parentRole: params.type === 'parent' ? params.parentRole ?? null : null,
+      };
 
       lifecycles.start('spawn', subject);
       void write(
-        [
-          {
-            kind: 'link-upsert',
-            link: {
-              source: params.sourceNodeId,
-              target: params.targetNodeId,
-              type: params.type,
-              parentRole,
-            },
-          },
-        ],
-        async () =>
-          linkWriteOutcome(
-            await record.addLink({
-              sourceId: params.sourceNodeId,
-              targetId: params.targetNodeId,
-              type: params.type,
-              parentRole,
-            })
-          )
+        [{ kind: 'link-upsert', link: pendingKinshipLink(kinship) }],
+        async () => linkWriteOutcome(await record.addLink(kinship))
       ).catch((e) => {
         lifecycles.abort('spawn', subject);
         reportWriteFailure(e, 'Failed to create kinship link.');

@@ -7,7 +7,6 @@ import { kinshipLinksFromRows, personFromRow } from '../lib/treeRecordRows';
 import {
   applyPending,
   confirmPending,
-  confirmedLinks,
   dropPending,
   emptyWorkingRecord,
   projectWorkingRecord,
@@ -37,9 +36,11 @@ export interface WorkingRecordController {
   working: FamilyGraph | null;
   /**
    * A Person is not "new" until the database says so, and no affordance may be
-   * derived from a Kinship Link the server has not persisted (D13).
+   * derived from a Kinship Link the server has not persisted (D13). `null`
+   * until the first read answers, which a reader must not read as an empty
+   * family.
    */
-  confirmedNodes: readonly FamilyNode[];
+  confirmedNodes: readonly FamilyNode[] | null;
   confirmedLinks: readonly FamilyLink[];
   isLoading: boolean;
   error: string | null;
@@ -60,11 +61,18 @@ export function linkWriteOutcome(result: AddLinkResult): WriteOutcome {
 
 interface Projection {
   working: FamilyGraph | null;
-  confirmedNodes: readonly FamilyNode[];
+  confirmedNodes: readonly FamilyNode[] | null;
   confirmedLinks: readonly FamilyLink[];
 }
 
-const NOTHING_YET: Projection = { working: null, confirmedNodes: [], confirmedLinks: [] };
+/**
+ * Before the first read there are no confirmed Persons *and no answer about
+ * them* — which is not the same as a family with nobody in it, and a reader
+ * that cannot tell the two apart acts on an empty tree that was never read.
+ * An empty perimeter, on the other hand, is the right answer either way:
+ * `confirmedLinks` grants nothing until the server has said otherwise.
+ */
+const NOTHING_YET: Projection = { working: null, confirmedNodes: null, confirmedLinks: [] };
 
 /**
  * The owner of the Working Record and the sequencer for every write (LIN-58).
@@ -97,14 +105,19 @@ export function useWorkingRecordOwner(): WorkingRecordController {
     setProjection({
       working,
       confirmedNodes: next.confirmed.nodes,
-      confirmedLinks: confirmedLinks(next),
+      confirmedLinks: next.confirmed.links,
     });
   }, []);
 
   const reload = useCallback(async (): Promise<void> => {
     try {
       setError(null);
-      advance(withConfirmedSnapshot(recordRef.current, await readTreeRecord(session?.access_token)));
+      // Read `recordRef` *after* the round trip, not before: a Pending Change
+      // applied while the fetch was in flight has to survive it (D14), and
+      // argument evaluation would otherwise capture the record as it was when
+      // the request went out.
+      const snapshot = await readTreeRecord(session?.access_token);
+      advance(withConfirmedSnapshot(recordRef.current, snapshot));
     } catch (err) {
       console.error('[useWorkingRecord] Error fetching family data:', err);
       setError('Failed to load family data');

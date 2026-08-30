@@ -41,7 +41,13 @@ export interface PendingChange {
 }
 
 export interface WorkingRecordState {
-  /** The last thing the server said. */
+  /**
+   * The last thing the server said. Permission derivation reads this and never
+   * the projection (D13): `canEdit` computes the 1-degree perimeter from
+   * Kinship Links and the server computes the same perimeter from persisted
+   * rows, so an affordance derived from a pending link is an affordance for a
+   * write the server refuses.
+   */
   confirmed: FamilyGraph;
   /** Ordered. Folded onto `confirmed` to derive the Working Record. */
   pending: PendingChange[];
@@ -107,16 +113,6 @@ export function revertPending(state: WorkingRecordState, changeId: ChangeId): Wo
  */
 export function dropPending(state: WorkingRecordState, changeId: ChangeId): WorkingRecordState {
   return revertPending(state, changeId);
-}
-
-/**
- * Permission derivation reads this, never the projection (D13). `canEdit`
- * computes the 1-degree perimeter from Kinship Links and the server computes
- * the same perimeter from persisted rows, so deriving affordances from
- * unpersisted links guarantees offering writes the server will refuse.
- */
-export function confirmedLinks(state: WorkingRecordState): readonly FamilyLink[] {
-  return state.confirmed.links;
 }
 
 /**
@@ -266,9 +262,19 @@ function linkKey(link: FamilyLink): string {
   return link.id ? `id:${link.id}` : `pair:${pairSignature(link)}`;
 }
 
+/**
+ * What makes two Kinship Links "the same edge" for a pending link with no row.
+ *
+ * `marriage` and `divorce` are symmetric — the server's duplicate guard matches
+ * both orderings of the pair — so the endpoints are sorted and A–B and B–A
+ * collapse to one signature. `parent` is not: A is B's parent is a different
+ * claim from B is A's parent, and both are writable.
+ */
 function pairSignature(link: FamilyLink): string {
   const { sourceId, targetId } = getLinkEndpoints(link);
-  return `${sourceId}|${targetId}|${link.type}`;
+  if (link.type === 'parent') return `${sourceId}|${targetId}|parent`;
+  const [a, b] = sourceId <= targetId ? [sourceId, targetId] : [targetId, sourceId];
+  return `${a}|${b}|${link.type}`;
 }
 
 // --- Projection -------------------------------------------------------------
@@ -280,6 +286,9 @@ function pairSignature(link: FamilyLink): string {
  */
 function personFactsEqual(a: FamilyNode, b: FamilyNode): boolean {
   if (a === b) return true;
+  // `FamilyNode` is an interface with no index signature, so a keyed read is
+  // unexpressible without this; nothing here writes, and every value is
+  // compared as `unknown`.
   const left = a as unknown as Record<string, unknown>;
   const right = b as unknown as Record<string, unknown>;
   const seen = new Set<string>();

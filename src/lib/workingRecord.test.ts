@@ -2,7 +2,6 @@ import { describe, it, expect } from 'vitest';
 import {
   applyPending,
   confirmPending,
-  confirmedLinks,
   dropPending,
   emptyWorkingRecord,
   projectWorkingRecord,
@@ -78,6 +77,28 @@ describe('applyPending', () => {
     ]);
 
     expect(projectWorkingRecord(state, null).links).toHaveLength(1);
+  });
+
+  it('does not project an id-less spouse link the record already holds in the other direction', () => {
+    const married = withConfirmedSnapshot(emptyWorkingRecord(), {
+      nodes: [person('ahmad', 'Ahmad'), person('fatima', 'Fatima')],
+      links: [link('l-1', 'fatima', 'ahmad', 'marriage')],
+    });
+    // The server's spouse guard matches both orderings, so the client's must
+    // too, or the canvas draws a second edge until `already_connected` lands.
+    const state = applyPending(married, 'c1', [
+      { kind: 'link-upsert', link: link(undefined, 'ahmad', 'fatima', 'marriage') },
+    ]);
+
+    expect(projectWorkingRecord(state, null).links).toHaveLength(1);
+  });
+
+  it('still projects a reversed pending parent link, which is a different claim', () => {
+    const state = applyPending(seeded(), 'c1', [
+      { kind: 'link-upsert', link: link(undefined, 'fahd', 'ahmad') },
+    ]);
+
+    expect(projectWorkingRecord(state, null).links).toHaveLength(2);
   });
 });
 
@@ -317,14 +338,14 @@ describe('withConfirmedSnapshot', () => {
   });
 });
 
-describe('confirmedLinks', () => {
-  it('excludes pending Kinship Links', () => {
+describe('confirmed', () => {
+  it('excludes pending Kinship Links, which permission derivation reads it for', () => {
     const applied = applyPending(seeded(), 'c1', [
       { kind: 'person-upsert', person: person('zaynab', 'Zaynab') },
       { kind: 'link-upsert', link: link(undefined, 'fahd', 'zaynab') },
     ]);
 
-    expect(confirmedLinks(applied).map((l) => l.id)).toEqual(['l-1']);
+    expect(applied.confirmed.links.map((l) => l.id)).toEqual(['l-1']);
     expect(projectWorkingRecord(applied, null).links).toHaveLength(2);
   });
 });
