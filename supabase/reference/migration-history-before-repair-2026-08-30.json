@@ -1,0 +1,333 @@
+{
+  "devFull": [
+    {
+      "version": "20260226133534",
+      "name": "initial_schema",
+      "has_sql": true
+    },
+    {
+      "version": "20260226133613",
+      "name": "initial_functions",
+      "has_sql": true
+    },
+    {
+      "version": "20260226134357",
+      "name": "initial_functions_part2",
+      "has_sql": true
+    },
+    {
+      "version": "20260226134414",
+      "name": "initial_functions_part3",
+      "has_sql": true
+    },
+    {
+      "version": "20260226134439",
+      "name": "initial_policies",
+      "has_sql": true
+    },
+    {
+      "version": "20260226134454",
+      "name": "add_divorce_type",
+      "has_sql": true
+    },
+    {
+      "version": "20260226134455",
+      "name": "audit_log_disable_rls",
+      "has_sql": true
+    },
+    {
+      "version": "20260226134526",
+      "name": "consolidate_node_invites_policies",
+      "has_sql": true
+    },
+    {
+      "version": "20260304103545",
+      "name": "20260304_get_claimed_node_ids",
+      "has_sql": true
+    },
+    {
+      "version": "20260304103559",
+      "name": "20260304_paternal_maternal_clusters",
+      "has_sql": true
+    },
+    {
+      "version": "20260304103614",
+      "name": "20260304_create_relative_parent_role",
+      "has_sql": true
+    },
+    {
+      "version": "20260304103630",
+      "name": "20260304_fix_get_public_metrics",
+      "has_sql": true
+    },
+    {
+      "version": "20260304103648",
+      "name": "20260304_backfill_maternal_clusters",
+      "has_sql": true
+    },
+    {
+      "version": "20260304104446",
+      "name": "20260304_backfill_maternal_single_parent",
+      "has_sql": true
+    },
+    {
+      "version": "20260313082508",
+      "name": "users_profile_fields",
+      "has_sql": true
+    },
+    {
+      "version": "20260313082650",
+      "name": "remove_avatar_url",
+      "has_sql": true
+    },
+    {
+      "version": "20260316111425",
+      "name": "fix_users_email_function",
+      "has_sql": true
+    },
+    {
+      "version": "20260406082327",
+      "name": "drop_legacy_create_relative_secure_4arg",
+      "has_sql": true
+    },
+    {
+      "version": "20260407143636",
+      "name": "lin37_seif_zeina_maternal_line_and_parent_links",
+      "has_sql": true
+    },
+    {
+      "version": "20260407191031",
+      "name": "admin_delete_node_bypass_rls",
+      "has_sql": true
+    },
+    {
+      "version": "20260407220000",
+      "name": "lin33_admin_node_insert_users_fk",
+      "has_sql": true
+    },
+    {
+      "version": "20260514142744",
+      "name": "data_api_public_table_grants",
+      "has_sql": true
+    },
+    {
+      "version": "20260817095338",
+      "name": "lin60_secure_node_invites",
+      "has_sql": true
+    },
+    {
+      "version": "20260817101207",
+      "name": "lin59_server_side_admin_write_gates",
+      "has_sql": true
+    },
+    {
+      "version": "20260826120000",
+      "name": "lin64_write_seam_return_contract",
+      "has_sql": false
+    }
+  ],
+  "prodFull": [
+    {
+      "version": "20260101",
+      "name": "initial_schema",
+      "has_sql": true
+    },
+    {
+      "version": "20260406091715",
+      "name": "lin22_first_name_rename_and_invite",
+      "has_sql": true
+    },
+    {
+      "version": "20260406091735",
+      "name": "lin22_first_name_create_relative",
+      "has_sql": true
+    },
+    {
+      "version": "20260407143629",
+      "name": "lin37_seif_zeina_maternal_line_and_parent_links",
+      "has_sql": true
+    },
+    {
+      "version": "20260407192522",
+      "name": "admin_delete_node_secure",
+      "has_sql": true
+    },
+    {
+      "version": "20260407192608",
+      "name": "admin_delete_node_bypass_rls",
+      "has_sql": true
+    },
+    {
+      "version": "20260514142414",
+      "name": "data_api_public_table_grants",
+      "has_sql": true
+    },
+    {
+      "version": "20260817095406",
+      "name": "lin60_secure_node_invites",
+      "has_sql": true
+    },
+    {
+      "version": "20260826120000",
+      "name": "lin64_write_seam_return_contract",
+      "has_sql": false
+    }
+  ],
+  "orphans": {
+    "capturedAt": "2026-08-30T12:45:03.722Z",
+    "dev": [
+      {
+        "version": "20260226133534",
+        "name": "initial_schema",
+        "has_sql": true
+      },
+      {
+        "version": "20260226133613",
+        "name": "initial_functions",
+        "has_sql": true
+      },
+      {
+        "version": "20260226134357",
+        "name": "initial_functions_part2",
+        "has_sql": true
+      },
+      {
+        "version": "20260226134414",
+        "name": "initial_functions_part3",
+        "has_sql": true
+      },
+      {
+        "version": "20260226134439",
+        "name": "initial_policies",
+        "has_sql": true
+      },
+      {
+        "version": "20260226134454",
+        "name": "add_divorce_type",
+        "has_sql": true
+      },
+      {
+        "version": "20260226134455",
+        "name": "audit_log_disable_rls",
+        "has_sql": true
+      },
+      {
+        "version": "20260226134526",
+        "name": "consolidate_node_invites_policies",
+        "has_sql": true
+      },
+      {
+        "version": "20260304103545",
+        "name": "20260304_get_claimed_node_ids",
+        "has_sql": true
+      },
+      {
+        "version": "20260304103559",
+        "name": "20260304_paternal_maternal_clusters",
+        "has_sql": true
+      },
+      {
+        "version": "20260304103614",
+        "name": "20260304_create_relative_parent_role",
+        "has_sql": true
+      },
+      {
+        "version": "20260304103630",
+        "name": "20260304_fix_get_public_metrics",
+        "has_sql": true
+      },
+      {
+        "version": "20260304103648",
+        "name": "20260304_backfill_maternal_clusters",
+        "has_sql": true
+      },
+      {
+        "version": "20260304104446",
+        "name": "20260304_backfill_maternal_single_parent",
+        "has_sql": true
+      },
+      {
+        "version": "20260313082508",
+        "name": "users_profile_fields",
+        "has_sql": true
+      },
+      {
+        "version": "20260313082650",
+        "name": "remove_avatar_url",
+        "has_sql": true
+      },
+      {
+        "version": "20260316111425",
+        "name": "fix_users_email_function",
+        "has_sql": true
+      },
+      {
+        "version": "20260406082327",
+        "name": "drop_legacy_create_relative_secure_4arg",
+        "has_sql": true
+      },
+      {
+        "version": "20260407143636",
+        "name": "lin37_seif_zeina_maternal_line_and_parent_links",
+        "has_sql": true
+      },
+      {
+        "version": "20260407191031",
+        "name": "admin_delete_node_bypass_rls",
+        "has_sql": true
+      },
+      {
+        "version": "20260514142744",
+        "name": "data_api_public_table_grants",
+        "has_sql": true
+      },
+      {
+        "version": "20260817095338",
+        "name": "lin60_secure_node_invites",
+        "has_sql": true
+      },
+      {
+        "version": "20260817101207",
+        "name": "lin59_server_side_admin_write_gates",
+        "has_sql": true
+      }
+    ],
+    "prod": [
+      {
+        "version": "20260406091715",
+        "name": "lin22_first_name_rename_and_invite",
+        "has_sql": true
+      },
+      {
+        "version": "20260406091735",
+        "name": "lin22_first_name_create_relative",
+        "has_sql": true
+      },
+      {
+        "version": "20260407143629",
+        "name": "lin37_seif_zeina_maternal_line_and_parent_links",
+        "has_sql": true
+      },
+      {
+        "version": "20260407192522",
+        "name": "admin_delete_node_secure",
+        "has_sql": true
+      },
+      {
+        "version": "20260407192608",
+        "name": "admin_delete_node_bypass_rls",
+        "has_sql": true
+      },
+      {
+        "version": "20260514142414",
+        "name": "data_api_public_table_grants",
+        "has_sql": true
+      },
+      {
+        "version": "20260817095406",
+        "name": "lin60_secure_node_invites",
+        "has_sql": true
+      }
+    ]
+  }
+}
