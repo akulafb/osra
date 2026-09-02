@@ -42,6 +42,6 @@ scripts/generate-badran-additions.mjs
 !.aidesigner/.gitkeep
 
 # Agent skill deployments (symlinks into local skills-manager library)
-  .agents/skills/
-  .claude/skills/
-  .omp/skills/
+.agents/skills/
+.claude/skills/
+.omp/skills/
