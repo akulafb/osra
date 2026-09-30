@@ -306,6 +306,26 @@ describe('findKinshipPaths', () => {
     expect(paths[0].personIds).toEqual(['A', 'E', 'M', 'G', 'N', 'B']);
   });
 
+  it('finds the marriage path when a walk that dead-ends reaches a Person on it first', () => {
+    // A and T share the child Q and are not married. Q is married to N.
+    // A is married to R, the grandparent of N (R, Y, N).
+    // The only Kinship Path through a marriage is A, R, Y, N, Q, T. The walk
+    // A, Q, N gets to N sooner, but it can only go on to T back through Q.
+    const tree: FamilyLink[] = [
+      { source: 'A', target: 'Q', type: 'parent', parentRole: 'father' },
+      { source: 'T', target: 'Q', type: 'parent', parentRole: 'mother' },
+      { source: 'Q', target: 'N', type: 'marriage' },
+      { source: 'A', target: 'R', type: 'marriage' },
+      { source: 'R', target: 'Y', type: 'parent', parentRole: 'mother' },
+      { source: 'Y', target: 'N', type: 'parent', parentRole: 'mother' },
+    ];
+    const paths = findKinshipPaths('A', 'T', tree);
+    expect(paths).toHaveLength(1);
+    expect(paths[0].kind).toBe('marriage');
+    expect(paths[0].personIds).toEqual(['A', 'R', 'Y', 'N', 'Q', 'T']);
+    expect(kinds(paths[0])).toEqual(['spouse', 'child', 'child', 'spouse', 'parent']);
+  });
+
   it('resolves Kinship Link endpoints that are node objects', () => {
     const byId = new Map(FIXTURE_PERSONS.map(p => [p.id, p] as const));
     const live: FamilyLink[] = links.map(l => ({
@@ -316,6 +336,144 @@ describe('findKinshipPaths', () => {
     const paths = findKinshipPaths(P.omar, P.sara, live);
     expect(paths.map(p => p.kind)).toEqual(['blood', 'marriage']);
     expect(paths[0].personIds).toHaveLength(5);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// findKinshipPaths against a reference that tries every path.
+//
+// The reference below shares no code with the search. It lists every chain of
+// Kinship Links from one Person to the other that goes through no Person
+// twice, then picks the shortest of each kind by the documented rules.
+// ---------------------------------------------------------------------------
+
+/** A small seeded random number generator, so the trees are the same on every run. */
+function seededRandom(seed: number): () => number {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/** A made-up tree of `size` Persons: at most two parents each, plus marriages and divorces. */
+function buildRandomTree(random: () => number, size: number): FamilyLink[] {
+  const ids = Array.from({ length: size }, (_, i) => `r${i}`);
+  const tree: FamilyLink[] = [];
+  const pick = (max: number) => Math.floor(random() * max);
+  // A parent always has a lower index than the child, so no Person is their own ancestor.
+  for (let child = 1; child < size; child++) {
+    const parents = new Set<number>();
+    const count = pick(3);
+    for (let k = 0; k < count; k++) parents.add(pick(child));
+    for (const parent of parents) {
+      tree.push({
+        source: ids[parent],
+        target: ids[child],
+        type: 'parent',
+        parentRole: random() < 0.5 ? 'mother' : 'father',
+      });
+    }
+  }
+  const unions = 1 + pick(4);
+  for (let k = 0; k < unions; k++) {
+    const a = pick(size);
+    const b = pick(size);
+    if (a !== b) tree.push({ source: ids[a], target: ids[b], type: random() < 0.25 ? 'divorce' : 'marriage' });
+  }
+  return tree;
+}
+
+/** The shortest length of each kind of Kinship Path, by trying every path. */
+function shortestByTryingEveryPath(
+  fromId: string,
+  toId: string,
+  tree: readonly FamilyLink[]
+): { blood: number; marriage: number; other: number } {
+  const best = { blood: Infinity, marriage: Infinity, other: Infinity };
+  const onPath = new Set<string>([fromId]);
+  // `U` up to a parent, `D` down to a child, `M` across a marriage or divorce.
+  const walk = (at: string, code: string) => {
+    if (at === toId) {
+      const kind = code.includes('M') ? 'marriage' : /^U*D*$/.test(code) ? 'blood' : 'other';
+      best[kind] = Math.min(best[kind], code.length);
+      return;
+    }
+    for (const link of tree) {
+      const source = getNodeId(link.source);
+      const target = getNodeId(link.target);
+      if (source !== at && target !== at) continue;
+      const next = source === at ? target : source;
+      if (onPath.has(next)) continue;
+      const letter = link.type !== 'parent' ? 'M' : source === at ? 'D' : 'U';
+      onPath.add(next);
+      walk(next, code + letter);
+      onPath.delete(next);
+    }
+  };
+  walk(fromId, '');
+  return best;
+}
+
+describe('findKinshipPaths against trying every path', () => {
+  it('returns the shortest path of each kind on 400 small random trees', () => {
+    const random = seededRandom(70);
+    let pairs = 0;
+    let marriagePaths = 0;
+    for (let t = 0; t < 400; t++) {
+      const size = 5 + (t % 4);
+      const tree = buildRandomTree(random, size);
+      for (let a = 0; a < size; a++) {
+        for (let b = 0; b < size; b++) {
+          if (a === b) continue;
+          const fromId = `r${a}`;
+          const toId = `r${b}`;
+          const best = shortestByTryingEveryPath(fromId, toId, tree);
+          const expected: Array<[string, number]> = [];
+          if (best.blood < Infinity) expected.push(['blood', best.blood]);
+          if (best.marriage < Infinity && best.marriage <= best.blood) expected.push(['marriage', best.marriage]);
+          if (expected.length === 0 && best.other < Infinity) expected.push(['other', best.other]);
+
+          const paths = findKinshipPaths(fromId, toId, tree);
+          const where = `tree ${t}, ${fromId} to ${toId}: ${JSON.stringify(tree)}`;
+          expect(paths.map(p => [p.kind, p.steps.length]), where).toEqual(expected);
+
+          for (const path of paths) {
+            // A real chain: from the first Person to the last, link by link, no Person twice.
+            expect(path.personIds[0], where).toBe(fromId);
+            expect(path.personIds[path.personIds.length - 1], where).toBe(toId);
+            expect(new Set(path.personIds).size, where).toBe(path.personIds.length);
+            expect(path.personIds, where).toHaveLength(path.steps.length + 1);
+            path.steps.forEach((step, i) => {
+              expect([step.fromId, step.toId], where).toEqual([path.personIds[i], path.personIds[i + 1]]);
+              expect(tree, where).toContain(step.link);
+              const source = getNodeId(step.link.source);
+              const target = getNodeId(step.link.target);
+              const stepKind =
+                step.link.type === 'marriage'
+                  ? 'spouse'
+                  : step.link.type === 'divorce'
+                    ? 'formerSpouse'
+                    : source === step.toId
+                      ? 'parent'
+                      : 'child';
+              expect(step.kind, where).toBe(stepKind);
+              expect([source, target].sort(), where).toEqual([step.fromId, step.toId].sort());
+            });
+            const crossesMarriage = path.steps.some(s => s.link.type !== 'parent');
+            expect(crossesMarriage, where).toBe(path.kind === 'marriage');
+            if (path.kind === 'marriage') marriagePaths++;
+          }
+          pairs++;
+        }
+      }
+    }
+    // The run is not empty by accident.
+    expect(pairs).toBeGreaterThan(10000);
+    expect(marriagePaths).toBeGreaterThan(1000);
   });
 });
 

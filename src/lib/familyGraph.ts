@@ -568,81 +568,228 @@ function findBloodSteps(index: KinshipIndex, fromId: string, toId: string): Kins
   return [...up, ...down];
 }
 
-/** A Person reached by a walk, plus whether the walk so far has crossed a marriage. */
-interface WalkState {
-  personId: string;
-  crossed: boolean;
-  step: KinshipPathStep | null;
-  prev: WalkState | null;
-}
-
-function stepsOfWalk(end: WalkState | null): KinshipPathStep[] | null {
-  if (!end) return null;
-  const steps: KinshipPathStep[] = [];
-  for (let state: WalkState | null = end; state && state.step; state = state.prev) {
-    steps.unshift(state.step);
-  }
-  return steps;
-}
-
-/** True when the walk that ends at `state` has already been through `personId`. */
-function walkHasVisited(state: WalkState, personId: string): boolean {
-  for (let at: WalkState | null = state; at; at = at.prev) {
-    if (at.personId === personId) return true;
-  }
-  return false;
+/** One step along `link`, read from `fromId` to `toId`. */
+function stepAlong(link: FamilyLink, fromId: string, toId: string): KinshipPathStep {
+  let kind: KinshipStepKind;
+  if (link.type === 'parent') kind = getLinkEndpoints(link).sourceId === toId ? 'parent' : 'child';
+  else kind = link.type === 'divorce' ? 'formerSpouse' : 'spouse';
+  return { fromId, toId, kind, link };
 }
 
 /**
- * The shortest chains from `fromId` to `toId` over every kind of Kinship Link:
- * one that crosses a marriage or divorce, and one that does not. Either can be
- * `null`.
+ * The shortest chain from `fromId` to `toId` over `parent` links only, up and
+ * down in any order. A plain breadth-first search is complete here: with no
+ * rule beyond "follow a parent link", the shortest walk never repeats a Person.
  */
-function findShortestSteps(
+function findParentLinkSteps(index: KinshipIndex, fromId: string, toId: string): KinshipPathStep[] | null {
+  const reachedBy = new Map<string, KinshipPathStep | null>([[fromId, null]]);
+  const queue = [fromId];
+  for (let i = 0; i < queue.length && !reachedBy.has(toId); i++) {
+    const personId = queue[i];
+    const adjacency = adjacencyOf(index, personId);
+    for (const hop of [...adjacency.parents, ...adjacency.children]) {
+      if (reachedBy.has(hop.personId)) continue;
+      reachedBy.set(hop.personId, stepAlong(hop.link, personId, hop.personId));
+      queue.push(hop.personId);
+    }
+  }
+  if (!reachedBy.has(toId)) return null;
+  const steps: KinshipPathStep[] = [];
+  for (let step = reachedBy.get(toId); step; step = reachedBy.get(step.fromId)) steps.unshift(step);
+  return steps;
+}
+
+/** How many Kinship Links, of any kind, each Person is from `startId`. */
+function linkDistances(index: KinshipIndex, startId: string): Map<string, number> {
+  const distance = new Map<string, number>([[startId, 0]]);
+  const queue = [startId];
+  for (let i = 0; i < queue.length; i++) {
+    const adjacency = adjacencyOf(index, queue[i]);
+    const next = (distance.get(queue[i]) as number) + 1;
+    for (const hops of [adjacency.parents, adjacency.spouses, adjacency.children]) {
+      for (const hop of hops) {
+        if (distance.has(hop.personId)) continue;
+        distance.set(hop.personId, next);
+        queue.push(hop.personId);
+      }
+    }
+  }
+  return distance;
+}
+
+/**
+ * Answers, for one `marriage` or `divorce` link at a time: what is the shortest
+ * Kinship Path from `fromId` to `toId` that goes through this link?
+ *
+ * Such a path is two chains that share no Person: one from an end of the link
+ * to `fromId`, and one from the other end of the link to `toId`. "Two chains
+ * that share no Person, as short as possible together" is a minimum-cost flow
+ * of two units where each Person can carry one unit, and that is solved
+ * exactly by finding the cheapest augmenting chain twice. A search that marks
+ * a Person as visited cannot do this: whether a walk may go on from a Person
+ * depends on every Person already on the walk, not only on the Person.
+ *
+ * The network: Person `i` is node `2i` (in) and `2i + 1` (out), joined by an
+ * arc that one unit can use. Every Kinship Link is an arc each way, at cost 1.
+ * `fromId` and `toId` each lead to the sink. Arc `k` and arc `k ^ 1` are one
+ * arc and its reverse.
+ */
+function pathThroughLinkFinder(
   index: KinshipIndex,
   fromId: string,
   toId: string
-): { throughMarriage: KinshipPathStep[] | null; withoutMarriage: KinshipPathStep[] | null } {
-  const key = (personId: string, crossed: boolean) => `${crossed ? 1 : 0}|${personId}`;
-  const seen = new Set<string>([key(fromId, false)]);
-  const queue: WalkState[] = [{ personId: fromId, crossed: false, step: null, prev: null }];
-  const ends: { throughMarriage: WalkState | null; withoutMarriage: WalkState | null } = {
-    throughMarriage: null,
-    withoutMarriage: null,
+): (link: FamilyLink, aId: string, bId: string) => KinshipPathStep[] | null {
+  const personIds = Array.from(index.keys());
+  const numberOf = new Map(personIds.map((id, i) => [id, i] as const));
+  const source = personIds.length * 2;
+  const sink = source + 1;
+  const arcsFrom: number[][] = Array.from({ length: sink + 1 }, () => []);
+  const arcTo: number[] = [];
+  const arcCost: number[] = [];
+  const arcLink: Array<FamilyLink | null> = [];
+  const addArc = (from: number, to: number, cost: number, link: FamilyLink | null): number => {
+    arcsFrom[from].push(arcTo.length);
+    arcTo.push(to);
+    arcCost.push(cost);
+    arcLink.push(link);
+    arcsFrom[to].push(arcTo.length);
+    arcTo.push(from);
+    arcCost.push(-cost);
+    arcLink.push(link);
+    return arcTo.length - 2;
   };
+  personIds.forEach((personId, i) => {
+    addArc(2 * i, 2 * i + 1, 0, null);
+    const adjacency = adjacencyOf(index, personId);
+    for (const hops of [adjacency.parents, adjacency.spouses, adjacency.children]) {
+      for (const hop of hops) addArc(2 * i + 1, 2 * (numberOf.get(hop.personId) as number), 1, hop.link);
+    }
+  });
+  addArc(2 * (numberOf.get(fromId) as number) + 1, sink, 0, null);
+  addArc(2 * (numberOf.get(toId) as number) + 1, sink, 0, null);
+  // The source leads to the two ends of the link in question; set on each call.
+  const sourceArcs = [addArc(source, 0, 0, null), addArc(source, 0, 0, null)];
+  const room: number[] = new Array(arcTo.length);
 
-  for (let i = 0; i < queue.length && !(ends.throughMarriage && ends.withoutMarriage); i++) {
-    const state = queue[i];
-    const adjacency = adjacencyOf(index, state.personId);
-    const visit = (hop: KinshipHop, kind: KinshipStepKind) => {
-      // A walk that visits a Person twice is not a Kinship Path.
-      if (walkHasVisited(state, hop.personId)) return;
-      const crossed = state.crossed || kind === 'spouse' || kind === 'formerSpouse';
-      const stateKey = key(hop.personId, crossed);
-      if (seen.has(stateKey)) return;
-      seen.add(stateKey);
-      const next: WalkState = {
-        personId: hop.personId,
-        crossed,
-        step: { fromId: state.personId, toId: hop.personId, kind, link: hop.link },
-        prev: state,
-      };
-      if (hop.personId === toId) {
-        if (crossed) ends.throughMarriage ??= next;
-        else ends.withoutMarriage ??= next;
-        return;
+  /** Sends one more unit from the source to the sink along the cheapest chain. */
+  const sendOneUnit = (): boolean => {
+    const cost: number[] = new Array(sink + 1).fill(Infinity);
+    const arcInto: number[] = new Array(sink + 1).fill(-1);
+    const queued: boolean[] = new Array(sink + 1).fill(false);
+    cost[source] = 0;
+    const queue = [source];
+    for (let i = 0; i < queue.length; i++) {
+      const node = queue[i];
+      queued[node] = false;
+      for (const arc of arcsFrom[node]) {
+        const to = arcTo[arc];
+        if (room[arc] === 0 || cost[node] + arcCost[arc] >= cost[to]) continue;
+        cost[to] = cost[node] + arcCost[arc];
+        arcInto[to] = arc;
+        if (!queued[to]) {
+          queued[to] = true;
+          queue.push(to);
+        }
       }
-      queue.push(next);
-    };
-    for (const hop of adjacency.parents) visit(hop, 'parent');
-    for (const hop of adjacency.spouses) visit(hop, hop.link.type === 'divorce' ? 'formerSpouse' : 'spouse');
-    for (const hop of adjacency.children) visit(hop, 'child');
-  }
-
-  return {
-    throughMarriage: stepsOfWalk(ends.throughMarriage),
-    withoutMarriage: stepsOfWalk(ends.withoutMarriage),
+    }
+    if (arcInto[sink] === -1) return false;
+    for (let node = sink; node !== source; node = arcTo[arcInto[node] ^ 1]) {
+      room[arcInto[node]] -= 1;
+      room[arcInto[node] ^ 1] += 1;
+    }
+    return true;
   };
+
+  /** The chain the flow takes from a Person until it leaves for the sink. */
+  const chainFrom = (startId: string): KinshipPathStep[] => {
+    const steps: KinshipPathStep[] = [];
+    for (let personId = startId; ; ) {
+      const out = 2 * (numberOf.get(personId) as number) + 1;
+      // Even arcs are the forward ones; a forward arc with no room left is in use.
+      const used = arcsFrom[out].find(arc => arc % 2 === 0 && room[arc] === 0);
+      if (used === undefined || arcTo[used] === sink) return steps;
+      const nextId = personIds[arcTo[used] >> 1];
+      steps.push(stepAlong(arcLink[used] as FamilyLink, personId, nextId));
+      personId = nextId;
+    }
+  };
+
+  return (link, aId, bId) => {
+    for (let arc = 0; arc < room.length; arc++) room[arc] = arc % 2 === 0 ? 1 : 0;
+    [aId, bId].forEach((endId, n) => {
+      const into = 2 * (numberOf.get(endId) as number);
+      // Move the source arc, and its reverse, onto this end of the link.
+      const old = arcTo[sourceArcs[n]];
+      arcsFrom[old].splice(arcsFrom[old].indexOf(sourceArcs[n] ^ 1), 1);
+      arcsFrom[into].push(sourceArcs[n] ^ 1);
+      arcTo[sourceArcs[n]] = into;
+    });
+    if (!sendOneUnit() || !sendOneUnit()) return null;
+
+    const fromA = chainFrom(aId);
+    const fromB = chainFrom(bId);
+    const endOfA = fromA.length > 0 ? fromA[fromA.length - 1].toId : aId;
+    // One chain ends at `fromId`: walk it backwards, cross the link, walk the other.
+    const [toStart, startEndId, otherEndId, toEnd] =
+      endOfA === fromId ? [fromA, aId, bId, fromB] : [fromB, bId, aId, fromA];
+    return [
+      ...toStart.map(step => stepAlong(step.link, step.toId, step.fromId)).reverse(),
+      stepAlong(link, startEndId, otherEndId),
+      ...toEnd,
+    ];
+  };
+}
+
+/**
+ * The shortest Kinship Path from `fromId` to `toId` that goes through at least
+ * one `marriage` or `divorce` link and is no longer than `maxLength`, or `null`.
+ *
+ * Every marriage or divorce link is a candidate for the path to go through.
+ * Each gets a floor first: no path through it can be shorter than the shortest
+ * walks to and from its two ends. The candidates are then solved exactly,
+ * lowest floor first, and the search stops as soon as the best path found is
+ * no longer than the next floor. So the result is the shortest for every shape
+ * of tree, and in the usual tree only one candidate is solved.
+ */
+function findMarriageSteps(
+  index: KinshipIndex,
+  fromId: string,
+  toId: string,
+  maxLength: number
+): KinshipPathStep[] | null {
+  const fromStart = linkDistances(index, fromId);
+  if (!fromStart.has(toId)) return null;
+  const fromEnd = linkDistances(index, toId);
+
+  const candidates: Array<{ link: FamilyLink; aId: string; bId: string; floor: number }> = [];
+  for (const [aId, adjacency] of index) {
+    const aFromStart = fromStart.get(aId);
+    const aFromEnd = fromEnd.get(aId);
+    if (aFromStart === undefined || aFromEnd === undefined) continue;
+    for (const hop of adjacency.spouses) {
+      // Each link is in the index twice, once for each end; take it once.
+      if (getLinkEndpoints(hop.link).sourceId !== aId) continue;
+      const bId = hop.personId;
+      const floor =
+        1 +
+        Math.min(
+          aFromStart + (fromEnd.get(bId) as number),
+          (fromStart.get(bId) as number) + aFromEnd
+        );
+      if (floor <= maxLength) candidates.push({ link: hop.link, aId, bId, floor });
+    }
+  }
+  if (candidates.length === 0) return null;
+  candidates.sort((x, y) => x.floor - y.floor);
+
+  const pathThrough = pathThroughLinkFinder(index, fromId, toId);
+  let best: KinshipPathStep[] | null = null;
+  for (const { link, aId, bId, floor } of candidates) {
+    if (best && best.length <= floor) break;
+    const steps = pathThrough(link, aId, bId);
+    if (steps && steps.length <= maxLength && (!best || steps.length < best.length)) best = steps;
+  }
+  return best;
 }
 
 const STEP_CODE: Record<KinshipStepKind, string> = {
@@ -775,11 +922,13 @@ export function findKinshipPaths(
   const blood = findBloodSteps(index, fromId, toId);
   if (blood) paths.push(toPath('blood', blood));
 
-  const { throughMarriage, withoutMarriage } = findShortestSteps(index, fromId, toId);
-  if (throughMarriage && (!blood || throughMarriage.length <= blood.length)) {
-    paths.push(toPath('marriage', throughMarriage));
+  const throughMarriage = findMarriageSteps(index, fromId, toId, blood ? blood.length : Infinity);
+  if (throughMarriage) paths.push(toPath('marriage', throughMarriage));
+
+  if (paths.length === 0) {
+    const withoutMarriage = findParentLinkSteps(index, fromId, toId);
+    if (withoutMarriage) paths.push(toPath('other', withoutMarriage));
   }
-  if (paths.length === 0 && withoutMarriage) paths.push(toPath('other', withoutMarriage));
   return paths;
 }
 
