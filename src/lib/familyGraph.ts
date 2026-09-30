@@ -385,11 +385,12 @@ export function getRelatives(
 ): string[] {
   if (!personId) return [];
   const index = buildKinshipIndex(links);
-  const { side, gender } = filter;
+  const { side, gender } = filter ?? {};
   const parents = (id: string) => parentIds(index, id);
   const children = (id: string) => childIds(index, id);
   const spouses = (id: string) => currentSpouseIds(index, id);
 
+  // No `default` and no initial value: a RelativeKind with no case stops compiling.
   let found: string[];
   switch (kind) {
     case 'parents':
@@ -438,11 +439,10 @@ export function getRelatives(
     case 'descendants':
       found = walkAll(children(personId), children);
       break;
-    default:
-      found = [];
   }
 
-  const unique = new Set(found);
+  // `found` is unset only when a caller passes a kind the types do not allow.
+  const unique = new Set(found ?? []);
   unique.delete(personId);
   const result = Array.from(unique);
   return gender ? result.filter(id => recordedGender(index, id) === gender) : result;
@@ -582,9 +582,15 @@ function stepsOfWalk(end: WalkState | null): KinshipPathStep[] | null {
   for (let state: WalkState | null = end; state && state.step; state = state.prev) {
     steps.unshift(state.step);
   }
-  // A walk that visits a Person twice is not a Kinship Path.
-  const visited = new Set(steps.map(s => s.toId));
-  return visited.size === steps.length ? steps : null;
+  return steps;
+}
+
+/** True when the walk that ends at `state` has already been through `personId`. */
+function walkHasVisited(state: WalkState, personId: string): boolean {
+  for (let at: WalkState | null = state; at; at = at.prev) {
+    if (at.personId === personId) return true;
+  }
+  return false;
 }
 
 /**
@@ -609,7 +615,8 @@ function findShortestSteps(
     const state = queue[i];
     const adjacency = adjacencyOf(index, state.personId);
     const visit = (hop: KinshipHop, kind: KinshipStepKind) => {
-      if (hop.personId === fromId) return;
+      // A walk that visits a Person twice is not a Kinship Path.
+      if (walkHasVisited(state, hop.personId)) return;
       const crossed = state.crossed || kind === 'spouse' || kind === 'formerSpouse';
       const stateKey = key(hop.personId, crossed);
       if (seen.has(stateKey)) return;
@@ -668,7 +675,7 @@ function nameSteps(index: KinshipIndex, steps: readonly KinshipPathStep[]): Kins
       return plain('child');
     case 'UD': {
       // Half-siblings only when the record shows a second, different parent for each.
-      const fromParents = parentIds(index, first.fromId);
+      const fromParents = Array.from(new Set(parentIds(index, first.fromId)));
       const toParents = new Set(parentIds(index, steps[1].toId));
       const shared = fromParents.filter(id => toParents.has(id)).length;
       const isHalf = shared === 1 && fromParents.length >= 2 && toParents.size >= 2;
@@ -687,8 +694,11 @@ function nameSteps(index: KinshipIndex, steps: readonly KinshipPathStep[]): Kins
     case 'X':
       return plain('former spouse');
     case 'US':
+      // The spouse of a parent is a step-parent only when they are not a parent too.
+      if (parentIds(index, first.fromId).includes(steps[1].toId)) return null;
       return withSide(plain('step-parent'));
     case 'SD':
+      if (childIds(index, first.fromId).includes(steps[1].toId)) return null;
       return plain('step-child');
     case 'SU':
       return inLaw('parent');
@@ -784,7 +794,10 @@ export interface PersonNameMatch {
   displayName: string;
   /** The parent recorded with `parent_role` father, or `null` when there is none. */
   fatherId: string | null;
-  /** The father's display name, or `null` when no father is recorded. */
+  /**
+   * The father's display name, or `null` when no father is recorded (or the
+   * father is not among the Persons passed in).
+   */
   fatherName: string | null;
 }
 
@@ -810,20 +823,21 @@ export function findPersonsByName(
   if (wanted.length === 0 || !persons || !Array.isArray(persons)) return [];
 
   const matches = persons.filter(person => {
-    const words = new Set(nameWords(formatNodeDisplayName(person)));
+    if (!person) return false;
+    const words = new Set(nameWords(`${person.firstName ?? ''} ${person.familyCluster ?? ''}`));
     return wanted.every(word => words.has(word));
   });
   if (matches.length === 0) return [];
 
   const index = buildKinshipIndex(links);
-  const byId = new Map(persons.map(person => [person.id, person] as const));
+  const byId = new Map(persons.filter(Boolean).map(person => [person.id, person] as const));
   return matches.map(person => {
     const fatherId = parentIds(index, person.id, 'father')[0] ?? null;
     const father = fatherId ? byId.get(fatherId) : undefined;
     return {
       personId: person.id,
       displayName: formatNodeDisplayName(person),
-      fatherId: father ? fatherId : null,
+      fatherId,
       fatherName: father ? formatNodeDisplayName(father) : null,
     };
   });

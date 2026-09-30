@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   getRelatives,
   getRecordedGender,
+  getNodeId,
   findKinshipPaths,
   nameKinshipPath,
   findPersonsByName,
@@ -197,8 +198,8 @@ describe('getRelatives', () => {
     const byId = new Map(FIXTURE_PERSONS.map(p => [p.id, p] as const));
     const live: FamilyLink[] = links.map(l => ({
       ...l,
-      source: byId.get(l.source as string) as FamilyNode,
-      target: byId.get(l.target as string) as FamilyNode,
+      source: byId.get(getNodeId(l.source)) as FamilyNode,
+      target: byId.get(getNodeId(l.target)) as FamilyNode,
     }));
     expect(sorted(getRelatives(P.omar, 'cousins', live, { side: 'father' }))).toEqual(sorted([P.sara, P.nabil]));
   });
@@ -258,7 +259,7 @@ describe('findKinshipPaths', () => {
     expect(findKinshipPaths(P.omar, P.yusufJr, links).map(p => p.kind)).toEqual(['blood']);
   });
 
-  it('returns no path, not an error, for two Persons with no connection', () => {
+  it('returns no path, not an error, for two Persons with no Kinship Path', () => {
     expect(findKinshipPaths(P.omar, P.omarZaher, links)).toEqual([]);
     expect(findKinshipPaths(P.omar, P.hana, links)).toEqual([]);
     expect(findKinshipPaths(P.hana, P.omar, links)).toEqual([]);
@@ -285,12 +286,32 @@ describe('findKinshipPaths', () => {
     expect(paths[0].relation).toBeNull();
   });
 
+  it('finds the marriage path when a shorter walk would go through one Person twice', () => {
+    // A and B share the child C and are not married. C is married to D, so the
+    // shortest walk that crosses a marriage is A, C, D, C, B: not a Kinship Path.
+    // A is married to E, and E is B's first cousin (G is their grandparent).
+    const tree: FamilyLink[] = [
+      { source: 'A', target: 'C', type: 'parent', parentRole: 'father' },
+      { source: 'B', target: 'C', type: 'parent', parentRole: 'mother' },
+      { source: 'C', target: 'D', type: 'marriage' },
+      { source: 'A', target: 'E', type: 'marriage' },
+      { source: 'G', target: 'M', type: 'parent', parentRole: 'father' },
+      { source: 'G', target: 'N', type: 'parent', parentRole: 'father' },
+      { source: 'M', target: 'E', type: 'parent', parentRole: 'mother' },
+      { source: 'N', target: 'B', type: 'parent', parentRole: 'mother' },
+    ];
+    const paths = findKinshipPaths('A', 'B', tree);
+    expect(paths).toHaveLength(1);
+    expect(paths[0].kind).toBe('marriage');
+    expect(paths[0].personIds).toEqual(['A', 'E', 'M', 'G', 'N', 'B']);
+  });
+
   it('resolves Kinship Link endpoints that are node objects', () => {
     const byId = new Map(FIXTURE_PERSONS.map(p => [p.id, p] as const));
     const live: FamilyLink[] = links.map(l => ({
       ...l,
-      source: byId.get(l.source as string) as FamilyNode,
-      target: byId.get(l.target as string) as FamilyNode,
+      source: byId.get(getNodeId(l.source)) as FamilyNode,
+      target: byId.get(getNodeId(l.target)) as FamilyNode,
     }));
     const paths = findKinshipPaths(P.omar, P.sara, live);
     expect(paths.map(p => p.kind)).toEqual(['blood', 'marriage']);
@@ -442,6 +463,34 @@ describe('the name of the relation for a Kinship Path', () => {
     expect(nameKinshipPath(path, links)).toEqual({ name: 'aunt or uncle', label: 'aunt or uncle', side: 'father' });
     expect(nameKinshipPath({ steps: [] }, links)).toBeNull();
   });
+
+  it('does not call a Person\'s own parent a step-parent, or their own child a step-child', () => {
+    // Omar, up to his father Yusuf, across to Yusuf's wife Huda: Huda is Omar's mother.
+    const fatherLink = links.find(l => l.source === P.yusuf && l.target === P.omar) as FamilyLink;
+    const marriageLink = links.find(l => l.source === P.yusuf && l.target === P.huda) as FamilyLink;
+    expect(
+      nameKinshipPath(
+        {
+          steps: [
+            { fromId: P.omar, toId: P.yusuf, kind: 'parent', link: fatherLink },
+            { fromId: P.yusuf, toId: P.huda, kind: 'spouse', link: marriageLink },
+          ],
+        },
+        links
+      )
+    ).toBeNull();
+    expect(
+      nameKinshipPath(
+        {
+          steps: [
+            { fromId: P.huda, toId: P.yusuf, kind: 'spouse', link: marriageLink },
+            { fromId: P.yusuf, toId: P.omar, kind: 'child', link: fatherLink },
+          ],
+        },
+        links
+      )
+    ).toBeNull();
+  });
 });
 
 describe('findPersonsByName', () => {
@@ -488,6 +537,18 @@ describe('findPersonsByName', () => {
     expect(find('Zorro')).toEqual([]);
     expect(find('')).toEqual([]);
     expect(find('   ')).toEqual([]);
+  });
+
+  it('does not match a Person with no name on the placeholder display name', () => {
+    const nameless: FamilyNode[] = [{ id: 'x', firstName: '' }];
+    expect(findPersonsByName('Unknown', nameless, [])).toEqual([]);
+  });
+
+  it('keeps the father\'s id when the father is recorded but not among the Persons passed in', () => {
+    const onlyOmar = FIXTURE_PERSONS.filter(p => p.id === P.omar);
+    expect(findPersonsByName('Omar', onlyOmar, links)).toEqual([
+      { personId: P.omar, displayName: 'Omar Haddad', fatherId: P.yusuf, fatherName: null },
+    ]);
   });
 });
 

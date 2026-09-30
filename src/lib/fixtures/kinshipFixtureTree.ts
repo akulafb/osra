@@ -1,6 +1,6 @@
 /**
  * A made-up Tree Record of 41 Persons, used by the Kinship Path tests and by
- * the chat test questions. No Person here is a real family member.
+ * the chat test questions. No Person here is real.
  *
  * Main tree (Haddad / Khoury / Mansour), oldest generation first:
  *
