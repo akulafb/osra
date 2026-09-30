@@ -30,7 +30,6 @@ dist-ssr
 *.sw?
 .vercel
 AGENTS.md
-FB-Notes-ai.md
 
 # Supabase CLI temp (contains project ref, pooler URL)
 supabase/.temp/
