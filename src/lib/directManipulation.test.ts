@@ -11,6 +11,7 @@ import {
   startDissolveAction,
   escapeAction,
   backgroundClickAction,
+  needsCanvas,
 } from './directManipulation';
 
 describe('directManipulation state machine', () => {
@@ -292,6 +293,48 @@ describe('directManipulation state machine', () => {
       state = directManipulationReducer(state, backgroundClickAction());
       expect(state.phase).toBe('idle');
       expect(state.selectedNodeId).toBeNull();
+    });
+  });
+
+  describe('needsCanvas', () => {
+    const selected = directManipulationReducer(
+      initialDirectManipulationState,
+      selectNodeAction('p1')
+    );
+
+    it('leaves the canvas free to be covered while nothing is being asked of it', () => {
+      expect(needsCanvas(initialDirectManipulationState)).toBe(false);
+      expect(needsCanvas(selected)).toBe(false);
+    });
+
+    it('claims the canvas for the whole of Connect Mode', () => {
+      const targeting = directManipulationReducer(selected, startConnectAction('p1'));
+      expect(needsCanvas(targeting)).toBe(true);
+
+      const choosing = directManipulationReducer(
+        targeting,
+        pickConnectTargetAction('p2', { ok: true })
+      );
+      expect(choosing.phase).toBe('choosing-kinship');
+      expect(needsCanvas(choosing)).toBe(true);
+    });
+
+    it('claims the canvas while a Ghost Node is open', () => {
+      const creating = directManipulationReducer(
+        selected,
+        startCreateRelativeAction('p1', 'child')
+      );
+      expect(needsCanvas(creating)).toBe(true);
+    });
+
+    it('claims the canvas while a Dissolve is being confirmed', () => {
+      const confirming = directManipulationReducer(selected, startDissolveAction('p1'));
+      expect(needsCanvas(confirming)).toBe(true);
+    });
+
+    it('gives the canvas back when the action is escaped', () => {
+      const targeting = directManipulationReducer(selected, startConnectAction('p1'));
+      expect(needsCanvas(directManipulationReducer(targeting, escapeAction()))).toBe(false);
     });
   });
 });

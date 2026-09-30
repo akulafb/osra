@@ -46,6 +46,7 @@ import {
 import { KinshipLinkType, ParentRole } from './cards/connectOptions';
 import { CONNECT_ACCENT } from './cards/relationStyle';
 import { DirectManipulationController } from '../hooks/useDirectManipulation';
+import { needsCanvas } from '../lib/directManipulation';
 
 // V3 Shared Assets - paths resolved at runtime for WebP when supported
 const planetTexturePaths = [
@@ -721,9 +722,11 @@ export const FamilyTree3DContent: React.FC<FamilyTree3DProps> = ({
           parentRole,
         })
       );
-      exitConnectMode();
+      // Escape only steps back to targeting; a confirmed link is the end of
+      // Connect Mode, so land on the source as the 2D view does.
+      interaction.selectNode(connectPair.source.id);
     },
-    [connectPair, onDirectConnectNodes, exitConnectMode]
+    [connectPair, onDirectConnectNodes, interaction]
   );
 
   const handleGraphBackgroundClick = useCallback(() => {
@@ -2148,10 +2151,17 @@ export const FamilyTree3DContent: React.FC<FamilyTree3DProps> = ({
         Direct manipulation (LIN-46): docked handles + in-scene Ghost Preview.
         Desktop only per ADR 0002 — touch has no hover model and the gestures
         fight pinch-zoom, so mobile keeps the PersonDetailDrawer path.
+
+        The drawer only *starts* Connect Mode and Dissolve, though; the target
+        list, the kinship picker and the confirm pill are here. So on mobile
+        the panel shows while the canvas is being asked something, and the
+        drawer steps aside (LIN-62). The drawer has already decided who may
+        start those, so the panel does not ask again.
       */}
       <Manipulation3DPanel
         selectedNode={selectedNode}
-        canEdit={canEditSelected && !isMobileDevice}
+        canEdit={isMobileDevice ? needsCanvas(interaction.state) : canEditSelected}
+        dock={isMobileDevice ? 'bottom' : 'side'}
         existingNodes={graphData?.nodes ?? []}
         visibleIds={visibleIds3D}
         graphData={graphData}

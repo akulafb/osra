@@ -18,7 +18,7 @@ This ADR was drafted from argument alone and then **corrected by a prototype** (
 
 - **Animation lifecycles are shared, renderings are not**: Supernova and black-hole collapse are the 3D renderings of **Spawn** and **Dissolve**, not new lifecycles — same triggers, same optimistic-update and rollback semantics. The 2D `SpawnBurst` / `ParticleDissolve` SVG particle systems are not portable and are reimplemented in Three.js. Link-growth pulses reuse the graph's built-in `linkDirectionalParticles`; hand-written effects are capped and disabled under `isMobile()`, alongside the existing geometry and material reductions.
 
-- **Desktop-only for v1**: Touch has no hover model and two-click targeting fights pinch-zoom. Mobile 3D retains the existing `PersonDetailDrawer` path, which is already a complete route to every action. Recorded as a known gap, not an omission.
+- **Desktop-only for v1**: Touch has no hover model and two-click targeting fights pinch-zoom. Mobile 3D retains the existing `PersonDetailDrawer` path, which is already a complete route to every action. Recorded as a known gap, not an omission. *Amended by LIN-62:* the drawer was never a complete route — it only *starts* Connect Mode and Dissolve, and the target list, kinship picker and confirm pill live in the docked panel. On mobile the panel now shows while the canvas is being asked something (`needsCanvas`), and the drawer — a bottom sheet on a phone, not a full-screen cover — steps aside until they end. The Action Handles themselves stay desktop-only.
 
 ## Constraints discovered by the prototype
 

@@ -5,6 +5,7 @@ import {
   Button, 
   IconButton, 
   Drawer,
+  useMediaQuery,
   useTheme,
   alpha
 } from '@mui/material';
@@ -18,6 +19,12 @@ type UserProfile = Database['public']['Tables']['users']['Row'];
 interface PersonDetailDrawerProps {
   selectedNode: FamilyNode | null;
   onClose: () => void;
+  /**
+   * Step aside without dropping the selection. On a phone or tablet the
+   * drawer covers most of the canvas, so it has to leave while the canvas is
+   * being asked something (LIN-62).
+   */
+  hidden?: boolean;
   canEditSelected: boolean;
   isAdmin: boolean;
   userProfile: UserProfile | null;
@@ -37,6 +44,7 @@ interface PersonDetailDrawerProps {
 export const PersonDetailDrawer: React.FC<PersonDetailDrawerProps> = ({
   selectedNode,
   onClose,
+  hidden = false,
   canEditSelected,
   isAdmin,
   userProfile,
@@ -49,6 +57,9 @@ export const PersonDetailDrawer: React.FC<PersonDetailDrawerProps> = ({
   onDelete,
 }) => {
   const theme = useTheme();
+  // A right-hand drawer at full width is the whole screen on a phone. There it
+  // is a bottom sheet instead, so the Tree Node it describes stays in view.
+  const isSheet = useMediaQuery(theme.breakpoints.down('sm'));
 
   if (!selectedNode) return null;
 
@@ -61,17 +72,27 @@ export const PersonDetailDrawer: React.FC<PersonDetailDrawerProps> = ({
 
   return (
     <Drawer
-      anchor="right"
-      open={!!selectedNode}
+      anchor={isSheet ? 'bottom' : 'right'}
+      open={!!selectedNode && !hidden}
       onClose={onClose}
       variant="persistent"
       sx={{
         '& .MuiDrawer-paper': {
-          width: { xs: '100%', sm: 400 },
+          width: isSheet ? '100%' : 400,
           background: 'rgba(5, 5, 5, 0.75)',
           backdropFilter: 'blur(24px)',
-          borderLeft: '1px solid rgba(212, 175, 55, 0.2)',
-          boxShadow: '-10px 0 40px rgba(0,0,0,0.5)',
+          ...(isSheet
+            ? {
+                maxHeight: '45vh',
+                borderTop: '1px solid rgba(212, 175, 55, 0.2)',
+                borderTopLeftRadius: 16,
+                borderTopRightRadius: 16,
+                boxShadow: '0 -10px 40px rgba(0,0,0,0.5)',
+              }
+            : {
+                borderLeft: '1px solid rgba(212, 175, 55, 0.2)',
+                boxShadow: '-10px 0 40px rgba(0,0,0,0.5)',
+              }),
           color: 'text.primary',
           display: 'flex',
           flexDirection: 'column',
@@ -80,7 +101,7 @@ export const PersonDetailDrawer: React.FC<PersonDetailDrawerProps> = ({
       }}
     >
       {/* Header */}
-      <Box sx={{ p: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+      <Box sx={{ p: isSheet ? 2 : 3, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <Box>
           <Typography 
             variant="h4" 
@@ -111,14 +132,15 @@ export const PersonDetailDrawer: React.FC<PersonDetailDrawerProps> = ({
       </Box>
 
       {/* Content */}
-      <Box sx={{ flex: 1, px: 3, py: 2, overflowY: 'auto' }}>
+      {/* The sheet's last rows scroll clear of the chat button docked bottom-left. */}
+      <Box sx={{ flex: 1, px: isSheet ? 2 : 3, pt: isSheet ? 0 : 2, pb: isSheet ? 10 : 2, overflowY: 'auto' }}>
         <Typography 
           variant="caption" 
           sx={{ 
             fontFamily: 'monospace', 
             color: 'rgba(255,255,255,0.3)',
             display: 'block',
-            mb: 4
+            mb: isSheet ? 2 : 4
           }}
         >
           ID: {selectedNode.id}
