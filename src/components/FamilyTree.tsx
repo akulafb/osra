@@ -15,6 +15,7 @@ import { canEdit, canManageInvites } from '../lib/permissions';
 import { filterGraphData, filterGraphDataFor3D } from '../lib/filterGraphData';
 import { searchNodes } from '../utils/treeSearch';
 import { useDirectManipulation } from '../hooks/useDirectManipulation';
+import { needsCanvas } from '../lib/directManipulation';
 import AddRelativeModal from './modals/AddRelativeModal';
 import EditNodeModal from './modals/EditNodeModal';
 import BulkInviteModal from './modals/BulkInviteModal';
@@ -594,6 +595,7 @@ export const FamilyTree: React.FC = () => {
       <PersonDetailDrawer
         selectedNode={selectedNode}
         onClose={() => interaction.deselect()}
+        hidden={isMobile() && needsCanvas(interaction.state)}
         canEditSelected={canEditSelected}
         isAdmin={isAdmin}
         userProfile={userProfile}

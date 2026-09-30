@@ -107,6 +107,24 @@ export function backgroundClickAction(): DirectManipulationAction {
   return { type: 'BACKGROUND_CLICK' };
 }
 
+/**
+ * Whether the canvas is being asked a question: a target to pick, a Ghost Node
+ * to name, a Dissolve to confirm. Chrome that covers the canvas has to step
+ * aside for these phases, or the action it started cannot be finished (LIN-62).
+ */
+export function needsCanvas(state: DirectManipulationState): boolean {
+  switch (state.phase) {
+    case 'creating-relative':
+    case 'targeting-connect':
+    case 'choosing-kinship':
+    case 'confirming-dissolve':
+      return true;
+    case 'idle':
+    case 'selected':
+      return false;
+  }
+}
+
 export function directManipulationReducer(
   state: DirectManipulationState,
   action: DirectManipulationAction
