@@ -29,6 +29,8 @@ import { useTargetVisibility } from '../hooks/useTargetVisibility';
 
 const PANEL_LEFT = 24;
 const PANEL_PADDING = 12;
+/** Clears the chat button docked bottom-left when the panel sits at the bottom. */
+const PANEL_BOTTOM = 88;
 
 /** The same red the scene pulses the aura with, so the pill and the planet
  *  read as one question. */
@@ -94,6 +96,12 @@ export interface Manipulation3DPanelProps {
   selectedNode: FamilyNode | null;
   /** Action Handles appear only when the active user may edit this person. */
   canEdit: boolean;
+  /**
+   * Which screen edge the panel docks to. At the side it sits mid-height, which
+   * on a phone is the middle of the scene; there it docks to the bottom instead
+   * (LIN-62).
+   */
+  dock?: 'side' | 'bottom';
   existingNodes: FamilyNode[];
   /** Ids the 3D filter is currently drawing, so Person Matches it hides say so. */
   visibleIds?: ReadonlySet<string>;
@@ -134,8 +142,9 @@ const AnchorLeaderLine: React.FC<{
   nodeId: string;
   color: string;
   /** Where the line meets the panel — derived by the caller from the panel's
-   *  own width, so widening the panel for a card cannot detach it. */
-  panelRightEdge: number;
+   *  own width, so widening the panel for a card cannot detach it. Null when
+   *  the panel is docked at the bottom: the ring alone marks the planet. */
+  panelRightEdge: number | null;
 }> = ({ fgRef, nodes, nodeId, color, panelRightEdge }) => {
   const [screen, setScreen] = useState<{ x: number; y: number } | null>(null);
 
@@ -184,16 +193,18 @@ const AnchorLeaderLine: React.FC<{
       width="100%"
       height="100%"
     >
-      <line
-        x1={screen.x}
-        y1={screen.y}
-        x2={panelRightEdge}
-        y2="50%"
-        stroke={color}
-        strokeWidth={1.5}
-        strokeDasharray="5 4"
-        opacity={0.6}
-      />
+      {panelRightEdge !== null && (
+        <line
+          x1={screen.x}
+          y1={screen.y}
+          x2={panelRightEdge}
+          y2="50%"
+          stroke={color}
+          strokeWidth={1.5}
+          strokeDasharray="5 4"
+          opacity={0.6}
+        />
+      )}
       <circle
         cx={screen.x}
         cy={screen.y}
@@ -210,6 +221,7 @@ const AnchorLeaderLine: React.FC<{
 export const Manipulation3DPanel: React.FC<Manipulation3DPanelProps> = ({
   selectedNode,
   canEdit,
+  dock = 'side',
   existingNodes,
   visibleIds,
   graphData,
@@ -339,15 +351,22 @@ export const Manipulation3DPanel: React.FC<Manipulation3DPanelProps> = ({
         nodes={nodes}
         nodeId={connect.sourceNode?.id ?? selectedNode.id}
         color={accent}
-        panelRightEdge={PANEL_LEFT + panelWidth}
+        panelRightEdge={dock === 'side' ? PANEL_LEFT + panelWidth : null}
       />
 
       <div
         style={{
           position: 'absolute',
-          left: PANEL_LEFT,
-          top: '50%',
-          transform: 'translateY(-50%)',
+          ...(dock === 'side'
+            ? { left: PANEL_LEFT, top: '50%', transform: 'translateY(-50%)' }
+            : {
+                left: '50%',
+                bottom: PANEL_BOTTOM,
+                transform: 'translateX(-50%)',
+                maxWidth: 'calc(100vw - 24px)',
+                maxHeight: '50vh',
+                overflowY: 'auto',
+              }),
           zIndex: 1250,
           width: panelWidth,
           boxSizing: 'border-box',

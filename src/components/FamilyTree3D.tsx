@@ -2161,6 +2161,7 @@ export const FamilyTree3DContent: React.FC<FamilyTree3DProps> = ({
       <Manipulation3DPanel
         selectedNode={selectedNode}
         canEdit={isMobileDevice ? needsCanvas(interaction.state) : canEditSelected}
+        dock={isMobileDevice ? 'bottom' : 'side'}
         existingNodes={graphData?.nodes ?? []}
         visibleIds={visibleIds3D}
         graphData={graphData}
