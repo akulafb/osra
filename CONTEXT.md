@@ -54,6 +54,10 @@ _Avoid_: Validation, Conflict, Duplicate check
 The immediate family boundary around an anchor Person — self, parents, children, spouses, siblings, and blended family equivalents (stepparents, stepchildren, co-parents) — used for permission scopes and invite management.
 _Avoid_: Immediate family, Close relatives, Permission group
 
+**Kinship Path**:
+The chain of Kinship Links that joins two Persons, read in order from one to the other. Two Persons can have more than one: a blood path and a path through a marriage.
+_Avoid_: Relationship, Relation chain, Route, Connection
+
 
 ### Direct Interaction
 
