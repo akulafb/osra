@@ -5,6 +5,8 @@
  * have a fallback and a slow failure is worse than a fast one.
  */
 
+import type { FetchLike } from './http.ts';
+
 export const RETRYABLE_STATUSES: readonly number[] = [429, 529];
 
 export interface RetryOptions {
@@ -16,8 +18,7 @@ export interface RetryOptions {
   maxDelayMs?: number;
   /** Each attempt is abandoned after this long. */
   attemptTimeoutMs?: number;
-  retryOn?: readonly number[];
-  fetchImpl?: (input: string, init?: RequestInit) => Promise<Response>;
+  fetchImpl?: FetchLike;
   sleep?: (ms: number) => Promise<void>;
   /** 0..1; injected so tests are exact. */
   random?: () => number;
@@ -64,22 +65,26 @@ export async function fetchWithRetry(
   init: RequestInit,
   options: RetryOptions = {},
 ): Promise<Response> {
-  const o = { ...DEFAULTS, ...options };
-  const fetchImpl = o.fetchImpl ?? fetch;
-  const sleep = o.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
-  const retryOn = o.retryOn ?? RETRYABLE_STATUSES;
+  // Each option falls back on its own: spreading over the defaults would let an
+  // explicit `retries: undefined` remove the limit and retry for ever.
+  const retries = options.retries ?? DEFAULTS.retries;
+  const baseDelayMs = options.baseDelayMs ?? DEFAULTS.baseDelayMs;
+  const maxDelayMs = options.maxDelayMs ?? DEFAULTS.maxDelayMs;
+  const attemptTimeoutMs = options.attemptTimeoutMs ?? DEFAULTS.attemptTimeoutMs;
+  const fetchImpl = options.fetchImpl ?? fetch;
+  const sleep = options.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
 
   for (let attempt = 0; ; attempt++) {
-    const res = await fetchImpl(url, { ...init, signal: AbortSignal.timeout(o.attemptTimeoutMs) });
-    if (!retryOn.includes(res.status) || attempt >= o.retries) return res;
+    const res = await fetchImpl(url, { ...init, signal: AbortSignal.timeout(attemptTimeoutMs) });
+    if (!RETRYABLE_STATUSES.includes(res.status) || attempt >= retries) return res;
     // Release the connection before waiting.
     await res.body?.cancel().catch(() => undefined);
     await sleep(
       backoffDelayMs(attempt, {
-        baseDelayMs: o.baseDelayMs,
-        maxDelayMs: o.maxDelayMs,
+        baseDelayMs,
+        maxDelayMs,
         retryAfterHeader: res.headers.get('Retry-After'),
-        random: o.random,
+        random: options.random,
       }),
     );
   }

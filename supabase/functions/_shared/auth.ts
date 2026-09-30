@@ -9,7 +9,7 @@
  * check would not catch.
  */
 
-import { errorResponse } from './http.ts';
+import { errorResponse, type FetchLike } from './http.ts';
 
 export interface AuthEnv {
   /** `SUPABASE_URL`, set by the platform for every function. */
@@ -21,8 +21,6 @@ export interface AuthEnv {
 export type AuthOutcome =
   | { ok: true; userId: string }
   | { ok: false; reason: 'missing-token' | 'invalid-session' | 'auth-unavailable' };
-
-export type FetchLike = (input: string, init?: RequestInit) => Promise<Response>;
 
 const BEARER = /^Bearer\s+(\S+)$/i;
 
@@ -50,7 +48,8 @@ export async function requireSignedInUser(
   } catch {
     return { ok: false, reason: 'auth-unavailable' };
   }
-  if (res.status >= 500) return { ok: false, reason: 'auth-unavailable' };
+  // A rate-limited or failing Auth has not said the session is bad.
+  if (res.status >= 500 || res.status === 429) return { ok: false, reason: 'auth-unavailable' };
   if (!res.ok) return { ok: false, reason: 'invalid-session' };
 
   const user: unknown = await res.json().catch(() => null);

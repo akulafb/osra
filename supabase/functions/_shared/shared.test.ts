@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { bearerToken, requireSignedInUser } from './auth.ts';
-import { answerPreflightOrWrongMethod, CORS_HEADERS, errorResponse } from './http.ts';
+import { answerPreflightOrWrongMethod, CORS_HEADERS, errorResponse, readJsonBody } from './http.ts';
 import { backoffDelayMs, fetchWithRetry } from './retry.ts';
 
 const env = { supabaseUrl: 'https://proj.supabase.co', supabaseAnonKey: 'anon-key' };
@@ -27,6 +27,13 @@ describe('http', () => {
 
   it('lets a POST through', () => {
     expect(answerPreflightOrWrongMethod(requestWith())).toBeNull();
+  });
+
+  it('reads a JSON body, and gives undefined for one that is not JSON or is too large', async () => {
+    const body = (text: string) => new Request('https://x', { method: 'POST', body: text });
+    expect(await readJsonBody(body('{"a":1}'))).toEqual({ a: 1 });
+    expect(await readJsonBody(body('{nope'))).toBeUndefined();
+    expect(await readJsonBody(body('{"a":"' + 'x'.repeat(50) + '"}'), 20)).toBeUndefined();
   });
 
   it('puts CORS headers on refusals, so the browser can read them', async () => {
@@ -85,11 +92,13 @@ describe('requireSignedInUser', () => {
   });
 
   it('refuses, as unavailable, when Supabase Auth cannot be asked', async () => {
-    const down = vi.fn(async () => new Response('', { status: 503 }));
-    expect(await requireSignedInUser(requestWith('Bearer t'), env, down)).toEqual({
-      ok: false,
-      reason: 'auth-unavailable',
-    });
+    for (const status of [503, 429]) {
+      const down = vi.fn(async () => new Response('', { status }));
+      expect(await requireSignedInUser(requestWith('Bearer t'), env, down)).toEqual({
+        ok: false,
+        reason: 'auth-unavailable',
+      });
+    }
     const throws = vi.fn(async () => {
       throw new Error('network');
     });
@@ -158,6 +167,13 @@ describe('fetchWithRetry', () => {
     expect(res.status).toBe(status);
     expect(fetchImpl).toHaveBeenCalledTimes(1);
     expect(sleep).not.toHaveBeenCalled();
+  });
+
+  it('keeps its limit when an option is passed as undefined', async () => {
+    const fetchImpl = sequence(429, 429, 429, 429, 429, 429);
+    const res = await fetchWithRetry('https://x', {}, { ...opts(fetchImpl), retries: undefined });
+    expect(res.status).toBe(429);
+    expect(fetchImpl).toHaveBeenCalledTimes(4);
   });
 
   it('does not retry a network failure', async () => {

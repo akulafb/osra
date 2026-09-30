@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Spelling-match evaluation (LIN-67). Not part of `npm test`: it needs the
- * TypeSafe key and the network, and it costs a little (about 64 requests).
+ * TypeSafe key and the network, and it costs a little (63 requests).
  *
  *   node scripts/spelling-eval/run.mjs                 # straight to TypeSafe
  *   node scripts/spelling-eval/run.mjs --threshold 0.7
@@ -48,6 +48,7 @@ function readEnvFile(path, name) {
 }
 
 const threshold = Number(flag('threshold', '0.5'));
+if (!(threshold >= 0 && threshold <= 1)) throw new Error('--threshold must be a number from 0 to 1.');
 const xlsxPath = resolve(repoRoot, flag('xlsx', 'Family Tree Bulk Upload.xlsx'));
 const showScores = process.argv.includes('--scores');
 const functionUrl = process.env.SPELLING_MATCHES_URL;

@@ -111,7 +111,7 @@ export function validateRequest(body: unknown): Validation {
  * A candidate is quoted inside the question. A double quote, a backtick (Jev's
  * state-path marker) or a control character would end the quote or change the
  * question, so they are left out of the wording. The score is still reported
- * under the name as it was sent.
+ * under the full (trimmed) name.
  */
 function quotable(name: string): string {
   // eslint-disable-next-line no-control-regex

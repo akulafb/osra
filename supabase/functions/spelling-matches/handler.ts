@@ -6,12 +6,13 @@
  * TypeSafe is called only after both the session and the body are accepted.
  */
 
-import { authRefusal, requireSignedInUser, type FetchLike } from '../_shared/auth.ts';
+import { authRefusal, requireSignedInUser } from '../_shared/auth.ts';
 import {
   answerPreflightOrWrongMethod,
   errorResponse,
   jsonResponse,
   readJsonBody,
+  type FetchLike,
 } from '../_shared/http.ts';
 import type { RetryOptions } from '../_shared/retry.ts';
 import { TYPESAFE_MODEL, validateRequest, type SpellingMatchResponse } from './spellingMatches.ts';
@@ -58,7 +59,13 @@ export async function handleSpellingMatches(req: Request, deps: HandlerDeps): Pr
     return errorResponse(500, 'not_configured', 'The function is not configured.');
   }
 
-  const outcome = await scoreNames(request, apiKey, { ...deps.retry, fetchImpl: deps.fetchImpl });
+  // A lookup takes well under a second, so an attempt that has not answered in
+  // a few is abandoned: the caller has a fallback and is waiting on a keystroke.
+  const outcome = await scoreNames(request, apiKey, {
+    attemptTimeoutMs: 6000,
+    ...deps.retry,
+    fetchImpl: deps.fetchImpl,
+  });
   if (outcome.ok) {
     const body: SpellingMatchResponse = { model: outcome.model, scores: outcome.scores };
     return jsonResponse(body);

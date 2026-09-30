@@ -13,6 +13,9 @@ export const CORS_HEADERS: Record<string, string> = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
+/** `fetch`, narrowed to what the functions use, so tests can stand in for the network. */
+export type FetchLike = (input: string, init?: RequestInit) => Promise<Response>;
+
 /** The body of every refusal: a stable `code` for code, a `message` for people. */
 export interface ErrorBody {
   error: { code: string; message: string };
@@ -45,10 +48,19 @@ export function answerPreflightOrWrongMethod(req: Request): Response | null {
   return null;
 }
 
-/** Reads a JSON body without throwing; `undefined` means it was not JSON. */
-export async function readJsonBody(req: Request): Promise<unknown> {
+/** Far more than any request a function accepts; a larger body is not parsed. */
+export const MAX_BODY_BYTES = 512 * 1024;
+
+/**
+ * Reads a JSON body without throwing; `undefined` means it was not JSON, or was
+ * larger than `maxBytes`.
+ */
+export async function readJsonBody(req: Request, maxBytes = MAX_BODY_BYTES): Promise<unknown> {
+  if (Number(req.headers.get('Content-Length') ?? 0) > maxBytes) return undefined;
   try {
-    return await req.json();
+    const text = await req.text();
+    if (text.length > maxBytes) return undefined;
+    return JSON.parse(text);
   } catch {
     return undefined;
   }
