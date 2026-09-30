@@ -375,6 +375,13 @@ deno_version = 2
 # [edge_runtime.secrets]
 # secret_key = "env(SECRET_VALUE)"
 
+# Finds spelling matches for a typed given name (LIN-67).
+# The gateway's own JWT check is off because it would pass the anon key, which is
+# a valid JWT for nobody. The function checks the session itself, with Supabase
+# Auth, before it does anything else (supabase/functions/_shared/auth.ts).
+[functions.spelling-matches]
+verify_jwt = false
+
 [analytics]
 enabled = true
 port = 54327
