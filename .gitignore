@@ -44,3 +44,6 @@ scripts/generate-badran-additions.mjs
 .agents/skills/
 .claude/skills/
 .omp/skills/
+
+#Worktrees
+.claude/worktrees/
