@@ -37,6 +37,8 @@ export interface ChatTestCost {
   modelCalls: number;
   /** OpenRouter's `usage.cost` for those calls, in US dollars. */
   modelCost: number;
+  /** Model calls whose answer had no `usage.cost`; their cost is not in the total. */
+  uncostedModelCalls: number;
   total: number;
 }
 
@@ -45,8 +47,6 @@ export interface ChatTestAnswer {
   cost: ChatTestCost;
   /** What the function logged, such as a TypeSafe failure. */
   log: string[];
-  /** Model calls whose answer had no `usage.cost`; their cost is not in the total. */
-  uncosted: number;
 }
 
 export interface ChatTestRunnerOptions {
@@ -56,13 +56,8 @@ export interface ChatTestRunnerOptions {
   network?: FetchLike;
 }
 
-interface Meter {
-  jevInputTokens: number;
-  modelCalls: number;
-  modelCost: number;
-  uncosted: number;
-  log: string[];
-}
+/** What one question's calls used, added up as their answers come back. */
+type Usage = Omit<ChatTestCost, 'jevCost' | 'total'>;
 
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
@@ -110,23 +105,6 @@ function fakeSupabase() {
 
 export function createChatTestRunner({ openRouterApiKey, typeSafeApiKey, network = fetch }: ChatTestRunnerOptions) {
   const supabase = fakeSupabase();
-  let meter: Meter;
-
-  const fetchImpl: FetchLike = async (url, init) => {
-    if (url.startsWith(FAKE_SUPABASE_URL)) return supabase(url, init);
-    if (url !== TYPESAFE_URL && url !== OPENROUTER_URL) throw new Error(`chat test: unexpected request to ${url}`);
-    const res = await network(url, init);
-    const usage = usageOf(await res.clone().json().catch(() => null));
-    if (url === TYPESAFE_URL) {
-      if (typeof usage.input_tokens === 'number') meter.jevInputTokens += usage.input_tokens;
-    } else {
-      meter.modelCalls += 1;
-      if (typeof usage.cost === 'number') meter.modelCost += usage.cost;
-      else if (res.ok) meter.uncosted += 1;
-    }
-    return res;
-  };
-
   const env: Record<string, string> = {
     SUPABASE_URL: FAKE_SUPABASE_URL,
     SUPABASE_ANON_KEY: ANON_KEY,
@@ -135,20 +113,41 @@ export function createChatTestRunner({ openRouterApiKey, typeSafeApiKey, network
     TYPESAFE_API_KEY: typeSafeApiKey,
   };
 
-  /** What `supabase.functions.invoke('family-chat')` gives back, from the handler itself. */
-  async function invoke(body: unknown): Promise<{ data: unknown; error: unknown }> {
-    const req = new Request('http://localhost/functions/v1/family-chat', {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${USER_TOKEN}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
-    const res = await handleFamilyChat(req, { env: (name) => env[name], fetchImpl, log: (m) => meter.log.push(m) });
-    return res.ok ? { data: await res.json(), error: null } : { data: null, error: { context: res } };
+  /** `fetch` for the handler: Supabase answered here, the two services metered into `usage`. */
+  function meteredFetch(usage: Usage): FetchLike {
+    return async (url, init) => {
+      if (url.startsWith(FAKE_SUPABASE_URL)) return supabase(url, init);
+      if (url !== TYPESAFE_URL && url !== OPENROUTER_URL) throw new Error(`chat test: unexpected request to ${url}`);
+      const res = await network(url, init);
+      const reported = usageOf(await res.clone().json().catch(() => null));
+      if (url === TYPESAFE_URL) {
+        if (typeof reported.input_tokens === 'number') usage.jevInputTokens += reported.input_tokens;
+      } else {
+        usage.modelCalls += 1;
+        if (typeof reported.cost === 'number') usage.modelCost += reported.cost;
+        else if (res.ok) usage.uncostedModelCalls += 1;
+      }
+      return res;
+    };
   }
 
   return {
     async ask(question: string): Promise<ChatTestAnswer> {
-      meter = { jevInputTokens: 0, modelCalls: 0, modelCost: 0, uncosted: 0, log: [] };
+      const usage: Usage = { jevInputTokens: 0, modelCalls: 0, modelCost: 0, uncostedModelCalls: 0 };
+      const log: string[] = [];
+      const deps = { env: (name: string) => env[name], fetchImpl: meteredFetch(usage), log: (m: string) => log.push(m) };
+
+      /** What `supabase.functions.invoke('family-chat')` gives back, from the handler itself. */
+      async function invoke(body: unknown): Promise<{ data: unknown; error: unknown }> {
+        const req = new Request('http://localhost/functions/v1/family-chat', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${USER_TOKEN}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        const res = await handleFamilyChat(req, deps);
+        return res.ok ? { data: await res.json(), error: null } : { data: null, error: { context: res } };
+      }
+
       const outcome = await askFamilyChat({
         question,
         history: [],
@@ -157,19 +156,8 @@ export function createChatTestRunner({ openRouterApiKey, typeSafeApiKey, network
         send: async (request) => readChatReply(await invoke(request)),
         messageId: crypto.randomUUID(),
       });
-      const jevCost = (meter.jevInputTokens * JEV_PRICE_PER_MILLION_INPUT_TOKENS) / 1e6;
-      return {
-        outcome,
-        cost: {
-          jevInputTokens: meter.jevInputTokens,
-          jevCost,
-          modelCalls: meter.modelCalls,
-          modelCost: meter.modelCost,
-          total: jevCost + meter.modelCost,
-        },
-        log: meter.log,
-        uncosted: meter.uncosted,
-      };
+      const jevCost = (usage.jevInputTokens * JEV_PRICE_PER_MILLION_INPUT_TOKENS) / 1e6;
+      return { outcome, cost: { ...usage, jevCost, total: jevCost + usage.modelCost }, log };
     },
   };
 }

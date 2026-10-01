@@ -37,7 +37,7 @@ describe('the chat test questions', () => {
     const expected: Record<string, string[]> = {
       'my-parents': relatives(me, 'parents'),
       'my-brother': relatives(me, 'siblings', { gender: 'male' }),
-      'my-paternal-cousins': relatives(me, 'cousins', { side: 'father' }),
+      'my-nieces-nephews': relatives(me, 'niecesAndNephews'),
       'my-paternal-grandparents': relatives(me, 'grandparents', { side: 'father' }),
       'layla-children': relatives(P.layla, 'children'),
       'idris-granddaughters': relatives(P.idris, 'grandchildren', { gender: 'female' }),

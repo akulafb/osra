@@ -14,7 +14,11 @@ export interface ChatTestCheck {
   problems: string[];
 }
 
-const DISPLAY_NAMES = [...new Set(FIXTURE_PERSONS.map((person) => formatNodeDisplayName(person)))];
+/** Each fixture Person's display name with their given name. */
+const PERSON_NAMES = FIXTURE_PERSONS.map((person) => ({
+  displayName: formatNodeDisplayName(person),
+  givenName: person.firstName ?? '',
+}));
 
 const NUMBER_WORDS = [
   'zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten',
@@ -24,13 +28,13 @@ const NUMBER_WORDS = [
 const NOT_RELATED =
   /\b(not|no|isn't|aren't|never)\b[^.\n]{0,60}\b(related|relation|relationship|connection|connected|kinship path|path|link)\b/i;
 
-function escape(text: string): string {
+function escapeRegExp(text: string): string {
   return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 /** Whether `text` holds `name` as whole words, ignoring case and Markdown. */
 function mentions(text: string, name: string): boolean {
-  return new RegExp(`(?<![\\p{L}\\p{M}])${escape(name)}(?![\\p{L}\\p{M}])`, 'iu').test(text);
+  return new RegExp(`(?<![\\p{L}\\p{M}])${escapeRegExp(name)}(?![\\p{L}\\p{M}])`, 'iu').test(text);
 }
 
 function holdsNumber(text: string, n: number): boolean {
@@ -47,23 +51,31 @@ export function checkChatTestReply({ question, expect }: ChatTestQuestion, reply
     if (!mentions(text, name)) problems.push(`missing ${name}`);
   }
 
+  // A Person counts as named by display name, or by given name alone when no
+  // Person the reply may name has that given name ("Walid", but not "Yusuf"
+  // when Yusuf Haddad is in the answer).
   const allowed = new Set([CHAT_TEST_SPEAKER.displayName, ...(expect.names ?? []), ...(expect.allow ?? [])]);
-  for (const name of DISPLAY_NAMES) {
-    if (!allowed.has(name) && !mentions(question, name) && mentions(text, name)) problems.push(`wrong name ${name}`);
+  const mayName = PERSON_NAMES.filter(({ displayName }) => allowed.has(displayName) || mentions(question, displayName));
+  const allowedGivenNames = new Set(mayName.map(({ givenName }) => givenName));
+  const wrong = new Set<string>();
+  for (const { displayName, givenName } of PERSON_NAMES) {
+    if (mayName.some((person) => person.displayName === displayName)) continue;
+    if (mentions(text, displayName) || (!allowedGivenNames.has(givenName) && mentions(text, givenName))) wrong.add(displayName);
   }
+  for (const name of wrong) problems.push(`wrong name ${name}`);
 
   if (expect.number !== undefined && !holdsNumber(text, expect.number)) {
     problems.push(`missing the number ${expect.number}`);
   }
 
-  let after = -1;
-  let previous: RegExp | null = null;
+  let lastFoundAt = -1;
+  let lastRelation: RegExp | null = null;
   for (const relation of expect.relations ?? []) {
     const at = text.search(relation);
     if (at === -1) problems.push(`missing relation ${relation}`);
-    else if (previous && at < after) problems.push(`relation ${relation} comes before ${previous}`);
-    else after = at;
-    previous = relation;
+    else if (lastRelation && at < lastFoundAt) problems.push(`relation ${relation} comes before ${lastRelation}`);
+    else lastFoundAt = at;
+    lastRelation = relation;
   }
 
   for (const word of expect.forbid ?? []) {

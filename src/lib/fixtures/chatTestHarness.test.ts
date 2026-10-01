@@ -69,7 +69,14 @@ describe('createChatTestRunner', () => {
     expect(answer.outcome).toMatchObject({ ok: true, answeredBy: 'code' });
     expect(answer.outcome.ok && answer.outcome.answer).toContain('**Nabil Khoury**');
     expect(answer.outcome.ok && answer.outcome.answer).toContain('**Dina Aziz**');
-    expect(answer.cost).toEqual({ jevInputTokens: 1000, jevCost: 0.000042, modelCalls: 0, modelCost: 0, total: 0.000042 });
+    expect(answer.cost).toEqual({
+      jevInputTokens: 1000,
+      jevCost: 0.000042,
+      modelCalls: 0,
+      modelCost: 0,
+      uncostedModelCalls: 0,
+      total: 0.000042,
+    });
     // Only TypeSafe went over the network, with the TypeSafe key.
     expect(requests.map((r) => [r.url, r.authorization])).toEqual([[TYPESAFE_URL, 'Bearer ts-test-key']]);
   });
@@ -106,6 +113,13 @@ describe('createChatTestRunner', () => {
     await runner.ask('Who are my parents?');
     const second = await runner.ask('Who are my parents?');
     expect(second.cost.jevInputTokens).toBe(500);
+  });
+
+  it('keeps the counts of questions asked at the same time apart', async () => {
+    const { network } = scripted({ [TYPESAFE_URL]: [jevParents(1000), jevParents(500)] });
+    const runner = createChatTestRunner({ ...KEYS, network });
+    const answers = await Promise.all([runner.ask('Who are my parents?'), runner.ask('Who are my parents?')]);
+    expect(answers.map((a) => a.cost.jevInputTokens).sort()).toEqual([1000, 500]);
   });
 
   it('notes a TypeSafe failure, and the message still goes to the model', async () => {

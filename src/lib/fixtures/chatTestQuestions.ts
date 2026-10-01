@@ -68,10 +68,11 @@ export const CHAT_TEST_QUESTIONS: readonly ChatTestQuestion[] = [
     expect: { names: ['Hani Khoury'] },
   },
   {
-    id: 'my-paternal-cousins',
+    id: 'my-nieces-nephews',
     group: 'relatives',
-    question: "Who are my cousins on my dad's side?",
-    expect: { names: ['Yusuf Haddad', 'Rima Haddad'] },
+    question: 'Who are my nieces and nephews?',
+    // Hani's son; Hani is the only sibling.
+    expect: { names: ['Sami Khoury'], allow: ['Hani Khoury'] },
   },
   {
     id: 'my-paternal-grandparents',

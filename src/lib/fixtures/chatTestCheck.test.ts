@@ -26,6 +26,14 @@ describe('checkChatTestReply', () => {
     expect(result.problems).toEqual(['wrong name Tala Mansour']);
   });
 
+  it('fails a reply that names a wrong Person by given name only, when no allowed Person has that name', () => {
+    const q = question({ names: ['Sara Khoury'] }, 'Who is my amto?');
+    expect(checkChatTestReply(q, 'Your aunts are **Sara** and **Walid**.').problems).toEqual(['missing Sara Khoury', 'wrong name Walid Aziz']);
+    // "Yusuf" may be Rima's brother Yusuf Haddad, who is in the answer.
+    const cousins = question({ names: ['Rima Haddad', 'Yusuf Haddad'] });
+    expect(checkChatTestReply(cousins, '**Rima Haddad** and **Yusuf Haddad** (Yusuf is named for his grandfather).').correct).toBe(true);
+  });
+
   it('allows the speaker, the Persons named in the question and the listed extras', () => {
     const q = question({ names: ['Jad Saleh', 'Nour Qasim'], allow: ['Karim Qasim'] }, "Who are Layla Haddad's children?");
     const reply = "**Layla Haddad**'s children: **Jad Saleh** and **Nour Qasim** (with **Karim Qasim**). Asked by **Maya Khoury**.";
@@ -39,14 +47,17 @@ describe('checkChatTestReply', () => {
   });
 
   it('checks a number as digits or as a word', () => {
-    const q = question({ number: 4 });
+    const q = question({ number: 4 }, 'How many grandchildren does Adel Mansour have?');
     expect(checkChatTestReply(q, 'Adel has **4** grandchildren.').correct).toBe(true);
     expect(checkChatTestReply(q, 'Adel has four grandchildren.').correct).toBe(true);
     expect(checkChatTestReply(q, 'Adel has 14 grandchildren.').problems).toEqual(['missing the number 4']);
   });
 
   it('checks relation words in the order given, and words that must not appear', () => {
-    const q = question({ relations: [/first cousin/i, /married|husband|wife|spouse/i], forbid: [/second cousin/i] });
+    const q = question(
+      { relations: [/first cousin/i, /married|husband|wife|spouse/i], forbid: [/second cousin/i] },
+      'How are Omar Haddad and Sara Khoury related?',
+    );
     expect(checkChatTestReply(q, 'Sara is his first cousin. Also related by marriage: his wife.').correct).toBe(true);
     expect(checkChatTestReply(q, 'Sara is his wife. She is also his first cousin.').problems).toEqual([
       'relation /married|husband|wife|spouse/i comes before /first cousin/i',
