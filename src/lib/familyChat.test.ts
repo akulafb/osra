@@ -199,6 +199,21 @@ describe('askFamilyChat: no Person id in a reply', () => {
     expect(outcome.ok && fromEnd(outcome.turns, 1)).toEqual({ role: 'assistant', content: expected });
   });
 
+  it('takes out a UUID even when it is not a Person in the Working Record', async () => {
+    const model = scriptedModel(textReply('**Karim Qasim** (3f2b8c1e-9a4d-4e6b-8c2a-1d5e7f9a0b3c) is her father.'));
+    expect(await ask("Who is Nour's father?", model.send)).toMatchObject({
+      ok: true,
+      answer: '**Karim Qasim** is her father.',
+    });
+  });
+
+  it('keeps an ordinary word that happens to be a short Person id, unless it is in brackets', async () => {
+    const tree = { nodes: [...KINSHIP_FIXTURE_TREE.nodes, { id: 'Omar', firstName: 'Odd', familyCluster: 'Id' }], links: [] };
+    const model = scriptedModel(textReply('Omar is here (Omar).'));
+    const outcome = await askFamilyChat({ question: 'Who?', history: [], record: tree, send: model.send, messageId: 'message-0001' });
+    expect(outcome).toMatchObject({ ok: true, answer: 'Omar is here.' });
+  });
+
   it('calls a reply that was nothing but an id a failure', async () => {
     const model = scriptedModel(textReply('(fx-omar-haddad)'));
     expect(await ask('Who am I?', model.send)).toMatchObject({ ok: false, cause: 'failed' });
@@ -261,5 +276,24 @@ describe('askFamilyChat: earlier questions', () => {
     expect(new TextEncoder().encode(JSON.stringify(request)).length).toBeLessThan(MAX_CHAT_BODY_BYTES);
     expect(request.messages[0]).toMatchObject({ role: 'user' });
     expect(fromEnd(request.messages, 2)).toEqual({ role: 'assistant', content: 'Answer 14' });
+  });
+});
+
+describe('askFamilyChat: a question too large to send', () => {
+  it('fails without another call when its own tool results pass the size cap', async () => {
+    // Each descendants list on a 900-Person line is close to the 20,000-character cap.
+    const nodes = Array.from({ length: 900 }, (_, i) => ({
+      id: `person-0000-0000-0000-${String(i).padStart(12, '0')}`,
+      firstName: `Person${i}`,
+      familyCluster: 'Longfamilyname',
+    }));
+    const links = nodes.slice(1).map((n, i) => ({ source: nodes[i].id, target: n.id, type: 'parent' as const }));
+    const ask14 = Array.from({ length: 14 }, () => ['getRelatives', { personId: nodes[0].id, kind: 'descendants' }] as [string, Record<string, unknown>]);
+    const model = scriptedModel(toolsReply(...ask14), textReply('never sent'));
+
+    const outcome = await askFamilyChat({ question: 'Everyone?', history: [], record: { nodes, links }, send: model.send, messageId: 'message-0001' });
+
+    expect(model.send).toHaveBeenCalledTimes(1);
+    expect(outcome).toEqual({ ok: false, cause: 'failed', line: CHAT_LINES.failed });
   });
 });

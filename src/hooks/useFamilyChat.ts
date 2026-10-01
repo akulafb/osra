@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect, useRef } from 'react';
 import type { ChatTurn } from '../../supabase/functions/family-chat/request.ts';
-import { askFamilyChat } from '../lib/familyChat';
+import { askFamilyChat, CHAT_LINES } from '../lib/familyChat';
 import { invokeFamilyChat } from '../lib/familyChatClient';
 import { useWorkingRecord } from '../contexts/WorkingRecordContext';
 
@@ -60,11 +60,20 @@ export function useFamilyChat() {
       setNotice(null);
       setMessages((prev) => [...prev, { role: 'user', content: question }]);
 
+      // Before the tree has loaded the tools would answer from an empty tree.
+      const record = workingRef.current;
+      if (!record) {
+        setNotice({ line: CHAT_LINES.failed, isLimit: false });
+        busyRef.current = false;
+        setIsLoading(false);
+        return;
+      }
+
       try {
         const outcome = await askFamilyChat({
           question,
           history: historyRef.current,
-          record: workingRef.current ?? { nodes: [], links: [] },
+          record,
           send: invokeFamilyChat,
           messageId: crypto.randomUUID(),
         });

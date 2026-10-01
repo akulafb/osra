@@ -76,19 +76,26 @@ function refusal(cause: RefusalCause, usage: ChatUsage | undefined): ChatOutcome
   return failure('failed');
 }
 
+/** A UUID, the shape of every Person id in the Tree Record. */
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** Shorter ids can be ordinary words ("Omar"); a bare one is left alone. */
+const MIN_BARE_ID_CHARS = 8;
+
 /**
  * Takes every Person id out of a reply. Ids are in the tool results so the
  * model can chain calls, and the function's prompt forbids showing them, but a
  * live test still wrote "Karim Hajjaj (p8)". An id in brackets goes with its
  * brackets (and a "personId:" label); a bare one goes with the space before it.
+ * Any UUID goes too, whether or not it is a Person in the Working Record.
  */
 export function hideIds(text: string, personIds: ReadonlySet<string>): string {
   return text
     .replace(/\s*[([]\s*(?:person\s*id|id)?\s*[:=]?\s*([A-Za-z0-9_-]+)\s*[)\]]/gi, (match, id: string) =>
-      personIds.has(id) ? '' : match,
+      personIds.has(id) || UUID.test(id) ? '' : match,
     )
     .replace(/(\s*)(?:(?:person\s*id|id)\s*[:=]?\s*)?([A-Za-z0-9_-]+)/gi, (match, _space: string, id: string) =>
-      personIds.has(id) ? '' : match,
+      (personIds.has(id) && id.length >= MIN_BARE_ID_CHARS) || UUID.test(id) ? '' : match,
     );
 }
 
@@ -100,17 +107,21 @@ function bodyBytes(body: ChatRequestBody): number {
 /** Room left under the function's body limit for the JSON around the turns. */
 const BODY_BUDGET_BYTES = MAX_CHAT_BODY_BYTES - 1024;
 
+/** Whether a request is within the function's turn and size caps. */
+function fits(messageId: string, messages: ChatTurn[]): boolean {
+  return messages.length <= MAX_TURNS && bodyBytes({ messageId, messages }) <= BODY_BUDGET_BYTES;
+}
+
 /**
  * The turns to send: the current question's turns, after as many earlier
  * ones as fit the function's turn and size caps. Earlier questions are
  * dropped oldest first and whole, so a tool result never loses its call.
+ * Null when the current question's turns do not fit on their own.
  */
-function fitTurns(history: readonly ChatTurn[], current: readonly ChatTurn[], messageId: string): ChatTurn[] {
+function fitTurns(history: readonly ChatTurn[], current: readonly ChatTurn[], messageId: string): ChatTurn[] | null {
   let kept = history;
-  const tooBig = () =>
-    kept.length + current.length > MAX_TURNS ||
-    bodyBytes({ messageId, messages: [...kept, ...current] }) > BODY_BUDGET_BYTES;
-  while (kept.length > 0 && tooBig()) {
+  while (!fits(messageId, [...kept, ...current])) {
+    if (kept.length === 0) return null;
     const nextQuestion = kept.findIndex((turn, i) => i > 0 && turn.role === 'user');
     kept = nextQuestion === -1 ? [] : kept.slice(nextQuestion);
   }
@@ -122,6 +133,8 @@ export async function askFamilyChat({ question, history, record, send, messageId
   // The function counts the same cap; stopping here saves a call it would refuse.
   for (let call = 0; call < MAX_MODEL_CALLS_PER_MESSAGE; call++) {
     const turns = fitTurns(history, current, messageId);
+    // The function would refuse it; one question asked for more than a request holds.
+    if (!turns) return failure('failed');
     let result: ChatSendResult;
     try {
       result = await send({ messageId, messages: turns });
@@ -136,6 +149,8 @@ export async function askFamilyChat({ question, history, record, send, messageId
       if (answer === '') return failure('failed');
       return { ok: true, answer, turns: [...turns, { role: 'assistant', content: answer }] };
     }
+    // No call is left to send the results on, so the tools are not run.
+    if (call === MAX_MODEL_CALLS_PER_MESSAGE - 1) break;
     current.push(message);
     for (const toolCall of message.toolCalls ?? []) {
       current.push({ role: 'tool', toolCallId: toolCall.id, content: runChatTool(toolCall, record) });

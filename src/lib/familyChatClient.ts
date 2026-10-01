@@ -1,4 +1,5 @@
 import type { ChatResponse, ChatUsage, RefusalCause } from '../../supabase/functions/family-chat/handler.ts';
+import { isObject } from '../../supabase/functions/family-chat/request.ts';
 import type { ChatSendResult, SendChat } from './familyChat';
 
 /**
@@ -21,11 +22,10 @@ export const invokeFamilyChat: SendChat = async (request) => {
   }
 };
 
-const CAUSES: readonly RefusalCause[] = ['daily_limit', 'credit_gone', 'not_signed_in', 'failed'];
-
-function isObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
+const CAUSES = ['daily_limit', 'credit_gone', 'not_signed_in', 'failed'] as const satisfies readonly RefusalCause[];
+// Fails to compile when the function gains a cause this list does not know.
+const everyCauseKnown: Exclude<RefusalCause, (typeof CAUSES)[number]> extends never ? true : never = true;
+void everyCauseKnown;
 
 /**
  * Turns what `supabase.functions.invoke` gave back into a result. A refusal

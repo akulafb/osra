@@ -15,6 +15,8 @@ import type { ToolCall } from '../../supabase/functions/family-chat/request.ts';
 import { MAX_TOOL_RESULT_CHARS } from '../../supabase/functions/family-chat/request.ts';
 import {
   CHAT_TOOL_NAMES,
+  KINSHIP_SIDES,
+  RECORDED_GENDERS,
   RELATIVE_KINDS,
   type ChatToolArguments,
   type ChatToolName,
@@ -34,9 +36,6 @@ export interface ChatRecord {
   nodes: readonly FamilyNode[];
   links: readonly FamilyLink[];
 }
-
-const SIDES = ['mother', 'father', 'both'] as const;
-const GENDERS = ['female', 'male'] as const;
 
 class BadArguments extends Error {}
 
@@ -162,8 +161,8 @@ function run(call: ToolCall, record: ChatRecord): string {
     case 'getRelatives': {
       const subject = person(args.personId, 'personId');
       const kind = oneOf(args.kind, RELATIVE_KINDS, 'kind');
-      const side = optionalOneOf(args.side, SIDES, 'side');
-      const gender = optionalOneOf(args.gender, GENDERS, 'gender');
+      const side = optionalOneOf(args.side, KINSHIP_SIDES, 'side');
+      const gender = optionalOneOf(args.gender, RECORDED_GENDERS, 'gender');
       const relatives = getRelatives(subject.personId, kind, record.links, { side, gender }).map(
         (personId) => ({ personId, displayName: displayNameOf(personId) }),
       );
