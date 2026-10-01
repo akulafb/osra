@@ -29,7 +29,7 @@ export function eachWord(label: string, change: (word: string) => string): strin
 }
 
 /** The cousin term for a degree (1 is first) and times removed. */
-export function cousinLabel(degree: number, removed: number): string {
+function cousinLabel(degree: number, removed: number): string {
   const ordinal = ORDINAL_WORDS[degree - 1] ?? ordinalNumber(degree);
   const times = removed === 0 ? '' : ` ${TIMES_WORDS[removed - 1] ?? `${removed} times`} removed`;
   return `${ordinal} cousin${times}`;
@@ -72,7 +72,7 @@ const CLOSED_STEP_WORDS = /\bstep-(mother|father|son|daughter|brother|sister)\b/
 export function genderedLabel(label: string, gender: RecordedGender | null): string {
   if (!gender) return label;
   return label
-    .replace(/(\S*?)(aunt|niece)(\S*) or \1(uncle|nephew)\3/g, (_, before: string, female: string, after: string, male: string) =>
+    .replace(/((?:\d+(?:st|nd|rd|th) )?\S*?)(aunt|niece)(\S*) or \1(uncle|nephew)\3/g, (_, before: string, female: string, after: string, male: string) =>
       `${before}${gender === 'female' ? female : male}${after}`,
     )
     .replace(/(?<!\p{L})(grandparent|parent|grandchild|child|sibling|spouse)(?!\p{L})/gu, (word: string) => GENDERED_WORDS[word][gender])

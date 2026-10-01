@@ -768,6 +768,9 @@ describe('Kinship Terms for any Kinship Path', () => {
     expect(terms('me', 'mum', tree)).toEqual(['mother-in-law']);
     expect(terms('me', 'brother', tree)).toEqual(['brother-in-law']);
     expect(terms('me', 'granny', tree)).toEqual(['grandmother-in-law']);
+    // The spouse's sibling's spouse.
+    const withSpouse = [...tree, married('brother', 'hisWife'), gendered('hisWife', 'female')];
+    expect(terms('me', 'hisWife', withSpouse)).toEqual(['sister-in-law']);
   });
 
   it('in-law at the far end: son-in-law, sister-in-law, aunt by marriage', () => {

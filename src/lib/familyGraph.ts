@@ -897,21 +897,21 @@ function stepTerm(
   marriage: KinshipPathStep,
   after: readonly KinshipPathStep[]
 ): { up: number; down: number; relation: KinshipRelation } | null {
-  const ahead = bloodShape(before);
-  const behind = bloodShape(after);
-  if (!ahead || !behind) return null;
+  const beforeShape = bloodShape(before);
+  const afterShape = bloodShape(after);
+  if (!beforeShape || !afterShape) return null;
   let up: number;
   let down: number;
-  if (after.length > 0 && behind.up === 0 && !childIds(index, marriage.fromId).includes(after[0].toId)) {
-    up = ahead.up;
-    down = ahead.down + behind.down;
+  if (after.length > 0 && afterShape.up === 0 && !childIds(index, marriage.fromId).includes(after[0].toId)) {
+    up = beforeShape.up;
+    down = beforeShape.down + afterShape.down;
   } else if (
     before.length > 0 &&
-    ahead.down === 0 &&
+    beforeShape.down === 0 &&
     !parentIds(index, before[before.length - 1].fromId).includes(marriage.toId)
   ) {
-    up = ahead.up + behind.up;
-    down = behind.down;
+    up = beforeShape.up + afterShape.up;
+    down = afterShape.down;
   } else {
     return null;
   }
@@ -973,6 +973,10 @@ function oneTerm(index: KinshipIndex, steps: readonly KinshipPathStep[]): Kinshi
   }
   if (steps.length === 1) {
     return first.kind === 'spouse' ? { name: 'spouse', label: 'spouse' } : { name: 'former spouse', label: 'former spouse' };
+  }
+  // A spouse's sibling's spouse is said to be a sibling-in-law too.
+  if (steps.map(step => step.kind).join() === 'spouse,parent,child,spouse') {
+    return { name: 'in-law', label: 'sibling-in-law' };
   }
   // Past a divorce, or across two marriages, no one word fits.
   if (steps[across].kind === 'formerSpouse' || steps.slice(across + 1).some(isAcross)) return null;

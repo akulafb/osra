@@ -363,7 +363,7 @@ class Reply {
   /** The Arabic kinship words the question used: the reply says them back where they fit. */
   private readonly arabic: ArabicWord[];
 
-  constructor(record: ChatRecord, speakerId: string | null, arabic: ArabicWord[] = []) {
+  constructor(record: ChatRecord, speakerId: string | null, arabic: ArabicWord[]) {
     this.record = record;
     this.speakerId = speakerId;
     this.arabic = arabic;

@@ -49,6 +49,8 @@ describe('genderedLabel: the gendered word, or the neutral one when gender is no
     expect(genderedLabel('great-aunt or great-uncle', 'male')).toBe('great-uncle');
     expect(genderedLabel('grandniece or grandnephew', 'male')).toBe('grandnephew');
     expect(genderedLabel('half-sibling', 'female')).toBe('half-sister');
+    expect(genderedLabel(bloodLabel(5, 1), 'female')).toBe('3rd great-aunt');
+    expect(genderedLabel(bloodLabel(1, 6), 'male')).toBe('3rd great-grandnephew');
     expect(genderedLabel('third cousin twice removed', 'female')).toBe('third cousin twice removed');
   });
 
