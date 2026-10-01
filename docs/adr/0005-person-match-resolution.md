@@ -76,3 +76,45 @@ creation path — the Ghost Node — did not guard at all. Two further problems:
   out to be unreachable rather than merely unread — `link_existing_relative_secure` raised
   `column reference "target_node_id" is ambiguous` before it could ever be returned. See
   [ADR-0010](0010-write-seam-return-contract.md).)*
+
+## Addendum: Spelling Matches (LIN-68)
+
+A substring compare cannot see that "Mohamed" and "Mohammed" are one name, so the
+same Person could be added twice under two spellings. The `spelling-matches` Edge
+Function (LIN-67) scores each distinct given name in the Tree Record against the
+typed name with TypeSafe Jev; a score of **0.5 or more** is a **Spelling Match**.
+
+5. **A Spelling Match is part of the Person Match answer, and only advice.** Each
+   `PersonMatch` carries `isSpellingVariant`, and `matchExistingPersons` alone
+   applies the threshold (`SPELLING_MATCH_THRESHOLD`). A Spelling Match alone gives
+   `candidates`, never `must-confirm`, and does not disable the Ghost Node's ↵.
+   At the threshold used, the prototype had 17 wrong extras in 63 lookups; a block
+   that fires that often on the wrong Person is the click-through obstacle
+   decision 2 exists to avoid. An exact given-name match still gives `must-confirm`
+   whatever the scores say, and is never also labelled a Spelling Match.
+
+6. **Order: exact, then Spelling Matches, then other substring matches**, each
+   alphabetical. The cap of 4, the hidden-match count and the `isVisible` /
+   `isAlreadyConnected` labels apply to Spelling Matches unchanged, and the lookup
+   uses the whole Tree Record (decision 3): one request per query, each distinct
+   given name sent once, the score mapped back to every Person with that name.
+
+7. **The network never holds up typing, and never breaks it.** The substring match
+   is computed synchronously; Spelling Matches join the list when the function
+   answers. The timing rules live in one place (`src/lib/spellingMatchLookup.ts`,
+   used through `src/hooks/usePersonMatch.ts`): a 300 ms debounce, no lookup below
+   the minimum query length, a 5 s timeout, and a reply for an old query is never
+   reported. Scores also carry the query they answer, and `matchExistingPersons`
+   ignores scores for any other query, so a stale reply cannot show even if a
+   caller holds on to it. If the function is slow, failing, signed out or offline,
+   the answer is exactly the substring match and no error is shown — a missing
+   suggestion is not something the user can act on.
+
+### Consequences
+
+- Every Person Match caller that matches while typing should use `usePersonMatch`,
+  not `matchExistingPersons` directly, or it silently loses Spelling Matches. The
+  Ghost Node (2D and 3D) does; the Add Relative and Edit Node modals follow in LIN-69.
+- Each pause in typing costs one function call (and one TypeSafe request) for a
+  signed-in editor. The list may reshuffle when Spelling Matches arrive; that is
+  accepted, and the timeout bounds how late it can happen.

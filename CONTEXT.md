@@ -43,8 +43,12 @@ The direction an Action Handle points — Parent, Child, Spouse or Sibling — e
 _Avoid_: Relation type, Link type, Relationship
 
 **Person Match**:
-An existing Person who might be the one currently being described, together with why we think so: whether the given name matches exactly, whether they are currently drawn, and whether they are already linked to the anchor.
+An existing Person who might be the one currently being described, together with why we think so: whether the given name matches exactly, whether it is a Spelling Match, whether they are currently drawn, and whether they are already linked to the anchor.
 _Avoid_: Duplicate, Suggestion, Autocomplete result
+
+**Spelling Match**:
+A Person Match whose given name is the typed name with a different spelling or transliteration ("Mohamed" and "Mohammed"), as scored by the `spelling-matches` function. It is advice only: it is offered and labelled "different spelling", but it never requires the user to resolve before writing.
+_Avoid_: Fuzzy match, Similar name, Typo match, Variant (alone)
 
 **Match Resolution**:
 What a Person Match obliges the caller to do: nothing, offer the matches, or require the user to resolve before writing.
