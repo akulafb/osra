@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import {
   createTreeRecord,
+  parentRoleForGender,
   relativeToKinshipLink,
   relativeToKinshipLinks,
   TreeRecordError,
@@ -268,6 +269,60 @@ describe('treeRecord module', () => {
       });
     });
 
+    it("sends the new Person's gender and reads it back", async () => {
+      const mockFetch = vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            success: true,
+            nodes: [{ ...NODE_ROW, gender: 'female' }],
+            links: [linkRow('link-1', 'node-1', 'child-node', 'parent', 'mother')],
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        )
+      );
+      const record = createTreeRecord(
+        { userId: 'user-1', isAdmin: false, sessionToken: 'user-token' },
+        { ...TEST_CONFIG, fetch: mockFetch }
+      );
+
+      const rows = await record.addPerson({
+        id: 'node-1',
+        firstName: 'Farah',
+        gender: 'female',
+        link: { targetId: 'child-node', relation: 'parent' },
+      });
+
+      expect(JSON.parse(mockFetch.mock.calls[0][1].body)).toEqual({
+        new_first_name: 'Farah',
+        rel_type: 'parent',
+        target_node_id: 'child-node',
+        creator_id: 'user-1',
+        p_gender: 'female',
+        p_new_node_id: 'node-1',
+      });
+      expect(rows.persons).toEqual([{ ...PERSON, gender: 'female' }]);
+      // The server, not the client, gives the parent link its role from the gender.
+      expect(rows.links?.[0].parentRole).toBe('mother');
+    });
+
+    it('sends the gender on a standalone Person', async () => {
+      const mockFetch = vi.fn().mockResolvedValue(
+        new Response(JSON.stringify([{ ...NODE_ROW, gender: 'male' }]), {
+          status: 201,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      );
+      const record = createTreeRecord(
+        { userId: 'admin-1', isAdmin: true, sessionToken: 'admin-token' },
+        { ...TEST_CONFIG, fetch: mockFetch }
+      );
+
+      const rows = await record.addPerson({ firstName: 'Farah', gender: 'male' });
+
+      expect(JSON.parse(mockFetch.mock.calls[0][1].body)).toMatchObject({ gender: 'male' });
+      expect(rows.persons).toEqual([{ ...PERSON, gender: 'male' }]);
+    });
+
     /**
      * A sibling addition writes one Person and one Kinship Link per parent the
      * anchor has. The client cannot know how many, or to whom.
@@ -504,6 +559,104 @@ describe('treeRecord module', () => {
     });
 
     /**
+     * A gender change can give the Person's parent links a role (the server
+     * fills an empty `parent_role` from the gender), so those links are read
+     * back too and confirmed with the Person.
+     */
+    it('sends the gender, then reads back the parent links it may have given a role', async () => {
+      const mockFetch = vi
+        .fn()
+        .mockResolvedValueOnce(
+          new Response(JSON.stringify([{ ...NODE_ROW, gender: 'female' }]), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          })
+        )
+        .mockResolvedValueOnce(
+          new Response(JSON.stringify([linkRow('link-1', 'node-1', 'child-1', 'parent', 'mother')]), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          })
+        );
+      const record = createTreeRecord(
+        { userId: 'user-1', isAdmin: false, sessionToken: 'user-token' },
+        { ...TEST_CONFIG, fetch: mockFetch }
+      );
+
+      const rows = await record.editPerson({ id: 'node-1', gender: 'female' });
+
+      expect(JSON.parse(mockFetch.mock.calls[0][1].body)).toEqual({ gender: 'female' });
+      const [url, init] = mockFetch.mock.calls[1];
+      expect(url).toBe(
+        'https://example.supabase.co/rest/v1/links?source_node_id=eq.node-1&type=eq.parent'
+      );
+      expect(init.method).toBe('GET');
+      expect(rows).toEqual({
+        persons: [{ ...PERSON, gender: 'female' }],
+        links: [{ id: 'link-1', source: 'node-1', target: 'child-1', type: 'parent', parentRole: 'mother' }],
+      });
+    });
+
+    it('sends a cleared gender as null', async () => {
+      const mockFetch = vi
+        .fn()
+        .mockResolvedValueOnce(
+          new Response(JSON.stringify([NODE_ROW]), { status: 200, headers: { 'Content-Type': 'application/json' } })
+        )
+        .mockResolvedValueOnce(new Response('[]', { status: 200, headers: { 'Content-Type': 'application/json' } }));
+      const record = createTreeRecord(
+        { userId: 'user-1', isAdmin: false, sessionToken: 'user-token' },
+        { ...TEST_CONFIG, fetch: mockFetch }
+      );
+
+      const rows = await record.editPerson({ id: 'node-1', gender: null });
+
+      expect(JSON.parse(mockFetch.mock.calls[0][1].body)).toEqual({ gender: null });
+      expect(rows).toEqual({ persons: [PERSON], links: [] });
+    });
+
+    it('still confirms the Person when the parent links cannot be read back', async () => {
+      const mockFetch = vi
+        .fn()
+        .mockResolvedValueOnce(
+          new Response(JSON.stringify([{ ...NODE_ROW, gender: 'male' }]), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          })
+        )
+        .mockRejectedValueOnce(new Error('offline'));
+      const record = createTreeRecord(
+        { userId: 'user-1', isAdmin: false, sessionToken: 'user-token' },
+        { ...TEST_CONFIG, fetch: mockFetch }
+      );
+
+      const rows = await record.editPerson({ id: 'node-1', gender: 'male' });
+
+      expect(rows).toEqual({ persons: [{ ...PERSON, gender: 'male' }] });
+    });
+
+    it('reports a gender the server refused as refused', async () => {
+      const mockFetch = vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            code: 'P0001',
+            message: 'Gender female disagrees with parent_role father on a Kinship Link where this Person is the parent',
+          }),
+          { status: 400, headers: { 'Content-Type': 'application/json' } }
+        )
+      );
+      const record = createTreeRecord(
+        { userId: 'user-1', isAdmin: false, sessionToken: 'user-token' },
+        { ...TEST_CONFIG, fetch: mockFetch }
+      );
+
+      await expect(record.editPerson({ id: 'node-1', gender: 'female' })).rejects.toMatchObject({
+        kind: 'refused',
+        message: expect.stringContaining('disagrees with parent_role'),
+      });
+    });
+
+    /**
      * `return=minimal` reported 204 whether or not a row matched, so an edit
      * RLS silently dropped looked like a success. The representation makes it
      * visible, and a write that reports nothing written is not confirmed.
@@ -684,6 +837,15 @@ describe('treeRecord module', () => {
         kind: 'not-authorized',
       });
       expect(mockFetch).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('parentRoleForGender', () => {
+    it("gives a parent link its role from the parent's gender, and none when not recorded", () => {
+      expect(parentRoleForGender('male')).toBe('father');
+      expect(parentRoleForGender('female')).toBe('mother');
+      expect(parentRoleForGender(null)).toBeNull();
+      expect(parentRoleForGender(undefined)).toBeNull();
     });
   });
 

@@ -32,6 +32,25 @@ describe('getRecordedGender', () => {
     expect(getRecordedGender(P.khalil, links)).toBeNull(); // no children
     expect(getRecordedGender(P.majed, links)).toBeNull(); // a parent with no parent_role
   });
+
+  it("reads the Person's own gender first, so a childless Person has one", () => {
+    const persons: FamilyNode[] = [
+      { id: P.khalil, firstName: 'Khalil', gender: 'male' },
+      { id: P.amal, firstName: 'Amal', gender: 'female' },
+    ];
+    expect(getRecordedGender(P.khalil, links, persons)).toBe('male');
+    expect(getRecordedGender(P.amal, links, persons)).toBe('female');
+  });
+
+  it('falls back to parent_role when the Person has no gender recorded', () => {
+    const persons: FamilyNode[] = [
+      { id: P.huda, firstName: 'Huda', gender: null },
+      { id: P.yusuf, firstName: 'Yusuf' },
+    ];
+    expect(getRecordedGender(P.huda, links, persons)).toBe('female');
+    expect(getRecordedGender(P.yusuf, links, persons)).toBe('male');
+    expect(getRecordedGender(P.majed, links, persons)).toBeNull();
+  });
 });
 
 describe('getRelatives', () => {
@@ -53,6 +72,10 @@ describe('getRelatives', () => {
     expect(sorted(getRelatives(P.idris, 'children', links))).toEqual(sorted([P.yusuf, P.mariam, P.khalil]));
     expect(getRelatives(P.idris, 'children', links, { gender: 'male' })).toEqual([P.yusuf]);
     expect(getRelatives(P.idris, 'children', links, { gender: 'female' })).toEqual([P.mariam]);
+    const persons: FamilyNode[] = [{ id: P.khalil, firstName: 'Khalil', gender: 'male' }];
+    expect(sorted(getRelatives(P.idris, 'children', links, { gender: 'male', persons }))).toEqual(
+      sorted([P.yusuf, P.khalil])
+    );
     expect(sorted(getRelatives(P.idris, 'children', links, { side: 'mother' }))).toEqual(
       sorted([P.yusuf, P.mariam, P.khalil])
     );

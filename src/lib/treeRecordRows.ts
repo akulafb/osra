@@ -24,6 +24,7 @@ export function personFromRow(row: NodeRow): FamilyNode {
     createdAt: typeof row.created_at === 'string' ? row.created_at : undefined,
     familyCluster: row.paternal_family_cluster || undefined,
     maternalFamilyCluster: row.maternal_family_cluster || undefined,
+    gender: row.gender || undefined,
   };
 }
 

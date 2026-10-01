@@ -1,5 +1,8 @@
 // src/types/graph.ts
 
+/** A Person's gender as recorded. Not recorded is `null` or absent. */
+export type PersonGender = 'male' | 'female';
+
 export interface FamilyNode {
   id: string;  // UUID from Supabase
   firstName: string;
@@ -9,6 +12,8 @@ export interface FamilyNode {
   birthPlace?: string;
   familyCluster?: string;  // paternal (display)
   maternalFamilyCluster?: string;
+  /** Male, female, or not recorded (`null` or absent). */
+  gender?: PersonGender | null;
   isClaimed?: boolean;
   /**
    * Simulation position, written onto the node by react-force-graph in the 3D

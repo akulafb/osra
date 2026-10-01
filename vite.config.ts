@@ -52,8 +52,8 @@ export default defineConfig(({ command }) => {
     test: {
       environment: 'node',
       // Edge Functions keep their logic in plain modules (no Deno imports) so
-      // it is tested here too.
-      include: ['src/**/*.test.ts', 'supabase/functions/**/*.test.ts'],
+      // it is tested here too, and so do the scripts.
+      include: ['src/**/*.test.ts', 'supabase/functions/**/*.test.ts', 'scripts/**/*.test.ts'],
     },
   }
 })

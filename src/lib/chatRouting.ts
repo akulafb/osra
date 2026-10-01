@@ -361,7 +361,7 @@ class Reply {
 
   /** "first cousin" as "aunt" or "mother-in-law" when the record shows the relative's gender. */
   private label(relation: KinshipRelation, personId: string): string {
-    const gender = getRecordedGender(personId, this.record.links);
+    const gender = getRecordedGender(personId, this.record.links, this.record.nodes);
     return (gender && GENDERED[relation.label]?.[gender]) ?? relation.label;
   }
 
@@ -381,13 +381,13 @@ class Reply {
       inLaw,
     }: { gender: Gender; side: ParentSide | null; wantsCount: boolean; inLaw: InLawOf | null },
   ): string {
-    const { links } = this.record;
+    const { links, nodes } = this.record;
     const kind = RELATIVE_KIND[relation];
     const all = getRelatives(subjectId, kind, links, { side: side ?? undefined }).filter(
       (id) => !inLaw || this.inLawOf(subjectId, id)?.inLaw === inLaw,
     );
-    const found = gender === 'any' ? all : this.byName(all.filter((id) => getRecordedGender(id, links) === gender));
-    const unknownGender = gender === 'any' ? [] : this.byName(all.filter((id) => getRecordedGender(id, links) === null));
+    const found = gender === 'any' ? all : this.byName(all.filter((id) => getRecordedGender(id, links, nodes) === gender));
+    const unknownGender = gender === 'any' ? [] : this.byName(all.filter((id) => getRecordedGender(id, links, nodes) === null));
     const ids = this.byName(found);
 
     const you = this.isSpeaker(subjectId);
