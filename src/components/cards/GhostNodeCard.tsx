@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { FamilyNode, RelativeDirection } from '../../types/graph';
-import { readMatchResolution } from '../../lib/personMatch';
+import { readMatchResolution, SPELLING_MATCH_LABEL } from '../../lib/personMatch';
 import { usePersonMatch } from '../../hooks/usePersonMatch';
 import { relationColor, relationLabel } from './relationStyle';
 
@@ -295,7 +295,7 @@ export const GhostNodeCard: React.FC<GhostNodeCardProps> = ({
               <span style={{ fontWeight: 600 }}>
                 {person.firstName}
                 {isSpellingVariant && (
-                  <span style={{ fontWeight: 400, color: '#94a3b8' }}> · different spelling</span>
+                  <span style={{ fontWeight: 400, color: '#94a3b8' }}> · {SPELLING_MATCH_LABEL}</span>
                 )}
                 {!isVisible && (
                   <span style={{ fontWeight: 400, color: '#94a3b8' }}> · hidden by filter</span>

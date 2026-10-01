@@ -3,7 +3,12 @@ import Button from '@mui/material/Button';
 import { useAuth } from '../../contexts/AuthContext';
 import { FamilyLink, FamilyNode } from '../../types/graph';
 import { formatNodeDisplayName } from '../../utils/nodeDisplayName';
-import { connectedPersonIds, matchExistingPersons, readMatchResolution } from '../../lib/personMatch';
+import {
+  connectedPersonIds,
+  readMatchResolution,
+  SPELLING_MATCH_LABEL,
+} from '../../lib/personMatch';
+import { usePersonMatch } from '../../hooks/usePersonMatch';
 import {
   createTreeRecord,
   pendingKinshipLink,
@@ -70,21 +75,19 @@ export default function AddRelativeModal({
     [existingLinks, targetNode.id]
   );
 
-  const resolution = useMemo(
-    () =>
-      matchExistingPersons({
-        query: name,
-        intent: 'creating',
-        pool: existingNodes,
-        excludePersonId: targetNode.id,
-        visibleIds,
-        connectedIds,
-      }),
-    [name, existingNodes, targetNode.id, visibleIds, connectedIds]
-  );
+  // The same Person Match path as the Ghost Node, Spelling Matches included.
+  const resolution = usePersonMatch({
+    query: name,
+    intent: 'creating',
+    pool: existingNodes,
+    excludePersonId: targetNode.id,
+    visibleIds,
+    connectedIds,
+  });
 
   // Only an exact given-name collision is a question worth blocking on; the
   // old guard fired on any substring, so "Bad" stopped the Badran cluster.
+  // A Spelling Match is advice too — see ADR-0005.
   const { matches, hiddenMatchCount, mustConfirm: mustConfirmMatch } =
     readMatchResolution(resolution);
   const isPreviewConnectMode = Boolean(selectedExistingId);
@@ -337,7 +340,7 @@ export default function AddRelativeModal({
                   : 'Someone here may already be this person. Connecting is optional.'}
               </p>
               <ul style={{ margin: '12px 0', paddingLeft: '0', listStyle: 'none' }}>
-                {matches.map(({ person, isVisible, isAlreadyConnected }) => (
+                {matches.map(({ person, isSpellingVariant, isVisible, isAlreadyConnected }) => (
                   <li key={person.id} style={{ marginBottom: '8px' }}>
                     <button
                       type="button"
@@ -358,7 +361,7 @@ export default function AddRelativeModal({
                       <span style={{ fontWeight: 600, color: 'white' }}>
                         {formatNodeDisplayName(person)}
                       </span>
-                      {(!isVisible || isAlreadyConnected) && (
+                      {(isSpellingVariant || !isVisible || isAlreadyConnected) && (
                         <span
                           style={{
                             fontSize: '0.65rem',
@@ -368,6 +371,7 @@ export default function AddRelativeModal({
                           }}
                         >
                           {[
+                            isSpellingVariant ? SPELLING_MATCH_LABEL : null,
                             !isVisible ? 'hidden by filter' : null,
                             isAlreadyConnected ? 'already connected' : null,
                           ]

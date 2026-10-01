@@ -422,3 +422,65 @@ describe('matchExistingPersons — spelling matches (advice only)', () => {
     expect(result).toEqual({ kind: 'none' });
   });
 });
+
+describe('matchExistingPersons — renaming with spelling scores (Edit Node)', () => {
+  const pool: FamilyNode[] = [
+    { id: 'me', firstName: 'Aisha', familyCluster: 'Badran' },
+    { id: 'ai', firstName: 'Aisha', familyCluster: 'Haddad' },
+    { id: 'ay', firstName: 'Aysha', familyCluster: 'Zabalawi' },
+    { id: 'om', firstName: 'Omar', familyCluster: 'Zabalawi' },
+  ];
+
+  const renaming = (
+    query: string,
+    byName: Record<string, number>,
+    overrides: Partial<Parameters<typeof matchExistingPersons>[0]> = {}
+  ) =>
+    matchExistingPersons({
+      query,
+      intent: 'renaming',
+      pool,
+      excludePersonId: 'me',
+      currentGivenName: 'Aisha',
+      spellingScores: spellingScoresFrom(
+        query,
+        Object.entries(byName).map(([name, score]) => ({ name, score }))
+      ),
+      ...overrides,
+    });
+
+  it('offers other spellings of the new name as candidates, labelled as spelling matches', () => {
+    const result = renaming('Ayesha', { Aisha: 0.91, Aysha: 0.88, Omar: 0.01 });
+    expect(result.kind).toBe('candidates');
+    if (result.kind === 'none') throw new Error('expected matches');
+    expect(result.matches.map((m) => [m.person.id, m.isSpellingVariant])).toEqual([
+      ['ai', true],
+      ['ay', true],
+    ]);
+    expect(readMatchResolution(result).mustConfirm).toBe(false);
+  });
+
+  it('never offers the Person being renamed, however well their own name scores', () => {
+    const result = renaming('Ayesha', { Aisha: 0.91 }, { pool: [pool[0]] });
+    expect(result).toEqual({ kind: 'none' });
+  });
+
+  it('still requires confirmation when the new name collides exactly, beside spelling matches', () => {
+    const withExact: FamilyNode[] = [...pool, { id: 'ex', firstName: 'Ayesha' }];
+    const result = renaming('Ayesha', { Aisha: 0.91, Aysha: 0.88, Ayesha: 1 }, { pool: withExact });
+    expect(result.kind).toBe('must-confirm');
+    expect(matchIds(result)).toEqual(['ex', 'ai', 'ay']);
+  });
+
+  it('resolves to none for an unchanged name in another case, even with scores', () => {
+    expect(renaming(' aisha ', { Aisha: 1, Aysha: 0.9 })).toEqual({ kind: 'none' });
+    expect(spellingLookupQuery({ query: ' aisha ', intent: 'renaming', currentGivenName: 'Aisha' })).toBe('');
+  });
+
+  it('falls back to substring matching when the lookup gave no scores', () => {
+    const result = renaming('Ays', {}, { spellingScores: undefined });
+    expect(matchIds(result)).toEqual(['ay']);
+    if (result.kind === 'none') throw new Error('expected matches');
+    expect(result.matches[0].isSpellingVariant).toBe(false);
+  });
+});

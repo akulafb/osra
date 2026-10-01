@@ -23,6 +23,12 @@ export const MATCH_CANDIDATE_LIMIT = 4;
  */
 export const SPELLING_MATCH_THRESHOLD = 0.5;
 
+/**
+ * How every caller labels a Person Match with `isSpellingVariant`, so the Ghost
+ * Node and both modals say the same thing about the same match.
+ */
+export const SPELLING_MATCH_LABEL = 'different spelling';
+
 /** Creation asks "does this Person exist?"; renaming asks "am I colliding with one?" */
 export type MatchIntent = 'creating' | 'renaming';
 

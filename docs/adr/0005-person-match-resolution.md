@@ -116,7 +116,10 @@ typed name with TypeSafe Jev; a score of **0.5 or more** is a **Spelling Match**
 
 - Every Person Match caller that matches while typing should use `usePersonMatch`,
   not `matchExistingPersons` directly, or it silently loses Spelling Matches. The
-  Ghost Node (2D and 3D) does; the Add Relative and Edit Node modals follow in LIN-69.
+  Ghost Node (2D and 3D), the Add Relative modal and the Edit Node modal all do
+  (LIN-69), and all three take the "different spelling" label from
+  `SPELLING_MATCH_LABEL`. In both modals a Spelling Match alone never blocks
+  Submit or Save; an unchanged name in Edit Node sends no lookup.
 - Each pause in typing costs one function call (and one TypeSafe request) for a
   signed-in editor. The list may reshuffle when Spelling Matches arrive; that is
   accepted, and the timeout bounds how late it can happen.
