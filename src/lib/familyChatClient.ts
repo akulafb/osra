@@ -19,7 +19,7 @@ import type { ChatSendResult, RouteChat, RouteSendResult, SendChat } from './fam
  * client, which attaches the signed-in session. The browser holds no model
  * key: the function owns the key, the model, the prompt and the tool list.
  *
- * Contract: `{ messageId, messages }` in; `{ message, done, usage }` out, or
+ * Contract: `{ messageId, messages, final? }` in; `{ message, done, usage, cost }` out, or
  * `{ error: { code, cause, message, usage? } }` on refusal. Any failure or
  * unexpected shape becomes `{ ok: false, cause: 'failed' }`; this never throws.
  */

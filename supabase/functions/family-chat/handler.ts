@@ -78,6 +78,12 @@ export interface ChatResponse {
   /** True when the model replied with text and asked for no tool. */
   done: boolean;
   usage: ChatUsage;
+  /**
+   * What this call cost, in US dollars, from OpenRouter's `usage.cost`; null
+   * when OpenRouter did not say. The browser adds up a message's calls and
+   * stops its tool loop past `MAX_MESSAGE_COST_USD` (LIN-80).
+   */
+  cost: number | null;
 }
 
 /**
@@ -240,7 +246,7 @@ async function handle(req: Request, deps: FamilyChatDeps, log: (message: string)
   }
   const validation = validateChatRequest(body);
   if (!validation.ok) return refuse(400, validation.code, 'failed', validation.message);
-  const { messageId, turns } = validation.request;
+  const { messageId, turns, final } = validation.request;
 
   const apiKey = deps.env('OPENROUTER_API_KEY')?.trim();
   if (!apiKey) {
@@ -263,14 +269,14 @@ async function handle(req: Request, deps: FamilyChatDeps, log: (message: string)
   }
 
   // 5. The model.
-  const outcome = await callModel(buildModelRequest(buildSystemPrompt(speaker), turns), apiKey, {
+  const outcome = await callModel(buildModelRequest(buildSystemPrompt(speaker), turns, { final }), apiKey, {
     attemptTimeoutMs: MODEL_ATTEMPT_TIMEOUT_MS,
     retries: 1,
     ...deps.retry,
     fetchImpl,
   });
   if (outcome.ok) {
-    const body: ChatResponse = { message: outcome.message, done: !outcome.message.toolCalls, usage };
+    const body: ChatResponse = { message: outcome.message, done: !outcome.message.toolCalls, usage, cost: outcome.cost };
     return jsonResponse(body);
   }
 

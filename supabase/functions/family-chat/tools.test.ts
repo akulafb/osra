@@ -28,3 +28,19 @@ describe('the chat tool list', () => {
     expect(properties.kind.enum).toEqual([...RELATIVE_KINDS]);
   });
 });
+
+describe('the tool descriptions (LIN-80)', () => {
+  const description = (name: string) => CHAT_TOOLS.find((t) => t.function.name === name)?.function.description ?? '';
+
+  it('tell the model to use the Kinship Term as given, never naming a relation or spelling out the path', () => {
+    expect(description('findKinshipPaths')).toMatch(/exactly as given/);
+    expect(description('findKinshipPaths')).toMatch(/never name a relation yourself/);
+    expect(description('findKinshipPaths')).toMatch(/never spell out the path/);
+  });
+
+  it('send an open question to the overview, which has counts and no list of the Persons', () => {
+    expect(description('getFamilyOverview')).toMatch(/Tell me about the family/);
+    expect(description('getFamilyOverview')).toMatch(/no list of the Persons/);
+    expect(description('getFamilyOverview')).toMatch(/do not list the Persons/);
+  });
+});

@@ -27,11 +27,16 @@ const usage: ChatUsage = {
 
 function toolsReply(...calls: Array<[string, Record<string, unknown>]>): ChatSendResult {
   const toolCalls: ToolCall[] = calls.map(([name, args], i) => ({ id: `call-${name}-${i}`, name, arguments: args }));
-  return { ok: true, reply: { message: { role: 'assistant', content: null, toolCalls }, done: false, usage } };
+  return { ok: true, reply: { message: { role: 'assistant', content: null, toolCalls }, done: false, usage, cost: null } };
 }
 
 function textReply(content: string): ChatSendResult {
-  return { ok: true, reply: { message: { role: 'assistant', content }, done: true, usage } };
+  return { ok: true, reply: { message: { role: 'assistant', content }, done: true, usage, cost: null } };
+}
+
+/** A scripted reply that cost `cost` US dollars. */
+function costing(cost: number, result: ChatSendResult): ChatSendResult {
+  return result.ok ? { ok: true, reply: { ...result.reply, cost } } : result;
 }
 
 /** A stand-in for the family-chat function: answers each call with the next scripted reply. */
@@ -128,6 +133,60 @@ describe('askFamilyChat: the tool loop', () => {
     expect(found.matches.map((m: { fatherName: string }) => m.fatherName)).toEqual(['Idris Haddad', 'Omar Haddad']);
     expect(found.note).toMatch(/ask the user which one/i);
     expect(outcome).toMatchObject({ ok: true, answer: question });
+  });
+
+  it('stops the tool loop once the message passes its cost cap, and still answers from what the tools gave', async () => {
+    const model = scriptedModel(
+      costing(0.004, toolsReply(['getFamilyOverview', {}])),
+      costing(0.004, toolsReply(['findPersonsByName', { name: 'Idris' }])),
+      costing(0.004, toolsReply(['getRelatives', { personId: P.idris, kind: 'children' }])),
+      costing(0.002, textReply('The tree has **41** Persons over 5 generations.')),
+    );
+
+    const outcome = await ask('Tell me about the family', model.send);
+
+    // $0.012 after three calls passes the $0.01 cap: the fourth is the last, with every tool result so far.
+    expect(model.send).toHaveBeenCalledTimes(4);
+    expect(model.requests.map((r) => r.final)).toEqual([undefined, undefined, undefined, true]);
+    expect(toolResults(model.requests[3])).toHaveLength(3);
+    expect(outcome).toMatchObject({ ok: true, answeredBy: 'model', answer: 'The tree has **41** Persons over 5 generations.' });
+  });
+
+  it('answers with the text of a final call even if the model still asked for a tool', async () => {
+    const model = scriptedModel(costing(0.011, toolsReply(['getFamilyOverview', {}])), {
+      ok: true,
+      reply: {
+        message: { role: 'assistant', content: 'The tree has **41** Persons.', toolCalls: [{ id: 'c', name: 'getTreeCounts', arguments: {} }] },
+        done: false,
+        usage,
+        cost: 0.001,
+      },
+    });
+    const outcome = await ask('Tell me about the family', model.send);
+    expect(model.send).toHaveBeenCalledTimes(2);
+    expect(outcome).toMatchObject({ ok: true, answer: 'The tree has **41** Persons.' });
+  });
+
+  it('keeps calling under the cost cap, and reads a missing cost as nothing', async () => {
+    const model = scriptedModel(
+      costing(0.003, toolsReply(['getTreeCounts', {}])),
+      toolsReply(['getTreeCounts', {}]),
+      costing(0.003, toolsReply(['getTreeCounts', {}])),
+      textReply('41'),
+    );
+    await ask('How many people?', model.send);
+    expect(model.requests.every((r) => r.final === undefined)).toBe(true);
+  });
+
+  it('makes the last allowed call the final one, so the model answers instead of asking for more tools', async () => {
+    const forever = Array.from({ length: 5 }, () => toolsReply(['getTreeCounts', {}]));
+    const model = scriptedModel(...forever, textReply('The tree has **41** Persons.'));
+
+    const outcome = await ask('Count everyone, again and again', model.send);
+
+    expect(model.send).toHaveBeenCalledTimes(6);
+    expect(model.requests[5].final).toBe(true);
+    expect(outcome).toMatchObject({ ok: true, answer: 'The tree has **41** Persons.' });
   });
 
   it('stops after 6 model calls for one question', async () => {

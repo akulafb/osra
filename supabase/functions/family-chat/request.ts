@@ -32,6 +32,12 @@ export type ChatTurn =
 export interface ChatRequest {
   messageId: string;
   turns: ChatTurn[];
+  /**
+   * The message's last call (LIN-80): the browser sends it once the message
+   * has passed its cost cap or is on its last allowed call. The model may then
+   * call no tool and must answer from the results so far.
+   */
+  final: boolean;
 }
 
 export type ChatRequestValidation =
@@ -155,14 +161,17 @@ function checkOrder(turns: ChatTurn[]): void {
   if (last.role === 'assistant') badTurn(turns.length - 1, 'the last turn must be a user message or a tool result');
 }
 
-/** Checks a request body of the form `{ messageId, messages }`. */
+/** Checks a request body of the form `{ messageId, messages, final? }`. */
 export function validateChatRequest(body: unknown): ChatRequestValidation {
   if (!isObject(body)) {
     return { ok: false, code: 'invalid_body', message: 'Send a JSON object: { messageId, messages }.' };
   }
-  const { messageId, messages } = body;
+  const { messageId, messages, final = false } = body;
   if (typeof messageId !== 'string' || !MESSAGE_ID.test(messageId)) {
     return { ok: false, code: 'invalid_message_id', message: INVALID_MESSAGE_ID };
+  }
+  if (typeof final !== 'boolean') {
+    return { ok: false, code: 'invalid_final', message: 'final must be true or false.' };
   }
   if (!Array.isArray(messages) || messages.length === 0) {
     return { ok: false, code: 'invalid_turns', message: 'messages must be a non-empty list.' };
@@ -173,7 +182,7 @@ export function validateChatRequest(body: unknown): ChatRequestValidation {
   try {
     const turns = messages.map(parseTurn);
     checkOrder(turns);
-    return { ok: true, request: { messageId, turns } };
+    return { ok: true, request: { messageId, turns, final } };
   } catch (err) {
     if (err instanceof Refusal) return { ok: false, code: err.code, message: err.message };
     throw err;

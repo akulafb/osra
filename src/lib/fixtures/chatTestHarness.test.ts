@@ -107,6 +107,31 @@ describe('createChatTestRunner', () => {
     expect(toolTurn?.content).toContain('41');
   });
 
+  it('stops the tool loop at the cost cap and still replies (LIN-80)', async () => {
+    const overview = (id: string) => ({
+      content: null,
+      tool_calls: [{ id, type: 'function', function: { name: 'getFamilyOverview', arguments: '{}' } }],
+    });
+    const { network, requests } = scripted({
+      [TYPESAFE_URL]: [jevOther(1000)],
+      [OPENROUTER_URL]: [
+        modelTurn(overview('c1'), 0.004),
+        modelTurn(overview('c2'), 0.004),
+        modelTurn(overview('c3'), 0.004),
+        modelTurn({ content: 'The tree has **41** Persons over 5 generations.' }, 0.001),
+      ],
+    });
+    const runner = createChatTestRunner({ ...KEYS, network });
+
+    const answer = await runner.ask('Tell me about the family');
+
+    expect(answer.outcome).toMatchObject({ ok: true, answeredBy: 'model', answer: 'The tree has **41** Persons over 5 generations.' });
+    const bodies = requests.filter((r) => r.url === OPENROUTER_URL).map((r) => r.body as { tool_choice: string });
+    // $0.012 after three calls: the fourth may call no tool.
+    expect(bodies.map((b) => b.tool_choice)).toEqual(['auto', 'auto', 'auto', 'none']);
+    expect(answer.cost.modelCost).toBeCloseTo(0.013, 10);
+  });
+
   it('keeps the counts of each question apart', async () => {
     const { network } = scripted({ [TYPESAFE_URL]: [jevParents(1000), jevParents(500)] });
     const runner = createChatTestRunner({ ...KEYS, network });

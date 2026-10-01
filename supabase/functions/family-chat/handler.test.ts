@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { handleFamilyChat, type FamilyChatDeps } from './handler.ts';
+import { MAX_REPLY_TOKENS } from './limits.ts';
 import { CHAT_MODEL } from './openRouter.ts';
 import { CHAT_TOOL_NAMES } from './tools.ts';
 
@@ -251,6 +252,7 @@ describe('a signed-in user', () => {
         maxModelCalls: 6,
         resetsAt: '2026-10-01T20:00:00.000Z',
       },
+      cost: null,
     });
   });
 
@@ -333,7 +335,8 @@ describe('what the function owns', () => {
     const [body] = world.modelBodies();
     expect(body.model).toBe(CHAT_MODEL);
     expect(body.model).toBe('x-ai/grok-4.3');
-    expect(body.max_tokens).toBe(1500);
+    expect(body.max_tokens).toBe(MAX_REPLY_TOKENS);
+    expect(body.tool_choice).toBe('auto');
     const messages = body.messages as Array<{ role: string; content: string }>;
     expect(messages.filter((m) => m.role === 'system')).toHaveLength(1);
     expect(messages[0].role).toBe('system');
@@ -371,6 +374,94 @@ describe('what the function owns', () => {
     const system = (world.modelBodies()[0].messages as Array<{ content: string }>)[0].content;
     expect(system).not.toContain('Fahd');
     expect(system).toMatch(/not linked to a Person/i);
+  });
+});
+
+describe('terse replies and the cost of a message (LIN-80)', () => {
+  function systemPrompt(): string {
+    return (world.modelBodies()[0].messages as Array<{ content: string }>)[0].content;
+  }
+
+  it('caps a reply at about 150 words with the max output tokens', async () => {
+    world.answerModelWith(modelReply('ok'));
+    await send({ messageId: 'msg-00000001', messages: [ask('hi')] });
+    // About 1.3 tokens a word, and room for Markdown; the reasoning is not counted.
+    expect(MAX_REPLY_TOKENS).toBeGreaterThanOrEqual(150);
+    expect(MAX_REPLY_TOKENS).toBeLessThanOrEqual(250);
+    expect(world.modelBodies()[0].max_tokens).toBe(MAX_REPLY_TOKENS);
+  });
+
+  it('tells the model to answer first, briefly, with nothing extra', async () => {
+    world.answerModelWith(modelReply('ok'));
+    await send({ messageId: 'msg-00000001', messages: [ask('hi')] });
+    const system = systemPrompt();
+    expect(system).toMatch(/answer comes first/i);
+    expect(system).toMatch(/one or two short lines/i);
+    expect(system).toMatch(/at most 150 words/i);
+    expect(system).toMatch(/never suggest a follow-up question/i);
+    expect(system).toMatch(/never end with an offer/i);
+    expect(system).toMatch(/getFamilyOverview/);
+    expect(system).toMatch(/never list every Person/i);
+  });
+
+  it('tells the model to use the Kinship Term exactly as given, and never name a relation or spell out a path', async () => {
+    world.answerModelWith(modelReply('ok'));
+    await send({ messageId: 'msg-00000001', messages: [ask('hi')] });
+    const system = systemPrompt();
+    expect(system).toMatch(/exactly as given/i);
+    expect(system).toMatch(/never name a relation yourself/i);
+    expect(system).toMatch(/never spell out the chain/i);
+    expect(system).toMatch(/no "Related by marriage:"/i);
+  });
+
+  it('passes on what the call cost, from OpenRouter\'s usage', async () => {
+    world.answerModelWith(() =>
+      Response.json({
+        choices: [{ index: 0, finish_reason: 'stop', message: { role: 'assistant', content: 'ok' } }],
+        usage: { prompt_tokens: 900, completion_tokens: 40, cost: 0.0021 },
+      }),
+    );
+    const res = await send({ messageId: 'msg-00000001', messages: [ask('hi')] });
+    expect(res.body.cost).toBe(0.0021);
+  });
+
+  it('gives a null cost when OpenRouter does not say', async () => {
+    world.answerModelWith(modelReply('ok'));
+    const res = await send({ messageId: 'msg-00000001', messages: [ask('hi')] });
+    expect(res.body.cost).toBeNull();
+  });
+
+  it('on a final call, lets the model call no tool and tells it to answer now', async () => {
+    world.answerModelWith(modelReply('Your cousins are **Tala** and **Ziad**.'));
+    const res = await send({
+      messageId: 'msg-00000001',
+      final: true,
+      messages: [
+        ask('My cousins on my mom side?'),
+        { role: 'assistant', content: null, toolCalls: [{ id: 'call-1', name: 'getTreeCounts', arguments: {} }] },
+        { role: 'tool', toolCallId: 'call-1', content: '{"persons":41}' },
+      ],
+    });
+    expect(res.status).toBe(200);
+    const [body] = world.modelBodies();
+    expect(body.tool_choice).toBe('none');
+    expect(systemPrompt()).toMatch(/answer now/i);
+  });
+
+  it('cuts a reply that ran into the cap back to its last whole sentence', async () => {
+    world.answerModelWith(() =>
+      Response.json({
+        choices: [
+          {
+            index: 0,
+            finish_reason: 'length',
+            message: { role: 'assistant', content: 'The tree has **41** Persons. The largest family is the Haddad fam' },
+          },
+        ],
+      }),
+    );
+    const res = await send({ messageId: 'msg-00000001', messages: [ask('Tell me about the family')] });
+    expect(res.body.message.content).toBe('The tree has **41** Persons.');
   });
 });
 

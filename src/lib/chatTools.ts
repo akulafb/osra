@@ -23,6 +23,7 @@ import {
 } from '../../supabase/functions/family-chat/tools.ts';
 import type { FamilyLink, FamilyNode } from '../types/graph';
 import { findKinshipPaths, findPersonsByName, getRecordedGender, getRelatives, type KinshipPath } from './familyGraph';
+import { familyOverview } from './familyOverview';
 import { kinshipTermText } from './kinshipTerm';
 import { formatNodeDisplayName } from '../utils/nodeDisplayName';
 
@@ -181,6 +182,23 @@ function run(call: ToolCall, record: ChatRecord): string {
       const kinshipLinks = { parent: 0, marriage: 0, divorce: 0 };
       for (const link of record.links) kinshipLinks[link.type] += 1;
       return JSON.stringify({ persons: record.nodes.length, kinshipLinks });
+    }
+
+    case 'getFamilyOverview': {
+      const { familyName } = args as Partial<Record<keyof ChatToolArguments['getFamilyOverview'], unknown>>;
+      if (familyName !== undefined && familyName !== null && typeof familyName !== 'string') {
+        throw new BadArguments('familyName must be a family name, or left out for the whole tree.');
+      }
+      const overview = familyOverview(record, familyName ?? undefined);
+      if (!overview) {
+        // The family names there are, so the model can try one of them.
+        const largestFamilies = familyOverview(record)?.largestFamilies;
+        return JSON.stringify({ error: `No Person has the family name ${familyName}.`, largestFamilies });
+      }
+      return JSON.stringify({
+        ...overview,
+        note: 'Answer with a short overview from these counts. Do not list the Persons.',
+      });
     }
   }
 }

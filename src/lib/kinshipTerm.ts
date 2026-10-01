@@ -94,3 +94,24 @@ export function kinshipTermText(
   const { personId, first, second } = relation.via;
   return `${genderedLabel(first.label, genderOf(personId))} ${nameOf(personId)}'s ${kinshipTermText(second, toId, { genderOf, nameOf })}`;
 }
+
+/** Kinship Terms that are themselves through a marriage: a spouse, an in-law, a step-relation. */
+const MARRIAGE_TERM_NAMES: ReadonlySet<KinshipRelation['name']> = new Set([
+  'spouse',
+  'former spouse',
+  'in-law',
+  'step-parent',
+  'step-child',
+  'step-relative',
+]);
+
+/**
+ * Whether the words of a Kinship Term already say it is through a marriage:
+ * "stepson", "mother-in-law", "aunt by marriage", "wife", or terms joined at
+ * a marriage ("former wife Layla's child"). Then "Related by marriage:" before
+ * it says nothing new.
+ */
+export function termShowsMarriage(relation: KinshipRelation): boolean {
+  if (MARRIAGE_TERM_NAMES.has(relation.name)) return true;
+  return relation.via ? termShowsMarriage(relation.via.first) || termShowsMarriage(relation.via.second) : false;
+}

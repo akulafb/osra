@@ -210,10 +210,24 @@ describe('routeMessage: code answers the common kinds, with no model call', () =
     });
   });
 
-  it('how related, when no one word fits: two terms joined by one Person', () => {
+  it('how related, when no one word fits: two terms joined at a marriage, with no "Related by marriage:" before them', () => {
     expect(route('How is Nour related to Tarek?', reading({ relation: 'how_related', subject: 'named_person' }))).toEqual({
       by: 'code',
-      answer: "Related by marriage: **Nour Qasim** is **Tarek Saleh**'s former wife **Layla Haddad**'s child.",
+      answer: "**Nour Qasim** is **Tarek Saleh**'s former wife **Layla Haddad**'s child.",
+    });
+  });
+
+  it('how related through a marriage: a step-relation says so itself, with no "Related by marriage:"', () => {
+    expect(route('How is Karim related to Jad?', reading({ relation: 'how_related', subject: 'named_person' }))).toEqual({
+      by: 'code',
+      answer: "**Karim Qasim** is **Jad Saleh**'s stepfather, on the mother's side.",
+    });
+  });
+
+  it('how related through a marriage: an in-law says so itself, with no "Related by marriage:"', () => {
+    expect(route('how am I related to Faris?', reading({ relation: 'how_related' }))).toEqual({
+      by: 'code',
+      answer: '**Faris Khoury** is your father-in-law.',
     });
   });
 
