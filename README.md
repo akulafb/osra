@@ -59,7 +59,7 @@ Each solution unlocked the next challenge, building from a simple graph into a f
 
 ### Family Chatbot
 
-- **Floating assistant (🤖)**: Knows who is signed in and answers questions like "Who is my father?" or "How many cousins do I have on my mom's side?". The model runs on the `family-chat` Edge Function, which holds the key and allows 10 messages per account per day. When it needs a fact it calls a tool; the browser runs the tool on the Working Record and sends back only the answer, never the whole tree. Read only.
+- **Floating assistant (🤖)**: Knows who is signed in and answers questions like "Who is my father?" or "How many cousins do I have on my mom's side?". The model runs on the `family-chat` Edge Function, which holds the key and allows 10 messages per account per day. TypeSafe Jev reads each message first; for the common kinds (a list of relatives, a count, how two Persons are related) code answers from the Working Record with no model call. Otherwise, when the model needs a fact it calls a tool; the browser runs the tool on the Working Record and sends back only the answer, never the whole tree. Read only.
 
 ### Core Functionality
 
@@ -158,6 +158,7 @@ src/
 │   ├── workingRecord.ts          # Confirmed snapshot + pending changes, projected
 │   ├── permissions.ts            # 1-degree permission helpers
 │   ├── familyChat.ts             # Chat tool loop through the family-chat function
+│   ├── chatRouting.ts            # Answers the common chat questions in code (Jev routes)
 │   ├── familyChatClient.ts       # Calls the family-chat Edge Function
 │   └── chatTools.ts              # Runs the chat's tools on the Working Record
 ├── pages/

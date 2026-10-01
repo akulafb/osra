@@ -6,7 +6,15 @@ import {
   type ToolCall,
 } from '../../supabase/functions/family-chat/request.ts';
 import type { ChatUsage } from '../../supabase/functions/family-chat/handler.ts';
-import { askFamilyChat, CHAT_LINES, type ChatRequestBody, type ChatSendResult } from './familyChat';
+import type { QuestionKind } from '../../supabase/functions/family-chat/questionKind.ts';
+import {
+  askFamilyChat,
+  CHAT_LINES,
+  type ChatRequestBody,
+  type ChatSendResult,
+  type RouteRequestBody,
+  type RouteSendResult,
+} from './familyChat';
 import { FIXTURE_IDS as P, KINSHIP_FIXTURE_TREE } from './fixtures/kinshipFixtureTree';
 
 const usage: ChatUsage = {
@@ -294,6 +302,141 @@ describe('askFamilyChat: a question too large to send', () => {
     const outcome = await askFamilyChat({ question: 'Everyone?', history: [], record: { nodes, links }, send: model.send, messageId: 'message-0001' });
 
     expect(model.send).toHaveBeenCalledTimes(1);
+    expect(outcome).toEqual({ ok: false, cause: 'failed', line: CHAT_LINES.failed });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// LIN-73: Jev reads the message first; code answers the common kinds.
+// ---------------------------------------------------------------------------
+
+const OMAR = { personId: P.omar, displayName: 'Omar Haddad' };
+
+function sure(value: string, confidence = 0.9) {
+  return { value, confidence };
+}
+
+/** Jev's reading of "who are my khalos". */
+const KHALOS: QuestionKind = {
+  relation: sure('aunts_uncles'),
+  side: sure('maternal'),
+  gender: sure('male'),
+  subject: sure('speaker'),
+  wantsCount: { value: false, confidence: 0.92 },
+} as QuestionKind;
+
+function routeReply(questionKind: QuestionKind | null, speaker: typeof OMAR | null = OMAR): RouteSendResult {
+  return { ok: true, reply: { questionKind, speaker, usage } };
+}
+
+/** A stand-in for the route operation: answers with `result`, and records what it was sent. */
+function scriptedRoute(result: RouteSendResult | (() => never)) {
+  const requests: RouteRequestBody[] = [];
+  const route = vi.fn(async (request: RouteRequestBody) => {
+    requests.push(structuredClone(request));
+    return typeof result === 'function' ? result() : result;
+  });
+  return { route, requests };
+}
+
+function askRouted(question: string, send: (r: ChatRequestBody) => Promise<ChatSendResult>, route: ReturnType<typeof scriptedRoute>['route']) {
+  return askFamilyChat({ question, history: [], record: KINSHIP_FIXTURE_TREE, send, route, messageId: 'message-0001' });
+}
+
+describe('askFamilyChat: Jev routes common questions to code', () => {
+  it('answers "who are my khalos" in code, with no model call', async () => {
+    const model = scriptedModel();
+    const jev = scriptedRoute(routeReply(KHALOS));
+
+    const outcome = await askRouted('who are my khalos', model.send, jev.route);
+
+    expect(jev.requests).toEqual([{ operation: 'route', messageId: 'message-0001', message: 'who are my khalos' }]);
+    expect(model.send).not.toHaveBeenCalled();
+    expect(outcome).toMatchObject({ ok: true, answeredBy: 'code' });
+    expect(outcome.ok && outcome.answer).toContain("Your uncle on your mother's side is **Samir Mansour**.");
+    // The answer is in the history, so a follow-up to the model has it.
+    expect(outcome.ok && outcome.turns.slice(-2)).toEqual([
+      { role: 'user', content: 'who are my khalos' },
+      { role: 'assistant', content: outcome.ok ? outcome.answer : '' },
+    ]);
+  });
+
+  it('sends a message Jev marks other to the model with tools, under the same message id', async () => {
+    const model = scriptedModel(textReply('Hello!'));
+    const jev = scriptedRoute(routeReply({ ...KHALOS, relation: sure('other') } as QuestionKind));
+
+    const outcome = await askRouted('hello!', model.send, jev.route);
+
+    expect(model.send).toHaveBeenCalledTimes(1);
+    expect(model.requests[0].messageId).toBe('message-0001');
+    expect(outcome).toMatchObject({ ok: true, answer: 'Hello!', answeredBy: 'model' });
+  });
+
+  it('sends an answer below the confidence gate to the model', async () => {
+    const model = scriptedModel(textReply('**Samir Mansour**'));
+    const jev = scriptedRoute(routeReply({ ...KHALOS, side: sure('maternal', 0.45) } as QuestionKind));
+
+    const outcome = await askRouted('who are my khalos', model.send, jev.route);
+
+    expect(model.send).toHaveBeenCalledTimes(1);
+    expect(outcome).toMatchObject({ ok: true, answeredBy: 'model' });
+  });
+
+  it('sends a name with two matches to the model, and the chat asks which Person', async () => {
+    const model = scriptedModel(
+      toolsReply(['findPersonsByName', { name: 'Layla' }]),
+      textReply('Which Layla do you mean: **Layla Haddad** (father **Yusuf Haddad**) or **Layla Zaher** (father **Munir Zaher**)?'),
+    );
+    const jev = scriptedRoute(
+      routeReply({ ...KHALOS, relation: sure('children'), side: sure('both'), gender: sure('any'), subject: sure('named_person') } as QuestionKind),
+    );
+
+    const outcome = await askRouted("Who are Layla's children?", model.send, jev.route);
+
+    const [matches] = toolResults(model.requests[1]);
+    expect(matches.total).toBe(2);
+    expect(outcome).toMatchObject({ ok: true, answeredBy: 'model' });
+    expect(outcome.ok && outcome.answer).toContain('Which Layla');
+  });
+
+  it('with TypeSafe off or failing, the model answers and no error shows', async () => {
+    for (const jev of [
+      scriptedRoute(routeReply(null)),
+      scriptedRoute({ ok: false, cause: 'failed' }),
+      scriptedRoute(() => {
+        throw new Error('network down');
+      }),
+    ]) {
+      const model = scriptedModel(textReply('**Samir Mansour**'));
+      const outcome = await askRouted('who are my khalos', model.send, jev.route);
+      expect(outcome).toMatchObject({ ok: true, answer: '**Samir Mansour**', answeredBy: 'model' });
+    }
+  });
+
+  it('shows the daily limit line when the route is refused for it, with no model call', async () => {
+    const model = scriptedModel();
+    const jev = scriptedRoute({ ok: false, cause: 'daily_limit', usage: { ...usage, messagesUsed: 10 } });
+
+    const outcome = await askRouted('who are my khalos', model.send, jev.route);
+
+    expect(model.send).not.toHaveBeenCalled();
+    expect(outcome).toEqual({ ok: false, cause: 'daily_limit', line: CHAT_LINES.daily_limit, resetsAt: usage.resetsAt });
+  });
+
+  it('leaves the model the calls the route did not use', async () => {
+    const model = scriptedModel(
+      toolsReply(['getTreeCounts', {}]),
+      toolsReply(['getTreeCounts', {}]),
+      toolsReply(['getTreeCounts', {}]),
+      toolsReply(['getTreeCounts', {}]),
+      toolsReply(['getTreeCounts', {}]),
+    );
+    const jev = scriptedRoute(routeReply(null));
+
+    const outcome = await askRouted('how many people are in the tree?', model.send, jev.route);
+
+    // The route was the message's first call; the function allows 6 in all.
+    expect(model.send).toHaveBeenCalledTimes(5);
     expect(outcome).toEqual({ ok: false, cause: 'failed', line: CHAT_LINES.failed });
   });
 });

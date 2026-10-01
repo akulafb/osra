@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { FunctionsFetchError, FunctionsHttpError } from '@supabase/supabase-js';
-import { readChatReply } from './familyChatClient';
+import { readChatReply, readRouteReply } from './familyChatClient';
 
 const usage = {
   messagesUsed: 3,
@@ -58,5 +58,48 @@ describe('readChatReply', () => {
     ['tool calls that are not a list', { message: { role: 'assistant', content: null, toolCalls: 'x' }, done: false, usage }],
   ])('calls a 200 with %s a failure', async (_why, data) => {
     expect(await readChatReply({ data, error: null })).toEqual({ ok: false, cause: 'failed' });
+  });
+});
+
+describe('readRouteReply', () => {
+  const questionKind = {
+    relation: { value: 'cousins', confidence: 0.9 },
+    side: { value: 'both', confidence: 0.8 },
+    gender: { value: 'any', confidence: 0.7 },
+    subject: { value: 'speaker', confidence: 0.95 },
+    wantsCount: { value: false, confidence: 0.9 },
+  };
+  const speaker = { personId: 'node-fahd', displayName: 'Fahd Badran' };
+
+  it("passes on Jev's reading, the speaker and the usage", async () => {
+    const data = { questionKind, speaker, usage };
+    expect(await readRouteReply({ data, error: null })).toEqual({ ok: true, reply: data });
+  });
+
+  it('passes on no reading and no speaker', async () => {
+    const data = { questionKind: null, speaker: null, usage };
+    expect(await readRouteReply({ data, error: null })).toEqual({ ok: true, reply: data });
+  });
+
+  it('reads a daily limit refusal', async () => {
+    const error = refusalResponse(429, { code: 'daily_limit', cause: 'daily_limit', message: 'x', usage });
+    expect(await readRouteReply({ data: null, error })).toEqual({ ok: false, cause: 'daily_limit', usage });
+  });
+
+  it.each([
+    ['an answer with no confidence', { ...questionKind, side: { value: 'both' } }],
+    ['a value the code does not know', { ...questionKind, gender: { value: 'other', confidence: 0.9 } }],
+    ['a missing answer', { ...questionKind, wantsCount: undefined }],
+  ])('treats %s as no reading, so the model answers', async (_why, reading) => {
+    const data = { questionKind: reading, speaker, usage };
+    expect(await readRouteReply({ data, error: null })).toEqual({ ok: true, reply: { ...data, questionKind: null } });
+  });
+
+  it.each([
+    ['nothing', null],
+    ['no usage', { questionKind, speaker }],
+    ['a speaker with no id', { questionKind, speaker: { displayName: 'x' }, usage }],
+  ])('calls a 200 with %s a failure', async (_why, data) => {
+    expect(await readRouteReply({ data, error: null })).toEqual({ ok: false, cause: 'failed' });
   });
 });

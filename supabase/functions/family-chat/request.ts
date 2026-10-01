@@ -66,6 +66,9 @@ class Refusal extends Error {
   }
 }
 
+const INVALID_MESSAGE_ID = 'messageId must be 8 to 100 letters, digits, "-" or "_".';
+const MESSAGE_TOO_LONG = `A message can be at most ${MAX_USER_MESSAGE_CHARS} characters.`;
+
 /** Length as a person counts it: "محمد" is four, not the UTF-16 unit count. */
 function characterCount(s: string): number {
   return [...s].length;
@@ -100,12 +103,7 @@ function parseTurn(raw: unknown, index: number): ChatTurn {
       if (typeof raw.content !== 'string' || raw.content.trim() === '') {
         badTurn(index, 'a user turn needs text');
       }
-      if (characterCount(raw.content) > MAX_USER_MESSAGE_CHARS) {
-        throw new Refusal(
-          'message_too_long',
-          `A message can be at most ${MAX_USER_MESSAGE_CHARS} characters.`,
-        );
-      }
+      if (characterCount(raw.content) > MAX_USER_MESSAGE_CHARS) throw new Refusal('message_too_long', MESSAGE_TOO_LONG);
       return { role: 'user', content: raw.content };
     }
     case 'assistant': {
@@ -164,11 +162,7 @@ export function validateChatRequest(body: unknown): ChatRequestValidation {
   }
   const { messageId, messages } = body;
   if (typeof messageId !== 'string' || !MESSAGE_ID.test(messageId)) {
-    return {
-      ok: false,
-      code: 'invalid_message_id',
-      message: 'messageId must be 8 to 100 letters, digits, "-" or "_".',
-    };
+    return { ok: false, code: 'invalid_message_id', message: INVALID_MESSAGE_ID };
   }
   if (!Array.isArray(messages) || messages.length === 0) {
     return { ok: false, code: 'invalid_turns', message: 'messages must be a non-empty list.' };
@@ -195,4 +189,33 @@ export async function questionHash(turns: ChatTurn[]): Promise<string> {
   const question = [...turns].reverse().find((t) => t.role === 'user')?.content ?? '';
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(question));
   return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+/**
+ * The second operation (LIN-73): before any model call, the browser asks what
+ * kind of question the message is. It sends only the message and its id; the
+ * id is the one the model calls for this message will use, if any.
+ */
+export interface RouteRequest {
+  messageId: string;
+  message: string;
+}
+
+export type RouteRequestValidation =
+  | { ok: true; request: RouteRequest }
+  | { ok: false; code: string; message: string };
+
+/** Checks a request body of the form `{ operation: 'route', messageId, message }`. */
+export function validateRouteRequest(body: Record<string, unknown>): RouteRequestValidation {
+  const { messageId, message } = body;
+  if (typeof messageId !== 'string' || !MESSAGE_ID.test(messageId)) {
+    return { ok: false, code: 'invalid_message_id', message: INVALID_MESSAGE_ID };
+  }
+  if (typeof message !== 'string' || message.trim() === '') {
+    return { ok: false, code: 'invalid_message', message: 'message must be text.' };
+  }
+  if (characterCount(message) > MAX_USER_MESSAGE_CHARS) {
+    return { ok: false, code: 'message_too_long', message: MESSAGE_TOO_LONG };
+  }
+  return { ok: true, request: { messageId, message } };
 }

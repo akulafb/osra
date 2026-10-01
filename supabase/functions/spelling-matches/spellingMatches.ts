@@ -12,7 +12,7 @@
  * Person Match code that uses it.
  */
 
-export const TYPESAFE_URL = 'https://api.typesafe.ai/v1/systemone';
+export { TYPESAFE_URL } from '../_shared/typeSafe.ts';
 
 /** Pinned, not `jev-latest`: the caller's threshold was measured on this version. */
 export const TYPESAFE_MODEL = 'jev-1.13.0';

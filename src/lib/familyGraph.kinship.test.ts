@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   getRelatives,
+  getFormerSpouses,
   getRecordedGender,
   getNodeId,
   findKinshipPaths,
@@ -213,6 +214,15 @@ describe('getRelatives', () => {
 
 /** The step kinds of a Kinship Path, in order. */
 const kinds = (path: KinshipPath) => path.steps.map(s => s.kind);
+
+describe('getFormerSpouses', () => {
+  it('lists the other end of each divorce, and not a current marriage', () => {
+    expect(getFormerSpouses(P.layla, links)).toEqual([P.tarek]);
+    expect(getFormerSpouses(P.tarek, links)).toEqual([P.layla]);
+    expect(getFormerSpouses(P.karim, links)).toEqual([]);
+    expect(getFormerSpouses('', links)).toEqual([]);
+  });
+});
 
 describe('findKinshipPaths', () => {
   it('returns the chain of Kinship Links in order from one Person to the other', () => {
