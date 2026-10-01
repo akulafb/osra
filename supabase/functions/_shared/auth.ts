@@ -10,6 +10,7 @@
  */
 
 import { errorResponse, type FetchLike } from './http.ts';
+import { projectUrl } from './supabaseRest.ts';
 
 export interface AuthEnv {
   /** `SUPABASE_URL`, set by the platform for every function. */
@@ -41,7 +42,7 @@ export async function requireSignedInUser(
 
   let res: Response;
   try {
-    res = await fetchImpl(`${env.supabaseUrl.replace(/\/+$/, '')}/auth/v1/user`, {
+    res = await fetchImpl(projectUrl(env.supabaseUrl, '/auth/v1/user'), {
       headers: { Authorization: `Bearer ${token}`, apikey: env.supabaseAnonKey },
       signal: AbortSignal.timeout(10_000),
     });
@@ -58,10 +59,16 @@ export async function requireSignedInUser(
   return { ok: true, userId: id };
 }
 
-/** The refusal a function sends for a failed sign-in check. */
-export function authRefusal(outcome: Extract<AuthOutcome, { ok: false }>): Response {
+/**
+ * The refusal a function sends for a failed sign-in check. `extra` adds the
+ * function's own fields to the error (family-chat adds its `cause`).
+ */
+export function authRefusal(
+  outcome: Extract<AuthOutcome, { ok: false }>,
+  extra: Record<string, unknown> = {},
+): Response {
   if (outcome.reason === 'auth-unavailable') {
-    return errorResponse(503, 'auth_unavailable', 'Could not check the session. Try again.');
+    return errorResponse(503, 'auth_unavailable', 'Could not check the session. Try again.', extra);
   }
-  return errorResponse(401, 'not_signed_in', 'A valid Supabase session is required.');
+  return errorResponse(401, 'not_signed_in', 'A valid Supabase session is required.', extra);
 }

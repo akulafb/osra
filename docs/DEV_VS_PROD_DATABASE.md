@@ -59,10 +59,11 @@ Server code lives in `supabase/functions/`. Each function is a folder with an `i
 | Function | What it does | Secrets it reads |
 |----------|--------------|------------------|
 | `spelling-matches` | Scores given names against a typed name with TypeSafe Jev (LIN-67) | `TYPESAFE_API_KEY` |
+| `family-chat` | The family chat's model calls through OpenRouter, with 10 messages per account per UAE day (LIN-71). Needs the `chat_message_usage` migration. | `OPENROUTER_API_KEY` |
 
 A function's keys are **function secrets**, stored in the Supabase project. They are not in the repo, not in Vercel, and never carry a `VITE_` prefix — a `VITE_` variable is compiled into the browser bundle. Dev and prod are separate projects, so every secret is set twice and every function is deployed twice.
 
-`SUPABASE_URL` and `SUPABASE_ANON_KEY` are given to every function by the platform; do not set them.
+`SUPABASE_URL`, `SUPABASE_ANON_KEY` and `SUPABASE_SERVICE_ROLE_KEY` are given to every function by the platform; do not set them. (`family-chat` uses the service role key for the one database function that keeps the daily count, which only the service role may run.)
 
 ### Set a secret and deploy (run once for dev, once for prod)
 
@@ -108,6 +109,59 @@ console.log(res.status, await res.json());
 App code calls it with `supabase.functions.invoke('spelling-matches', { body: { typedName, names } })`, which sends the session token for you.
 
 Function logs (including the provider's error text, which is never sent to the browser): Supabase Dashboard → Edge Functions → the function → Logs.
+
+### `family-chat`: migration, secret, deploy (dev, then prod)
+
+The chat function needs a table and a database function first (`supabase/migrations/20261001120000_lin71_chat_message_usage.sql`), then its secret, then the deploy. Use a new OpenRouter key with a credit cap; the old one was public in the site code.
+
+```bash
+REF=your-dev-project-id        # then repeat everything below with the prod ref
+
+# 1. Apply the migration. Look at the dry run first: it should list only the
+#    migrations you expect (here, 20261001120000_lin71_chat_message_usage.sql).
+npx supabase link --project-ref "$REF"
+npx supabase db push --dry-run
+npx supabase db push
+
+# 2. Set the secret, read from .env.local without printing it.
+KEY="$(sed -nE 's/^[[:space:]]*OPENROUTER_API_KEY[[:space:]]*=[[:space:]]*"?([^"[:space:]]+)"?[[:space:]]*$/\1/p' .env.local)"
+npx supabase secrets set "OPENROUTER_API_KEY=$KEY" --project-ref "$REF"
+unset KEY
+
+# 3. Deploy.
+npx supabase functions deploy family-chat --project-ref "$REF"
+npx supabase secrets list --project-ref "$REF"      # OPENROUTER_API_KEY is listed
+```
+
+Check it from `npm run dev` (signed in, browser console on `http://localhost:5173`):
+
+```js
+const ref = 'your-dev-project-id';
+const token = JSON.parse(localStorage.getItem(`sb-${ref}-auth-token`)).access_token;
+const chat = (body) => fetch(`https://${ref}.supabase.co/functions/v1/family-chat`, {
+  method: 'POST',
+  headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+  body: JSON.stringify(body),
+}).then(async (r) => [r.status, await r.json()]);
+const messageId = crypto.randomUUID();
+console.log(await chat({ messageId, messages: [{ role: 'user', content: 'How many cousins do I have?' }] }));
+// 200 { message: { role: 'assistant', content: null, toolCalls: [{ id, name: 'getRelatives', arguments: {…} }] },
+//       done: false, usage: { messagesUsed: 1, dailyLimit: 10, modelCalls: 1, maxModelCalls: 6, resetsAt: '…' } }
+```
+
+Without a session the same call answers 401 with `cause: 'not_signed_in'` (try it with `Authorization` removed). Each new `messageId` uses one of the account's 10 messages for the UAE day; the count starts again at midnight UAE time (20:00 UTC). A `messageId` belongs to one question: tool rounds and retries reuse it, a new question needs a new one (reusing it answers 409 `message_id_reused`). To see the counts: Dashboard → Table Editor → `chat_message_usage`. To give a test account its messages back on dev, delete its rows there.
+
+How the function is called — the request, the answer, the tool round and the refusal causes — is written at the top of `supabase/functions/family-chat/handler.ts` and `request.ts`.
+
+The database rules and RLS have a check script, `supabase/tests/chat_message_usage.sql`, for a local or throwaway database only (never dev or prod). With Docker:
+
+```bash
+docker run -d --rm --name osra-pg -e POSTGRES_PASSWORD=pw postgres:16-alpine && sleep 3
+for f in supabase/tests/stub_supabase_auth.sql supabase/migrations/20261001120000_lin71_chat_message_usage.sql supabase/tests/chat_message_usage.sql; do
+  docker exec -i osra-pg psql -U postgres -v ON_ERROR_STOP=1 -q < "$f" || break
+done
+docker stop osra-pg
+```
 
 ### Tests and the evaluation set
 

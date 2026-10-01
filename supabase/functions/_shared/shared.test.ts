@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { bearerToken, requireSignedInUser } from './auth.ts';
 import { answerPreflightOrWrongMethod, CORS_HEADERS, errorResponse, readJsonBody } from './http.ts';
 import { backoffDelayMs, fetchWithRetry } from './retry.ts';
+import { DatabaseError, serviceRoleRequest } from './supabaseRest.ts';
 
 const env = { supabaseUrl: 'https://proj.supabase.co', supabaseAnonKey: 'anon-key' };
 
@@ -182,5 +183,39 @@ describe('fetchWithRetry', () => {
     });
     await expect(fetchWithRetry('https://x', {}, { fetchImpl, sleep })).rejects.toThrow('network');
     expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('serviceRoleRequest', () => {
+  const ok = () => vi.fn<(url: string, init?: RequestInit) => Promise<Response>>(async () => Response.json([{ id: 1 }]));
+
+  it('sends a legacy service_role JWT as apikey and bearer, and reads the JSON answer', async () => {
+    const fetchImpl = ok();
+    const env = { supabaseUrl: 'https://proj.supabase.co/', serviceRoleKey: 'eyJ.jwt' };
+    expect(await serviceRoleRequest(env, 'users?id=eq.1', fetchImpl)).toEqual([{ id: 1 }]);
+    const [url, init] = fetchImpl.mock.calls[0];
+    expect(url).toBe('https://proj.supabase.co/rest/v1/users?id=eq.1');
+    expect(init?.method).toBe('GET');
+    expect(init?.headers).toEqual({ apikey: 'eyJ.jwt', Authorization: 'Bearer eyJ.jwt' });
+  });
+
+  it('sends a new-style secret key as apikey only, and POSTs a body as JSON', async () => {
+    const fetchImpl = ok();
+    const env = { supabaseUrl: 'https://proj.supabase.co', serviceRoleKey: 'sb_secret_x' };
+    await serviceRoleRequest(env, 'rpc/f', fetchImpl, { a: 1 });
+    const [, init] = fetchImpl.mock.calls[0];
+    expect(init?.method).toBe('POST');
+    expect(init?.body).toBe('{"a":1}');
+    expect(init?.headers).toEqual({ apikey: 'sb_secret_x', 'Content-Type': 'application/json' });
+  });
+
+  it('throws DatabaseError for a refusal or a network failure', async () => {
+    const env = { supabaseUrl: 'https://proj.supabase.co', serviceRoleKey: 'k' };
+    const refused = vi.fn(async () => new Response('no', { status: 401 }));
+    const down = vi.fn(async () => {
+      throw new Error('down');
+    });
+    await expect(serviceRoleRequest(env, 'x', refused)).rejects.toBeInstanceOf(DatabaseError);
+    await expect(serviceRoleRequest(env, 'x', down)).rejects.toBeInstanceOf(DatabaseError);
   });
 });

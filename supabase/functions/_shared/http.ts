@@ -16,9 +16,12 @@ export const CORS_HEADERS: Record<string, string> = {
 /** `fetch`, narrowed to what the functions use, so tests can stand in for the network. */
 export type FetchLike = (input: string, init?: RequestInit) => Promise<Response>;
 
-/** The body of every refusal: a stable `code` for code, a `message` for people. */
+/**
+ * The body of every refusal: a stable `code` for code, a `message` for people,
+ * and any fields a function adds for its own callers (family-chat adds `cause`).
+ */
 export interface ErrorBody {
-  error: { code: string; message: string };
+  error: { code: string; message: string; [field: string]: unknown };
 }
 
 export function jsonResponse(body: unknown, status = 200): Response {
@@ -28,8 +31,13 @@ export function jsonResponse(body: unknown, status = 200): Response {
   });
 }
 
-export function errorResponse(status: number, code: string, message: string): Response {
-  const body: ErrorBody = { error: { code, message } };
+export function errorResponse(
+  status: number,
+  code: string,
+  message: string,
+  extra: Record<string, unknown> = {},
+): Response {
+  const body: ErrorBody = { error: { ...extra, code, message } };
   return jsonResponse(body, status);
 }
 
