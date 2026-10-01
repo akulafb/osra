@@ -21,9 +21,10 @@
  * Needs Node 22.18 or later (it imports the function's TypeScript directly).
  */
 
-import { existsSync, readFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { readApiKey } from '../readApiKey.mjs';
 import { candidateNames } from './candidates.mjs';
 import { TYPESAFE_MODEL } from '../../supabase/functions/spelling-matches/spellingMatches.ts';
 import { scoreNames } from '../../supabase/functions/spelling-matches/typeSafe.ts';
@@ -34,17 +35,6 @@ const repoRoot = resolve(here, '../..');
 function flag(name, fallback) {
   const i = process.argv.indexOf(`--${name}`);
   return i >= 0 ? process.argv[i + 1] : fallback;
-}
-
-/** Reads one variable from a dotenv file. Tolerates spaces around `=` and quotes. */
-function readEnvFile(path, name) {
-  if (!existsSync(path)) return undefined;
-  for (const line of readFileSync(path, 'utf8').split(/\r?\n/)) {
-    const m = line.match(/^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*?)\s*$/);
-    if (!m || m[1] !== name) continue;
-    return m[2].replace(/^(['"])(.*)\1$/, '$2');
-  }
-  return undefined;
 }
 
 const threshold = Number(flag('threshold', '0.5'));
@@ -75,13 +65,7 @@ if (functionUrl) {
     return (await res.json()).scores;
   };
 } else {
-  const apiKey =
-    process.env.TYPESAFE_API_KEY?.trim() ||
-    readEnvFile(resolve(repoRoot, '.env.local'), 'TYPESAFE_API_KEY') ||
-    (process.env.ENV_FILE && readEnvFile(resolve(process.env.ENV_FILE), 'TYPESAFE_API_KEY'));
-  if (!apiKey) {
-    throw new Error('No TYPESAFE_API_KEY in the environment, in .env.local, or in $ENV_FILE.');
-  }
+  const apiKey = readApiKey('TYPESAFE_API_KEY');
   lookup = async (typedName) => {
     const outcome = await scoreNames({ typedName, names: candidates }, apiKey);
     if (!outcome.ok) {

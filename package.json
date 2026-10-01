@@ -11,7 +11,8 @@
     "compress-images": "node scripts/compress-images.mjs",
     "prebuild": "npm run compress-images",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "chat-questions": "vite-node scripts/chat-questions/run.ts"
   },
   "dependencies": {
     "@emotion/react": "^11.14.0",
