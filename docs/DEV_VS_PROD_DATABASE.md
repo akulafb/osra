@@ -149,7 +149,7 @@ console.log(await chat({ messageId, messages: [{ role: 'user', content: 'How man
 //       done: false, usage: { messagesUsed: 1, dailyLimit: 10, modelCalls: 1, maxModelCalls: 6, resetsAt: '…' } }
 ```
 
-Without a session the same call answers 401 with `cause: 'not_signed_in'` (try it with `Authorization` removed). Each new `messageId` uses one of the account's 10 messages for the UAE day; the count starts again at midnight UAE time (20:00 UTC). To see the counts: Dashboard → Table Editor → `chat_message_usage`. To give a test account its messages back on dev, delete its rows there.
+Without a session the same call answers 401 with `cause: 'not_signed_in'` (try it with `Authorization` removed). Each new `messageId` uses one of the account's 10 messages for the UAE day; the count starts again at midnight UAE time (20:00 UTC). A `messageId` belongs to one question: tool rounds and retries reuse it, a new question needs a new one (reusing it answers 409 `message_id_reused`). To see the counts: Dashboard → Table Editor → `chat_message_usage`. To give a test account its messages back on dev, delete its rows there.
 
 How the function is called — the request, the answer, the tool round and the refusal causes — is written at the top of `supabase/functions/family-chat/handler.ts` and `request.ts`.
 

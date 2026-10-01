@@ -41,17 +41,21 @@ export type ChatRequestValidation =
 /** A UUID fits; so does any other id of letters, digits, `-` and `_`. */
 const MESSAGE_ID = /^[A-Za-z0-9_-]{8,100}$/;
 
-/** Turns kept in one request: about 20 questions and answers. */
-export const MAX_TURNS = 40;
+/**
+ * Turns in one request. A tool round adds an assistant turn and one turn per
+ * tool call, so this is a handful of earlier questions plus the current one;
+ * the browser trims older turns, keeping each tool result with its call.
+ */
+export const MAX_TURNS = 80;
 /** A tool result for a long list of relatives fits; the whole tree does not. */
 export const MAX_TOOL_RESULT_CHARS = 20_000;
 export const MAX_ASSISTANT_CHARS = 8_000;
-export const MAX_TOOL_CALLS_PER_TURN = 10;
+export const MAX_TOOL_CALLS_PER_TURN = 20;
 const MAX_ID_CHARS = 200;
 const MAX_TOOL_NAME_CHARS = 64;
 const MAX_ARGUMENTS_CHARS = 2_000;
 
-/** Well above the largest valid request (40 turns at their caps is under 200 KB). */
+/** The real bound on a request's size; the per-turn caps keep any one turn sane. */
 export const MAX_CHAT_BODY_BYTES = 256 * 1024;
 
 class Refusal extends Error {
@@ -67,7 +71,7 @@ function characterCount(s: string): number {
   return [...s].length;
 }
 
-function isObject(value: unknown): value is Record<string, unknown> {
+export function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
@@ -180,4 +184,15 @@ export function validateChatRequest(body: unknown): ChatRequestValidation {
     if (err instanceof Refusal) return { ok: false, code: err.code, message: err.message };
     throw err;
   }
+}
+
+/**
+ * SHA-256 (hex) of the last user turn: the question a message id belongs to.
+ * A tool round or a retry repeats the question and gets the same hash; a new
+ * question under an id already counted does not, and is refused.
+ */
+export async function questionHash(turns: ChatTurn[]): Promise<string> {
+  const question = [...turns].reverse().find((t) => t.role === 'user')?.content ?? '';
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(question));
+  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('');
 }

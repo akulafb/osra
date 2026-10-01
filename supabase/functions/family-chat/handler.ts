@@ -7,14 +7,14 @@
  * request is known to be good:
  *   1. sign-in check (Supabase Auth) — no session, nothing else happens;
  *   2. the body — a bad or oversized request is refused before it is counted;
- *   3. the signed-in Person, read from the database for the system prompt;
- *   4. the count — `chat_use_model_call` records the call or refuses it;
+ *   3. the count — `chat_use_model_call` records the call or refuses it;
+ *   4. the signed-in Person, read from the database for the system prompt;
  *   5. OpenRouter, with the function's model, prompt, tools and reply cap.
  *
  * Every refusal carries a `cause` the browser turns into one line for the user.
  */
 
-import { requireSignedInUser } from '../_shared/auth.ts';
+import { authRefusal, requireSignedInUser } from '../_shared/auth.ts';
 import {
   answerPreflightOrWrongMethod,
   errorResponse,
@@ -23,7 +23,8 @@ import {
   type FetchLike,
 } from '../_shared/http.ts';
 import type { RetryOptions } from '../_shared/retry.ts';
-import { DatabaseError, findSpeaker, recordModelCall, type DatabaseEnv } from './database.ts';
+import { DatabaseError, type ServiceRoleEnv } from '../_shared/supabaseRest.ts';
+import { findSpeaker, recordModelCall, type QuotaOutcome } from './database.ts';
 import {
   DAILY_MESSAGE_LIMIT,
   MAX_MODEL_CALLS_PER_MESSAGE,
@@ -32,7 +33,7 @@ import {
 } from './limits.ts';
 import { buildModelRequest, callModel, type AssistantTurn } from './openRouter.ts';
 import { buildSystemPrompt, type Speaker } from './prompt.ts';
-import { MAX_CHAT_BODY_BYTES, validateChatRequest } from './request.ts';
+import { MAX_CHAT_BODY_BYTES, questionHash, validateChatRequest } from './request.ts';
 
 /**
  * Why a call was refused, as the browser shows it (LIN-72 has the lines):
@@ -40,6 +41,8 @@ import { MAX_CHAT_BODY_BYTES, validateChatRequest } from './request.ts';
  * - `credit_gone`: the owner's OpenRouter credit is used up;
  * - `not_signed_in`: no valid Supabase session;
  * - `failed`: anything else. `code` says what, for logs and tests.
+ * Read the cause, not the HTTP status: `daily_limit` and `message_call_limit`
+ * are both 429.
  */
 export type RefusalCause = 'daily_limit' | 'credit_gone' | 'not_signed_in' | 'failed';
 
@@ -93,6 +96,12 @@ function refuse(
   return errorResponse(status, code, message, usage ? { cause, usage } : { cause });
 }
 
+function databaseRefusal(err: unknown, log: (message: string) => void): Response {
+  if (!(err instanceof DatabaseError)) throw err;
+  log(`family-chat: database: ${err.message}`);
+  return refuse(503, 'database_unavailable', 'failed', 'The chat is unavailable. Try again.');
+}
+
 /** The model may take a while with tools; one slow attempt is abandoned after this. */
 const MODEL_ATTEMPT_TIMEOUT_MS = 60_000;
 
@@ -125,10 +134,8 @@ async function handle(req: Request, deps: FamilyChatDeps, log: (message: string)
   // 1. Who is asking. No session, no further work and no call to OpenRouter.
   const auth = await requireSignedInUser(req, { supabaseUrl, supabaseAnonKey }, fetchImpl);
   if (!auth.ok) {
-    if (auth.reason === 'auth-unavailable') {
-      return refuse(503, 'auth_unavailable', 'failed', 'Could not check the session. Try again.');
-    }
-    return refuse(401, 'not_signed_in', 'not_signed_in', 'A valid Supabase session is required.');
+    const cause: RefusalCause = auth.reason === 'auth-unavailable' ? 'failed' : 'not_signed_in';
+    return authRefusal(auth, { cause });
   }
 
   // 2. What they sent.
@@ -142,17 +149,17 @@ async function handle(req: Request, deps: FamilyChatDeps, log: (message: string)
     return refuse(500, 'not_configured', 'failed', 'The chat is not configured.');
   }
 
-  // 3 and 4. Who they are in the tree, and whether this call may be made.
-  const db: DatabaseEnv = { supabaseUrl, serviceRoleKey };
-  let speaker: Speaker | null;
-  let quota: Awaited<ReturnType<typeof recordModelCall>>;
+  // 3. Whether this call may be made. Without the count the limit cannot
+  //    hold, so a database failure means the model is not called.
+  const db: ServiceRoleEnv = { supabaseUrl, serviceRoleKey };
+  let quota: QuotaOutcome;
   try {
-    speaker = await findSpeaker(db, auth.userId, fetchImpl);
     quota = await recordModelCall(
       db,
       {
         userId: auth.userId,
         messageId,
+        questionHash: await questionHash(turns),
         uaeDay: uaeDay(now),
         dailyLimit: DAILY_MESSAGE_LIMIT,
         maxModelCalls: MAX_MODEL_CALLS_PER_MESSAGE,
@@ -160,10 +167,7 @@ async function handle(req: Request, deps: FamilyChatDeps, log: (message: string)
       fetchImpl,
     );
   } catch (err) {
-    if (!(err instanceof DatabaseError)) throw err;
-    // Without the count the limit cannot hold, so the model is not called.
-    log(`family-chat: database: ${err.message}`);
-    return refuse(503, 'database_unavailable', 'failed', 'The chat is unavailable. Try again.');
+    return databaseRefusal(err, log);
   }
 
   const usage: ChatUsage = {
@@ -184,6 +188,17 @@ async function handle(req: Request, deps: FamilyChatDeps, log: (message: string)
       `One message can use at most ${MAX_MODEL_CALLS_PER_MESSAGE} model calls.`,
       usage,
     );
+  }
+  if (quota.outcome === 'message_id_reused') {
+    return refuse(409, 'message_id_reused', 'failed', 'Each new question needs a new messageId.', usage);
+  }
+
+  // 4. Who is asking, in the tree.
+  let speaker: Speaker | null;
+  try {
+    speaker = await findSpeaker(db, auth.userId, fetchImpl);
+  } catch (err) {
+    return databaseRefusal(err, log);
   }
 
   // 5. The model.

@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { handleFamilyChat, type FamilyChatDeps } from './handler.ts';
 import { CHAT_MODEL } from './openRouter.ts';
@@ -26,7 +27,7 @@ interface Call {
 }
 
 function fakeWorld() {
-  const usage = new Map<string, { day: string; calls: number }>();
+  const usage = new Map<string, { day: string; calls: number; question: string }>();
   const calls: Call[] = [];
   const modelAnswers: Array<() => Response | Promise<Response>> = [];
   const world = {
@@ -82,6 +83,9 @@ function fakeWorld() {
           [...usage.entries()].filter(([k, v]) => k.startsWith(`${a.p_user_id}|`) && v.day === day).length;
         const row = usage.get(key);
         if (row) {
+          if (row.question !== a.p_question_hash) {
+            return Response.json({ outcome: 'message_id_reused', new_message: false, messages_used: usedOn(a.p_uae_day), model_calls: row.calls });
+          }
           if (row.calls >= a.p_max_model_calls) {
             return Response.json({ outcome: 'message_call_limit', new_message: false, messages_used: usedOn(a.p_uae_day), model_calls: row.calls });
           }
@@ -91,7 +95,7 @@ function fakeWorld() {
         if (usedOn(a.p_uae_day) >= a.p_daily_limit) {
           return Response.json({ outcome: 'daily_limit', new_message: true, messages_used: usedOn(a.p_uae_day), model_calls: 0 });
         }
-        usage.set(key, { day: a.p_uae_day, calls: 1 });
+        usage.set(key, { day: a.p_uae_day, calls: 1, question: a.p_question_hash });
         return Response.json({ outcome: 'ok', new_message: true, messages_used: usedOn(a.p_uae_day), model_calls: 1 });
       }
     }
@@ -390,6 +394,8 @@ describe('the daily limit', () => {
     expect(JSON.parse(String(rpc.init.body))).toEqual({
       p_user_id: 'user-fahd',
       p_message_id: 'message-1',
+      // SHA-256 of the question, worked out here with Node's own crypto.
+      p_question_hash: createHash('sha256').update('Who is my father?').digest('hex'),
       p_uae_day: '2026-10-02',
       p_daily_limit: 10,
       p_max_model_calls: 6,
@@ -409,6 +415,21 @@ describe('the daily limit', () => {
     });
     expect(repeat.status).toBe(200);
     expect(repeat.body.usage).toMatchObject({ messagesUsed: 10, modelCalls: 2 });
+  });
+
+  it('refuses a new question under an id already counted, without calling the model', async () => {
+    await sendNewMessage('message-1');
+    const reused = await send({ messageId: 'message-1', messages: [ask('And who is my mother?')] });
+    expect(reused.status).toBe(409);
+    expect(reused.body.error).toMatchObject({ code: 'message_id_reused', cause: 'failed' });
+    expect(world.callsTo('openrouter.ai')).toHaveLength(1);
+  });
+
+  it('lets a retry of the same question through on the same id', async () => {
+    await sendNewMessage('message-1');
+    const retry = await sendNewMessage('message-1');
+    expect(retry.status).toBe(200);
+    expect(retry.body.usage).toMatchObject({ messagesUsed: 1, modelCalls: 2 });
   });
 
   it('counts each account on its own', async () => {

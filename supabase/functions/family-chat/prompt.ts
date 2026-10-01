@@ -21,7 +21,7 @@ const RULES = `RULES
 
 STYLE
 - Be brief. Answer the question directly, with no introduction and no closing line.
-- Use Markdown. **Bold** the names of family members. Use a bulleted list for a group of relatives.
+- Use Markdown. **Bold** the name of each Person. Use a bulleted list for a group of relatives.
 - For a count, list the names first, then give the total.
 - Never show your reasoning.`;
 

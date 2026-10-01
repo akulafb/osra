@@ -11,7 +11,7 @@
 
 import { fetchWithRetry, RETRYABLE_STATUSES, type RetryOptions } from '../_shared/retry.ts';
 import { MAX_REPLY_TOKENS } from './limits.ts';
-import type { ChatTurn, ToolCall } from './request.ts';
+import { isObject, type ChatTurn, type ToolCall } from './request.ts';
 import { CHAT_TOOLS } from './tools.ts';
 
 export const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
@@ -69,10 +69,6 @@ export function buildModelRequest(systemPrompt: string, turns: ChatTurn[]) {
     tool_choice: 'auto',
     max_tokens: MAX_REPLY_TOKENS,
   };
-}
-
-function isObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 function parseArguments(raw: unknown): Record<string, unknown> | null {

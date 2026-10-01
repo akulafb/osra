@@ -97,7 +97,7 @@ describe('validateChatRequest', () => {
   });
 
   it('refuses a conversation or a tool result too large to be a family chat', () => {
-    const many = Array.from({ length: 41 }, (_, i) =>
+    const many = Array.from({ length: 80 }, (_, i) =>
       i % 2 === 0 ? ask('q') : { role: 'assistant', content: 'a' },
     );
     expect(refusalCode({ messageId: id, messages: [...many, ask('q')] })).toBe('too_many_turns');
