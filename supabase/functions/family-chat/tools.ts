@@ -35,14 +35,18 @@ export const RELATIVE_KINDS = [
 ] as const;
 export type RelativeKindArgument = (typeof RELATIVE_KINDS)[number];
 
+/** `KinshipSide` and `RecordedGender` in src/lib/familyGraph.ts. */
+export const KINSHIP_SIDES = ['mother', 'father', 'both'] as const;
+export const RECORDED_GENDERS = ['female', 'male'] as const;
+
 /** What the model sends for each tool, once the browser has checked it. */
 export interface ChatToolArguments {
   findPersonsByName: { name: string };
   getRelatives: {
     personId: string;
     kind: RelativeKindArgument;
-    side?: 'mother' | 'father' | 'both';
-    gender?: 'female' | 'male';
+    side?: (typeof KINSHIP_SIDES)[number];
+    gender?: (typeof RECORDED_GENDERS)[number];
   };
   findKinshipPaths: { fromPersonId: string; toPersonId: string };
   getTreeCounts: Record<string, never>;
@@ -98,7 +102,7 @@ export const CHAT_TOOLS: readonly ToolDefinition[] = [
           kind: { type: 'string', enum: [...RELATIVE_KINDS] },
           side: {
             type: 'string',
-            enum: ['mother', 'father', 'both'],
+            enum: [...KINSHIP_SIDES],
             description:
               "Only relatives reached through the Person's mother or father (\"mom's side\"). " +
               'Applies to parents, siblings, grandparents, aunts and uncles, cousins, nieces ' +
@@ -106,7 +110,7 @@ export const CHAT_TOOLS: readonly ToolDefinition[] = [
           },
           gender: {
             type: 'string',
-            enum: ['female', 'male'],
+            enum: [...RECORDED_GENDERS],
             description:
               'Only relatives the record shows as female or male (for example aunts, not ' +
               'uncles). Persons whose gender the record cannot tell are left out.',

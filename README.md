@@ -59,7 +59,7 @@ Each solution unlocked the next challenge, building from a simple graph into a f
 
 ### Family Chatbot
 
-- **Floating assistant (🤖)**: Now with **User Identification**—the bot knows who is signed in and can answer personal questions like "Who is my father?". Uses person-centric context from your tree. BE EXTREMELY CONCISE responses.
+- **Floating assistant (🤖)**: Knows who is signed in and answers questions like "Who is my father?" or "How many cousins do I have on my mom's side?". The model runs on the `family-chat` Edge Function, which holds the key and allows 10 messages per account per day. When it needs a fact it calls a tool; the browser runs the tool on the Working Record and sends back only the answer, never the whole tree. Read only.
 
 ### Core Functionality
 
@@ -119,9 +119,8 @@ Each solution unlocked the next challenge, building from a simple graph into a f
 
 ### AI & LLM
 
-- **OpenRouter**: Cloud-based LLM access (Grok 4.3)
-- **Ollama**: Local LLM support (Qwen 2.5 Coder)
-- **Custom Reasoning Engine**: Person-centric context generation from graph data
+- **OpenRouter**: Grok 4.3, called only from the `family-chat` Supabase Edge Function. No model key is in the browser.
+- **Chat tools**: Relatives lists, Kinship Paths and relation names worked out in code (`src/lib/familyGraph.ts`), run in the browser on the Working Record
 
 ### Backend & Database
 
@@ -153,14 +152,14 @@ src/
 │   └── WorkingRecordContext.tsx  # The one owner of the Working Record
 ├── hooks/
 │   ├── useWorkingRecord.ts       # Working Record state and the write sequencer
-│   └── useFamilyChat.ts          # Chatbot logic and LLM orchestration
+│   └── useFamilyChat.ts          # Chat state: question, answer, limit lines
 ├── lib/
 │   ├── supabase.ts               # Supabase client configuration
 │   ├── workingRecord.ts          # Confirmed snapshot + pending changes, projected
-│   └── permissions.ts            # 1-degree permission helpers
-├── utils/
-│   ├── llmClient.ts              # OpenRouter/Ollama dual-mode client
-│   └── familyContext.ts          # Graph-to-profile context generator
+│   ├── permissions.ts            # 1-degree permission helpers
+│   ├── familyChat.ts             # Chat tool loop through the family-chat function
+│   ├── familyChatClient.ts       # Calls the family-chat Edge Function
+│   └── chatTools.ts              # Runs the chat's tools on the Working Record
 ├── pages/
 │   ├── HomePage.tsx              # Landing or tree (auth-gated)
 │   └── InvitePage.tsx            # Invite token claim page
