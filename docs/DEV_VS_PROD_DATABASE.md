@@ -186,6 +186,8 @@ The functions' logic is in plain TypeScript modules with no Deno imports, so `np
 
 `node scripts/chat-routing-eval/run.mjs` does the same for the chat route (LIN-73): it sends the 46 prototype messages in `scripts/chat-routing-eval/messages.json` to Jev as the `family-chat` route does, and prints how many of the tuned (32) and new (14) messages Jev read right, and where each would go at the confidence gate. Same key, same rule: run it before changing the model or the wording in `questionKind.ts`.
 
+`npx vite-node scripts/chat-questions/run.ts` asks the 20 chat test questions (LIN-74, `src/lib/fixtures/chatTestQuestions.ts`) on the made-up test tree, signed in as its Person Maya Khoury, through the same chat code the browser uses with the real Jev and OpenRouter. For each question it prints correct or wrong, whether code or the model answered, the model calls and the cost (Jev's input tokens at $0.042 a million, plus OpenRouter's `usage.cost`), then the totals: correct, routed to code, mean cost, highest cost. It needs `OPENROUTER_API_KEY` and `TYPESAFE_API_KEY` (from the environment, `.env.local`, or the file named by `$ENV_FILE`) and costs about a cent a run. It needs no deployed function: it runs the `family-chat` handler in-process with Supabase Auth and the database faked, so it reaches no Supabase project, makes no change to the Tree Record and does not use the daily limit. Add `--replies` to print each reply, or `--only <id>,<id>` to ask some of them. It exits 1 below 18 of 20. Run it after any change to the chat, the routing or the prompt.
+
 ## Verification
 
 1. Ensure `.env.local` has `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` pointing to the **dev** project.
