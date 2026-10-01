@@ -382,6 +382,11 @@ deno_version = 2
 [functions.spelling-matches]
 verify_jwt = false
 
+# The family chat (LIN-71): holds the OpenRouter key, counts messages per day.
+# Same as above: the function checks the session with Supabase Auth itself.
+[functions.family-chat]
+verify_jwt = false
+
 [analytics]
 enabled = true
 port = 54327
