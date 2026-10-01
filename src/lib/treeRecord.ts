@@ -1,5 +1,5 @@
 import { getParents } from './familyGraph';
-import { FamilyLink, FamilyNode, RelativeDirection } from '../types/graph';
+import { FamilyLink, FamilyNode, PersonGender, RelativeDirection } from '../types/graph';
 import { kinshipLinksFromRows, personsFromRows } from './treeRecordRows';
 
 export type TreeRecordErrorKind = 'refused' | 'not-authorized' | 'network' | 'conflict' | 'unknown';
@@ -45,6 +45,8 @@ export interface AddPersonParams {
    */
   id?: string;
   firstName: string;
+  /** Male, female, or not recorded (`null` or omitted). */
+  gender?: PersonGender | null;
   paternalCluster?: string | null;
   maternalCluster?: string | null;
   /**
@@ -64,6 +66,8 @@ export interface AddLinkParams {
 export interface EditPersonParams {
   id: string;
   firstName?: string;
+  /** Omitted leaves the gender alone; `null` clears it to not recorded. */
+  gender?: PersonGender | null;
   paternalCluster?: string | null;
   maternalCluster?: string | null;
 }
@@ -119,6 +123,17 @@ export interface TreeRecord {
   editLink(params: EditLinkParams): Promise<ConfirmedRows>;
   removePerson(params: RemovePersonParams): Promise<ConfirmedRows>;
   removeLink(params: RemoveLinkParams): Promise<ConfirmedRows>;
+}
+
+/**
+ * The `parent_role` a parent Kinship Link takes from the parent's gender, or
+ * `null` when the gender is not recorded. The database applies the same rule
+ * to every parent link it writes, and refuses a role that disagrees.
+ */
+export function parentRoleForGender(gender: PersonGender | null | undefined): 'mother' | 'father' | null {
+  if (gender === 'male') return 'father';
+  if (gender === 'female') return 'mother';
+  return null;
 }
 
 /**
@@ -229,6 +244,20 @@ function buildHeaders(identity: TreeRecordIdentity, supabaseKey: string, prefer?
   return headers;
 }
 
+/**
+ * A rule the database enforces itself — a raised exception (`P0001`) or a check
+ * constraint (`23514`), such as a gender that disagrees with a `parent_role` —
+ * is a refusal, not a transport failure.
+ */
+function isRefusedByRule(text: string): boolean {
+  try {
+    const code = (JSON.parse(text) as { code?: string }).code;
+    return code === 'P0001' || code === '23514';
+  } catch {
+    return false;
+  }
+}
+
 function parseErrorMessage(text: string, status: number): string {
   try {
     const j = JSON.parse(text) as { message?: string; error?: string; hint?: string };
@@ -309,6 +338,9 @@ async function handleResponseError(res: Response): Promise<never> {
   if (isConflict) {
     throw new TreeRecordError('conflict', message, res.status);
   }
+  if (isRefusedByRule(text)) {
+    throw new TreeRecordError('refused', message, res.status);
+  }
   throw new TreeRecordError('network', message, res.status);
 }
 
@@ -334,6 +366,11 @@ export function createTreeRecord(
       };
       if (params.link.relation === 'child' && params.link.parentRole) {
         bodyPayload.p_parent_role = params.link.parentRole;
+      }
+      // Sent only when recorded, like `p_parent_role`: the RPC resolves by the
+      // argument names supplied.
+      if (params.gender) {
+        bodyPayload.p_gender = params.gender;
       }
       if (params.id) {
         bodyPayload.p_new_node_id = params.id;
@@ -383,6 +420,9 @@ export function createTreeRecord(
       maternal_family_cluster: params.maternalCluster?.trim().slice(0, 100) || null,
       created_by_user_id: identity.userId,
     };
+    if (params.gender) {
+      payload.gender = params.gender;
+    }
     if (params.id) {
       payload.id = params.id;
     }
@@ -503,6 +543,10 @@ export function createTreeRecord(
       updateData.first_name = sanitizedName;
     }
 
+    if (params.gender !== undefined) {
+      updateData.gender = params.gender;
+    }
+
     if (identity.isAdmin) {
       if (params.paternalCluster !== undefined) {
         updateData.paternal_family_cluster = params.paternalCluster ? params.paternalCluster.trim().slice(0, 100) : null;
@@ -535,7 +579,31 @@ export function createTreeRecord(
         'No Person was updated. Confirm you are allowed to edit this Person, then refresh and try again.'
       );
     }
-    return { persons };
+    if (params.gender === undefined) {
+      return { persons };
+    }
+    const links = await readParentLinks(params.id);
+    return links ? { persons, links } : { persons };
+  };
+
+  /**
+   * The parent Kinship Links from one Person. A gender change fills an empty
+   * `parent_role` on them server-side, so they are read back to confirm them
+   * with the Person. The edit is already written, so a failed read is not a
+   * failed write: it returns `null` and the links catch up on the next load.
+   */
+  const readParentLinks = async (personId: string): Promise<FamilyLink[] | null> => {
+    const pid = encodeURIComponent(personId);
+    try {
+      const res = await fetchFn(`${supabaseUrl}/rest/v1/links?source_node_id=eq.${pid}&type=eq.parent`, {
+        method: 'GET',
+        headers: buildHeaders(identity, supabaseKey),
+      });
+      if (!res.ok) return null;
+      return kinshipLinksFromRows(JSON.parse(await res.text()));
+    } catch {
+      return null;
+    }
   };
 
   const editLink = async (params: EditLinkParams): Promise<ConfirmedRows> => {

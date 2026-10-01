@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import Button from '@mui/material/Button';
 import { useAuth } from '../../contexts/AuthContext';
-import { FamilyNode } from '../../types/graph';
+import { FamilyNode, PersonGender } from '../../types/graph';
 import { formatNodeDisplayName } from '../../utils/nodeDisplayName';
 import { createTreeRecord } from '../../lib/treeRecord';
 import { readMatchResolution, SPELLING_MATCH_LABEL } from '../../lib/personMatch';
@@ -33,6 +33,7 @@ export default function EditNodeModal({
   const [name, setName] = useState('');
   const [familyCluster, setFamilyCluster] = useState('');
   const [maternalFamilyCluster, setMaternalFamilyCluster] = useState('');
+  const [gender, setGender] = useState<PersonGender | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -44,6 +45,7 @@ export default function EditNodeModal({
       setName(targetNode.firstName);
       setFamilyCluster(targetNode.familyCluster || '');
       setMaternalFamilyCluster(targetNode.maternalFamilyCluster || '');
+      setGender(targetNode.gender ?? null);
       setError(null);
       setSuccessMessage(null);
       setConfirmedDifferentPerson(false);
@@ -105,6 +107,9 @@ export default function EditNodeModal({
       });
       const paternalCluster = isAdmin ? familyCluster : undefined;
       const maternalCluster = isAdmin ? maternalFamilyCluster : undefined;
+      // Sent only when changed: a gender change makes the seam read the
+      // Person's parent links back, since the server may have given them a role.
+      const changedGender = gender !== (targetNode.gender ?? null) ? gender : undefined;
 
       // The edited Person goes onto the canvas now and the server row replaces
       // them wholesale on confirmation (D12) — including the two cluster fields
@@ -119,6 +124,7 @@ export default function EditNodeModal({
               firstName: sanitizedName,
               familyCluster: paternalCluster ?? targetNode.familyCluster,
               maternalFamilyCluster: maternalCluster ?? targetNode.maternalFamilyCluster,
+              gender,
             },
           },
         ],
@@ -127,6 +133,7 @@ export default function EditNodeModal({
           rows: await record.editPerson({
             id: targetNode.id,
             firstName: sanitizedName,
+            gender: changedGender,
             paternalCluster,
             maternalCluster,
           }),
@@ -178,6 +185,20 @@ export default function EditNodeModal({
             <p style={{ margin: '8px 0 0 0', fontSize: '0.7rem', color: 'rgba(255,255,255,0.4)', fontStyle: 'italic' }}>
               Paternal / maternal family clusters are set below (admin) or inherited from the tree.
             </p>
+          </div>
+
+          <div style={fieldStyle}>
+            <label style={labelStyle}>GENDER</label>
+            <select
+              value={gender ?? ''}
+              onChange={(e) => setGender(e.target.value ? (e.target.value as PersonGender) : null)}
+              style={inputStyle}
+              disabled={isSubmitting}
+            >
+              <option value="">Not recorded</option>
+              <option value="male">Male</option>
+              <option value="female">Female</option>
+            </select>
           </div>
 
           {/* Admin-only: Family Cluster fields */}

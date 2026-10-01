@@ -163,7 +163,7 @@ function run(call: ToolCall, record: ChatRecord): string {
       const kind = oneOf(args.kind, RELATIVE_KINDS, 'kind');
       const side = optionalOneOf(args.side, KINSHIP_SIDES, 'side');
       const gender = optionalOneOf(args.gender, RECORDED_GENDERS, 'gender');
-      const relatives = getRelatives(subject.personId, kind, record.links, { side, gender }).map(
+      const relatives = getRelatives(subject.personId, kind, record.links, { side, gender, persons: record.nodes }).map(
         (personId) => ({ personId, displayName: displayNameOf(personId) }),
       );
       return fitRelatives(

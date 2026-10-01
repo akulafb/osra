@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useSyncExternalStore } from 'react';
 import Button from '@mui/material/Button';
 import { useAuth } from '../../contexts/AuthContext';
-import { FamilyLink, FamilyNode } from '../../types/graph';
+import { FamilyLink, FamilyNode, PersonGender } from '../../types/graph';
 import { formatNodeDisplayName } from '../../utils/nodeDisplayName';
 import {
   connectedPersonIds,
@@ -11,6 +11,7 @@ import {
 import { usePersonMatch } from '../../hooks/usePersonMatch';
 import {
   createTreeRecord,
+  parentRoleForGender,
   pendingKinshipLink,
   relativeToKinshipLink,
   relativeToKinshipLinks,
@@ -65,6 +66,7 @@ export default function AddRelativeModal({
   const [name, setName] = useState('');
   const [relationship, setRelationship] = useState<RelationshipType>('child');
   const [parentRole, setParentRole] = useState<'mother' | 'father' | null>(null);
+  const [gender, setGender] = useState<PersonGender | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirmedDifferentPerson, setConfirmedDifferentPerson] = useState(false);
@@ -103,6 +105,7 @@ export default function AddRelativeModal({
       setName('');
       setRelationship('child');
       setParentRole(null);
+      setGender(null);
       setError(null);
       setConfirmedDifferentPerson(false);
       setSelectedExistingId(null);
@@ -114,6 +117,12 @@ export default function AddRelativeModal({
     if (!isOpen) return;
     onPendingConnectTargetChange?.(selectedExistingId);
   }, [isOpen, selectedExistingId, onPendingConnectTargetChange]);
+
+  // A parent link's role follows the parent's gender, and the server refuses
+  // one that disagrees: when the anchor's gender is recorded, adding a child
+  // has no "I am the…" choice to make.
+  const anchorParentRole = parentRoleForGender(targetNode.gender);
+  const childParentRole = anchorParentRole ?? parentRole;
 
   useEffect(() => {
     if (!isOpen) return;
@@ -137,10 +146,18 @@ export default function AddRelativeModal({
     // A sibling shares parents rather than being linked to the anchor, so no
     // single Kinship Link says it; this is the long-standing approximation,
     // unchanged.
+    const existingParentRole = parentRoleForGender(
+      existingNodes.find((person) => person.id === existingId)?.gender
+    );
     const kinship: AddLinkParams =
       relationship === 'sibling'
         ? { sourceId: targetNode.id, targetId: existingId, type: 'parent', parentRole: null }
-        : relativeToKinshipLink(targetNode.id, existingId, relationship, parentRole);
+        : relativeToKinshipLink(
+            targetNode.id,
+            existingId,
+            relationship,
+            relationship === 'parent' ? existingParentRole : childParentRole
+          );
 
     await write(
       [{ kind: 'link-upsert', link: pendingKinshipLink(kinship) }],
@@ -158,16 +175,19 @@ export default function AddRelativeModal({
     // The Person's uuid is minted here so the optimistic Person and the row
     // the server writes are the same Person (D11).
     const personId = crypto.randomUUID();
+    // The new Person is the parent when adding a parent, so the link's role
+    // comes from the gender being entered; the server derives the same.
+    const linkRole = relationship === 'parent' ? parentRoleForGender(gender) : childParentRole;
 
     await write(
       [
-        { kind: 'person-upsert', person: { id: personId, firstName: sanitizedName } },
+        { kind: 'person-upsert', person: { id: personId, firstName: sanitizedName, gender } },
         ...relativeToKinshipLinks(
           targetNode.id,
           personId,
           relationship,
           existingLinks ?? [],
-          parentRole
+          linkRole
         ).map((link) => ({ kind: 'link-upsert' as const, link })),
       ],
       async () => ({
@@ -175,7 +195,8 @@ export default function AddRelativeModal({
         rows: await record.addPerson({
           id: personId,
           firstName: sanitizedName,
-          link: { targetId: targetNode.id, relation: relationship, parentRole },
+          gender,
+          link: { targetId: targetNode.id, relation: relationship, parentRole: childParentRole },
         }),
       })
     );
@@ -311,7 +332,34 @@ export default function AddRelativeModal({
             </select>
           </div>
 
-          {relationship === 'child' && (
+          {!selectedExistingId && (
+            <div style={fieldStyle}>
+              <label style={labelStyle}>GENDER</label>
+              <select
+                value={gender ?? ''}
+                onChange={(e) => setGender(e.target.value ? (e.target.value as PersonGender) : null)}
+                style={inputStyle}
+              >
+                <option value="">Not recorded</option>
+                <option value="male">Male</option>
+                <option value="female">Female</option>
+              </select>
+            </div>
+          )}
+
+          {relationship === 'child' && anchorParentRole && (
+            <div style={fieldStyle}>
+              <label style={labelStyle}>I AM THE…</label>
+              <p style={{ margin: 0, fontSize: '0.9rem', color: 'white' }}>
+                {anchorParentRole === 'mother' ? 'Mother' : 'Father'}
+              </p>
+              <p style={{ margin: '8px 0 0 0', fontSize: '0.7rem', color: 'rgba(255,255,255,0.4)', fontStyle: 'italic' }}>
+                From {formatNodeDisplayName(targetNode)}&apos;s recorded gender
+              </p>
+            </div>
+          )}
+
+          {relationship === 'child' && !anchorParentRole && (
             <div style={fieldStyle}>
               <label style={labelStyle}>I AM THE…</label>
               <select

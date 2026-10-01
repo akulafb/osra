@@ -107,6 +107,22 @@ describe('routeMessage: code answers the common kinds, with no model call', () =
     });
   });
 
+  it("reads a Person's recorded gender, so a childless aunt is counted", () => {
+    const record = {
+      ...KINSHIP_FIXTURE_TREE,
+      nodes: KINSHIP_FIXTURE_TREE.nodes.map((node) => (node.id === P.amal ? { ...node, gender: 'female' as const } : node)),
+    };
+    const reply = (gender: Gender) =>
+      routeMessage({
+        message: 'who are my aunts on my mom side',
+        questionKind: reading({ relation: 'aunts_uncles', side: 'maternal', gender }),
+        speaker: OMAR,
+        record,
+      });
+    expect(reply('female')).toEqual({ by: 'code', answer: "Your aunt on your mother's side is **Amal Mansour**." });
+    expect(reply('male')).toEqual({ by: 'code', answer: "Your uncle on your mother's side is **Samir Mansour**." });
+  });
+
   it('aunts and uncles on both sides say which side each one is on', () => {
     expect(route('who are my aunts and uncles', reading({ relation: 'aunts_uncles' }))).toEqual({
       by: 'code',

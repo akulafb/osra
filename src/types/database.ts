@@ -44,6 +44,8 @@ export interface Database {
           first_name: string;
           paternal_family_cluster: string | null;
           maternal_family_cluster: string | null;
+          /** Male, female, or `null` for not recorded (LIN-76). */
+          gender: 'male' | 'female' | null;
           created_by_user_id: string | null; // UUID from auth.users
           created_at: string;
         };
@@ -52,6 +54,7 @@ export interface Database {
           first_name: string;
           paternal_family_cluster?: string | null;
           maternal_family_cluster?: string | null;
+          gender?: 'male' | 'female' | null;
           created_by_user_id?: string | null; // UUID from auth.users
           created_at?: string;
         };
@@ -60,6 +63,7 @@ export interface Database {
           first_name?: string;
           paternal_family_cluster?: string | null;
           maternal_family_cluster?: string | null;
+          gender?: 'male' | 'female' | null;
           created_by_user_id?: string | null; // UUID from auth.users
           created_at?: string;
         };
@@ -192,6 +196,8 @@ export interface Database {
           p_parent_role?: string | null;
           /** Caller-supplied Person uuid; the database mints one when omitted. */
           p_new_node_id?: string | null;
+          /** The new Person's gender: 'male', 'female', or omitted for not recorded. */
+          p_gender?: string | null;
         };
         Returns: {
           success: boolean;

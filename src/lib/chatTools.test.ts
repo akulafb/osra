@@ -99,6 +99,19 @@ describe('runChatTool: filters', () => {
   });
 });
 
+describe('runChatTool: recorded gender', () => {
+  it("reads a Person's own gender before parent_role", () => {
+    const record = {
+      ...KINSHIP_FIXTURE_TREE,
+      nodes: KINSHIP_FIXTURE_TREE.nodes.map((node) => (node.id === P.amal ? { ...node, gender: 'female' as const } : node)),
+    };
+    const result = JSON.parse(
+      runChatTool({ id: 'call-1', name: 'getRelatives', arguments: { personId: P.omar, kind: 'auntsAndUncles', side: 'mother', gender: 'female' } }, record),
+    );
+    expect(result.relatives.map((r: { displayName: string }) => r.displayName)).toEqual(['Amal Mansour']);
+  });
+});
+
 describe('runChatTool: a large list', () => {
   // A founder with 900 children, and 300 Persons who are not related to them.
   const founder: FamilyNode = { id: 'founder', firstName: 'Founder', familyCluster: 'Big' };

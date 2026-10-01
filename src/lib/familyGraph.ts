@@ -1,4 +1,4 @@
-import type { FamilyNode, FamilyLink, LinkEndpoint, RelativeDirection } from '../types/graph';
+import type { FamilyNode, FamilyLink, LinkEndpoint, PersonGender, RelativeDirection } from '../types/graph';
 import { formatNodeDisplayName } from '../utils/nodeDisplayName';
 export type { FamilyNode, FamilyLink, LinkEndpoint, RelativeDirection };
 
@@ -275,8 +275,14 @@ function adjacencyOf(index: KinshipIndex, personId: string): KinshipAdjacency {
 /** Which parent a relative is reached through. `both` is the same as no filter. */
 export type KinshipSide = 'mother' | 'father' | 'both';
 
-/** Gender as far as the Tree Record can tell: only from `parent_role`. */
-export type RecordedGender = 'female' | 'male';
+/**
+ * Gender as far as the Tree Record can tell: the Person's own gender, or else
+ * `parent_role` on a Kinship Link where the Person is the parent.
+ */
+export type RecordedGender = PersonGender;
+
+/** The Persons whose own gender is read first; only `id` and `gender` are used. */
+export type GenderedPersons = readonly Pick<FamilyNode, 'id' | 'gender'>[];
 
 export type RelativeKind =
   | 'parents'
@@ -306,6 +312,11 @@ export interface RelativeFilter {
    * gender the record cannot tell is left out when this is set.
    */
   gender?: RecordedGender;
+  /**
+   * The Persons of the Tree Record, so `gender` reads each relative's own
+   * gender before falling back to `parent_role`.
+   */
+  persons?: GenderedPersons;
 }
 
 function parentIds(index: KinshipIndex, personId: string, side?: KinshipSide): string[] {
@@ -353,16 +364,27 @@ function recordedGender(index: KinshipIndex, personId: string): RecordedGender |
   return null;
 }
 
+/** Reads each Person's own gender first, then `parent_role` where they are a parent. */
+function genderReader(index: KinshipIndex, persons: GenderedPersons | undefined): (personId: string) => RecordedGender | null {
+  const byId = new Map<string, RecordedGender>();
+  for (const person of persons ?? []) {
+    if (person.gender) byId.set(person.id, person.gender);
+  }
+  return personId => byId.get(personId) ?? recordedGender(index, personId);
+}
+
 /**
- * The gender of a Person as far as the Tree Record can tell. The record holds
- * no gender on a Person; the only evidence is `parent_role` on a Kinship Link
- * where the Person is the parent. Returns `null` when there is none.
+ * The gender of a Person as far as the Tree Record can tell: the Person's own
+ * gender when `persons` has one, or else `parent_role` on a Kinship Link where
+ * the Person is the parent (a Person recorded before genders were). Returns
+ * `null` when neither says.
  */
 export function getRecordedGender(
   personId: string,
-  links: readonly FamilyLink[]
+  links: readonly FamilyLink[],
+  persons?: GenderedPersons
 ): RecordedGender | null {
-  return recordedGender(buildKinshipIndex(links), personId);
+  return genderReader(buildKinshipIndex(links), persons)(personId);
 }
 
 /**
@@ -385,7 +407,7 @@ export function getRelatives(
 ): string[] {
   if (!personId) return [];
   const index = buildKinshipIndex(links);
-  const { side, gender } = filter ?? {};
+  const { side, gender, persons } = filter ?? {};
   const parents = (id: string) => parentIds(index, id);
   const children = (id: string) => childIds(index, id);
   const spouses = (id: string) => currentSpouseIds(index, id);
@@ -445,7 +467,9 @@ export function getRelatives(
   const unique = new Set(found ?? []);
   unique.delete(personId);
   const result = Array.from(unique);
-  return gender ? result.filter(id => recordedGender(index, id) === gender) : result;
+  if (!gender) return result;
+  const genderOf = genderReader(index, persons);
+  return result.filter(id => genderOf(id) === gender);
 }
 
 /**
