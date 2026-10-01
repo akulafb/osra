@@ -22,8 +22,8 @@ export type UsePersonMatchParams = Omit<MatchExistingPersonsParams, 'spellingSco
  * The substring match is computed on every render, so the list never waits for
  * the network. Spelling matches join it when the spelling-matches function
  * answers; until then, and whenever it is slow or failing, the answer is exactly
- * the substring match. Every caller that matches as the user types (Ghost Node
- * now, the Add Relative and Edit Node modals next) uses this hook, so the
+ * the substring match. Every caller that matches as the user types (the Ghost
+ * Node, the Add Relative modal and the Edit Node modal) uses this hook, so the
  * threshold, debounce and fallback have one home.
  *
  * `fetchScores` is injectable for tests and must be referentially stable.

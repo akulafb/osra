@@ -1,10 +1,11 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import Button from '@mui/material/Button';
 import { useAuth } from '../../contexts/AuthContext';
 import { FamilyNode } from '../../types/graph';
 import { formatNodeDisplayName } from '../../utils/nodeDisplayName';
 import { createTreeRecord } from '../../lib/treeRecord';
-import { matchExistingPersons, readMatchResolution } from '../../lib/personMatch';
+import { readMatchResolution, SPELLING_MATCH_LABEL } from '../../lib/personMatch';
+import { usePersonMatch } from '../../hooks/usePersonMatch';
 import { useWorkingRecord } from '../../contexts/WorkingRecordContext';
 
 const MAX_NAME_LENGTH = 200;
@@ -50,19 +51,18 @@ export default function EditNodeModal({
   }, [isOpen, targetNode]);
 
   // Renaming asks "am I colliding with someone?" — the same matching every other
-  // path uses, so a rename can no longer miss a cluster match the Ghost Node sees.
-  const resolution = useMemo(
-    () =>
-      matchExistingPersons({
-        query: name,
-        intent: 'renaming',
-        pool: existingNodes,
-        excludePersonId: targetNode.id,
-        visibleIds,
-        currentGivenName: targetNode.firstName,
-      }),
-    [name, existingNodes, targetNode.id, targetNode.firstName, visibleIds]
-  );
+  // path uses, so a rename can no longer miss a cluster match the Ghost Node sees,
+  // Spelling Matches included. An unchanged name resolves to none and is never
+  // looked up. A closed modal asks nothing, so a name left in the field is not
+  // looked up behind it.
+  const resolution = usePersonMatch({
+    query: isOpen ? name : '',
+    intent: 'renaming',
+    pool: existingNodes,
+    excludePersonId: targetNode.id,
+    visibleIds,
+    currentGivenName: targetNode.firstName,
+  });
 
   // An exact collision has to be answered before Save; anything looser stays advisory.
   const { matches, hiddenMatchCount, mustConfirm: unresolved } = readMatchResolution(resolution);
@@ -230,9 +230,12 @@ export default function EditNodeModal({
             <div style={warningStyle}>
               <strong style={{ fontSize: '0.75rem', letterSpacing: '0.05em' }}>SIMILAR NAMES IN ARCHIVE</strong>
               <ul style={{ margin: '12px 0', paddingLeft: '20px', color: 'rgba(255,255,255,0.8)' }}>
-                {matches.map(({ person, isVisible }) => (
+                {matches.map(({ person, isSpellingVariant, isVisible }) => (
                   <li key={person.id} style={{ fontSize: '0.85rem' }}>
                     {formatNodeDisplayName(person)}
+                    {isSpellingVariant && (
+                      <span style={{ color: 'rgba(255,255,255,0.5)' }}> · {SPELLING_MATCH_LABEL}</span>
+                    )}
                     {!isVisible && (
                       <span style={{ color: 'rgba(255,255,255,0.5)' }}> · hidden by filter</span>
                     )}
