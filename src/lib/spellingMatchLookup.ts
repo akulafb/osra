@@ -1,5 +1,10 @@
 import { FamilyNode } from '../types/graph';
-import { MIN_MATCH_QUERY_LENGTH, SpellingScores, spellingScoresFrom } from './personMatch';
+import {
+  foldName,
+  MIN_MATCH_QUERY_LENGTH,
+  SpellingScores,
+  spellingScoresFrom,
+} from './personMatch';
 
 /**
  * Asks the spelling-matches function (LIN-67) which given names in the Tree
@@ -99,7 +104,7 @@ export function createSpellingMatchLookup({
   return {
     request(query, names) {
       const typedName = query.trim();
-      const key = `${typedName.toLowerCase()}\u0000${names.join('\u0001')}`;
+      const key = `${foldName(typedName)}\u0000${names.join('\u0001')}`;
       if (key === currentKey) return;
       currentKey = key;
       cancel();
@@ -133,7 +138,7 @@ export function spellingLookupNames(pool: readonly FamilyNode[]): string[] {
   const seen = new Set<string>();
   for (const person of pool) {
     const name = (person.firstName ?? '').trim();
-    const key = name.toLowerCase();
+    const key = foldName(name);
     if (!name || characterCount(name) > SPELLING_LOOKUP_MAX_NAME_LENGTH || seen.has(key)) continue;
     seen.add(key);
     names.push(name);

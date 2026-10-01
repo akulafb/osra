@@ -91,7 +91,9 @@ typed name with TypeSafe Jev; a score of **0.5 or more** is a **Spelling Match**
    At the threshold used, the prototype had 17 wrong extras in 63 lookups; a block
    that fires that often on the wrong Person is the click-through obstacle
    decision 2 exists to avoid. An exact given-name match still gives `must-confirm`
-   whatever the scores say, and is never also labelled a Spelling Match.
+   whatever the scores say, and is never also labelled a Spelling Match. Nor is a
+   given name that already contains the query: "Moham" is Mohammed half-typed, not
+   spelled differently, so it stays an ordinary substring match.
 
 6. **Order: exact, then Spelling Matches, then other substring matches**, each
    alphabetical. The cap of 4, the hidden-match count and the `isVisible` /

@@ -288,6 +288,14 @@ describe('matchExistingPersons — spelling matches (advice only)', () => {
     expect(matchIds(result)).toEqual(['exact', 'var', 'sub']);
   });
 
+  it('does not call a given name that already contains the query a different spelling', () => {
+    // "Moham" is Mohammed half-typed, not spelled differently: it stays an
+    // ordinary substring match, unlabelled and in the substring tier.
+    const result = spelling('Moham', { Mohammed: 0.8 });
+    if (result.kind === 'none') throw new Error('expected matches');
+    expect(result.matches.map((m) => [m.person.id, m.isSpellingVariant])).toEqual([['mz', false]]);
+  });
+
   it('counts a score of 0.5 as a spelling match and anything below it as none', () => {
     expect(SPELLING_MATCH_THRESHOLD).toBe(0.5);
     expect(matchIds(spelling('Mohamed', { Mohammed: 0.5 }))).toEqual(['mz']);

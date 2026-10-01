@@ -87,31 +87,41 @@ export interface MatchExistingPersonsParams {
   /** `renaming` only: the Person's current given name; an unchanged name resolves to `none`. */
   currentGivenName?: string;
   /**
-   * Spelling scores for this query, from `useSpellingScores` / the spelling
-   * lookup. Omit (or pass scores for another query) for substring matching only.
+   * Spelling scores for this query, from the spelling lookup (`usePersonMatch`
+   * wires it). Omit, or pass scores for another query, for substring matching only.
    */
   spellingScores?: SpellingScores;
   limit?: number;
 }
 
-/** Trimmed and case-folded, the form both the query and a given name are compared in. */
-function fold(value: string | undefined): string {
+/**
+ * Trimmed and case-folded, the form a query and a given name are compared in.
+ * Exported so the spelling lookup keys names the same way this module reads them.
+ */
+export function foldName(value: string | undefined): string {
   return (value ?? '').trim().toLowerCase();
 }
+const fold = foldName;
 
 const NONE: MatchResolution = { kind: 'none' };
+
+type RenameParams = Pick<MatchExistingPersonsParams, 'query' | 'intent' | 'currentGivenName'>;
+
+/**
+ * A rename that has not changed the name is not a collision with anything —
+ * otherwise merely opening Edit on an Ahmad would block on an untouched field.
+ */
+function isUnchangedRename({ query, intent, currentGivenName }: RenameParams): boolean {
+  return intent === 'renaming' && fold(query) === fold(currentGivenName);
+}
 
 /**
  * The query worth a spelling lookup for these params, or `''` for none: an
  * unchanged rename resolves to `none` whatever the scores, so it is not sent.
  * (Too-short queries are refused by the lookup itself.)
  */
-export function spellingLookupQuery({
-  query,
-  intent,
-  currentGivenName,
-}: Pick<MatchExistingPersonsParams, 'query' | 'intent' | 'currentGivenName'>): string {
-  return intent === 'renaming' && fold(query) === fold(currentGivenName) ? '' : query;
+export function spellingLookupQuery(params: RenameParams): string {
+  return isUnchangedRename(params) ? '' : params.query;
 }
 
 export function matchExistingPersons({
@@ -128,9 +138,7 @@ export function matchExistingPersons({
   const q = fold(query);
   if (q.length < MIN_MATCH_QUERY_LENGTH) return NONE;
 
-  // A rename that has not changed the name is not a collision with anything —
-  // otherwise merely opening Edit on an Ahmad would block on an untouched field.
-  if (intent === 'renaming' && q === fold(currentGivenName)) return NONE;
+  if (isUnchangedRename({ query, intent, currentGivenName })) return NONE;
 
   // Scores answer one query. Any others are a stale reply and are dropped here,
   // so no caller can show a previous query's spelling matches.
@@ -141,8 +149,10 @@ export function matchExistingPersons({
     if (person.id === excludePersonId) continue;
     const givenName = fold(person.firstName);
     const isExactGivenName = givenName === q;
+    // A given name that already contains the query is being typed, not spelled
+    // differently ("Moham" → Mohammed): it stays a plain substring match.
     const isSpellingVariant =
-      !isExactGivenName && (scores?.get(givenName) ?? 0) >= SPELLING_MATCH_THRESHOLD;
+      !givenName.includes(q) && (scores?.get(givenName) ?? 0) >= SPELLING_MATCH_THRESHOLD;
     if (!isSpellingVariant && !nodeSearchHaystack(person).toLowerCase().includes(q)) continue;
     matches.push({
       person,
