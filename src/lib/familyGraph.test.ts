@@ -309,6 +309,53 @@ describe('familyGraph module', () => {
       });
     });
 
+    describe('with both parents linked (ADR 0012)', () => {
+      // Dad married Mum, then Second Wife. Me is linked to Dad and Mum; Half is
+      // linked to Dad and Second Wife. Mum's earlier child Brother is linked to
+      // Mum and her former husband Ex.
+      const both: FamilyLink[] = [
+        { source: 'dad', target: 'mum', type: 'divorce' },
+        { source: 'dad', target: 'second-wife', type: 'marriage' },
+        { source: 'ex', target: 'mum', type: 'divorce' },
+        { source: 'dad', target: 'me', type: 'parent', parentRole: 'father' },
+        { source: 'mum', target: 'me', type: 'parent', parentRole: 'mother' },
+        { source: 'dad', target: 'half', type: 'parent', parentRole: 'father' },
+        { source: 'second-wife', target: 'half', type: 'parent', parentRole: 'mother' },
+        { source: 'ex', target: 'brother', type: 'parent', parentRole: 'father' },
+        { source: 'mum', target: 'brother', type: 'parent', parentRole: 'mother' },
+      ];
+      const relativeOf = (anchor: string, id: string) => get1DegreeRelatives(anchor, both).find(r => r.nodeId === id);
+
+      it("counts a father's spouse who is also linked as the parent as a parent, not a stepparent", () => {
+        expect(relativeOf('me', 'mum')).toEqual({ nodeId: 'mum', relationship: 'parent', isBlended: false });
+        expect(relativeOf('half', 'second-wife')).toEqual({ nodeId: 'second-wife', relationship: 'parent', isBlended: false });
+      });
+
+      it("still counts a father's other spouse as a stepparent", () => {
+        expect(relativeOf('me', 'second-wife')).toEqual({ nodeId: 'second-wife', relationship: 'parent', isBlended: true });
+        expect(relativeOf('half', 'mum')).toEqual({ nodeId: 'mum', relationship: 'parent', isBlended: true });
+      });
+
+      it("finds half-siblings on the mother's side as well as the father's", () => {
+        expect(relativeOf('me', 'half')).toEqual({ nodeId: 'half', relationship: 'sibling', isBlended: false });
+        expect(relativeOf('me', 'brother')).toEqual({ nodeId: 'brother', relationship: 'sibling', isBlended: false });
+        expect(relativeOf('half', 'brother')).toBeUndefined();
+      });
+
+      it("counts the mother as a child's parent and the father's spouse, and a co-parent's child as a child", () => {
+        expect(relativeOf('mum', 'me')).toEqual({ nodeId: 'me', relationship: 'child', isBlended: false });
+        expect(relativeOf('mum', 'dad')).toEqual({ nodeId: 'dad', relationship: 'spouse', isBlended: false });
+        expect(relativeOf('second-wife', 'me')).toEqual({ nodeId: 'me', relationship: 'child', isBlended: true });
+      });
+
+      it('was a stepparent before the mother was linked', () => {
+        const fatherOnly = both.filter(l => !(l.type === 'parent' && l.parentRole === 'mother'));
+        expect(get1DegreeRelatives('me', fatherOnly).find(r => r.nodeId === 'mum')).toEqual({
+          nodeId: 'mum', relationship: 'parent', isBlended: true,
+        });
+      });
+    });
+
     describe('get1DegreeNodeIds', () => {
       it('returns all 1-degree relative IDs plus the anchor node itself', () => {
         const ids = get1DegreeNodeIds('user-1', links);

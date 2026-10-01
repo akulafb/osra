@@ -693,6 +693,48 @@ describe('the name of the relation for a Kinship Path', () => {
   });
 });
 
+describe('half-siblings and sides once both parents are linked (ADR 0012)', () => {
+  // Dad married Mum, then Rana. Me and Sister are Dad and Mum's; Half is Dad
+  // and Rana's. Mum's brother Khal has a son, Cousin.
+  const fatherOnly: FamilyLink[] = [
+    { source: 'dad', target: 'mum', type: 'divorce' },
+    { source: 'dad', target: 'rana', type: 'marriage' },
+    { source: 'dad', target: 'me', type: 'parent', parentRole: 'father' },
+    { source: 'dad', target: 'sister', type: 'parent', parentRole: 'father' },
+    { source: 'dad', target: 'half', type: 'parent', parentRole: 'father' },
+    { source: 'grandpa', target: 'mum', type: 'parent', parentRole: 'father' },
+    { source: 'grandpa', target: 'khal', type: 'parent', parentRole: 'father' },
+    { source: 'khal', target: 'cousin', type: 'parent', parentRole: 'father' },
+  ];
+  const both: FamilyLink[] = [
+    ...fatherOnly,
+    { source: 'mum', target: 'me', type: 'parent', parentRole: 'mother' },
+    { source: 'mum', target: 'sister', type: 'parent', parentRole: 'mother' },
+    { source: 'rana', target: 'half', type: 'parent', parentRole: 'mother' },
+  ];
+  const relation = (fromId: string, toId: string, tree: FamilyLink[]) => findKinshipPaths(fromId, toId, tree)[0]?.relation;
+
+  it('tells a half-sibling from a sibling', () => {
+    expect(relation('me', 'half', fatherOnly)).toEqual({ name: 'sibling', label: 'sibling' });
+    expect(relation('me', 'half', both)).toEqual({ name: 'half-sibling', label: 'half-sibling', side: 'father' });
+    expect(relation('me', 'sister', both)).toEqual({ name: 'sibling', label: 'sibling' });
+  });
+
+  it("finds relatives on the mother's side", () => {
+    expect(getRelatives('me', 'parents', fatherOnly, { side: 'mother' })).toEqual([]);
+    expect(getRelatives('me', 'parents', both, { side: 'mother' })).toEqual(['mum']);
+    expect(getRelatives('me', 'auntsAndUncles', both, { side: 'mother' })).toEqual(['khal']);
+    expect(getRelatives('me', 'cousins', both, { side: 'mother' })).toEqual(['cousin']);
+    expect(getRelatives('me', 'cousins', both, { side: 'father' })).toEqual([]);
+    expect(relation('me', 'cousin', both)).toMatchObject({ name: 'cousin', side: 'mother' });
+  });
+
+  it("keeps a half-sibling on the father's side only", () => {
+    expect(sorted(getRelatives('me', 'siblings', both, { side: 'father' }))).toEqual(['half', 'sister']);
+    expect(getRelatives('me', 'siblings', both, { side: 'mother' })).toEqual(['sister']);
+  });
+});
+
 describe('Kinship Terms for any Kinship Path', () => {
   const parent = (source: string, target: string, parentRole?: 'mother' | 'father'): FamilyLink => ({
     source,

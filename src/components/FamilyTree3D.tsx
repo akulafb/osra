@@ -20,6 +20,7 @@ import { getTexturePath } from '../utils/imageFormat';
 import { getClusterColors } from '../utils/familyColors';
 import { getNodeId } from '../lib/familyGraph';
 import { filterGraphDataFor3D } from '../lib/filterGraphData';
+import { keepDrawnParentLinks } from '../lib/layoutEngine';
 import { useClusterBubbles } from '../hooks/useClusterBubbles';
 import { EXIT_MULT } from '../utils/clusterBubbles';
 import { useCosmicFx } from '../hooks/useCosmicFx';
@@ -459,12 +460,15 @@ export const FamilyTree3DContent: React.FC<FamilyTree3DProps> = ({
     try {
       if (!graphData) return { nodes: [], links: [] };
 
-      const filtered = filterGraphDataFor3D(
+      const visible = filterGraphDataFor3D(
         graphData,
         effectiveCollapsedNodes,
         visibleClusters3D,
         uniqueClusters
       );
+      // One parent line per child, chosen by the 2D rule (ADR 0012); both
+      // parent links stay in the Tree Record.
+      const filtered = { ...visible, links: keepDrawnParentLinks(visible.nodes, visible.links) };
 
       // Synthetic dashed edges. Both reuse the same `isPreviewLink` rendering
       // path, which is also why the Connect Mode beam appears only once a pair
@@ -926,9 +930,11 @@ export const FamilyTree3DContent: React.FC<FamilyTree3DProps> = ({
     const nodesInCluster = graphData.nodes.filter(n => n.familyCluster === clusterName);
     const clusterNodeIds = new Set(nodesInCluster.map(n => n.id));
 
-    // 1. Build adjacency list for children in this cluster
+    // 1. Build adjacency list for children in this cluster, one parent per
+    // child (the drawn one), so a child linked to both parents is placed once.
+    const drawnLinks = keepDrawnParentLinks(graphData.nodes, graphData.links);
     const childrenMap = new Map<string, string[]>();
-    graphData.links.forEach(link => {
+    drawnLinks.forEach(link => {
       if (link.type === 'parent') {
         const s = getNodeId(link.source);
         const t = getNodeId(link.target);
@@ -955,7 +961,7 @@ export const FamilyTree3DContent: React.FC<FamilyTree3DProps> = ({
 
     // 3. Find roots (nodes with no parents in the cluster)
     const roots = nodesInCluster.filter(node => {
-      const hasParentInCluster = graphData.links.some(link => {
+      const hasParentInCluster = drawnLinks.some(link => {
         const t = getNodeId(link.target);
         const s = getNodeId(link.source);
         return t === node.id && link.type === 'parent' && clusterNodeIds.has(s);

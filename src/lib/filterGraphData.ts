@@ -34,47 +34,8 @@ export function filterGraphData(
       return true;
     });
 
-    // Spouse / ex-spouse edges (marriage and divorce) — when one co-parent is outside the
-    // preset, parent→child edges are dropped by the filter; reconnect via the co-parent who
-    // is still in scope (applies to any child cluster mix, not only "maternal-only" rows).
-    const spouseByNode = new Map<string, string>();
-    graphData.links.forEach((l) => {
-      if (l.type === 'marriage' || l.type === 'divorce') {
-        const a = getNodeId(l.source);
-        const b = getNodeId(l.target);
-        if (a && b) {
-          spouseByNode.set(a, b);
-          spouseByNode.set(b, a);
-        }
-      }
-    });
-    graphData.links.forEach((l) => {
-      if (l.type !== 'parent') return;
-      const parentId = getNodeId(l.source);
-      const childId = getNodeId(l.target);
-      if (!parentId || !childId || !nodeIds.has(childId)) return;
-      if (nodeIds.has(parentId)) return;
-
-      const altParentId = spouseByNode.get(parentId);
-      if (!altParentId || !nodeIds.has(altParentId)) return;
-
-      const key = getLinkKey(altParentId, childId, 'parent');
-      if (visibleLinkKeys.has(key)) return;
-
-      visibleLinkKeys.add(key);
-      const parentRole =
-        l.parentRole === 'father'
-          ? ('mother' as const)
-          : l.parentRole === 'mother'
-            ? ('father' as const)
-            : undefined;
-      links.push({
-        source: altParentId,
-        target: childId,
-        type: 'parent',
-        ...(parentRole ? { parentRole } : {}),
-      });
-    });
+    // No parent link is invented here: a child is linked to each parent the
+    // family knows (ADR 0012), so the layout picks which one to draw.
   }
 
   return applyCollapsedNodesFilter(nodes, links, collapsedNodes);
