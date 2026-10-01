@@ -448,6 +448,18 @@ export function getRelatives(
   return gender ? result.filter(id => recordedGender(index, id) === gender) : result;
 }
 
+/**
+ * The former spouses of one Person: the other end of each `divorce` link.
+ * `getRelatives(…, 'spouses')` lists current marriages only.
+ */
+export function getFormerSpouses(personId: string, links: readonly FamilyLink[]): string[] {
+  if (!personId) return [];
+  const former = adjacencyOf(buildKinshipIndex(links), personId)
+    .spouses.filter(h => h.link.type === 'divorce')
+    .map(h => h.personId);
+  return Array.from(new Set(former)).filter(id => id !== personId);
+}
+
 // ---------------------------------------------------------------------------
 // Kinship Path
 // ---------------------------------------------------------------------------

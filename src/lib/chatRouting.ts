@@ -27,16 +27,16 @@ import type {
   QuestionKind,
   Relation,
 } from '../../supabase/functions/family-chat/questionKind.ts';
-import type { FamilyLink } from '../types/graph';
 import type { ChatRecord } from './chatTools';
 import {
   findKinshipPaths,
   findPersonsByName,
-  getLinkEndpoints,
+  getFormerSpouses,
   getRecordedGender,
   getRelatives,
   type KinshipPath,
   type KinshipRelation,
+  type KinshipSide,
   type RecordedGender,
   type RelativeKind,
 } from './familyGraph';
@@ -70,6 +70,12 @@ export interface RouteMessage {
 }
 
 type ListRelation = Exclude<Relation, 'how_related' | 'other'>;
+
+/** Which parent's side a list is limited to. */
+type ParentSide = Exclude<KinshipSide, 'both'>;
+
+/** What an in-law is without the marriage: `KinshipRelation.inLaw`. */
+type InLawOf = NonNullable<KinshipRelation['inLaw']>;
 
 const RELATIVE_KIND: Record<ListRelation, RelativeKind> = {
   parents: 'parents',
@@ -115,6 +121,42 @@ const NOUNS: Record<ListRelation, Record<Gender, [string, string]>> = {
   },
   in_laws: { any: ['in-law', 'in-laws'], male: ['male in-law', 'male in-laws'], female: ['female in-law', 'female in-laws'] },
 };
+
+const IN_LAW_NOUNS: Record<InLawOf, Record<Gender, [string, string]>> = {
+  parent: { any: ['parent-in-law', 'parents-in-law'], male: ['father-in-law', 'fathers-in-law'], female: ['mother-in-law', 'mothers-in-law'] },
+  sibling: { any: ['sibling-in-law', 'siblings-in-law'], male: ['brother-in-law', 'brothers-in-law'], female: ['sister-in-law', 'sisters-in-law'] },
+  child: { any: ['child-in-law', 'children-in-law'], male: ['son-in-law', 'sons-in-law'], female: ['daughter-in-law', 'daughters-in-law'] },
+};
+
+/** "mother in law" and the like, as written: which in-law, and its gender. */
+const IN_LAW_WORDS: Record<string, { of: InLawOf; gender: Gender }> = {
+  mother: { of: 'parent', gender: 'female' },
+  mom: { of: 'parent', gender: 'female' },
+  mum: { of: 'parent', gender: 'female' },
+  father: { of: 'parent', gender: 'male' },
+  dad: { of: 'parent', gender: 'male' },
+  parent: { of: 'parent', gender: 'any' },
+  brother: { of: 'sibling', gender: 'male' },
+  sister: { of: 'sibling', gender: 'female' },
+  sibling: { of: 'sibling', gender: 'any' },
+  son: { of: 'child', gender: 'male' },
+  daughter: { of: 'child', gender: 'female' },
+  child: { of: 'child', gender: 'any' },
+};
+
+/**
+ * Jev says only "in-laws" and a gender; "mother in law" also says which
+ * in-law. Read from the words, so "female in-laws" does not list a sister-in-law
+ * for "who is my mother in law". Null when the message names no one kind.
+ */
+function inLawAsked(message: string): { of: InLawOf; gender: Gender } | null {
+  const asked = new Set(
+    [...message.toLowerCase().matchAll(/\b(mother|mom|mum|father|dad|parent|brother|sister|sibling|son|daughter|child)s?[\s-]*in[\s-]*laws?\b/g)].map(
+      (m) => m[1],
+    ),
+  );
+  return asked.size === 1 ? IN_LAW_WORDS[[...asked][0]] : null;
+}
 
 /**
  * Words that are never read as part of a name, even when a Person has them as
@@ -253,10 +295,26 @@ export function routeMessage({ message, questionKind: kind, speaker, record }: R
       return { by: 'model', why: 'names_do_not_fit' };
   }
 
-  const gender = IGNORES_GENDER.has(relation) ? 'any' : kind.gender.value;
-  const side = !USES_SIDE.has(relation) || kind.side.value === 'both' ? null : kind.side.value === 'maternal' ? 'mother' : 'father';
-  return { by: 'code', answer: reply.relatives(subjectId, relation, { gender, side, wantsCount: kind.wantsCount.value }) };
+  const inLaw = relation === 'in_laws' ? inLawAsked(message) : null;
+  // The words of the message, when they give a gender, over Jev's reading of them.
+  const gender = IGNORES_GENDER.has(relation) ? 'any' : inLaw && inLaw.gender !== 'any' ? inLaw.gender : kind.gender.value;
+  return {
+    by: 'code',
+    answer: reply.relatives(subjectId, relation, {
+      gender,
+      side: USES_SIDE.has(relation) ? PARENT_SIDE[kind.side.value] : null,
+      wantsCount: kind.wantsCount.value,
+      inLaw: inLaw?.of ?? null,
+    }),
+  };
 }
+
+const PARENT_SIDE: Record<QuestionKind['side']['value'], ParentSide | null> = {
+  maternal: 'mother',
+  paternal: 'father',
+  both: null,
+  family_name: null,
+};
 
 /** Labels for a relation the code has named, by the recorded gender of the relative. */
 const GENDERED: Partial<Record<string, Record<RecordedGender, string>>> = {
@@ -307,14 +365,27 @@ class Reply {
     return (gender && GENDERED[relation.label]?.[gender]) ?? relation.label;
   }
 
+  /** What `personId` is to `subjectId` through a marriage, when it is an in-law. */
+  private inLawOf(subjectId: string, personId: string): KinshipRelation | null {
+    const throughMarriage = findKinshipPaths(subjectId, personId, this.record.links).find((path) => path.kind === 'marriage');
+    return throughMarriage?.relation?.inLaw ? throughMarriage.relation : null;
+  }
+
   relatives(
     subjectId: string,
     relation: ListRelation,
-    { gender, side, wantsCount }: { gender: Gender; side: 'mother' | 'father' | null; wantsCount: boolean },
+    {
+      gender,
+      side,
+      wantsCount,
+      inLaw,
+    }: { gender: Gender; side: ParentSide | null; wantsCount: boolean; inLaw: InLawOf | null },
   ): string {
     const { links } = this.record;
     const kind = RELATIVE_KIND[relation];
-    const all = getRelatives(subjectId, kind, links, { side: side ?? undefined });
+    const all = getRelatives(subjectId, kind, links, { side: side ?? undefined }).filter(
+      (id) => !inLaw || this.inLawOf(subjectId, id)?.inLaw === inLaw,
+    );
     const found = gender === 'any' ? all : this.byName(all.filter((id) => getRecordedGender(id, links) === gender));
     const unknownGender = gender === 'any' ? [] : this.byName(all.filter((id) => getRecordedGender(id, links) === null));
     const ids = this.byName(found);
@@ -322,14 +393,14 @@ class Reply {
     const you = this.isSpeaker(subjectId);
     const owner = you ? 'Your' : `${this.bold(subjectId)}'s`;
     const sideText = side ? ` on ${you ? 'your' : 'the'} ${side}'s side` : '';
-    const [one, many] = NOUNS[relation][gender];
+    const [one, many] = inLaw ? IN_LAW_NOUNS[inLaw][gender] : NOUNS[relation][gender];
     const noun = ids.length === 1 ? one : many;
 
     const parts: string[] = [];
     if (ids.length === 0) {
       parts.push(`The tree has no ${many}${sideText} recorded for ${you ? 'you' : this.bold(subjectId)}.`);
     } else {
-      const notes = this.notes(subjectId, relation, side, ids);
+      const notes = inLaw ? new Map<string, string>() : this.notes(subjectId, relation, side, ids);
       const item = (id: string) => `${this.bold(id)}${notes.get(id) ? ` (${notes.get(id)})` : ''}`;
       const list = ids.map((id) => `- ${item(id)}`).join('\n');
       if (wantsCount) {
@@ -341,7 +412,7 @@ class Reply {
     }
 
     if (relation === 'spouse') {
-      const former = this.formerSpouses(subjectId);
+      const former = this.byName(getFormerSpouses(subjectId, links));
       if (ids.length === 0 && former.length > 0) {
         parts[0] = `${you ? 'You have' : `${this.bold(subjectId)} has`} no current spouse in the tree.`;
       }
@@ -359,13 +430,13 @@ class Reply {
    * A note after each name where the kind alone does not say enough: which
    * side, for a list over both sides; what each in-law is.
    */
-  private notes(subjectId: string, relation: ListRelation, side: 'mother' | 'father' | null, ids: string[]): Map<string, string> {
+  private notes(subjectId: string, relation: ListRelation, side: ParentSide | null, ids: string[]): Map<string, string> {
     const notes = new Map<string, string>();
     const { links } = this.record;
     if (relation === 'in_laws') {
       for (const id of ids) {
-        const throughMarriage = findKinshipPaths(subjectId, id, links).find((path) => path.kind === 'marriage');
-        if (throughMarriage?.relation) notes.set(id, this.label(throughMarriage.relation, id));
+        const relation = this.inLawOf(subjectId, id);
+        if (relation) notes.set(id, this.label(relation, id));
       }
     } else if (USES_SIDE.has(relation) && side === null) {
       const kind = RELATIVE_KIND[relation];
@@ -378,14 +449,6 @@ class Reply {
       }
     }
     return notes;
-  }
-
-  private formerSpouses(personId: string): string[] {
-    const former = this.record.links
-      .filter((link: FamilyLink) => link.type === 'divorce')
-      .map((link) => getLinkEndpoints(link))
-      .flatMap(({ sourceId, targetId }) => (sourceId === personId ? [targetId] : targetId === personId ? [sourceId] : []));
-    return this.byName(new Set(former));
   }
 
   /**

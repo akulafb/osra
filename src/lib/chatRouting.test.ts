@@ -132,10 +132,26 @@ describe('routeMessage: code answers the common kinds, with no model call', () =
     });
   });
 
-  it('in-laws: "who is my mother in law", with what each in-law is', () => {
+  it('in-laws: "who is my mother in law"', () => {
     expect(route('who is my mother in law', reading({ relation: 'in_laws', gender: 'female' }))).toEqual({
       by: 'code',
-      answer: 'Your female in-law is **Mariam Haddad** (mother-in-law).',
+      answer: 'Your mother-in-law is **Mariam Haddad**.',
+    });
+  });
+
+  it('in-laws: "who is Nabil\'s father in law" lists the father-in-law only, not every male in-law', () => {
+    expect(route("who is Nabil's father in law", reading({ relation: 'in_laws', gender: 'male', subject: 'named_person' }))).toEqual({
+      by: 'code',
+      answer: "**Nabil Khoury**'s father-in-law is **Bashir Aziz**.",
+    });
+  });
+
+  it('in-laws of every kind say what each in-law is', () => {
+    expect(route('who are my in-laws', reading({ relation: 'in_laws' }))).toEqual({
+      by: 'code',
+      answer:
+        'Your in-laws:\n\n- **Faris Khoury** (father-in-law)\n- **Karim Qasim** (brother-in-law)\n' +
+        '- **Mariam Haddad** (mother-in-law)\n- **Nabil Khoury** (brother-in-law)',
     });
   });
 

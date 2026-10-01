@@ -4,11 +4,11 @@
  * script, so the script measures the request the function really sends.
  */
 
-import { fetchWithRetry, RETRYABLE_STATUSES, type RetryOptions } from '../_shared/retry.ts';
+import type { RetryOptions } from '../_shared/retry.ts';
+import { askSystemOne } from '../_shared/typeSafe.ts';
 import {
   buildTypeSafeRequest,
   mapScores,
-  TYPESAFE_URL,
   type NameScore,
   type SpellingMatchRequest,
 } from './spellingMatches.ts';
@@ -28,36 +28,17 @@ export async function scoreNames(
   retryOptions: RetryOptions = {},
 ): Promise<ScoreOutcome> {
   const body = buildTypeSafeRequest(request);
-
-  let res: Response;
-  try {
-    res = await fetchWithRetry(
-      TYPESAFE_URL,
-      {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      },
-      retryOptions,
-    );
-  } catch (err) {
-    return { ok: false, kind: 'unreachable', detail: err instanceof Error ? err.message : String(err) };
-  }
-
-  if (RETRYABLE_STATUSES.includes(res.status)) {
-    await res.body?.cancel().catch(() => undefined);
-    return { ok: false, kind: 'busy', status: res.status };
-  }
-  if (!res.ok) {
-    const detail = (await res.text().catch(() => '')).slice(0, 500);
-    return { ok: false, kind: 'failed', status: res.status, detail };
-  }
-
-  const json: unknown = await res.json().catch(() => null);
-  const scores = mapScores(request.names, json);
-  if (!scores) {
-    return { ok: false, kind: 'failed', status: res.status, detail: 'answer did not cover every name' };
-  }
-  const model = (json as { model?: unknown }).model;
-  return { ok: true, model: typeof model === 'string' ? model : body.model, scores };
+  const outcome = await askSystemOne(
+    body,
+    apiKey,
+    (json) => {
+      const scores = mapScores(request.names, json);
+      if (!scores) return null;
+      const model = (json as { model?: unknown }).model;
+      return { model: typeof model === 'string' ? model : body.model, scores };
+    },
+    'answer did not cover every name',
+    retryOptions,
+  );
+  return outcome.ok ? { ok: true, ...outcome.answer } : outcome;
 }

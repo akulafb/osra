@@ -31,7 +31,7 @@ import {
   MAX_TURNS,
   type ChatTurn,
 } from '../../supabase/functions/family-chat/request.ts';
-import { routeMessage } from './chatRouting';
+import { routeMessage, type RouteDecision } from './chatRouting';
 import { runChatTool, type ChatRecord } from './chatTools';
 
 /** The body the family-chat function takes. */
@@ -186,7 +186,13 @@ export async function askFamilyChat({
     callsUsed = routed.ok ? routed.reply.usage.modelCalls : 1;
     if (routed.ok) {
       const { questionKind, speaker } = routed.reply;
-      const decision = routeMessage({ message: question, questionKind, speaker, record });
+      let decision: RouteDecision;
+      try {
+        decision = routeMessage({ message: question, questionKind, speaker, record });
+      } catch {
+        // A fault in the code that answers is no reason to leave the user without one.
+        decision = { by: 'model', why: 'no_reading' };
+      }
       if (decision.by === 'code') {
         return {
           ok: true,

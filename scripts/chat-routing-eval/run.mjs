@@ -96,7 +96,7 @@ for (const { group, row } of cases) {
   if (!outcome.ok) {
     throw new Error(`TypeSafe ${outcome.kind} ${outcome.status ?? ''} ${outcome.detail ?? ''} on "${row[0]}"`);
   }
-  const kind = outcome.questionKind;
+  const kind = outcome.answer;
   const wrong = usedAnswers(kind, row).filter(([, answer, expected]) => answer.value !== expected);
   const shouldGoToCode = row[1] !== 'other' && !(USES_SIDE.has(row[1]) && row[2] === 'family_name');
   results.push({ group, row, kind, wrong, toCode: goesToCode(kind), shouldGoToCode });

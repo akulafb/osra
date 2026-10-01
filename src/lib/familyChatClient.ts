@@ -5,7 +5,13 @@ import type {
   RouteResponse,
 } from '../../supabase/functions/family-chat/handler.ts';
 import { isObject } from '../../supabase/functions/family-chat/request.ts';
-import type { QuestionKind } from '../../supabase/functions/family-chat/questionKind.ts';
+import {
+  GENDERS,
+  RELATIONS,
+  SIDES,
+  SUBJECTS,
+  type QuestionKind,
+} from '../../supabase/functions/family-chat/questionKind.ts';
 import type { ChatSendResult, RouteChat, RouteSendResult, SendChat } from './familyChat';
 
 /**
@@ -84,14 +90,21 @@ async function readRefusal(error: unknown): Promise<{ ok: false; cause: RefusalC
   return isObject(refusal.usage) ? { ok: false, cause, usage: refusal.usage as unknown as ChatUsage } : { ok: false, cause };
 }
 
-const QUESTION_KIND_FIELDS = ['relation', 'side', 'gender', 'subject', 'wantsCount'] as const;
+/** The values each of Jev's five answers may take; the code that answers reads no other. */
+const ANSWER_VALUES: Record<keyof QuestionKind, readonly unknown[]> = {
+  relation: RELATIONS,
+  side: SIDES,
+  gender: GENDERS,
+  subject: SUBJECTS,
+  wantsCount: [true, false],
+};
 
-/** Jev's reading, when each of its five answers has a value and a confidence; otherwise null. */
-function readQuestionKind(value: unknown): QuestionKind | null {
+/** The function's reading, when each answer is one the code knows, with a confidence; otherwise null. */
+function usableQuestionKind(value: unknown): QuestionKind | null {
   if (!isObject(value)) return null;
-  const usable = QUESTION_KIND_FIELDS.every((field) => {
+  const usable = (Object.keys(ANSWER_VALUES) as Array<keyof QuestionKind>).every((field) => {
     const answer = value[field];
-    return isObject(answer) && answer.value !== undefined && typeof answer.confidence === 'number';
+    return isObject(answer) && ANSWER_VALUES[field].includes(answer.value) && typeof answer.confidence === 'number';
   });
   return usable ? (value as unknown as QuestionKind) : null;
 }
@@ -109,7 +122,7 @@ export async function readRouteReply({ data, error }: { data: unknown; error: un
   return {
     ok: true,
     reply: {
-      questionKind: readQuestionKind(data.questionKind),
+      questionKind: usableQuestionKind(data.questionKind),
       speaker: speaker as RouteResponse['speaker'],
       usage: data.usage as unknown as ChatUsage,
     },

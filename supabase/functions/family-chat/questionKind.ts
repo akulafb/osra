@@ -13,11 +13,9 @@
  * measures it on those 46 messages.
  */
 
-import { fetchWithRetry, RETRYABLE_STATUSES, type RetryOptions } from '../_shared/retry.ts';
+import type { RetryOptions } from '../_shared/retry.ts';
+import { askSystemOne, type SystemOneOutcome } from '../_shared/typeSafe.ts';
 import { isObject } from './request.ts';
-
-/** The same endpoint the spelling-matches function calls. */
-export const TYPESAFE_URL = 'https://api.typesafe.ai/v1/systemone';
 
 /** Pinned, not `jev-latest`: the routing gate was measured on this version. */
 export const TYPESAFE_MODEL = 'jev-1.13.0';
@@ -72,7 +70,7 @@ const RELATION_CRITERIA: Record<Relation, string> = {
     'The grandmothers and grandfathers of the subject: parents of a parent. Arabic words: teta, sitto, sitti, sittos (grandmother); jiddo, jeddo, seedo, jiddos (grandfather).',
   grandchildren: 'The children of the children of the subject.',
   aunts_uncles:
-    'The brothers and sisters of a parent of the subject, and their spouses. Arabic words, also in the plural: khalo, khalos, khal (brother of the mother), khalto, khaltos, khala (sister of the mother), ammo, ammos, amo (brother of the father), amto, amtos, amme (sister of the father).',
+    'The brothers and sisters of a parent of the subject, and their spouses. Arabic words, also in the plural: khalo, khalos, khal (brother of the mother), khalto, khaltos, khala (sister of the mother), ammo, ammos, amo (brother of the father), amto, amtos, amme (sister of the father). Not teta, sitto, sitti, jiddo or seedo: those are grandparents.',
   cousins: 'The children of the aunts and uncles of the subject.',
   nieces_nephews: 'The children of the brothers and sisters of the subject.',
   in_laws: 'The family of the spouse of the subject: for example mother-in-law, brother-in-law.',
@@ -157,7 +155,7 @@ function readNoul(answer: unknown): Judged<boolean> | null {
 }
 
 /** Jev's answers as a QuestionKind, or null when any one is missing or out of range. */
-export function readQuestionKind(body: unknown): QuestionKind | null {
+export function readJevAnswers(body: unknown): QuestionKind | null {
   const answers = isObject(body) && isObject(body.answers) ? body.answers : null;
   if (!answers) return null;
   const relation = readChoice(answers.relation, RELATIONS);
@@ -169,47 +167,19 @@ export function readQuestionKind(body: unknown): QuestionKind | null {
   return { relation, side, gender, subject, wantsCount };
 }
 
-export type QuestionKindOutcome =
-  | { ok: true; questionKind: QuestionKind }
-  /** Still 429 or 529 after the retry. */
-  | { ok: false; kind: 'busy'; status: number }
-  /** Any other HTTP status, or an answer that is not five usable answers. */
-  | { ok: false; kind: 'failed'; status: number; detail: string }
-  /** No answer at all: network error or timeout. */
-  | { ok: false; kind: 'unreachable'; detail: string };
+export type QuestionKindOutcome = SystemOneOutcome<QuestionKind>;
 
 /** The one call to Jev. Never throws; the caller sends the message to the model on any failure. */
-export async function askQuestionKind(
+export function askQuestionKind(
   message: string,
   apiKey: string,
   retryOptions: RetryOptions = {},
 ): Promise<QuestionKindOutcome> {
-  let res: Response;
-  try {
-    res = await fetchWithRetry(
-      TYPESAFE_URL,
-      {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify(buildQuestionKindRequest(message)),
-      },
-      retryOptions,
-    );
-  } catch (err) {
-    return { ok: false, kind: 'unreachable', detail: err instanceof Error ? err.message : String(err) };
-  }
-
-  if (RETRYABLE_STATUSES.includes(res.status)) {
-    await res.body?.cancel().catch(() => undefined);
-    return { ok: false, kind: 'busy', status: res.status };
-  }
-  if (!res.ok) {
-    const detail = (await res.text().catch(() => '')).slice(0, 500);
-    return { ok: false, kind: 'failed', status: res.status, detail };
-  }
-  const questionKind = readQuestionKind(await res.json().catch(() => null));
-  if (!questionKind) {
-    return { ok: false, kind: 'failed', status: res.status, detail: 'the answer did not hold all five answers' };
-  }
-  return { ok: true, questionKind };
+  return askSystemOne(
+    buildQuestionKindRequest(message),
+    apiKey,
+    readJevAnswers,
+    'the answer did not hold all five answers',
+    retryOptions,
+  );
 }

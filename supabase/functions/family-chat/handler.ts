@@ -339,7 +339,7 @@ async function route(
     ]);
     speaker = found;
     if (outcome?.ok) {
-      questionKind = outcome.questionKind;
+      questionKind = outcome.answer;
     } else if (outcome) {
       // The provider's own words go to the log only, and never with the key.
       const detail = 'detail' in outcome && apiKey ? outcome.detail.split(apiKey).join('[TYPESAFE_API_KEY]') : '';

@@ -86,8 +86,12 @@ describe('readRouteReply', () => {
     expect(await readRouteReply({ data: null, error })).toEqual({ ok: false, cause: 'daily_limit', usage });
   });
 
-  it('treats a reading it cannot use as no reading, so the model answers', async () => {
-    const data = { questionKind: { ...questionKind, side: { value: 'both' } }, speaker, usage };
+  it.each([
+    ['an answer with no confidence', { ...questionKind, side: { value: 'both' } }],
+    ['a value the code does not know', { ...questionKind, gender: { value: 'other', confidence: 0.9 } }],
+    ['a missing answer', { ...questionKind, wantsCount: undefined }],
+  ])('treats %s as no reading, so the model answers', async (_why, reading) => {
+    const data = { questionKind: reading, speaker, usage };
     expect(await readRouteReply({ data, error: null })).toEqual({ ok: true, reply: { ...data, questionKind: null } });
   });
 
