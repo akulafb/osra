@@ -14,7 +14,7 @@ describe('validateChatRequest', () => {
     const v = validateChatRequest({ messageId: id, messages: [ask('Who are my cousins?')] });
     expect(v).toEqual({
       ok: true,
-      request: { messageId: id, turns: [{ role: 'user', content: 'Who are my cousins?' }] },
+      request: { messageId: id, turns: [{ role: 'user', content: 'Who are my cousins?' }], final: false },
     });
   });
 
@@ -44,7 +44,7 @@ describe('validateChatRequest', () => {
       tools: [],
       max_tokens: 100000,
     });
-    expect(v).toEqual({ ok: true, request: { messageId: id, turns: [{ role: 'user', content: 'hi' }] } });
+    expect(v).toEqual({ ok: true, request: { messageId: id, turns: [{ role: 'user', content: 'hi' }], final: false } });
   });
 
   it('refuses a system turn: the system prompt belongs to the function', () => {
@@ -111,5 +111,21 @@ describe('validateChatRequest', () => {
         ],
       }),
     ).toBe('turn_too_long');
+  });
+});
+
+describe('validateChatRequest: the final call (LIN-80)', () => {
+  const id = 'msg-00000001';
+  it('takes final: true, and reads a missing final as false', () => {
+    const turns = [{ role: 'user', content: 'hi' }];
+    expect(validateChatRequest({ messageId: id, messages: turns, final: true })).toMatchObject({ ok: true, request: { final: true } });
+    expect(validateChatRequest({ messageId: id, messages: turns })).toMatchObject({ ok: true, request: { final: false } });
+  });
+
+  it('refuses a final that is not true or false', () => {
+    expect(validateChatRequest({ messageId: 'msg-00000001', messages: [{ role: 'user', content: 'hi' }], final: 'yes' })).toMatchObject({
+      ok: false,
+      code: 'invalid_final',
+    });
   });
 });

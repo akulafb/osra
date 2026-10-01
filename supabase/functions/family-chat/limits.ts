@@ -17,11 +17,21 @@ export const MAX_MODEL_CALLS_PER_MESSAGE = 6;
 export const MAX_USER_MESSAGE_CHARS = 2000;
 
 /**
- * The cap on one model reply, in tokens. Grok 4.3 reasons before it answers and
- * the reasoning counts against this cap (about 100 to 200 tokens in a live test),
- * so the cap leaves room for that plus a brief answer.
+ * The cap on one model reply, in tokens: about 150 words (LIN-80), at about
+ * 1.3 tokens a word, with room for Markdown. Grok 4.3 reasons before it
+ * answers, but on OpenRouter the reasoning is not held to this cap (checked
+ * live on 2026-10-01: `max_tokens: 30` still reasoned 689 tokens, then cut the
+ * answer at 30), so the whole cap is the answer's.
  */
-export const MAX_REPLY_TOKENS = 1500;
+export const MAX_REPLY_TOKENS = 220;
+
+/**
+ * What one user message may cost in model calls, in US dollars (LIN-80). Once
+ * the calls so far pass it, the browser stops the tool loop and asks for the
+ * best answer from what the tools have returned. On top of the call and daily
+ * limits, which the database holds.
+ */
+export const MAX_MESSAGE_COST_USD = 0.01;
 
 /**
  * The UAE is UTC+4 all year (`Asia/Dubai` has no daylight saving), so a fixed

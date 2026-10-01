@@ -75,6 +75,35 @@ describe('runChatTool: getTreeCounts', () => {
   });
 });
 
+describe('runChatTool: getFamilyOverview', () => {
+  it('gives the whole tree as counts, with no list of the Persons', () => {
+    const result = run('getFamilyOverview', {});
+    expect(result).toMatchObject({ family: null, persons: 41, generations: 5, branches: 11 });
+    expect(result.founders.total).toBe(9);
+    expect(result.note).toMatch(/short overview/i);
+  });
+
+  it('gives one family as counts', () => {
+    expect(run('getFamilyOverview', { familyName: 'Haddad' })).toMatchObject({
+      family: 'Haddad',
+      persons: 8,
+      generations: 4,
+      founders: { total: 1, names: ['Idris Haddad'] },
+      branches: 3,
+    });
+  });
+
+  it('names the families there are when no Person has the family name', () => {
+    const result = run('getFamilyOverview', { familyName: 'Smith' });
+    expect(result.error).toMatch(/no person has the family name smith/i);
+    expect(result.largestFamilies.map((f: { name: string }) => f.name)).toContain('Haddad');
+  });
+
+  it('refuses a family name that is not text', () => {
+    expect(run('getFamilyOverview', { familyName: 7 }).error).toMatch(/familyName/);
+  });
+});
+
 describe('runChatTool: arguments the model got wrong', () => {
   it.each([
     ['an unknown tool', 'deleteEveryone', { personId: P.omar }, /no tool/i],

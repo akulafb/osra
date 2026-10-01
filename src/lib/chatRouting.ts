@@ -40,7 +40,7 @@ import {
   type RecordedGender,
   type RelativeKind,
 } from './familyGraph';
-import { kinshipTermText } from './kinshipTerm';
+import { kinshipTermText, termShowsMarriage } from './kinshipTerm';
 import { formatNodeDisplayName } from '../utils/nodeDisplayName';
 
 /** Below this, an answer the code would use sends the message to the model. */
@@ -495,6 +495,8 @@ class Reply {
   /**
    * What `toId` is to `fromId` as a Kinship Term, blood first, then "also
    * related by marriage". Every path has a term, so this always answers.
+   * A marriage path alone is "Related by marriage:" only when its term does
+   * not already show the marriage (LIN-80).
    */
   howRelated(fromId: string, toId: string, bothNamed: boolean): string {
     const paths = findKinshipPaths(fromId, toId, this.record.links);
@@ -514,7 +516,9 @@ class Reply {
       return `${this.bold(toId)} is ${owner} ${arabic ?? this.term(relation, toId)}${sideText}.`;
     };
     const [first, second] = paths;
-    const parts = [first.kind === 'marriage' ? `Related by marriage: ${sentence(first.relation)}` : sentence(first.relation)];
+    // A term that already says "step-", "-in-law" or the like needs no "Related by marriage:".
+    const prefixed = first.kind === 'marriage' && !termShowsMarriage(first.relation);
+    const parts = [prefixed ? `Related by marriage: ${sentence(first.relation)}` : sentence(first.relation)];
     if (second) parts.push(`Also related by marriage: ${sentence(second.relation)}`);
     return parts.join('\n\n');
   }

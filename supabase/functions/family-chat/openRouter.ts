@@ -11,6 +11,7 @@
 
 import { fetchWithRetry, RETRYABLE_STATUSES, type RetryOptions } from '../_shared/retry.ts';
 import { MAX_REPLY_TOKENS } from './limits.ts';
+import { FINAL_CALL_NOTE } from './prompt.ts';
 import { isObject, type ChatTurn, type ToolCall } from './request.ts';
 import { CHAT_TOOLS } from './tools.ts';
 
@@ -21,7 +22,8 @@ export const CHAT_MODEL = 'x-ai/grok-4.3';
 export type AssistantTurn = Extract<ChatTurn, { role: 'assistant' }>;
 
 export type ModelOutcome =
-  | { ok: true; message: AssistantTurn }
+  /** `cost` is OpenRouter's `usage.cost` for the call, in US dollars; null when it gave none. */
+  | { ok: true; message: AssistantTurn; cost: number | null }
   /** OpenRouter says the account or the key has no credit left (402, or a key limit). */
   | { ok: false; kind: 'credit_gone'; status: number; detail: string }
   /** Still 429 or 529 after the retries. */
@@ -60,15 +62,32 @@ function toWire(turn: ChatTurn): WireMessage {
   }
 }
 
-/** Everything but the turns is fixed here; nothing the browser sends can change it. */
-export function buildModelRequest(systemPrompt: string, turns: ChatTurn[]) {
+/**
+ * Everything but the turns is fixed here; nothing the browser sends can change
+ * it. On a message's final call (LIN-80) the model may call no tool, and the
+ * system prompt tells it to answer now.
+ */
+export function buildModelRequest(systemPrompt: string, turns: ChatTurn[], { final = false } = {}) {
+  const system = final ? `${systemPrompt}\n\n${FINAL_CALL_NOTE}` : systemPrompt;
   return {
     model: CHAT_MODEL,
-    messages: [{ role: 'system', content: systemPrompt } as WireMessage, ...turns.map(toWire)],
+    messages: [{ role: 'system', content: system } as WireMessage, ...turns.map(toWire)],
     tools: CHAT_TOOLS,
-    tool_choice: 'auto',
+    tool_choice: final ? 'none' : 'auto',
     max_tokens: MAX_REPLY_TOKENS,
   };
+}
+
+/**
+ * A reply the reply cap cut off, back to its last whole sentence or line, so
+ * the user never sees half a word. Unchanged when no sentence ended.
+ */
+function toLastWholeSentence(text: string): string {
+  const ends = [...text.matchAll(/[.!?](?:\*\*)?(?=\s|$)|\n/g)];
+  const last = ends[ends.length - 1];
+  if (!last || last.index === undefined) return text;
+  const cut = text.slice(0, last.index + last[0].length).trim();
+  return cut === '' ? text : cut;
 }
 
 function parseArguments(raw: unknown): Record<string, unknown> | null {
@@ -99,7 +118,10 @@ function readAssistantTurn(json: unknown): AssistantTurn | null {
     })
     .filter((call) => call.id !== '' && call.name !== '');
 
-  const content = typeof message.content === 'string' && message.content.trim() !== '' ? message.content : null;
+  let content = typeof message.content === 'string' && message.content.trim() !== '' ? message.content : null;
+  if (content !== null && toolCalls.length === 0 && isObject(choice) && choice.finish_reason === 'length') {
+    content = toLastWholeSentence(content);
+  }
   if (toolCalls.length > 0) return { role: 'assistant', content, toolCalls };
   if (content !== null) return { role: 'assistant', content };
   return null;
@@ -179,5 +201,7 @@ export async function callModel(
   if (!message) {
     return { ok: false, kind: 'failed', status: res.status, detail: 'the answer had no text and no tool call' };
   }
-  return { ok: true, message };
+  const usage = isObject(json) && isObject(json.usage) ? json.usage : {};
+  const cost = typeof usage.cost === 'number' && Number.isFinite(usage.cost) ? usage.cost : null;
+  return { ok: true, message, cost };
 }

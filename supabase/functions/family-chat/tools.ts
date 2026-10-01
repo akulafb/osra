@@ -15,6 +15,7 @@ export const CHAT_TOOL_NAMES = [
   'getRelatives',
   'findKinshipPaths',
   'getTreeCounts',
+  'getFamilyOverview',
 ] as const;
 export type ChatToolName = (typeof CHAT_TOOL_NAMES)[number];
 
@@ -50,6 +51,7 @@ export interface ChatToolArguments {
   };
   findKinshipPaths: { fromPersonId: string; toPersonId: string };
   getTreeCounts: Record<string, never>;
+  getFamilyOverview: { familyName?: string };
 }
 
 /** The OpenAI-style function definition OpenRouter takes in `tools`. */
@@ -130,7 +132,8 @@ export const CHAT_TOOLS: readonly ToolDefinition[] = [
         'path through a marriage when there is one. Each path has its kind (blood, marriage ' +
         'or other) and its term: what the second Person is to the first, worked out by code ' +
         '(for example "aunt, father\'s side" or "sister May Badran\'s stepson"). Use the term ' +
-        'exactly as given. An empty list means not related.',
+        'exactly as given: never name a relation yourself and never spell out the path. Answer ' +
+        'in one or two short lines. An empty list means not related.',
       parameters: {
         type: 'object',
         properties: {
@@ -150,6 +153,28 @@ export const CHAT_TOOLS: readonly ToolDefinition[] = [
         'Counts for the whole family tree: the number of Persons, and the number of Kinship ' +
         'Links of each type (parent, marriage, divorce).',
       parameters: { type: 'object', properties: {}, additionalProperties: false },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'getFamilyOverview',
+      description:
+        'For an open question about the family ("Tell me about the family", "Explain the ' +
+        'Haddad family"). Returns an overview as counts: Persons, generations, founders ' +
+        '(with at most three names), branches, and for the whole tree the largest families. ' +
+        'It returns no list of the Persons. Answer with a short overview from these counts, in ' +
+        'two or three sentences; do not list the Persons and do not call other tools to find them.',
+      parameters: {
+        type: 'object',
+        properties: {
+          familyName: {
+            type: 'string',
+            description: 'A family name, such as "Haddad". Leave it out for the whole tree.',
+          },
+        },
+        additionalProperties: false,
+      },
     },
   },
 ];

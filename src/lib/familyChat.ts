@@ -5,8 +5,11 @@
  * The browser sends the conversation turns; the function asks the model. When
  * the model wants a fact, the reply carries tool calls instead of text: they
  * run here (`chatTools.ts`) and their results go back under the same
- * `messageId`, until the model answers or the call cap is reached. The tree
- * itself is never sent.
+ * `messageId`, until the model answers. The tree itself is never sent.
+ *
+ * The loop stops at the call cap or once the message's calls pass its cost
+ * cap (LIN-80); the call after that is the final one, where the model may call
+ * no tool and answers from the results so far.
  *
  * Before that, TypeSafe Jev reads the message (the function's `route`
  * operation, LIN-73). When it is a common kind of question, code answers it
@@ -24,6 +27,7 @@ import type {
 } from '../../supabase/functions/family-chat/handler.ts';
 import {
   DAILY_MESSAGE_LIMIT,
+  MAX_MESSAGE_COST_USD,
   MAX_MODEL_CALLS_PER_MESSAGE,
 } from '../../supabase/functions/family-chat/limits.ts';
 import {
@@ -38,6 +42,8 @@ import { runChatTool, type ChatRecord } from './chatTools';
 export interface ChatRequestBody {
   messageId: string;
   messages: ChatTurn[];
+  /** The message's last call: the model may call no tool and must answer (LIN-80). */
+  final?: true;
 }
 
 /**
@@ -204,31 +210,38 @@ export async function askFamilyChat({
     }
   }
 
+  // What this message's model calls have cost so far, in US dollars (LIN-80).
+  let spent = 0;
+  let final = false;
   // The function counts the same cap; stopping here saves a call it would refuse.
   for (let call = callsUsed; call < MAX_MODEL_CALLS_PER_MESSAGE; call++) {
+    // On the last call allowed, the model gets no tools and must answer from what it has.
+    if (call === MAX_MODEL_CALLS_PER_MESSAGE - 1) final = true;
     const turns = fitTurns(history, current, messageId);
     // The function would refuse it; one question asked for more than a request holds.
     if (!turns) return failure('failed');
     let result: ChatSendResult;
     try {
-      result = await send({ messageId, messages: turns });
+      result = await send({ messageId, messages: turns, ...(final && { final: true as const }) });
     } catch {
       return failure('failed');
     }
     if (!result.ok) return refusal(result.cause, result.usage);
 
-    const { message, done } = result.reply;
-    if (done) {
+    const { message, done, cost } = result.reply;
+    if (typeof cost === 'number' && Number.isFinite(cost)) spent += cost;
+    // A final call is the answer, even if the model asked for a tool alongside its text.
+    if (done || final) {
       const answer = hideIds(message.content ?? '', new Set(record.nodes.map((node) => node.id))).trim();
       if (answer === '') return failure('failed');
       return { ok: true, answer, turns: [...turns, { role: 'assistant', content: answer }], answeredBy: 'model' };
     }
-    // No call is left to send the results on, so the tools are not run.
-    if (call === MAX_MODEL_CALLS_PER_MESSAGE - 1) break;
     current.push(message);
     for (const toolCall of message.toolCalls ?? []) {
       current.push({ role: 'tool', toolCallId: toolCall.id, content: runChatTool(toolCall, record) });
     }
+    // Past the cost cap the tool loop stops: one more call answers from these results.
+    if (spent >= MAX_MESSAGE_COST_USD) final = true;
   }
   return failure('failed');
 }
