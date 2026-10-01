@@ -33,6 +33,7 @@
  * SUPABASE_ANON_KEY instead.
  */
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { readApiKey } from '../readApiKey.mjs';
 import {
   listCsv,
@@ -110,7 +111,11 @@ const plan = await fillIn(false, named);
 
 if (!apply) {
   writeFileSync(willLinkFile, willLinkCsv(plan.will_link));
-  writeFileSync(listFile, listCsv(plan.needs_a_name));
+  // A dry run with --names reads the owner's answers from the list file, so it
+  // must not overwrite them; the apply reads the same file again.
+  if (!namesFile || resolve(namesFile) !== resolve(listFile)) {
+    writeFileSync(listFile, listCsv(plan.needs_a_name));
+  }
   report(plan);
   console.log(`\nDry run: nothing was written to the Tree Record.`);
   console.log(`  Review:  ${willLinkFile}`);
