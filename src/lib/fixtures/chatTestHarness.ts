@@ -26,7 +26,8 @@ export const JEV_PRICE_PER_MILLION_INPUT_TOKENS = 0.042;
 
 /** Not a real project: anything sent here is answered by `fakeSupabase`. */
 const FAKE_SUPABASE_URL = 'https://chat-test.supabase.invalid';
-const ANON_KEY = 'chat-test-anon-key';
+const PUBLISHABLE_KEY = 'sb_publishable_chat_test';
+const SECRET_KEY = 'sb_secret_chat_test';
 const USER_TOKEN = 'chat-test-user-token';
 const USER_ID = 'chat-test-user';
 
@@ -82,6 +83,11 @@ function fakeSupabase() {
       const token = new Headers(init?.headers).get('Authorization');
       return token === `Bearer ${USER_TOKEN}` ? json({ id: USER_ID }) : json({ message: 'bad token' }, 401);
     }
+    // The secret key is not a JWT: on apikey only, never as the bearer.
+    const headers = new Headers(init?.headers);
+    if (headers.get('apikey') !== SECRET_KEY || headers.has('Authorization')) {
+      return json({ message: 'permission denied' }, 401);
+    }
     if (path.startsWith('/rest/v1/users?')) return json([{ node_id: speaker.id }]);
     if (path.startsWith('/rest/v1/nodes?')) {
       return json([{ first_name: speaker.firstName, paternal_family_cluster: speaker.familyCluster }]);
@@ -107,8 +113,9 @@ export function createChatTestRunner({ openRouterApiKey, typeSafeApiKey, network
   const supabase = fakeSupabase();
   const env: Record<string, string> = {
     SUPABASE_URL: FAKE_SUPABASE_URL,
-    SUPABASE_ANON_KEY: ANON_KEY,
-    SUPABASE_SERVICE_ROLE_KEY: 'chat-test-service-role-key',
+    // As Supabase injects them: JSON objects of key name to key.
+    SUPABASE_PUBLISHABLE_KEYS: JSON.stringify({ default: PUBLISHABLE_KEY }),
+    SUPABASE_SECRET_KEYS: JSON.stringify({ default: SECRET_KEY }),
     OPENROUTER_API_KEY: openRouterApiKey,
     TYPESAFE_API_KEY: typeSafeApiKey,
   };

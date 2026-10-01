@@ -29,3 +29,14 @@ export function readApiKey(name) {
   if (!value) throw new Error(`No ${name} in the environment, in .env.local, or in $ENV_FILE.`);
   return value;
 }
+
+/**
+ * Headers for calling the Supabase API with a project key. A publishable or
+ * secret key (`sb_…`) is not a JWT and goes on `apikey` only (LIN-82); a legacy
+ * anon or service_role JWT goes on both.
+ *
+ * @param {string} key @returns {Record<string, string>}
+ */
+export function supabaseKeyHeaders(key) {
+  return key.startsWith('sb_') ? { apikey: key } : { apikey: key, Authorization: `Bearer ${key}` };
+}

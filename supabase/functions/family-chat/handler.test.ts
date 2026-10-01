@@ -13,10 +13,13 @@ import { CHAT_TOOL_NAMES } from './tools.ts';
 // ---------------------------------------------------------------------------
 
 const SUPABASE_URL = 'https://proj.supabase.co';
+const PUBLISHABLE_KEY = 'sb_publishable_test';
+const SECRET_KEY = 'sb_secret_test';
+// As Supabase injects them: JSON objects of key name to key.
 const ENV: Record<string, string> = {
   SUPABASE_URL,
-  SUPABASE_ANON_KEY: 'anon-key',
-  SUPABASE_SERVICE_ROLE_KEY: 'service-role-key',
+  SUPABASE_PUBLISHABLE_KEYS: JSON.stringify({ default: PUBLISHABLE_KEY }),
+  SUPABASE_SECRET_KEYS: JSON.stringify({ default: SECRET_KEY }),
   OPENROUTER_API_KEY: 'sk-or-secret',
   TYPESAFE_API_KEY: 'ts-secret',
 };
@@ -67,7 +70,8 @@ function fakeWorld() {
     }
 
     if (url.startsWith(`${SUPABASE_URL}/rest/v1/`)) {
-      if (headers.get('apikey') !== ENV.SUPABASE_SERVICE_ROLE_KEY) {
+      // The secret key is not a JWT: on apikey only, never as the bearer.
+      if (headers.get('apikey') !== SECRET_KEY || headers.has('Authorization')) {
         return Response.json({ message: 'permission denied' }, { status: 401 });
       }
       if (world.databaseDown) return Response.json({ message: 'down' }, { status: 503 });
@@ -219,8 +223,8 @@ describe('sign-in', () => {
     expect(world.callsTo('/rpc/')).toHaveLength(0);
   });
 
-  it('refuses the anon key and a session Supabase Auth does not accept', async () => {
-    for (const token of ['anon-key', 'expired-token']) {
+  it('refuses the publishable key and a session Supabase Auth does not accept', async () => {
+    for (const token of [PUBLISHABLE_KEY, 'expired-token']) {
       const res = await send({ messageId: 'msg-00000001', messages: [ask('hi')] }, token);
       expect(res.status).toBe(401);
       expect(res.body.error.cause).toBe('not_signed_in');

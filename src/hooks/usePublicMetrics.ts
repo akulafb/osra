@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { supabaseHeaders, supabasePublishableKey, supabaseUrl } from '../lib/supabaseConfig';
 
 interface PublicMetrics {
   individuals: number;
@@ -86,27 +87,17 @@ export function usePublicMetrics(): PublicMetrics {
 
     const fetchMetrics = async () => {
       try {
-        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-        const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-
-        if (!supabaseUrl || !supabaseKey) {
-          setMetrics({
-            individuals: 0,
-            families: 0,
-            isLoading: false,
-            hasError: true,
-          });
-          return;
-        }
+        // Throws, into the catch below, when VITE_SUPABASE_URL is missing or unknown.
+        const key = supabasePublishableKey();
 
         // Call public RPC function (bypasses RLS)
-        const rpcUrl = `${supabaseUrl}/rest/v1/rpc/get_public_metrics`;
+        const rpcUrl = `${supabaseUrl()}/rest/v1/rpc/get_public_metrics`;
         
+        // Signed out: the publishable key on apikey, and no bearer.
         const rpcResponse = await fetch(rpcUrl, {
           method: 'POST',
           headers: {
-            'apikey': supabaseKey,
-            'Authorization': `Bearer ${supabaseKey}`,
+            ...supabaseHeaders(key),
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({}),

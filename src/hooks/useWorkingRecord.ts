@@ -18,6 +18,7 @@ import {
 import type { AddLinkResult, ConfirmedRows } from '../lib/treeRecord';
 import type { FamilyGraph, FamilyLink, FamilyNode } from '../types/graph';
 import type { Database } from '../types/database';
+import { supabaseHeaders, supabasePublishableKey, supabaseUrl } from '../lib/supabaseConfig';
 
 type NodeRow = Database['public']['Tables']['nodes']['Row'];
 
@@ -172,15 +173,12 @@ export function useWorkingRecordOwner(): WorkingRecordController {
  * `realtime.eventsPerSecond` at 0.
  */
 async function readTreeRecord(accessToken: string | undefined): Promise<FamilyGraph> {
-  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-  const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+  const url = supabaseUrl();
   // Authenticated session token where there is one, so RLS policies apply.
-  const headers = {
-    apikey: supabaseKey,
-    Authorization: `Bearer ${accessToken || supabaseKey}`,
-  };
+  // Signed out, the publishable key goes on apikey only.
+  const headers = supabaseHeaders(supabasePublishableKey(), accessToken);
 
-  const nodesResponse = await fetch(`${supabaseUrl}/rest/v1/nodes?order=created_at.asc&select=*`, {
+  const nodesResponse = await fetch(`${url}/rest/v1/nodes?order=created_at.asc&select=*`, {
     method: 'GET',
     headers,
   });
@@ -194,7 +192,7 @@ async function readTreeRecord(accessToken: string | undefined): Promise<FamilyGr
   }
   const nodesData = await nodesResponse.json();
 
-  const linksResponse = await fetch(`${supabaseUrl}/rest/v1/links?order=created_at.asc&select=*`, {
+  const linksResponse = await fetch(`${url}/rest/v1/links?order=created_at.asc&select=*`, {
     method: 'GET',
     headers,
   });
@@ -213,7 +211,7 @@ async function readTreeRecord(accessToken: string | undefined): Promise<FamilyGr
   // tree still works without claim indicators.
   let claimedNodeIds = new Set<string>();
   try {
-    const claimedRes = await fetch(`${supabaseUrl}/rest/v1/rpc/get_claimed_node_ids`, {
+    const claimedRes = await fetch(`${url}/rest/v1/rpc/get_claimed_node_ids`, {
       method: 'POST',
       headers: { ...headers, 'Content-Type': 'application/json' },
       body: '{}',

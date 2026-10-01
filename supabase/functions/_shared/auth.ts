@@ -3,8 +3,10 @@
  * money or reads data.
  *
  * The browser sends the user's Supabase access token as `Authorization: Bearer`.
- * The anon key is also a well-formed JWT, so "the header holds a JWT" proves
- * nothing; the token is shown to Supabase Auth, which says whose session it is.
+ * Signed out, supabase-js sends the project's publishable key there instead
+ * (the legacy anon key was a well-formed JWT too), so "the header holds a
+ * token" proves nothing; the token is shown to Supabase Auth, which says whose
+ * session it is.
  * A revoked or expired session is refused there too, which a local signature
  * check would not catch.
  */
@@ -15,8 +17,8 @@ import { projectUrl } from './supabaseRest.ts';
 export interface AuthEnv {
   /** `SUPABASE_URL`, set by the platform for every function. */
   supabaseUrl: string;
-  /** `SUPABASE_ANON_KEY`, set by the platform for every function. */
-  supabaseAnonKey: string;
+  /** The project's publishable key (projectKeys.ts), sent on `apikey` only. */
+  publishableKey: string;
 }
 
 export type AuthOutcome =
@@ -36,14 +38,17 @@ export async function requireSignedInUser(
   fetchImpl: FetchLike = fetch,
 ): Promise<AuthOutcome> {
   const token = bearerToken(req);
-  // The anon key is what supabase-js sends when nobody is signed in. It is
-  // refused here without a round trip.
-  if (!token || token === env.supabaseAnonKey) return { ok: false, reason: 'missing-token' };
+  // The publishable key (or the legacy anon key) is what supabase-js sends when
+  // nobody is signed in. It, and any other sb_ key, is nobody: refused here
+  // without a round trip.
+  if (!token || token === env.publishableKey || token.startsWith('sb_')) {
+    return { ok: false, reason: 'missing-token' };
+  }
 
   let res: Response;
   try {
     res = await fetchImpl(projectUrl(env.supabaseUrl, '/auth/v1/user'), {
-      headers: { Authorization: `Bearer ${token}`, apikey: env.supabaseAnonKey },
+      headers: { Authorization: `Bearer ${token}`, apikey: env.publishableKey },
       signal: AbortSignal.timeout(10_000),
     });
   } catch {

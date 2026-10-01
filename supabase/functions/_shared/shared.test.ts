@@ -2,9 +2,10 @@ import { describe, expect, it, vi } from 'vitest';
 import { bearerToken, requireSignedInUser } from './auth.ts';
 import { answerPreflightOrWrongMethod, CORS_HEADERS, errorResponse, readJsonBody } from './http.ts';
 import { backoffDelayMs, fetchWithRetry } from './retry.ts';
+import { projectKeys } from './projectKeys.ts';
 import { DatabaseError, serviceRoleRequest } from './supabaseRest.ts';
 
-const env = { supabaseUrl: 'https://proj.supabase.co', supabaseAnonKey: 'anon-key' };
+const env = { supabaseUrl: 'https://proj.supabase.co', publishableKey: 'anon-key' };
 
 function requestWith(authorization?: string, method = 'POST'): Request {
   return new Request('https://proj.supabase.co/functions/v1/x', {
@@ -67,6 +68,29 @@ describe('requireSignedInUser', () => {
     expect(fetchImpl).not.toHaveBeenCalled();
   });
 
+  it('refuses a publishable key as the bearer: it is not a JWT, and it is nobody', async () => {
+    const fetchImpl = vi.fn();
+    const keyEnv = { ...env, publishableKey: 'sb_publishable_x' };
+    for (const key of ['sb_publishable_x', 'sb_secret_y']) {
+      expect(await requireSignedInUser(requestWith(`Bearer ${key}`), keyEnv, fetchImpl)).toEqual({
+        ok: false,
+        reason: 'missing-token',
+      });
+    }
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it('asks Supabase Auth with the publishable key on apikey and the user token as bearer', async () => {
+    const fetchImpl = vi.fn(async () => Response.json({ id: 'user-1' }));
+    const keyEnv = { ...env, publishableKey: 'sb_publishable_x' };
+    expect(await requireSignedInUser(requestWith('Bearer user-jwt'), keyEnv, fetchImpl)).toEqual({
+      ok: true,
+      userId: 'user-1',
+    });
+    const [, init] = fetchImpl.mock.calls[0] as unknown as [string, RequestInit];
+    expect(init.headers).toEqual({ Authorization: 'Bearer user-jwt', apikey: 'sb_publishable_x' });
+  });
+
   it('asks Supabase Auth whose token it is', async () => {
     const fetchImpl = vi.fn(async () => Response.json({ id: 'user-1' }));
     const outcome = await requireSignedInUser(requestWith('Bearer user-jwt'), env, fetchImpl);
@@ -107,6 +131,38 @@ describe('requireSignedInUser', () => {
       ok: false,
       reason: 'auth-unavailable',
     });
+  });
+});
+
+describe('projectKeys', () => {
+  const reader = (vars: Record<string, string>) => (name: string) => vars[name];
+
+  it("reads the `default` publishable and secret keys Supabase injects", () => {
+    const env = reader({
+      SUPABASE_PUBLISHABLE_KEYS: JSON.stringify({ default: 'sb_publishable_a', other: 'sb_publishable_b' }),
+      SUPABASE_SECRET_KEYS: JSON.stringify({ default: 'sb_secret_a' }),
+      SUPABASE_ANON_KEY: 'legacy-anon',
+      SUPABASE_SERVICE_ROLE_KEY: 'legacy-service',
+    });
+    expect(projectKeys(env)).toEqual({ publishableKey: 'sb_publishable_a', secretKey: 'sb_secret_a' });
+  });
+
+  it('falls back to the legacy keys only when the new ones are missing', () => {
+    const env = reader({ SUPABASE_ANON_KEY: 'legacy-anon', SUPABASE_SERVICE_ROLE_KEY: 'legacy-service' });
+    expect(projectKeys(env)).toEqual({ publishableKey: 'legacy-anon', secretKey: 'legacy-service' });
+  });
+
+  it('falls back when the injected value is not JSON or has no `default`', () => {
+    const env = reader({
+      SUPABASE_PUBLISHABLE_KEYS: 'not json',
+      SUPABASE_SECRET_KEYS: JSON.stringify({ other: 'sb_secret_b' }),
+      SUPABASE_ANON_KEY: 'legacy-anon',
+    });
+    expect(projectKeys(env)).toEqual({ publishableKey: 'legacy-anon', secretKey: undefined });
+  });
+
+  it('gives undefined for a key that is set nowhere', () => {
+    expect(projectKeys(reader({}))).toEqual({ publishableKey: undefined, secretKey: undefined });
   });
 });
 

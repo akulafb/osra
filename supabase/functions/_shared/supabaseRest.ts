@@ -13,7 +13,7 @@ import type { FetchLike } from './http.ts';
 export interface ServiceRoleEnv {
   /** `SUPABASE_URL`, set by the platform for every function. */
   supabaseUrl: string;
-  /** `SUPABASE_SERVICE_ROLE_KEY`, set by the platform for every function. */
+  /** The project's secret key (projectKeys.ts), or the legacy service_role JWT. */
   serviceRoleKey: string;
 }
 

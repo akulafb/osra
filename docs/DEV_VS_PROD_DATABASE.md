@@ -63,7 +63,7 @@ Server code lives in `supabase/functions/`. Each function is a folder with an `i
 
 A function's keys are **function secrets**, stored in the Supabase project. They are not in the repo, not in Vercel, and never carry a `VITE_` prefix — a `VITE_` variable is compiled into the browser bundle. Dev and prod are separate projects, so every secret is set twice and every function is deployed twice.
 
-`SUPABASE_URL`, `SUPABASE_ANON_KEY` and `SUPABASE_SERVICE_ROLE_KEY` are given to every function by the platform; do not set them. (`family-chat` uses the service role key for the one database function that keeps the daily count, which only the service role may run.)
+`SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEYS` and `SUPABASE_SECRET_KEYS` are given to every function by the platform; do not set them. The functions use the `default` key of each (`_shared/projectKeys.ts`), and fall back to the legacy `SUPABASE_ANON_KEY` and `SUPABASE_SERVICE_ROLE_KEY` only where those are missing (LIN-82). Neither new key is a JWT: each goes on `apikey` only. (`family-chat` uses the secret key for the one database function that keeps the daily count, which only the service role may run.)
 
 ### Set a secret and deploy (run once for dev, once for prod)
 
@@ -212,7 +212,7 @@ Running it again links no one twice. The SQL checks are in `supabase/tests/both_
 
 ## Verification
 
-1. Ensure `.env.local` has `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` pointing to the **dev** project.
+1. Ensure `.env.local` has `VITE_SUPABASE_URL` pointing to the **dev** project. The app picks that project's publishable key from `src/lib/supabaseConfig.ts`.
 2. Run `npm run dev` and visit http://localhost:5173
 3. Sign in with Google → data is saved to the dev database only.
 4. Production at https://3d-family-tree-vert.vercel.app uses the production database.

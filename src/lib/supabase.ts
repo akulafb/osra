@@ -1,16 +1,16 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from '../types/database';
+import { fetchWithoutKeyAsBearer, supabasePublishableKey, supabaseUrl } from './supabaseConfig';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+// Throws when VITE_SUPABASE_URL is missing or names a project with no key.
+const supabaseKey = supabasePublishableKey();
 
-if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error(
-    'Missing Supabase environment variables. Please check your .env.local file.'
-  );
-}
-
-export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
+export const supabase = createClient<Database>(supabaseUrl(), supabaseKey, {
+  // Signed out, supabase-js would send the publishable key as the bearer too.
+  // It is not a JWT: it goes on apikey only (LIN-82).
+  global: {
+    fetch: fetchWithoutKeyAsBearer(supabaseKey),
+  },
   auth: {
     persistSession: true,
     autoRefreshToken: true,

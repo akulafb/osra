@@ -122,7 +122,7 @@ describe('handleSpellingMatches', () => {
   const AUTH_URL = 'https://proj.supabase.co/auth/v1/user';
   const ENV: Record<string, string> = {
     SUPABASE_URL: 'https://proj.supabase.co',
-    SUPABASE_ANON_KEY: 'anon-key',
+    SUPABASE_PUBLISHABLE_KEYS: JSON.stringify({ default: 'sb_publishable_test' }),
     TYPESAFE_API_KEY: 'ts-secret',
   };
 
@@ -189,7 +189,7 @@ describe('handleSpellingMatches', () => {
 
   it.each([
     ['no Authorization header', null],
-    ['the anon key', 'anon-key'],
+    ['the publishable key', 'sb_publishable_test'],
     ['a token Supabase Auth rejects', 'forged'],
   ])('refuses %s and makes no call to TypeSafe', async (_label, token) => {
     const { deps, typeSafeCalls } = setup([answers(1, 1)]);
