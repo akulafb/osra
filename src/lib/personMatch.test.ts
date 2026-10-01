@@ -5,6 +5,9 @@ import {
   readMatchResolution,
   MATCH_CANDIDATE_LIMIT,
   MIN_MATCH_QUERY_LENGTH,
+  SPELLING_MATCH_THRESHOLD,
+  spellingLookupQuery,
+  spellingScoresFrom,
 } from './personMatch';
 import { FamilyLink, FamilyNode } from '../types/graph';
 
@@ -238,5 +241,184 @@ describe('readMatchResolution', () => {
   it('reports must-confirm only for the resolution that blocks', () => {
     expect(readMatchResolution(creating('Ahmad')).mustConfirm).toBe(true);
     expect(readMatchResolution(creating('Bad')).mustConfirm).toBe(false);
+  });
+});
+
+describe('matchExistingPersons — spelling matches (advice only)', () => {
+  const pool: FamilyNode[] = [
+    { id: 'mz', firstName: 'Mohammed', familyCluster: 'Zabalawi' },
+    { id: 'om', firstName: 'Omar', familyCluster: 'Zabalawi' },
+  ];
+
+  /** Scores as the server would report them for `typedName`. */
+  const scores = (typedName: string, byName: Record<string, number>) =>
+    spellingScoresFrom(
+      typedName,
+      Object.entries(byName).map(([name, score]) => ({ name, score }))
+    );
+
+  const spelling = (
+    query: string,
+    byName: Record<string, number>,
+    overrides: Partial<Parameters<typeof matchExistingPersons>[0]> = {}
+  ) =>
+    matchExistingPersons({
+      query,
+      intent: 'creating',
+      pool,
+      excludePersonId: 'zzz',
+      spellingScores: scores(query, byName),
+      ...overrides,
+    });
+
+  it('offers a Person whose given name is a different spelling, as a candidate', () => {
+    const result = spelling('Mohamed', { Mohammed: 0.93, Omar: 0.02 });
+    expect(result.kind).toBe('candidates');
+    if (result.kind === 'none') throw new Error('expected matches');
+    expect(result.matches.map((m) => [m.person.id, m.isSpellingVariant])).toEqual([['mz', true]]);
+  });
+
+  it('sorts exact matches first, then spelling matches, then other substring matches', () => {
+    const mixed: FamilyNode[] = [
+      { id: 'sub', firstName: 'Aaron', familyCluster: 'Alis' },
+      { id: 'var', firstName: 'Aly' },
+      { id: 'exact', firstName: 'Ali' },
+    ];
+    const result = spelling('Ali', { Aaron: 0.01, Aly: 0.8 }, { pool: mixed });
+    expect(matchIds(result)).toEqual(['exact', 'var', 'sub']);
+  });
+
+  it('does not call a given name that already contains the query a different spelling', () => {
+    // "Moham" is Mohammed half-typed, not spelled differently: it stays an
+    // ordinary substring match, unlabelled and in the substring tier.
+    const result = spelling('Moham', { Mohammed: 0.8 });
+    if (result.kind === 'none') throw new Error('expected matches');
+    expect(result.matches.map((m) => [m.person.id, m.isSpellingVariant])).toEqual([['mz', false]]);
+  });
+
+  it('counts a score of 0.5 as a spelling match and anything below it as none', () => {
+    expect(SPELLING_MATCH_THRESHOLD).toBe(0.5);
+    expect(matchIds(spelling('Mohamed', { Mohammed: 0.5 }))).toEqual(['mz']);
+    expect(spelling('Mohamed', { Mohammed: 0.49 }).kind).toBe('none');
+  });
+
+  it('never requires confirmation for spelling matches alone', () => {
+    const many: FamilyNode[] = [
+      { id: '1', firstName: 'Mohammed' },
+      { id: '2', firstName: 'Muhammad' },
+      { id: '3', firstName: 'Mohammad' },
+    ];
+    const result = spelling(
+      'Mohamed',
+      { Mohammed: 0.99, Muhammad: 0.97, Mohammad: 0.98 },
+      { pool: many }
+    );
+    expect(result.kind).toBe('candidates');
+    expect(readMatchResolution(result).mustConfirm).toBe(false);
+  });
+
+  it('still requires confirmation on an exact given-name match beside spelling matches', () => {
+    const withExact: FamilyNode[] = [...pool, { id: 'exact', firstName: 'mohamed' }];
+    const result = spelling('Mohamed', { Mohammed: 0.93, mohamed: 1 }, { pool: withExact });
+    expect(result.kind).toBe('must-confirm');
+    if (result.kind === 'none') throw new Error('expected matches');
+    // The exact match is exact, not a spelling variant of itself.
+    expect(result.matches.map((m) => [m.person.id, m.isExactGivenName, m.isSpellingVariant])).toEqual(
+      [
+        ['exact', true, false],
+        ['mz', false, true],
+      ]
+    );
+  });
+
+  it('applies a score to every Person with that given name, whatever its case', () => {
+    const twins: FamilyNode[] = [
+      { id: 'm1', firstName: 'Mohammed', familyCluster: 'Zabalawi' },
+      { id: 'm2', firstName: ' mohammed ', familyCluster: 'Badran' },
+    ];
+    expect(matchIds(spelling('Mohamed', { Mohammed: 0.9 }, { pool: twins }))).toEqual(['m2', 'm1']);
+  });
+
+  it('ignores scores that answer a different query (a stale reply)', () => {
+    const result = matchExistingPersons({
+      query: 'Omer',
+      intent: 'creating',
+      pool,
+      excludePersonId: 'zzz',
+      spellingScores: scores('Mohamed', { Mohammed: 0.93 }),
+    });
+    expect(result.kind).toBe('none');
+  });
+
+  it('accepts scores for the same query typed with other case or spacing', () => {
+    const result = matchExistingPersons({
+      query: '  mohamed ',
+      intent: 'creating',
+      pool,
+      excludePersonId: 'zzz',
+      spellingScores: scores('Mohamed', { Mohammed: 0.93 }),
+    });
+    expect(matchIds(result)).toEqual(['mz']);
+  });
+
+  it('with no scores, resolves exactly as substring matching does', () => {
+    // The fallback when the function is slow, failing or offline.
+    for (const query of ['Ahmad', 'Bad', 'badran', 'nobody', 'a']) {
+      const without = creating(query);
+      expect(without).toEqual(creating(query, { spellingScores: undefined }));
+      if (without.kind !== 'none') {
+        expect(without.matches.every((m) => !m.isSpellingVariant)).toBe(true);
+      }
+    }
+  });
+
+  it('keeps the cap and counts spelling matches the cap left out', () => {
+    const crowd: FamilyNode[] = [
+      { id: '1', firstName: 'Mohammed' },
+      { id: '2', firstName: 'Muhammad' },
+      { id: '3', firstName: 'Mohammad' },
+      { id: '4', firstName: 'Mohamad' },
+      { id: '5', firstName: 'Muhamed' },
+    ];
+    const result = spelling(
+      'Mohamed',
+      { Mohammed: 0.9, Muhammad: 0.9, Mohammad: 0.9, Mohamad: 0.9, Muhamed: 0.9 },
+      { pool: crowd }
+    );
+    expect(matchIds(result)).toHaveLength(MATCH_CANDIDATE_LIMIT);
+    expect(readMatchResolution(result).hiddenMatchCount).toBe(1);
+  });
+
+  it('labels spelling matches hidden by the filter or already connected', () => {
+    const result = spelling(
+      'Mohamed',
+      { Mohammed: 0.93 },
+      { visibleIds: new Set(['om']), connectedIds: new Set(['mz']) }
+    );
+    if (result.kind === 'none') throw new Error('expected matches');
+    expect(result.matches[0]).toMatchObject({
+      isSpellingVariant: true,
+      isVisible: false,
+      isAlreadyConnected: true,
+    });
+  });
+
+  it('never offers the excluded Person as a spelling match', () => {
+    expect(spelling('Mohamed', { Mohammed: 0.93 }, { excludePersonId: 'mz' }).kind).toBe('none');
+  });
+
+  it('asks for no lookup on an unchanged rename, and the typed query otherwise', () => {
+    expect(spellingLookupQuery({ query: ' ahmad', intent: 'renaming', currentGivenName: 'Ahmad' })).toBe('');
+    expect(spellingLookupQuery({ query: 'Ahmed', intent: 'renaming', currentGivenName: 'Ahmad' })).toBe('Ahmed');
+    expect(spellingLookupQuery({ query: 'Ahmad', intent: 'creating' })).toBe('Ahmad');
+  });
+
+  it('resolves an unchanged rename to none even with scores', () => {
+    const result = spelling(
+      'Mohammed',
+      { Mohammed: 1 },
+      { intent: 'renaming', currentGivenName: 'Mohammed', excludePersonId: 'om' }
+    );
+    expect(result).toEqual({ kind: 'none' });
   });
 });

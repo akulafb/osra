@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { FamilyNode, RelativeDirection } from '../../types/graph';
-import { matchExistingPersons, readMatchResolution } from '../../lib/personMatch';
+import { readMatchResolution } from '../../lib/personMatch';
+import { usePersonMatch } from '../../hooks/usePersonMatch';
 import { relationColor, relationLabel } from './relationStyle';
 
 /**
@@ -61,21 +62,18 @@ export const GhostNodeCard: React.FC<GhostNodeCardProps> = ({
     return () => clearTimeout(timer);
   }, []);
 
-  const resolution = useMemo(
-    () =>
-      matchExistingPersons({
-        query: name,
-        intent: 'creating',
-        pool: existingNodes,
-        excludePersonId: anchorNodeId,
-        visibleIds,
-        connectedIds,
-      }),
-    [name, existingNodes, anchorNodeId, visibleIds, connectedIds]
-  );
+  const resolution = usePersonMatch({
+    query: name,
+    intent: 'creating',
+    pool: existingNodes,
+    excludePersonId: anchorNodeId,
+    visibleIds,
+    connectedIds,
+  });
 
   // An exact given-name collision is a real question, so Enter waits for an
-  // answer. Anything looser stays advisory — see ADR-0005.
+  // answer. Anything looser — a substring or a spelling match — stays advisory;
+  // see ADR-0005.
   const { matches, hiddenMatchCount, mustConfirm: unresolved } = readMatchResolution(resolution);
   const mustConfirm = unresolved && !confirmedDifferentPerson;
   const exactMatchName = matches.find((m) => m.isExactGivenName)?.person.firstName ?? name.trim();
@@ -265,7 +263,7 @@ export const GhostNodeCard: React.FC<GhostNodeCardProps> = ({
               </button>
             )}
           </div>
-          {matches.map(({ person, isVisible, isAlreadyConnected }) => (
+          {matches.map(({ person, isSpellingVariant, isVisible, isAlreadyConnected }) => (
             <button
               key={person.id}
               type="button"
@@ -296,6 +294,9 @@ export const GhostNodeCard: React.FC<GhostNodeCardProps> = ({
             >
               <span style={{ fontWeight: 600 }}>
                 {person.firstName}
+                {isSpellingVariant && (
+                  <span style={{ fontWeight: 400, color: '#94a3b8' }}> · different spelling</span>
+                )}
                 {!isVisible && (
                   <span style={{ fontWeight: 400, color: '#94a3b8' }}> · hidden by filter</span>
                 )}

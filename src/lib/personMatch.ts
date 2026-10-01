@@ -16,14 +16,51 @@ export const MIN_MATCH_QUERY_LENGTH = 2;
 /** Most matches handed to a caller at once, so a 190px card never overruns. */
 export const MATCH_CANDIDATE_LIMIT = 4;
 
+/**
+ * A score at or above this, from the spelling-matches function, is a spelling
+ * match. Measured on the pinned model (LIN-67); it lives here so no caller can
+ * pick a second number.
+ */
+export const SPELLING_MATCH_THRESHOLD = 0.5;
+
 /** Creation asks "does this Person exist?"; renaming asks "am I colliding with one?" */
 export type MatchIntent = 'creating' | 'renaming';
+
+/**
+ * The server's spelling scores for one typed name, keyed by case-folded given
+ * name. Opaque to callers: they pass it through to `matchExistingPersons`, which
+ * alone decides what counts as a spelling match.
+ */
+export interface SpellingScores {
+  /** The query these scores answer, folded. Scores for any other query are ignored. */
+  readonly typedName: string;
+  readonly byGivenName: ReadonlyMap<string, number>;
+}
+
+/** Builds `SpellingScores` from the function's `{ name, score }` list. */
+export function spellingScoresFrom(
+  typedName: string,
+  scores: ReadonlyArray<{ name: string; score: number }>
+): SpellingScores {
+  const byGivenName = new Map<string, number>();
+  for (const { name, score } of scores) {
+    const key = fold(name);
+    // Two spellings that fold together share a key; keep the stronger score.
+    byGivenName.set(key, Math.max(score, byGivenName.get(key) ?? 0));
+  }
+  return { typedName: fold(typedName), byGivenName };
+}
 
 /** An existing Person who might be the one being described, and why we think so. */
 export interface PersonMatch {
   person: FamilyNode;
   /** The query is exactly this Person's given name, trimmed and case-folded. */
   isExactGivenName: boolean;
+  /**
+   * The given name is the query spelled or transliterated differently, per the
+   * spelling-matches function. Advice only: never makes a resolution `must-confirm`.
+   */
+  isSpellingVariant: boolean;
   /** False when hidden by a cluster preset or a collapsed subtree. Labelling only. */
   isVisible: boolean;
   /** Already has a Kinship Link to the anchor. Marking only — never excluded. */
@@ -49,15 +86,43 @@ export interface MatchExistingPersonsParams {
   connectedIds?: ReadonlySet<string>;
   /** `renaming` only: the Person's current given name; an unchanged name resolves to `none`. */
   currentGivenName?: string;
+  /**
+   * Spelling scores for this query, from the spelling lookup (`usePersonMatch`
+   * wires it). Omit, or pass scores for another query, for substring matching only.
+   */
+  spellingScores?: SpellingScores;
   limit?: number;
 }
 
-/** Trimmed and case-folded, the form both the query and a given name are compared in. */
-function fold(value: string | undefined): string {
+/**
+ * Trimmed and case-folded, the form a query and a given name are compared in.
+ * Exported so the spelling lookup keys names the same way this module reads them.
+ */
+export function foldName(value: string | undefined): string {
   return (value ?? '').trim().toLowerCase();
 }
+const fold = foldName;
 
 const NONE: MatchResolution = { kind: 'none' };
+
+type RenameParams = Pick<MatchExistingPersonsParams, 'query' | 'intent' | 'currentGivenName'>;
+
+/**
+ * A rename that has not changed the name is not a collision with anything —
+ * otherwise merely opening Edit on an Ahmad would block on an untouched field.
+ */
+function isUnchangedRename({ query, intent, currentGivenName }: RenameParams): boolean {
+  return intent === 'renaming' && fold(query) === fold(currentGivenName);
+}
+
+/**
+ * The query worth a spelling lookup for these params, or `''` for none: an
+ * unchanged rename resolves to `none` whatever the scores, so it is not sent.
+ * (Too-short queries are refused by the lookup itself.)
+ */
+export function spellingLookupQuery(params: RenameParams): string {
+  return isUnchangedRename(params) ? '' : params.query;
+}
 
 export function matchExistingPersons({
   query,
@@ -67,35 +132,46 @@ export function matchExistingPersons({
   visibleIds,
   connectedIds,
   currentGivenName,
+  spellingScores,
   limit = MATCH_CANDIDATE_LIMIT,
 }: MatchExistingPersonsParams): MatchResolution {
   const q = fold(query);
   if (q.length < MIN_MATCH_QUERY_LENGTH) return NONE;
 
-  // A rename that has not changed the name is not a collision with anything —
-  // otherwise merely opening Edit on an Ahmad would block on an untouched field.
-  if (intent === 'renaming' && q === fold(currentGivenName)) return NONE;
+  if (isUnchangedRename({ query, intent, currentGivenName })) return NONE;
 
-  const matches: PersonMatch[] = pool
-    .filter(
-      (person) =>
-        person.id !== excludePersonId && nodeSearchHaystack(person).toLowerCase().includes(q)
-    )
-    .map((person) => ({
+  // Scores answer one query. Any others are a stale reply and are dropped here,
+  // so no caller can show a previous query's spelling matches.
+  const scores = spellingScores?.typedName === q ? spellingScores.byGivenName : undefined;
+
+  const matches: PersonMatch[] = [];
+  for (const person of pool) {
+    if (person.id === excludePersonId) continue;
+    const givenName = fold(person.firstName);
+    const isExactGivenName = givenName === q;
+    // A given name that already contains the query is being typed, not spelled
+    // differently ("Moham" → Mohammed): it stays a plain substring match.
+    const isSpellingVariant =
+      !givenName.includes(q) && (scores?.get(givenName) ?? 0) >= SPELLING_MATCH_THRESHOLD;
+    if (!isSpellingVariant && !nodeSearchHaystack(person).toLowerCase().includes(q)) continue;
+    matches.push({
       person,
-      isExactGivenName: fold(person.firstName) === q,
+      isExactGivenName,
+      isSpellingVariant,
       isVisible: visibleIds ? visibleIds.has(person.id) : true,
       isAlreadyConnected: connectedIds ? connectedIds.has(person.id) : false,
-    }));
+    });
+  }
 
   if (matches.length === 0) return NONE;
 
   // Exact matches first — they are the ones a caller may have to block on — then
-  // alphabetical. Visibility and connectedness are labels and do not reorder.
-  matches.sort((a, b) => {
-    if (a.isExactGivenName !== b.isExactGivenName) return a.isExactGivenName ? -1 : 1;
-    return a.person.firstName.localeCompare(b.person.firstName);
-  });
+  // spelling matches, then other substring matches, each alphabetical.
+  // Visibility and connectedness are labels and do not reorder.
+  const rank = (m: PersonMatch) => (m.isExactGivenName ? 0 : m.isSpellingVariant ? 1 : 2);
+  matches.sort(
+    (a, b) => rank(a) - rank(b) || a.person.firstName.localeCompare(b.person.firstName)
+  );
 
   // Exactness is judged before the cap: an exact match hidden behind the limit is
   // still the question the user needs to answer.
