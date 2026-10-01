@@ -4,14 +4,13 @@ import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import ReactMarkdown from 'react-markdown';
 import Button from '@mui/material/Button';
+import { MAX_USER_MESSAGE_CHARS } from '../../supabase/functions/family-chat/limits.ts';
 import { useFamilyChat } from '../hooks/useFamilyChat';
-
-const MAX_CHAT_INPUT_LENGTH = 2000;
 
 export const FamilyChat: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [inputValue, setInputValue] = useState('');
-  const { messages, isLoading, error, sendMessage, clearChat } = useFamilyChat();
+  const { messages, isLoading, notice, isLimited, sendMessage, clearChat } = useFamilyChat();
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -26,8 +25,8 @@ export const FamilyChat: React.FC = () => {
 
   const handleSend = async (e?: React.FormEvent) => {
     e?.preventDefault();
-    const query = inputValue.trim().slice(0, MAX_CHAT_INPUT_LENGTH);
-    if (!query || isLoading) return;
+    const query = inputValue.trim().slice(0, MAX_USER_MESSAGE_CHARS);
+    if (!query || isLoading || isLimited) return;
 
     setInputValue('');
     await sendMessage(query);
@@ -118,9 +117,9 @@ export const FamilyChat: React.FC = () => {
                   AI is thinking...
                 </div>
               )}
-              {error && (
-                <div style={{ color: '#ef4444', fontSize: '0.8rem', textAlign: 'center', padding: '5px' }}>
-                  Error: {error}
+              {notice && (
+                <div role="status" style={{ color: '#fbbf24', fontSize: '0.85rem', textAlign: 'center', padding: '5px' }}>
+                  {notice.line}
                 </div>
               )}
               <div ref={messagesEndRef} />
@@ -140,9 +139,10 @@ export const FamilyChat: React.FC = () => {
               <input
                 type="text"
                 value={inputValue}
-                onChange={(e) => setInputValue(e.target.value.slice(0, MAX_CHAT_INPUT_LENGTH))}
+                onChange={(e) => setInputValue(e.target.value.slice(0, MAX_USER_MESSAGE_CHARS))}
                 placeholder="Who are my maternal cousins?"
-                maxLength={MAX_CHAT_INPUT_LENGTH}
+                maxLength={MAX_USER_MESSAGE_CHARS}
+                disabled={isLimited}
                 style={{
                   flex: 1,
                   backgroundColor: '#1a1a1a',
@@ -153,7 +153,7 @@ export const FamilyChat: React.FC = () => {
                   outline: 'none'
                 }}
               />
-              <Button type="submit" variant="contained" color="primary" disabled={isLoading}>
+              <Button type="submit" variant="contained" color="primary" disabled={isLoading || isLimited}>
                 Send
               </Button>
             </form>

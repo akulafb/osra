@@ -1,108 +1,100 @@
 // src/hooks/useFamilyChat.ts
 
-import { useState, useCallback, useMemo } from 'react';
-import { Message, callLLM } from '../utils/llmClient';
-import { formatFamilyData } from '../utils/familyContext';
-import { formatNodeDisplayName } from '../utils/nodeDisplayName';
+import { useState, useCallback, useEffect, useRef } from 'react';
+import type { ChatTurn } from '../../supabase/functions/family-chat/request.ts';
+import { askFamilyChat } from '../lib/familyChat';
+import { invokeFamilyChat } from '../lib/familyChatClient';
 import { useWorkingRecord } from '../contexts/WorkingRecordContext';
-import { useAuth } from '../contexts/AuthContext';
 
 const MAX_DISPLAYED_MESSAGES = 50;
 
+/** One bubble in the chat. */
+export interface ChatBubble {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
+/**
+ * A line in place of an answer. A limit line (daily limit, credit gone)
+ * disables the input while it shows; a daily limit lifts at `resetsAt`.
+ */
+export interface ChatNotice {
+  line: string;
+  isLimit: boolean;
+  resetsAt?: string;
+}
+
+/**
+ * The family chat's state. The question goes to the family-chat function with
+ * the earlier turns; tool calls run on the Working Record, read by reference
+ * when the question is sent (ADR 0009), so the chat never fetches the tree.
+ */
 export function useFamilyChat() {
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [messages, setMessages] = useState<ChatBubble[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const { working: graphData } = useWorkingRecord();
-  const { userProfile } = useAuth();
+  const [notice, setNotice] = useState<ChatNotice | null>(null);
+  const { working } = useWorkingRecord();
 
-  const currentUserName = useMemo(() => {
-    if (!userProfile?.node_id || !graphData?.nodes) return null;
-    const node = graphData.nodes.find(n => n.id === userProfile.node_id);
-    return node ? formatNodeDisplayName(node) : null;
-  }, [userProfile, graphData]);
+  const workingRef = useRef(working);
+  workingRef.current = working;
+  /** The turns sent so far, tool rounds included; the model needs them for follow-ups. */
+  const historyRef = useRef<ChatTurn[]>([]);
+  const busyRef = useRef(false);
 
-  const sendMessage = useCallback(async (userQuery: string) => {
-    if (!userQuery.trim()) return;
+  // A daily limit lifts at the next midnight in the UAE.
+  useEffect(() => {
+    if (!notice?.resetsAt) return;
+    const wait = Date.parse(notice.resetsAt) - Date.now();
+    if (!Number.isFinite(wait)) return;
+    const timer = setTimeout(() => setNotice(null), Math.max(0, wait));
+    return () => clearTimeout(timer);
+  }, [notice]);
 
-    setIsLoading(true);
-    setError(null);
+  const isLimited = notice?.isLimit ?? false;
 
-    // Add user message to UI
-    const userMessage: Message = { role: 'user', content: userQuery };
-    setMessages(prev => [...prev, userMessage]);
+  const sendMessage = useCallback(
+    async (question: string) => {
+      if (!question.trim() || busyRef.current || isLimited) return;
+      busyRef.current = true;
+      setIsLoading(true);
+      setNotice(null);
+      setMessages((prev) => [...prev, { role: 'user', content: question }]);
 
-    try {
-      // Prepare context from family data
-      const familyContext = graphData 
-        ? formatFamilyData(graphData.nodes, graphData.links)
-        : 'Family data is currently unavailable.';
+      try {
+        const outcome = await askFamilyChat({
+          question,
+          history: historyRef.current,
+          record: workingRef.current ?? { nodes: [], links: [] },
+          send: invokeFamilyChat,
+          messageId: crypto.randomUUID(),
+        });
+        if (outcome.ok) {
+          historyRef.current = outcome.turns;
+          setMessages((prev) => [...prev, { role: 'assistant', content: outcome.answer }]);
+        } else {
+          setNotice({ line: outcome.line, isLimit: outcome.cause !== 'failed', resetsAt: outcome.resetsAt });
+        }
+      } finally {
+        busyRef.current = false;
+        setIsLoading(false);
+      }
+    },
+    [isLimited],
+  );
 
-      const userIdentityContext = currentUserName 
-        ? `The user currently signed in and speaking to you is **${currentUserName}**. When they use first-person pronouns like "I", "me", "my", or "mine", they are referring to **${currentUserName}**.`
-        : `The user's specific identity in the family tree is currently unknown, but they are likely a family member.`;
-
-      const systemPrompt: Message = {
-        role: 'system',
-        content: `You are an expert Family Tree Analyst. Use the provided family data to answer questions with 100% accuracy.
-
-USER IDENTITY:
-${userIdentityContext}
-
-REASONING PROTOCOL:
-1. DATA SCOPE: Use the "FAMILY PROFILES" provided. Each profile lists parents, siblings, spouses, and children.
-2. COUSINS: 
-   - A person's cousins are the children of their parents' siblings.
-   - Trace: Subject -> Parents -> Parents' Siblings -> Their Children.
-3. MATERNAL VS PATERNAL: 
-   - "Maternal" means tracing through the Mother (usually female).
-   - "Paternal" means tracing through the Father (usually male).
-   - If gender is not explicit, use names to infer (e.g., Baha = Mother, Basel = Father).
-4. ROBUSTNESS: 
-   - Always check BOTH parents for siblings to find all cousins.
-   - Blood relationships cross "Family Clusters".
-5. COUNTING: List names first, categorized by side (Maternal/Paternal), then give the total.
-6. OUTPUT STYLE: 
-   - Use **Markdown** for better readability.
-   - **Bold** names of family members.
-   - Use bulleted lists for groups of relatives.
-   - Use headers (e.g., ### Maternal Side) to separate different lineages if applicable.
-   - BE EXTREMELY CONCISE. Answering the question directly is the priority. Do not include introductory filler or closing pleasantries unless necessary for clarity.
-   - If asked to count, list the names first, then provide the total.
-   - IMPORTANT: Never show your reasoning process. Only output the final answer. No step-by-step workthrough.
-7. NAME AMBIGUITY: Distinguish between people with the same name using their family cluster or specific relatives.
-8. INTERPRETATION: "Fahd" refers to "Fahd Badran".
-9. CLARIFICATION: In case of ambiguity, ask the user to provide more information (e.g. "which Nada are you referring to: Okasha or Badran")
-
-Family Data:
-${familyContext}`
-      };
-
-      const recentMessages = messages.slice(-20);
-      const llmResponse = await callLLM([systemPrompt, ...recentMessages, userMessage]);
-
-      const assistantMessage: Message = { role: 'assistant', content: llmResponse };
-      setMessages(prev => [...prev, assistantMessage]);
-    } catch (err) {
-      console.error('Chat error:', err);
-      setError(err instanceof Error ? err.message : 'Failed to get a response from the AI.');
-    } finally {
-      setIsLoading(false);
-    }
-  }, [graphData, messages, currentUserName]);
-
+  /** Clears the conversation. A limit line stays: the limit still holds. */
   const clearChat = useCallback(() => {
     setMessages([]);
-    setError(null);
+    historyRef.current = [];
+    setNotice((current) => (current?.isLimit ? current : null));
   }, []);
 
-  const displayedMessages = messages.slice(-MAX_DISPLAYED_MESSAGES);
-
   return {
-    messages: displayedMessages,
+    messages: messages.slice(-MAX_DISPLAYED_MESSAGES),
     isLoading,
-    error,
+    notice,
+    isLimited,
     sendMessage,
-    clearChat
+    clearChat,
   };
 }
