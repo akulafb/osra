@@ -59,7 +59,7 @@ Server code lives in `supabase/functions/`. Each function is a folder with an `i
 | Function | What it does | Secrets it reads |
 |----------|--------------|------------------|
 | `spelling-matches` | Scores given names against a typed name with TypeSafe Jev (LIN-67) | `TYPESAFE_API_KEY` |
-| `family-chat` | The family chat's model calls through OpenRouter, with 10 messages per account per UAE day (LIN-71). Needs the `chat_message_usage` migration. | `OPENROUTER_API_KEY` |
+| `family-chat` | The family chat's model calls through OpenRouter, with 10 messages per account per UAE day (LIN-71). Needs the `chat_message_usage` migration. Its `route` operation asks TypeSafe Jev what kind of question a message is, so code can answer the common kinds with no model call (LIN-73). | `OPENROUTER_API_KEY`, `TYPESAFE_API_KEY` |
 
 A function's keys are **function secrets**, stored in the Supabase project. They are not in the repo, not in Vercel, and never carry a `VITE_` prefix — a `VITE_` variable is compiled into the browser bundle. Dev and prod are separate projects, so every secret is set twice and every function is deployed twice.
 
@@ -151,7 +151,22 @@ console.log(await chat({ messageId, messages: [{ role: 'user', content: 'How man
 
 Without a session the same call answers 401 with `cause: 'not_signed_in'` (try it with `Authorization` removed). Each new `messageId` uses one of the account's 10 messages for the UAE day; the count starts again at midnight UAE time (20:00 UTC). A `messageId` belongs to one question: tool rounds and retries reuse it, a new question needs a new one (reusing it answers 409 `message_id_reused`). To see the counts: Dashboard → Table Editor → `chat_message_usage`. To give a test account its messages back on dev, delete its rows there.
 
-How the function is called — the request, the answer, the tool round and the refusal causes — is written at the top of `supabase/functions/family-chat/handler.ts` and `request.ts`.
+#### The `route` operation (LIN-73)
+
+Before any model call the browser sends `{ operation: 'route', messageId, message }`. The function counts the message (the route is its first call, so a message that code answers still uses one of the day's 10, and a message sent on to the model has 5 model calls left), asks Jev its five questions (`supabase/functions/family-chat/questionKind.ts`, pinned to `jev-1.13.0`), and answers `200 { questionKind, speaker, usage }`. `questionKind` is `null` when `TYPESAFE_API_KEY` is not set, or Jev failed, took over 2.5 s, or was still busy after one short retry; the browser then sends the message to the model and the user sees no error. The `TYPESAFE_API_KEY` secret is the one the `spelling-matches` function already reads, so a project that has it needs only the deploy:
+
+```bash
+npx supabase secrets list --project-ref "$REF"      # TYPESAFE_API_KEY is listed (set for spelling-matches)
+npx supabase functions deploy family-chat --project-ref "$REF"
+```
+
+```js
+console.log(await chat({ operation: 'route', messageId: crypto.randomUUID(), message: 'who are my khalos' }));
+// 200 { questionKind: { relation: { value: 'aunts_uncles', confidence: 0.9… }, side: { value: 'maternal', … }, gender: …,
+//       subject: …, wantsCount: { value: false, … } }, speaker: { personId, displayName }, usage: { messagesUsed: 1, … } }
+```
+
+How the function is called — the request, the answer, the tool round, the route and the refusal causes — is written at the top of `supabase/functions/family-chat/handler.ts` and `request.ts`.
 
 The database rules and RLS have a check script, `supabase/tests/chat_message_usage.sql`, for a local or throwaway database only (never dev or prod). With Docker:
 
@@ -168,6 +183,8 @@ docker stop osra-pg
 The functions' logic is in plain TypeScript modules with no Deno imports, so `npm test` runs their tests (`supabase/functions/**/*.test.ts`). Typecheck them with `npx tsc -p supabase/functions`.
 
 `node scripts/spelling-eval/run.mjs` runs the spelling-match evaluation set against TypeSafe and prints found / wrong extras / missed. It is not part of `npm test`: it needs `TYPESAFE_API_KEY` (from the environment or `.env.local`) and the network. Run it again before changing the pinned model or the question wording.
+
+`node scripts/chat-routing-eval/run.mjs` does the same for the chat route (LIN-73): it sends the 46 prototype messages in `scripts/chat-routing-eval/messages.json` to Jev as the `family-chat` route does, and prints how many of the tuned (32) and new (14) messages Jev read right, and where each would go at the confidence gate. Same key, same rule: run it before changing the model or the wording in `questionKind.ts`.
 
 ## Verification
 

@@ -382,7 +382,8 @@ deno_version = 2
 [functions.spelling-matches]
 verify_jwt = false
 
-# The family chat (LIN-71): holds the OpenRouter key, counts messages per day.
+# The family chat (LIN-71): holds the OpenRouter key, counts messages per day,
+# and asks TypeSafe Jev what kind of question a message is (LIN-73).
 # Same as above: the function checks the session with Supabase Auth itself.
 [functions.family-chat]
 verify_jwt = false

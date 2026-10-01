@@ -8,10 +8,20 @@
  * `messageId`, until the model answers or the call cap is reached. The tree
  * itself is never sent.
  *
- * The transport is passed in, so the whole loop runs under `npm test` with
- * the model scripted.
+ * Before that, TypeSafe Jev reads the message (the function's `route`
+ * operation, LIN-73). When it is a common kind of question, code answers it
+ * from the Working Record (`chatRouting.ts`) and no model is called. The route
+ * is the message's first call, so it uses one of the day's messages either way.
+ *
+ * The transports are passed in, so the whole loop runs under `npm test` with
+ * Jev and the model scripted.
  */
-import type { ChatResponse, ChatUsage, RefusalCause } from '../../supabase/functions/family-chat/handler.ts';
+import type {
+  ChatResponse,
+  ChatUsage,
+  RefusalCause,
+  RouteResponse,
+} from '../../supabase/functions/family-chat/handler.ts';
 import {
   DAILY_MESSAGE_LIMIT,
   MAX_MODEL_CALLS_PER_MESSAGE,
@@ -21,6 +31,7 @@ import {
   MAX_TURNS,
   type ChatTurn,
 } from '../../supabase/functions/family-chat/request.ts';
+import { routeMessage } from './chatRouting';
 import { runChatTool, type ChatRecord } from './chatTools';
 
 /** The body the family-chat function takes. */
@@ -39,6 +50,19 @@ export type ChatSendResult =
 
 export type SendChat = (request: ChatRequestBody) => Promise<ChatSendResult>;
 
+/** The body of the family-chat function's route operation: only the message. */
+export interface RouteRequestBody {
+  operation: 'route';
+  messageId: string;
+  message: string;
+}
+
+export type RouteSendResult =
+  | { ok: true; reply: RouteResponse }
+  | { ok: false; cause: RefusalCause; usage?: ChatUsage };
+
+export type RouteChat = (request: RouteRequestBody) => Promise<RouteSendResult>;
+
 export interface AskFamilyChat {
   question: string;
   /** The turns of earlier questions in this chat, oldest first. */
@@ -46,6 +70,11 @@ export interface AskFamilyChat {
   /** The Working Record, read at send time. */
   record: ChatRecord;
   send: SendChat;
+  /**
+   * Asks Jev what kind of question it is, before any model call. Without it,
+   * every question goes to the model.
+   */
+  route?: RouteChat;
   /** New for each question; every call for this question repeats it. */
   messageId: string;
 }
@@ -61,8 +90,11 @@ export const CHAT_LINES: Record<ChatFailureCause, string> = {
 };
 
 export type ChatOutcome =
-  /** `turns` is the history with this question, its tool rounds and the answer added. */
-  | { ok: true; answer: string; turns: ChatTurn[] }
+  /**
+   * `turns` is the history with this question, its tool rounds and the answer
+   * added. `answeredBy` says whether code wrote the answer or the model did.
+   */
+  | { ok: true; answer: string; turns: ChatTurn[]; answeredBy: 'code' | 'model' }
   /** `resetsAt` (ISO 8601) is when a daily limit lifts. */
   | { ok: false; cause: ChatFailureCause; line: string; resetsAt?: string };
 
@@ -128,10 +160,46 @@ function fitTurns(history: readonly ChatTurn[], current: readonly ChatTurn[], me
   return [...kept, ...current];
 }
 
-export async function askFamilyChat({ question, history, record, send, messageId }: AskFamilyChat): Promise<ChatOutcome> {
+export async function askFamilyChat({
+  question,
+  history,
+  record,
+  send,
+  route,
+  messageId,
+}: AskFamilyChat): Promise<ChatOutcome> {
   const current: ChatTurn[] = [{ role: 'user', content: question }];
+
+  // Calls this message has used. A route that gave no usage back is taken to
+  // have used one: guessing low would leave a call the function refuses.
+  let callsUsed = 0;
+  if (route) {
+    let routed: RouteSendResult;
+    try {
+      routed = await route({ operation: 'route', messageId, message: question });
+    } catch {
+      routed = { ok: false, cause: 'failed' };
+    }
+    // The limit holds for the model too. Any other refusal or failure is the
+    // model's to answer: with TypeSafe off or failing, the user sees no error.
+    if (!routed.ok && routed.cause === 'daily_limit') return refusal(routed.cause, routed.usage);
+    callsUsed = routed.ok ? routed.reply.usage.modelCalls : 1;
+    if (routed.ok) {
+      const { questionKind, speaker } = routed.reply;
+      const decision = routeMessage({ message: question, questionKind, speaker, record });
+      if (decision.by === 'code') {
+        return {
+          ok: true,
+          answer: decision.answer,
+          turns: [...history, ...current, { role: 'assistant', content: decision.answer }],
+          answeredBy: 'code',
+        };
+      }
+    }
+  }
+
   // The function counts the same cap; stopping here saves a call it would refuse.
-  for (let call = 0; call < MAX_MODEL_CALLS_PER_MESSAGE; call++) {
+  for (let call = callsUsed; call < MAX_MODEL_CALLS_PER_MESSAGE; call++) {
     const turns = fitTurns(history, current, messageId);
     // The function would refuse it; one question asked for more than a request holds.
     if (!turns) return failure('failed');
@@ -147,7 +215,7 @@ export async function askFamilyChat({ question, history, record, send, messageId
     if (done) {
       const answer = hideIds(message.content ?? '', new Set(record.nodes.map((node) => node.id))).trim();
       if (answer === '') return failure('failed');
-      return { ok: true, answer, turns: [...turns, { role: 'assistant', content: answer }] };
+      return { ok: true, answer, turns: [...turns, { role: 'assistant', content: answer }], answeredBy: 'model' };
     }
     // No call is left to send the results on, so the tools are not run.
     if (call === MAX_MODEL_CALLS_PER_MESSAGE - 1) break;

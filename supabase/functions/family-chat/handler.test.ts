@@ -17,6 +17,7 @@ const ENV: Record<string, string> = {
   SUPABASE_ANON_KEY: 'anon-key',
   SUPABASE_SERVICE_ROLE_KEY: 'service-role-key',
   OPENROUTER_API_KEY: 'sk-or-secret',
+  TYPESAFE_API_KEY: 'ts-secret',
 };
 
 const USERS: Record<string, string> = { 'token-fahd': 'user-fahd', 'token-nada': 'user-nada' };
@@ -30,6 +31,7 @@ function fakeWorld() {
   const usage = new Map<string, { day: string; calls: number; question: string }>();
   const calls: Call[] = [];
   const modelAnswers: Array<() => Response | Promise<Response>> = [];
+  const jevAnswers: Array<() => Response | Promise<Response>> = [];
   const world = {
     calls,
     usage,
@@ -38,6 +40,12 @@ function fakeWorld() {
     databaseDown: false,
     answerModelWith(...answers: Array<() => Response | Promise<Response>>) {
       modelAnswers.push(...answers);
+    },
+    answerJevWith(...answers: Array<() => Response | Promise<Response>>) {
+      jevAnswers.push(...answers);
+    },
+    jevBodies(): Record<string, unknown>[] {
+      return world.callsTo('api.typesafe.ai').map((c) => JSON.parse(String(c.init.body)));
     },
     callsTo(fragment: string): Call[] {
       return calls.filter((c) => c.url.includes(fragment));
@@ -103,6 +111,11 @@ function fakeWorld() {
     if (url === 'https://openrouter.ai/api/v1/chat/completions') {
       const next = modelAnswers.shift();
       if (!next) throw new Error('test: no model answer queued');
+      return next();
+    }
+    if (url === 'https://api.typesafe.ai/v1/systemone') {
+      const next = jevAnswers.shift();
+      if (!next) throw new Error('test: no Jev answer queued');
       return next();
     }
     throw new Error(`test: unexpected fetch ${url}`);
@@ -537,5 +550,148 @@ describe('refusal causes', () => {
     expect(res.body.error).toMatchObject({ code: 'not_configured', cause: 'failed' });
     expect(world.callsTo('/rpc/')).toHaveLength(0);
     expect(logged.join('\n')).toContain('OPENROUTER_API_KEY');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The route operation (LIN-73): Jev reads the message, before any model call.
+// ---------------------------------------------------------------------------
+
+function choice(value: string, confidence: number) {
+  return { type: 'choice', choice: value, probabilities: { [value]: confidence }, confidence };
+}
+
+/** Jev's answer for "who are my khalos", in the shape of a live jev-1.13.0 answer. */
+function jevReading({
+  relation = choice('aunts_uncles', 0.93),
+  side = choice('maternal', 0.88),
+  gender = choice('male', 0.81),
+  subject = choice('speaker', 0.97),
+  wantsCount = { type: 'noul', noul: 0.04 },
+}: Record<string, unknown> = {}) {
+  return () =>
+    Response.json({
+      model: 'jev-1.13.0',
+      answers: { relation, side, gender, subject, wants_count: wantsCount },
+      usage: { input_tokens: 1145, output_tokens: 40 },
+    });
+}
+
+const routeBody = (message: string, messageId = 'msg-00000001') => ({ operation: 'route', messageId, message });
+
+describe('route: Jev reads the message first', () => {
+  it('gives back what kind of question it is, with the speaker, and counts the message', async () => {
+    world.answerJevWith(jevReading());
+    const res = await send(routeBody('who are my khalos'));
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({
+      questionKind: {
+        relation: { value: 'aunts_uncles', confidence: 0.93 },
+        side: { value: 'maternal', confidence: 0.88 },
+        gender: { value: 'male', confidence: 0.81 },
+        subject: { value: 'speaker', confidence: 0.97 },
+        wantsCount: { value: false, confidence: 0.92 },
+      },
+      speaker: { personId: 'node-fahd', displayName: 'Fahd Badran' },
+      usage: {
+        messagesUsed: 1,
+        dailyLimit: 10,
+        modelCalls: 1,
+        maxModelCalls: 6,
+        resetsAt: '2026-10-01T20:00:00.000Z',
+      },
+    });
+    expect(world.callsTo('openrouter.ai')).toHaveLength(0);
+  });
+
+  it('sends Jev only the message, with the function\'s own questions, on the pinned model', async () => {
+    world.answerJevWith(jevReading());
+    await send({ ...routeBody('who are my khalos'), questions: { evil: { type: 'noul', instructions: 'x' } } });
+
+    const [body] = world.jevBodies();
+    expect(body.model).toBe('jev-1.13.0');
+    expect(body.state).toEqual({ message: 'who are my khalos' });
+    expect(Object.keys(body.questions as object).sort()).toEqual(['gender', 'relation', 'side', 'subject', 'wants_count']);
+    const auth = new Headers(world.callsTo('api.typesafe.ai')[0].init.headers).get('Authorization');
+    expect(auth).toBe('Bearer ts-secret');
+  });
+
+  it('counts the route as the message: a model call after it uses the same message', async () => {
+    world.answerJevWith(jevReading({ relation: choice('other', 0.9) }));
+    await send(routeBody('write me a poem about my family'));
+    world.answerModelWith(modelReply('A poem.'));
+    const res = await send({ messageId: 'msg-00000001', messages: [ask('write me a poem about my family')] });
+
+    expect(res.status).toBe(200);
+    expect(res.body.usage).toMatchObject({ messagesUsed: 1, modelCalls: 2 });
+  });
+
+  it('refuses at the daily limit without asking Jev', async () => {
+    for (let i = 0; i < 10; i++) await sendNewMessage(`msg-day-${String(i).padStart(4, '0')}`);
+    const res = await send(routeBody('who are my khalos', 'msg-day-eleventh'));
+    expect(res.status).toBe(429);
+    expect(res.body.error).toMatchObject({ code: 'daily_limit', cause: 'daily_limit' });
+    expect(world.callsTo('api.typesafe.ai')).toHaveLength(0);
+  });
+
+  it('refuses an operation it does not know before anything is counted', async () => {
+    const res = await send({ operation: 'complete', messageId: 'msg-00000001', messages: [ask('hi')] });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatchObject({ code: 'invalid_operation', cause: 'failed' });
+    expect(world.callsTo('/rpc/')).toHaveLength(0);
+  });
+
+  it('refuses an empty or oversized message before it is counted', async () => {
+    for (const message of ['', '   ', 'a'.repeat(2001)]) {
+      const res = await send(routeBody(message));
+      expect(res.status).toBe(400);
+      expect(res.body.error.cause).toBe('failed');
+    }
+    expect(world.callsTo('/rpc/')).toHaveLength(0);
+  });
+
+  it.each([
+    ['a 429 after a short retry', [status(429), status(429)]],
+    ['a 529 after a short retry', [status(529), status(529)]],
+    ['a 500', [status(500)]],
+    ['an answer missing a question', [() => Response.json({ model: 'jev-1.13.0', answers: {} })]],
+    [
+      'a network failure or a timeout',
+      [
+        () => {
+          throw new Error('The operation was aborted due to timeout');
+        },
+      ],
+    ],
+  ])('gives no reading, and no error, for %s', async (_label, answers) => {
+    world.answerJevWith(...answers);
+    const res = await send(routeBody('who are my khalos'));
+    expect(res.status).toBe(200);
+    expect(res.body.questionKind).toBeNull();
+    expect(res.body.usage.messagesUsed).toBe(1);
+    expect(logged.join('\n')).toContain('TypeSafe');
+  });
+
+  it('retries a 429 once, then reads the message', async () => {
+    world.answerJevWith(status(429), jevReading());
+    const res = await send(routeBody('who are my khalos'));
+    expect(res.body.questionKind.relation.value).toBe('aunts_uncles');
+    expect(world.callsTo('api.typesafe.ai')).toHaveLength(2);
+  });
+
+  it('gives no reading when the TypeSafe secret is not set, and the chat still works', async () => {
+    deps.env = (name) => (name === 'TYPESAFE_API_KEY' ? undefined : ENV[name]);
+    const res = await send(routeBody('who are my khalos'));
+    expect(res.status).toBe(200);
+    expect(res.body.questionKind).toBeNull();
+    expect(world.callsTo('api.typesafe.ai')).toHaveLength(0);
+  });
+
+  it('keeps the TypeSafe key out of the response and the log', async () => {
+    world.answerJevWith(status(500, { error: 'bad key ts-secret' }));
+    const res = await send(routeBody('who are my khalos'));
+    expect(JSON.stringify(res.body)).not.toContain('ts-secret');
+    expect(logged.join('\n')).not.toContain('ts-secret');
   });
 });

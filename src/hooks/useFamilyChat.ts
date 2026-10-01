@@ -3,7 +3,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import type { ChatTurn } from '../../supabase/functions/family-chat/request.ts';
 import { askFamilyChat, CHAT_LINES } from '../lib/familyChat';
-import { invokeFamilyChat } from '../lib/familyChatClient';
+import { invokeChatRoute, invokeFamilyChat } from '../lib/familyChatClient';
 import { useWorkingRecord } from '../contexts/WorkingRecordContext';
 
 const MAX_DISPLAYED_MESSAGES = 50;
@@ -25,8 +25,9 @@ export interface ChatNotice {
 }
 
 /**
- * The family chat's state. The question goes to the family-chat function with
- * the earlier turns; tool calls run on the Working Record, read by reference
+ * The family chat's state. Jev reads the question first, and code answers the
+ * common kinds (LIN-73); any other question goes to the family-chat function with
+ * the earlier turns, and tool calls run on the Working Record, read by reference
  * when the question is sent (ADR 0009), so the chat never fetches the tree.
  */
 export function useFamilyChat() {
@@ -75,6 +76,7 @@ export function useFamilyChat() {
           history: historyRef.current,
           record,
           send: invokeFamilyChat,
+          route: invokeChatRoute,
           messageId: crypto.randomUUID(),
         });
         if (outcome.ok) {

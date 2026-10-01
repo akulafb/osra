@@ -11,6 +11,12 @@
  *   4. the signed-in Person, read from the database for the system prompt;
  *   5. OpenRouter, with the function's model, prompt, tools and reply cap.
  *
+ * A body with `operation: 'route'` (LIN-73) takes the same first three steps,
+ * then asks TypeSafe Jev what kind of question the message is instead of
+ * calling the model. The route is counted as the message's first call, so a
+ * message that code answers still uses one of the day's messages, and a
+ * message sent on to the model uses the same message with the calls left.
+ *
  * Every refusal carries a `cause` the browser turns into one line for the user.
  */
 
@@ -33,7 +39,15 @@ import {
 } from './limits.ts';
 import { buildModelRequest, callModel, type AssistantTurn } from './openRouter.ts';
 import { buildSystemPrompt, type Speaker } from './prompt.ts';
-import { MAX_CHAT_BODY_BYTES, questionHash, validateChatRequest } from './request.ts';
+import { askQuestionKind, type QuestionKind } from './questionKind.ts';
+import {
+  isObject,
+  MAX_CHAT_BODY_BYTES,
+  questionHash,
+  validateChatRequest,
+  validateRouteRequest,
+  type ChatTurn,
+} from './request.ts';
 
 /**
  * Why a call was refused, as the browser shows it (LIN-72 has the lines):
@@ -63,6 +77,18 @@ export interface ChatResponse {
   message: AssistantTurn;
   /** True when the model replied with text and asked for no tool. */
   done: boolean;
+  usage: ChatUsage;
+}
+
+/**
+ * The 200 answer to a route (LIN-73). `questionKind` is null when TypeSafe is
+ * not set up, failed, was slow or was busy: the browser then sends the message
+ * to the model, and the user sees no error. `speaker` is the signed-in
+ * Person, for questions about "me" and "my".
+ */
+export interface RouteResponse {
+  questionKind: QuestionKind | null;
+  speaker: Speaker | null;
   usage: ChatUsage;
 }
 
@@ -105,6 +131,71 @@ function databaseRefusal(err: unknown, log: (message: string) => void): Response
 /** The model may take a while with tools; one slow attempt is abandoned after this. */
 const MODEL_ATTEMPT_TIMEOUT_MS = 60_000;
 
+/**
+ * Jev answers in about half a second. Past this the message goes to the
+ * model instead: the user is waiting, and the model can answer it anyway.
+ */
+const JEV_ATTEMPT_TIMEOUT_MS = 2_500;
+/** One short retry for a 429 or 529, whatever `Retry-After` asks for. */
+const JEV_RETRY = { retries: 1, baseDelayMs: 200, maxDelayMs: 500 } as const;
+
+/**
+ * Records one call for a message, or refuses it. The quota itself, or the
+ * response to send back when the call may not be made.
+ */
+async function countCall(
+  db: ServiceRoleEnv,
+  args: { userId: string; messageId: string; turns: ChatTurn[]; now: Date },
+  fetchImpl: FetchLike,
+  log: (message: string) => void,
+): Promise<{ usage: ChatUsage } | { refusal: Response }> {
+  let quota: QuotaOutcome;
+  try {
+    quota = await recordModelCall(
+      db,
+      {
+        userId: args.userId,
+        messageId: args.messageId,
+        questionHash: await questionHash(args.turns),
+        uaeDay: uaeDay(args.now),
+        dailyLimit: DAILY_MESSAGE_LIMIT,
+        maxModelCalls: MAX_MODEL_CALLS_PER_MESSAGE,
+      },
+      fetchImpl,
+    );
+  } catch (err) {
+    return { refusal: databaseRefusal(err, log) };
+  }
+
+  const usage: ChatUsage = {
+    messagesUsed: quota.messagesUsed,
+    dailyLimit: DAILY_MESSAGE_LIMIT,
+    modelCalls: quota.modelCalls,
+    maxModelCalls: MAX_MODEL_CALLS_PER_MESSAGE,
+    resetsAt: nextUaeMidnight(args.now).toISOString(),
+  };
+  switch (quota.outcome) {
+    case 'ok':
+      return { usage };
+    case 'daily_limit':
+      return {
+        refusal: refuse(429, 'daily_limit', 'daily_limit', `You have used your ${DAILY_MESSAGE_LIMIT} messages for today.`, usage),
+      };
+    case 'message_call_limit':
+      return {
+        refusal: refuse(
+          429,
+          'message_call_limit',
+          'failed',
+          `One message can use at most ${MAX_MODEL_CALLS_PER_MESSAGE} model calls.`,
+          usage,
+        ),
+      };
+    case 'message_id_reused':
+      return { refusal: refuse(409, 'message_id_reused', 'failed', 'Each new question needs a new messageId.', usage) };
+  }
+}
+
 export async function handleFamilyChat(req: Request, deps: FamilyChatDeps): Promise<Response> {
   const log = deps.log ?? ((m: string) => console.error(m));
   try {
@@ -139,7 +230,15 @@ async function handle(req: Request, deps: FamilyChatDeps, log: (message: string)
   }
 
   // 2. What they sent.
-  const validation = validateChatRequest(await readJsonBody(req, MAX_CHAT_BODY_BYTES));
+  const body = await readJsonBody(req, MAX_CHAT_BODY_BYTES);
+  const db: ServiceRoleEnv = { supabaseUrl, serviceRoleKey };
+  if (isObject(body) && body.operation === 'route') {
+    return route(body, { db, userId: auth.userId, now, fetchImpl, deps, log });
+  }
+  if (isObject(body) && body.operation !== undefined && body.operation !== 'chat') {
+    return refuse(400, 'invalid_operation', 'failed', 'operation must be "chat" or "route".');
+  }
+  const validation = validateChatRequest(body);
   if (!validation.ok) return refuse(400, validation.code, 'failed', validation.message);
   const { messageId, turns } = validation.request;
 
@@ -151,47 +250,9 @@ async function handle(req: Request, deps: FamilyChatDeps, log: (message: string)
 
   // 3. Whether this call may be made. Without the count the limit cannot
   //    hold, so a database failure means the model is not called.
-  const db: ServiceRoleEnv = { supabaseUrl, serviceRoleKey };
-  let quota: QuotaOutcome;
-  try {
-    quota = await recordModelCall(
-      db,
-      {
-        userId: auth.userId,
-        messageId,
-        questionHash: await questionHash(turns),
-        uaeDay: uaeDay(now),
-        dailyLimit: DAILY_MESSAGE_LIMIT,
-        maxModelCalls: MAX_MODEL_CALLS_PER_MESSAGE,
-      },
-      fetchImpl,
-    );
-  } catch (err) {
-    return databaseRefusal(err, log);
-  }
-
-  const usage: ChatUsage = {
-    messagesUsed: quota.messagesUsed,
-    dailyLimit: DAILY_MESSAGE_LIMIT,
-    modelCalls: quota.modelCalls,
-    maxModelCalls: MAX_MODEL_CALLS_PER_MESSAGE,
-    resetsAt: nextUaeMidnight(now).toISOString(),
-  };
-  if (quota.outcome === 'daily_limit') {
-    return refuse(429, 'daily_limit', 'daily_limit', `You have used your ${DAILY_MESSAGE_LIMIT} messages for today.`, usage);
-  }
-  if (quota.outcome === 'message_call_limit') {
-    return refuse(
-      429,
-      'message_call_limit',
-      'failed',
-      `One message can use at most ${MAX_MODEL_CALLS_PER_MESSAGE} model calls.`,
-      usage,
-    );
-  }
-  if (quota.outcome === 'message_id_reused') {
-    return refuse(409, 'message_id_reused', 'failed', 'Each new question needs a new messageId.', usage);
-  }
+  const counted = await countCall(db, { userId: auth.userId, messageId, turns, now }, fetchImpl, log);
+  if ('refusal' in counted) return counted.refusal;
+  const { usage } = counted;
 
   // 4. Who is asking, in the tree.
   let speaker: Speaker | null;
@@ -230,4 +291,65 @@ async function handle(req: Request, deps: FamilyChatDeps, log: (message: string)
       log(`family-chat: OpenRouter could not be reached: ${detail}`);
       return refuse(502, 'upstream_unreachable', 'failed', 'The chat service could not be reached.');
   }
+}
+
+/**
+ * The route operation (LIN-73): count the message, then ask Jev what kind of
+ * question it is. Any TypeSafe failure is logged and answered with no reading,
+ * never refused: the browser then sends the message to the model.
+ */
+async function route(
+  body: Record<string, unknown>,
+  ctx: {
+    db: ServiceRoleEnv;
+    userId: string;
+    now: Date;
+    fetchImpl: FetchLike;
+    deps: FamilyChatDeps;
+    log: (message: string) => void;
+  },
+): Promise<Response> {
+  const { db, userId, now, fetchImpl, deps, log } = ctx;
+  const validation = validateRouteRequest(body);
+  if (!validation.ok) return refuse(400, validation.code, 'failed', validation.message);
+  const { messageId, message } = validation.request;
+
+  // The same hash a model call for this message takes, so the calls after a
+  // route continue its row.
+  const turns: ChatTurn[] = [{ role: 'user', content: message }];
+  const counted = await countCall(db, { userId, messageId, turns, now }, fetchImpl, log);
+  if ('refusal' in counted) return counted.refusal;
+
+  const apiKey = deps.env('TYPESAFE_API_KEY')?.trim();
+  if (!apiKey) log('family-chat: the TYPESAFE_API_KEY secret is not set; the message goes to the model');
+
+  let speaker: Speaker | null;
+  let questionKind: QuestionKind | null = null;
+  try {
+    const [found, outcome] = await Promise.all([
+      findSpeaker(db, userId, fetchImpl),
+      apiKey
+        ? askQuestionKind(message, apiKey, {
+            attemptTimeoutMs: JEV_ATTEMPT_TIMEOUT_MS,
+            ...JEV_RETRY,
+            ...deps.retry,
+            fetchImpl,
+          })
+        : null,
+    ]);
+    speaker = found;
+    if (outcome?.ok) {
+      questionKind = outcome.questionKind;
+    } else if (outcome) {
+      // The provider's own words go to the log only, and never with the key.
+      const detail = 'detail' in outcome && apiKey ? outcome.detail.split(apiKey).join('[TYPESAFE_API_KEY]') : '';
+      const status = 'status' in outcome ? ` ${outcome.status}` : '';
+      log(`family-chat: TypeSafe ${outcome.kind}${status}: ${detail}; the message goes to the model`);
+    }
+  } catch (err) {
+    return databaseRefusal(err, log);
+  }
+
+  const answer: RouteResponse = { questionKind, speaker, usage: counted.usage };
+  return jsonResponse(answer);
 }
