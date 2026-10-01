@@ -1,4 +1,3 @@
-import { supabase } from './supabase';
 import type { FetchSpellingScores } from './spellingMatchLookup';
 
 /**
@@ -14,6 +13,10 @@ export const invokeSpellingMatches: FetchSpellingScores = async (request, signal
   if (typeof navigator !== 'undefined' && navigator.onLine === false) {
     throw new Error('spelling-matches: offline');
   }
+  // Loaded on first use, not at import: `./supabase` throws without env vars,
+  // and the Ghost Node card (which reaches this module) is imported by code
+  // that unit tests load.
+  const { supabase } = await import('./supabase');
   const { data, error } = await supabase.functions.invoke<unknown>('spelling-matches', {
     body: request,
     signal,
