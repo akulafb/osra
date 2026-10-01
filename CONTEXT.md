@@ -7,7 +7,7 @@ An interactive visual family tree platform enabling collaborative genealogy expl
 ### Core Entities
 
 **Person**:
-A family member record in the database identified by `first_name` and optional cluster affiliations.
+A family member record in the database identified by `first_name` and optional cluster affiliations, with a gender (male, female, or not recorded).
 _Avoid_: User, Member, Profile (when referring to family nodes)
 
 **Tree Node**:
@@ -15,7 +15,7 @@ The visual representation and interactive card of a Person positioned on the tre
 _Avoid_: Box, Vertex, Bubble
 
 **Kinship Link**:
-A typed genealogical edge connecting two Persons (`parent`, `marriage`, or `divorce`, with an optional `parent_role` for mother/father). Expressed as an absolute edge between two IDs.
+A typed genealogical edge connecting two Persons (`parent`, `marriage`, or `divorce`, with an optional `parent_role` for mother/father). Expressed as an absolute edge between two IDs. A child has a `parent` Kinship Link to each biological parent the family knows, mother and father, even though the tree draws only one line to the child.
 _Avoid_: Edge, Connection, Wire, Branch
 
 **Tree Record**:
@@ -61,6 +61,10 @@ _Avoid_: Immediate family, Close relatives, Permission group
 **Kinship Path**:
 The chain of Kinship Links that joins two Persons, read in order from one to the other. Two Persons can have more than one: a blood path and a path through a marriage.
 _Avoid_: Relationship, Relation chain, Route, Connection
+
+**Kinship Term**:
+The everyday word for what one Person is to another, read from a Kinship Path: nephew, grandmother, son-in-law, stepdaughter, great-aunt, second cousin. The family chat answers with a Kinship Term, never by spelling out the Kinship Path.
+_Avoid_: Relation label, Shortcut word, Relationship name
 
 
 ### Direct Interaction
