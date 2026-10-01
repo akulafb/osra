@@ -9,6 +9,7 @@ import {
   findPersonsByName,
 } from './familyGraph';
 import type { KinshipPath, RelativeKind } from './familyGraph';
+import { kinshipTermText } from './kinshipTerm';
 import type { FamilyLink, FamilyNode } from '../types/graph';
 import { FIXTURE_IDS as P, FIXTURE_LINKS as links, FIXTURE_PERSONS } from './fixtures/kinshipFixtureTree';
 
@@ -316,7 +317,8 @@ describe('findKinshipPaths', () => {
     expect(paths).toHaveLength(1);
     expect(paths[0].kind).toBe('other');
     expect(paths[0].personIds).toEqual(['a', 'c', 'b']);
-    expect(paths[0].relation).toBeNull();
+    // No one word: the child's mother, two terms joined at the child.
+    expect(paths[0].relation).toMatchObject({ name: 'two terms', label: "child's parent", via: { personId: 'c' } });
   });
 
   it('finds the marriage path when a shorter walk would go through one Person twice', () => {
@@ -627,19 +629,26 @@ describe('the name of the relation for a Kinship Path', () => {
     expect(relation(P.karim, P.jad)).toEqual({ name: 'step-child', label: 'step-child' });
   });
 
-  it('returns the chain with no name when no rule fits', () => {
-    // Great-grandparent: a blood path, but not in the fixed rules.
+  it('great-grandparent, on the father\'s side', () => {
     const [greatGrandparent] = findKinshipPaths(P.yusufJr, P.idris, links);
     expect(greatGrandparent.kind).toBe('blood');
     expect(greatGrandparent.personIds).toEqual([P.yusufJr, P.omar, P.yusuf, P.idris]);
-    expect(greatGrandparent.steps).toHaveLength(3);
-    expect(greatGrandparent.relation).toBeNull();
+    expect(greatGrandparent.relation).toEqual({ name: 'grandparent', label: 'great-grandparent', side: 'father' });
+  });
 
-    // The child of a former spouse: a path through a divorce, not a step-child.
+  it('great-aunt or great-uncle, on the father\'s side', () => {
+    expect(relation(P.hani, P.khalil)).toEqual({ name: 'aunt or uncle', label: 'great-aunt or great-uncle', side: 'father' });
+  });
+
+  it('the child of a former spouse: two terms, not a step-child', () => {
     const [formerStepChild] = findKinshipPaths(P.tarek, P.nour, links);
     expect(formerStepChild.kind).toBe('marriage');
     expect(kinds(formerStepChild)).toEqual(['formerSpouse', 'child']);
-    expect(formerStepChild.relation).toBeNull();
+    expect(formerStepChild.relation).toEqual({
+      name: 'two terms',
+      label: "former spouse's child",
+      via: { personId: P.layla, first: { name: 'former spouse', label: 'former spouse' }, second: { name: 'child', label: 'child' } },
+    });
   });
 
   it('names a marriage path that is shorter than the blood path', () => {
@@ -669,7 +678,7 @@ describe('the name of the relation for a Kinship Path', () => {
         },
         links
       )
-    ).toBeNull();
+    ).toMatchObject({ name: 'two terms', label: "parent's spouse" });
     expect(
       nameKinshipPath(
         {
@@ -680,7 +689,185 @@ describe('the name of the relation for a Kinship Path', () => {
         },
         links
       )
-    ).toBeNull();
+    ).toMatchObject({ name: 'two terms', label: "spouse's child" });
+  });
+});
+
+describe('Kinship Terms for any Kinship Path', () => {
+  const parent = (source: string, target: string, parentRole?: 'mother' | 'father'): FamilyLink => ({
+    source,
+    target,
+    type: 'parent',
+    ...(parentRole && { parentRole }),
+  });
+  const married = (source: string, target: string): FamilyLink => ({ source, target, type: 'marriage' });
+  /** Gives `personId` a child, so the record shows their gender through `parent_role`. */
+  const gendered = (personId: string, gender: 'female' | 'male'): FamilyLink =>
+    parent(personId, `${personId}-child`, gender === 'female' ? 'mother' : 'father');
+
+  /** What `toId` is to `fromId`, in words, for each path: gendered where the record shows it. */
+  const terms = (fromId: string, toId: string, tree: FamilyLink[]) =>
+    findKinshipPaths(fromId, toId, tree).map(path =>
+      kinshipTermText(path.relation, toId, { genderOf: id => getRecordedGender(id, tree), nameOf: id => id })
+    );
+
+  describe('a sibling\'s child linked only through the sibling\'s spouse (the Issa case)', () => {
+    // Me and May share a father. May is married to Ammar; Issa is linked to his father Ammar only.
+    const tree: FamilyLink[] = [
+      parent('father', 'me', 'father'),
+      parent('father', 'may', 'father'),
+      married('ammar', 'may'),
+      parent('ammar', 'issa', 'father'),
+    ];
+
+    it('is a step-nephew, never a chain or no name', () => {
+      const [path] = findKinshipPaths('me', 'issa', tree);
+      expect(path.kind).toBe('marriage');
+      expect(kinds(path)).toEqual(['parent', 'child', 'spouse', 'child']);
+      expect(path.relation).toEqual({ name: 'step-relative', label: 'step-niece or step-nephew' });
+      expect(terms('me', 'issa', tree)).toEqual(['step-niece or step-nephew']);
+      expect(terms('me', 'issa', [...tree, gendered('issa', 'male')])).toEqual(['step-nephew']);
+    });
+
+    it('is a nephew or niece once also linked to the sibling, gendered when known', () => {
+      const linked = [...tree, parent('may', 'issa', 'mother')];
+      expect(findKinshipPaths('me', 'issa', linked)[0].relation).toEqual({ name: 'niece or nephew', label: 'niece or nephew' });
+      expect(terms('me', 'issa', linked)[0]).toBe('niece or nephew');
+      expect(terms('me', 'issa', [...linked, gendered('issa', 'male')])[0]).toBe('nephew');
+      expect(terms('me', 'issa', [...linked, gendered('issa', 'female')])[0]).toBe('niece');
+    });
+  });
+
+  it('blood terms at depth: great-grandparent, great-aunt, third cousin', () => {
+    const fixture = (fromId: string, toId: string) => terms(fromId, toId, links)[0];
+    expect(fixture(P.yusufJr, P.idris)).toBe('great-grandfather');
+    expect(fixture(P.hani, P.yusuf)).toBe('great-uncle');
+    expect(fixture(P.hani, P.khalil)).toBe('great-aunt or great-uncle');
+
+    // Two lines of four generations down from one couple: third cousins, then twice removed.
+    const line = (name: string, length: number) =>
+      Array.from({ length }, (_, i) => parent(i === 0 ? 'root' : `${name}${i}`, `${name}${i + 1}`));
+    const tree = [...line('a', 4), ...line('b', 6)];
+    expect(findKinshipPaths('a4', 'b4', tree)[0].relation).toEqual({
+      name: 'cousin', label: 'third cousin', cousinDegree: 3, timesRemoved: 0,
+    });
+    expect(terms('a4', 'b6', tree)).toEqual(['third cousin twice removed']);
+    expect(terms('a2', 'root', tree)).toEqual(['grandparent']);
+    expect(terms('b6', 'root', tree)).toEqual(['4th great-grandparent']);
+    expect(terms('a1', 'b3', tree)).toEqual(['grandniece or grandnephew']);
+  });
+
+  it('in-law at the spouse end: mother-in-law, brother-in-law, grandparent-in-law', () => {
+    const tree = [
+      married('me', 'wife'),
+      parent('mum', 'wife', 'mother'),
+      parent('mum', 'brother', 'mother'),
+      gendered('brother', 'male'),
+      parent('granny', 'mum', 'mother'),
+    ];
+    expect(terms('me', 'mum', tree)).toEqual(['mother-in-law']);
+    expect(terms('me', 'brother', tree)).toEqual(['brother-in-law']);
+    expect(terms('me', 'granny', tree)).toEqual(['grandmother-in-law']);
+  });
+
+  it('in-law at the far end: son-in-law, sister-in-law, aunt by marriage', () => {
+    expect(terms(P.faris, P.omar, links)).toEqual(['son-in-law']);
+    const tree = [
+      parent('gran', 'dad', 'father'),
+      parent('gran', 'uncle', 'father'),
+      parent('dad', 'me', 'father'),
+      parent('dad', 'brother', 'father'),
+      married('uncle', 'auntie'),
+      married('brother', 'sisterInLaw'),
+      gendered('auntie', 'female'),
+      gendered('sisterInLaw', 'female'),
+    ];
+    expect(findKinshipPaths('me', 'auntie', tree)[0].relation).toEqual({
+      name: 'in-law', label: 'aunt or uncle by marriage', side: 'father',
+    });
+    expect(terms('me', 'auntie', tree)).toEqual(['aunt by marriage']);
+    expect(terms('me', 'sisterInLaw', tree)).toEqual(['sister-in-law']);
+  });
+
+  it('step-relations at depth: stepmother, step-grandchild, step-sibling', () => {
+    const tree = [
+      parent('dad', 'me', 'father'),
+      married('dad', 'stepmum'),
+      parent('stepmum', 'stepsister', 'mother'),
+      gendered('stepmum', 'female'),
+      gendered('stepsister', 'female'),
+      married('me', 'wife'),
+      parent('wife', 'stepson', 'mother'),
+      parent('stepson', 'stepgrandson', 'father'),
+      gendered('stepgrandson', 'male'),
+    ];
+    expect(terms('me', 'stepmum', tree)).toEqual(['stepmother']);
+    expect(terms('me', 'stepsister', tree)).toEqual(['stepsister']);
+    expect(terms('me', 'stepson', tree)).toEqual(['stepson']);
+    expect(findKinshipPaths('me', 'stepgrandson', tree)[0].relation).toEqual({ name: 'step-relative', label: 'step-grandchild' });
+    expect(terms('me', 'stepgrandson', tree)).toEqual(['step-grandson']);
+  });
+
+  it('neutral words when the gender is not recorded', () => {
+    const tree = [parent('dad', 'me', 'father'), parent('dad', 'sib'), parent('sib', 'kid'), married('me', 'spouse')];
+    expect(terms('me', 'sib', tree)).toEqual(['sibling']);
+    expect(terms('me', 'kid', tree)).toEqual(['niece or nephew']);
+    expect(terms('sib', 'spouse', tree)).toEqual(['sibling-in-law']);
+    expect(terms('dad', 'me', tree)).toEqual(['child']);
+  });
+
+  it('two terms joined by one Person when no one word fits, never a longer chain', () => {
+    // Through a divorce: the former wife's child.
+    expect(terms(P.tarek, P.nour, links)).toEqual([`former wife ${P.layla}'s child`]);
+    // A sibling's spouse's parent: no English word.
+    const tree = [
+      parent('dad', 'me', 'father'),
+      parent('dad', 'may', 'father'),
+      gendered('may', 'female'),
+      married('ammar', 'may'),
+      parent('hisMum', 'ammar', 'mother'),
+    ];
+    const [path] = findKinshipPaths('me', 'hisMum', tree);
+    expect(path.relation).toMatchObject({ name: 'two terms', label: "sibling's parent-in-law", via: { personId: 'may' } });
+    expect(terms('me', 'hisMum', tree)).toEqual(["sister may's mother-in-law"]);
+  });
+
+  it('a chain no two terms fit is a relative by marriage', () => {
+    const tree = [married('a', 'b'), married('b', 'c'), married('c', 'd')];
+    const step = (fromId: string, toId: string): KinshipPath['steps'][number] => ({
+      fromId,
+      toId,
+      kind: 'spouse',
+      link: tree.find(l => [l.source, l.target].includes(fromId) && [l.source, l.target].includes(toId)) as FamilyLink,
+    });
+    expect(nameKinshipPath({ steps: [step('a', 'b'), step('b', 'c'), step('c', 'd')] }, tree)).toEqual({
+      name: 'relative',
+      label: 'relative by marriage',
+    });
+  });
+
+  it('names every path found on 400 small random trees', () => {
+    let seed = 7;
+    const random = (n: number) => {
+      seed = (seed * 1103515245 + 12345) % 2147483648;
+      return seed % n;
+    };
+    for (let t = 0; t < 400; t++) {
+      const tree: FamilyLink[] = [];
+      for (let i = 1; i < 10; i++) {
+        const kind = random(3);
+        if (kind === 0) tree.push(married(`p${random(i)}`, `p${i}`));
+        else tree.push(parent(`p${random(i)}`, `p${i}`, random(2) ? 'father' : 'mother'));
+      }
+      for (let a = 0; a < 10; a++) {
+        for (let b = 0; b < 10; b++) {
+          for (const path of findKinshipPaths(`p${a}`, `p${b}`, tree)) {
+            expect(path.relation.label).toBeTruthy();
+            if (path.relation.via) expect(path.personIds).toContain(path.relation.via.personId);
+          }
+        }
+      }
+    }
   });
 });
 

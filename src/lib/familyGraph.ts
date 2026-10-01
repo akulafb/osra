@@ -1,5 +1,6 @@
 import type { FamilyNode, FamilyLink, LinkEndpoint, PersonGender, RelativeDirection } from '../types/graph';
 import { formatNodeDisplayName } from '../utils/nodeDisplayName';
+import { bloodLabel, eachWord } from './kinshipTerm';
 export type { FamilyNode, FamilyLink, LinkEndpoint, RelativeDirection };
 
 /**
@@ -518,24 +519,44 @@ export type KinshipRelationName =
   | 'cousin'
   | 'in-law'
   | 'step-parent'
-  | 'step-child';
+  | 'step-child'
+  /** Any other step-relation: step-sibling, step-grandchild, step-nephew. */
+  | 'step-relative'
+  /** No one word fits: two Kinship Terms joined by one Person, in `via`. */
+  | 'two terms'
+  /** The last resort when not even two terms fit: "relative" or "relative by marriage". */
+  | 'relative';
 
-/** The name of a relation: what the last Person of a Kinship Path is to the first. */
+/**
+ * The Kinship Term (CONTEXT.md) for a Kinship Path: what the last Person is to
+ * the first. `label` is the neutral word; `genderedLabel` in `kinshipTerm.ts`
+ * gives the gendered one.
+ */
 export interface KinshipRelation {
   name: KinshipRelationName;
   /**
-   * The name in full, for example `first cousin once removed` or
-   * `parent-in-law`. It does not include the side.
+   * The neutral term in full, for example `great-aunt or great-uncle`,
+   * `first cousin once removed` or `parent-in-law`. It does not include the
+   * side.
    */
   label: string;
-  /** Set when the path starts through the first Person's mother or father. */
+  /**
+   * Set when the path starts through the first Person's mother or father, for
+   * an ancestor, an aunt or uncle, a cousin or a half-sibling.
+   */
   side?: 'mother' | 'father';
   /** For `cousin`: 1 is a first cousin, 2 a second cousin. */
-  cousinDegree?: 1 | 2;
+  cousinDegree?: number;
   /** For `cousin`: 1 is "once removed". */
-  timesRemoved?: 0 | 1;
-  /** For `in-law`: what the Person would be without the marriage in the chain. */
+  timesRemoved?: number;
+  /** For a parent-, sibling- or child-in-law: what the Person would be without the marriage in the chain. */
   inLaw?: 'parent' | 'sibling' | 'child';
+  /**
+   * For `two terms`: the Person the two terms meet at, what they are to the
+   * first Person, and what the last Person is to them. "Issa is your sister
+   * May's stepson" has May as `personId`, sibling `first` and step-child `second`.
+   */
+  via?: { personId: string; first: KinshipRelation; second: KinshipRelation };
 }
 
 /**
@@ -551,8 +572,8 @@ export interface KinshipPath {
   personIds: string[];
   /** The chain of Kinship Links, in order. `steps.length` is `personIds.length - 1`. */
   steps: KinshipPathStep[];
-  /** The name of the relation, or `null` when no fixed rule fits the chain. */
-  relation: KinshipRelation | null;
+  /** The Kinship Term for the path, always set. */
+  relation: KinshipRelation;
 }
 
 interface AncestorEntry {
@@ -828,99 +849,180 @@ function findMarriageSteps(
   return best;
 }
 
-const STEP_CODE: Record<KinshipStepKind, string> = {
-  parent: 'U',
-  child: 'D',
-  spouse: 'S',
-  formerSpouse: 'X',
-};
+/** How many steps up to a parent, then down to a child: a blood shape. `null` for any other order. */
+function bloodShape(steps: readonly KinshipPathStep[]): { up: number; down: number } | null {
+  let up = 0;
+  while (up < steps.length && steps[up].kind === 'parent') up++;
+  for (let i = up; i < steps.length; i++) if (steps[i].kind !== 'child') return null;
+  return { up, down: steps.length - up };
+}
 
-const COUSIN_ORDINAL = { 1: 'first', 2: 'second' } as const;
+/** Ancestors, aunts and uncles and cousins have a side; siblings, nieces and descendants do not. */
+const takesSide = (up: number, down: number) => up >= 1 && (down === 0 || up >= 2);
 
-function nameSteps(index: KinshipIndex, steps: readonly KinshipPathStep[]): KinshipRelation | null {
-  if (steps.length === 0) return null;
-  const code = steps.map(s => STEP_CODE[s.kind]).join('');
+const isAcross = (step: KinshipPathStep) => step.kind === 'spouse' || step.kind === 'formerSpouse';
+
+function bloodName(up: number, down: number): KinshipRelationName {
+  if (down === 0) return up === 1 ? 'parent' : 'grandparent';
+  if (up === 0) return down === 1 ? 'child' : 'grandchild';
+  if (up === 1) return down === 1 ? 'sibling' : 'niece or nephew';
+  return down === 1 ? 'aunt or uncle' : 'cousin';
+}
+
+function bloodTerm(index: KinshipIndex, steps: readonly KinshipPathStep[], up: number, down: number): KinshipRelation {
+  if (up === 1 && down === 1) {
+    // Half-siblings only when the record shows a second, different parent for each.
+    const fromParents = Array.from(new Set(parentIds(index, steps[0].fromId)));
+    const toParents = new Set(parentIds(index, steps[1].toId));
+    const shared = fromParents.filter(id => toParents.has(id)).length;
+    const isHalf = shared === 1 && fromParents.length >= 2 && toParents.size >= 2;
+    return isHalf ? { name: 'half-sibling', label: 'half-sibling' } : { name: 'sibling', label: 'sibling' };
+  }
+  const name = bloodName(up, down);
+  const label = bloodLabel(up, down);
+  if (name !== 'cousin') return { name, label };
+  return { name, label, cousinDegree: Math.min(up, down) - 1, timesRemoved: Math.abs(up - down) };
+}
+
+/**
+ * A step-relation: the chain goes through a marriage to a spouse's child who
+ * is not one's own child (a step-child), or to a parent's spouse who is not
+ * one's own parent (a step-parent). Counting that step as a child or a parent
+ * leaves a blood shape, which names the term: a sibling's spouse's child is a
+ * step-nephew, a spouse's grandchild a step-grandchild.
+ */
+function stepTerm(
+  index: KinshipIndex,
+  before: readonly KinshipPathStep[],
+  marriage: KinshipPathStep,
+  after: readonly KinshipPathStep[]
+): { up: number; down: number; relation: KinshipRelation } | null {
+  const ahead = bloodShape(before);
+  const behind = bloodShape(after);
+  if (!ahead || !behind) return null;
+  let up: number;
+  let down: number;
+  if (after.length > 0 && behind.up === 0 && !childIds(index, marriage.fromId).includes(after[0].toId)) {
+    up = ahead.up;
+    down = ahead.down + behind.down;
+  } else if (
+    before.length > 0 &&
+    ahead.down === 0 &&
+    !parentIds(index, before[before.length - 1].fromId).includes(marriage.toId)
+  ) {
+    up = ahead.up + behind.up;
+    down = behind.down;
+  } else {
+    return null;
+  }
+  // Past a first cousin, "step-" is not said.
+  if (up >= 2 && down >= 2 && (up > 2 || down > 2)) return null;
+  const blood = up === 2 && down === 2 ? 'cousin' : bloodLabel(up, down);
+  const name: KinshipRelationName =
+    up === 1 && down === 0 ? 'step-parent' : up === 0 && down === 1 ? 'step-child' : 'step-relative';
+  return { up, down, relation: { name, label: eachWord(blood, word => `step-${word}`) } };
+}
+
+/**
+ * An in-law: a spouse's blood relative (mother-in-law, brother-in-law), or a
+ * blood relative's spouse (son-in-law, sister-in-law, "aunt by marriage").
+ */
+function inLawTerm(
+  before: readonly KinshipPathStep[],
+  after: readonly KinshipPathStep[]
+): { up: number; down: number; relation: KinshipRelation } | null {
+  // The marriage is at one end of the chain, and the rest is blood.
+  if (before.length > 0 && after.length > 0) return null;
+  const spouseFirst = before.length === 0;
+  const shape = bloodShape(spouseFirst ? after : before);
+  if (!shape) return null;
+  const { up, down } = shape;
+  // A spouse's descendant is a step-relation, an ancestor's spouse too: not in-laws.
+  if (spouseFirst ? up === 0 : down === 0) return null;
+  const inLaw = (label: string, of?: KinshipRelation['inLaw']): KinshipRelation =>
+    of ? { name: 'in-law', label, inLaw: of } : { name: 'in-law', label };
+
+  let relation: KinshipRelation;
+  if (up >= 2 && down >= 2) {
+    // "cousin-in-law" for a first cousin; past that, no one word.
+    if (up !== 2 || down !== 2) return null;
+    relation = inLaw('cousin-in-law');
+  } else if (!spouseFirst && up >= 2 && down === 1) {
+    relation = inLaw(`${bloodLabel(up, down)} by marriage`);
+  } else {
+    const of = up === 1 && down === 0 ? 'parent' : up === 1 && down === 1 ? 'sibling' : up === 0 && down === 1 ? 'child' : undefined;
+    relation = inLaw(eachWord(bloodLabel(up, down), word => `${word}-in-law`), of);
+  }
+  // A spouse's relative is on no side of one's own family.
+  return spouseFirst ? { up: 0, down: 0, relation } : { up, down, relation };
+}
+
+/** One Kinship Term for the whole chain, or `null` when no one word fits. */
+function oneTerm(index: KinshipIndex, steps: readonly KinshipPathStep[]): KinshipRelation | null {
   const first = steps[0];
   const firstRole = first.kind === 'parent' ? first.link.parentRole : null;
-  const withSide = (relation: KinshipRelation): KinshipRelation =>
-    firstRole ? { ...relation, side: firstRole } : relation;
-  const plain = (name: KinshipRelationName): KinshipRelation => ({ name, label: name });
-  const inLaw = (of: 'parent' | 'sibling' | 'child'): KinshipRelation => ({
-    name: 'in-law',
-    label: `${of}-in-law`,
-    inLaw: of,
-  });
+  const withSide = (relation: KinshipRelation, applies: boolean): KinshipRelation =>
+    firstRole && applies ? { ...relation, side: firstRole } : relation;
 
-  switch (code) {
-    case 'U':
-      return withSide(plain('parent'));
-    case 'D':
-      return plain('child');
-    case 'UD': {
-      // Half-siblings only when the record shows a second, different parent for each.
-      const fromParents = Array.from(new Set(parentIds(index, first.fromId)));
-      const toParents = new Set(parentIds(index, steps[1].toId));
-      const shared = fromParents.filter(id => toParents.has(id)).length;
-      const isHalf = shared === 1 && fromParents.length >= 2 && toParents.size >= 2;
-      return isHalf ? withSide(plain('half-sibling')) : plain('sibling');
-    }
-    case 'UU':
-      return withSide(plain('grandparent'));
-    case 'DD':
-      return plain('grandchild');
-    case 'UUD':
-      return withSide(plain('aunt or uncle'));
-    case 'UDD':
-      return plain('niece or nephew');
-    case 'S':
-      return plain('spouse');
-    case 'X':
-      return plain('former spouse');
-    case 'US':
-      // The spouse of a parent is a step-parent only when they are not a parent too.
-      if (parentIds(index, first.fromId).includes(steps[1].toId)) return null;
-      return withSide(plain('step-parent'));
-    case 'SD':
-      if (childIds(index, first.fromId).includes(steps[1].toId)) return null;
-      return plain('step-child');
-    case 'SU':
-      return inLaw('parent');
-    case 'SUD':
-    case 'UDS':
-      return inLaw('sibling');
-    case 'DS':
-      return inLaw('child');
+  const across = steps.findIndex(isAcross);
+  if (across === -1) {
+    const shape = bloodShape(steps);
+    if (!shape) return null;
+    const relation = bloodTerm(index, steps, shape.up, shape.down);
+    return withSide(relation, relation.name === 'half-sibling' || takesSide(shape.up, shape.down));
   }
+  if (steps.length === 1) {
+    return first.kind === 'spouse' ? { name: 'spouse', label: 'spouse' } : { name: 'former spouse', label: 'former spouse' };
+  }
+  // Past a divorce, or across two marriages, no one word fits.
+  if (steps[across].kind === 'formerSpouse' || steps.slice(across + 1).some(isAcross)) return null;
 
-  const cousin = /^(U{2,})(D{2,})$/.exec(code);
-  if (cousin) {
-    const up = cousin[1].length;
-    const down = cousin[2].length;
-    const degree = Math.min(up, down) - 1;
-    const removed = Math.abs(up - down);
-    if ((degree === 1 || degree === 2) && (removed === 0 || removed === 1)) {
-      return withSide({
-        name: 'cousin',
-        label: `${COUSIN_ORDINAL[degree]} cousin${removed === 1 ? ' once removed' : ''}`,
-        cousinDegree: degree,
-        timesRemoved: removed,
-      });
+  const before = steps.slice(0, across);
+  const after = steps.slice(across + 1);
+  const named = stepTerm(index, before, steps[across], after) ?? inLawTerm(before, after);
+  return named && withSide(named.relation, takesSide(named.up, named.down));
+}
+
+/**
+ * Two Kinship Terms joined by one Person, split at the marriage when there is
+ * one: "Issa is your sister May's stepson".
+ */
+function twoTerms(index: KinshipIndex, steps: readonly KinshipPathStep[]): KinshipRelation | null {
+  const across = steps.findIndex(isAcross);
+  const splits = new Set([across, across + 1, ...steps.keys()].filter(k => k > 0 && k < steps.length));
+  for (const k of splits) {
+    const first = oneTerm(index, steps.slice(0, k));
+    const second = first && oneTerm(index, steps.slice(k));
+    if (first && second) {
+      return { name: 'two terms', label: `${first.label}'s ${second.label}`, via: { personId: steps[k].fromId, first, second } };
     }
   }
   return null;
 }
 
+/** The Kinship Term for a chain of one or more steps. Never `null`. */
+function nameSteps(index: KinshipIndex, steps: readonly KinshipPathStep[]): KinshipRelation {
+  return (
+    oneTerm(index, steps) ??
+    twoTerms(index, steps) ?? {
+      name: 'relative',
+      label: steps.some(isAcross) ? 'relative by marriage' : 'relative',
+    }
+  );
+}
+
 /**
- * Names the relation for a Kinship Path from fixed rules: what the last Person
- * is to the first. Returns `null` when no rule fits (for example a
- * great-grandparent, a third cousin, or a chain through a divorce); the caller
- * still has the chain and decides what to do with it.
+ * Builds the Kinship Term for a Kinship Path: what the last Person is to the
+ * first. Blood terms at any depth (great-aunt, third cousin twice removed),
+ * in-laws at either end (mother-in-law, son-in-law), step-relations
+ * (stepmother, step-grandson, step-nephew); when no one word fits, two terms
+ * joined by one Person. Returns `null` only for a path with no steps.
  */
 export function nameKinshipPath(
   path: Pick<KinshipPath, 'steps'>,
   links: readonly FamilyLink[]
 ): KinshipRelation | null {
-  return nameSteps(buildKinshipIndex(links), path.steps);
+  return path.steps.length === 0 ? null : nameSteps(buildKinshipIndex(links), path.steps);
 }
 
 /**

@@ -85,7 +85,7 @@ describe('routeMessage: code answers the common kinds, with no model call', () =
   it('grandparents: "my teta from my mother\'s side"', () => {
     expect(
       route("my teta from my mother's side - what is her name?", reading({ relation: 'grandparents', side: 'maternal', gender: 'female' })),
-    ).toEqual({ by: 'code', answer: "Your grandmother on your mother's side is **Widad Sabbagh**." });
+    ).toEqual({ by: 'code', answer: "Your teta on your mother's side is **Widad Sabbagh**." });
   });
 
   it('grandchildren: "how many grandkids does Idris have", with the total', () => {
@@ -102,7 +102,7 @@ describe('routeMessage: code answers the common kinds, with no model call', () =
     expect(route('who are my khalos', reading({ relation: 'aunts_uncles', side: 'maternal', gender: 'male' }))).toEqual({
       by: 'code',
       answer:
-        "Your uncle on your mother's side is **Samir Mansour**.\n\n" +
+        'Your khalo is **Samir Mansour**.\n\n' +
         'The tree does not record whether **Amal Mansour** is male or female, so they are not counted here.',
     });
   });
@@ -192,6 +192,45 @@ describe('routeMessage: code answers the common kinds, with no model call', () =
     });
   });
 
+  it('how related, at depth: a great-grandparent', () => {
+    expect(route('How is Idris related to Rima?', reading({ relation: 'how_related', subject: 'named_person' }))).toEqual({
+      by: 'code',
+      answer: "**Idris Haddad** is **Rima Haddad**'s great-grandfather, on the father's side.",
+    });
+  });
+
+  it('how related, when no one word fits: two terms joined by one Person', () => {
+    expect(route('How is Nour related to Tarek?', reading({ relation: 'how_related', subject: 'named_person' }))).toEqual({
+      by: 'code',
+      answer: "Related by marriage: **Nour Qasim** is **Tarek Saleh**'s former wife **Layla Haddad**'s child.",
+    });
+  });
+
+  it('how related, with the Arabic word the question used', () => {
+    expect(route('how am I related to Samir, is he my khalo?', reading({ relation: 'how_related' }))).toEqual({
+      by: 'code',
+      answer: '**Samir Mansour** is your khalo.',
+    });
+    expect(route('how am I related to Idris, is he my jiddo?', reading({ relation: 'how_related' }))).toEqual({
+      by: 'code',
+      answer: "**Idris Haddad** is your jiddo, on your father's side.",
+    });
+    // Mariam is the father's sister: "khalto" (the mother's sister) does not fit, so the reply is in English.
+    expect(route('how am I related to Mariam, my khalto?', reading({ relation: 'how_related' }))).toEqual({
+      by: 'code',
+      answer: "**Mariam Haddad** is your aunt, on your father's side.\n\nAlso related by marriage: **Mariam Haddad** is your mother-in-law.",
+    });
+  });
+
+  it('a list with the Arabic word the question used: "who is my amto"', () => {
+    expect(route('who is my amto', reading({ relation: 'aunts_uncles', side: 'paternal', gender: 'female' }))).toEqual({
+      by: 'code',
+      answer:
+        'Your amto is **Mariam Haddad**.\n\n' +
+        'The tree does not record whether **Khalil Haddad** is male or female, so they are not counted here.',
+    });
+  });
+
   it('how related: two Persons with no Kinship Path', () => {
     expect(route('is Hana related to Rima', reading({ relation: 'how_related', subject: 'named_person' }))).toEqual({
       by: 'code',
@@ -268,13 +307,6 @@ describe('routeMessage: everything else goes to the model with tools', () => {
 
   it('a question about "me" that also names someone ("is Nabil my cousin?")', () => {
     expect(route('is Nabil my cousin?', reading({ relation: 'cousins' })).by).toBe('model');
-  });
-
-  it('a relation no fixed rule names (a great-grandparent)', () => {
-    expect(route('How is Idris related to Rima?', reading({ relation: 'how_related', subject: 'named_person' }))).toEqual({
-      by: 'model',
-      why: 'relation_unnamed',
-    });
   });
 
   it('subject nobody with a relative kind', () => {

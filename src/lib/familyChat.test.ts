@@ -99,9 +99,9 @@ describe('askFamilyChat: the tool loop', () => {
     const [omar, sara, related] = toolResults(model.requests[2]);
     expect(omar.matches.map((m: { personId: string }) => m.personId)).toEqual([P.omar]);
     expect(sara.matches.map((m: { personId: string }) => m.personId)).toEqual([P.sara]);
-    expect(related.paths.map((p: { kind: string; relation: string }) => [p.kind, p.relation])).toEqual([
-      ['blood', "first cousin, father's side"],
-      ['marriage', 'spouse'],
+    expect(related.paths).toEqual([
+      { kind: 'blood', term: "first cousin, father's side" },
+      { kind: 'marriage', term: 'wife' },
     ]);
     expect(outcome.ok && outcome.answer).toMatch(/first cousin.*also related by marriage/);
   });
@@ -353,7 +353,7 @@ describe('askFamilyChat: Jev routes common questions to code', () => {
     expect(jev.requests).toEqual([{ operation: 'route', messageId: 'message-0001', message: 'who are my khalos' }]);
     expect(model.send).not.toHaveBeenCalled();
     expect(outcome).toMatchObject({ ok: true, answeredBy: 'code' });
-    expect(outcome.ok && outcome.answer).toContain("Your uncle on your mother's side is **Samir Mansour**.");
+    expect(outcome.ok && outcome.answer).toContain('Your khalo is **Samir Mansour**.');
     // The answer is in the history, so a follow-up to the model has it.
     expect(outcome.ok && outcome.turns.slice(-2)).toEqual([
       { role: 'user', content: 'who are my khalos' },

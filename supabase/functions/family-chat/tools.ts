@@ -128,9 +128,9 @@ export const CHAT_TOOLS: readonly ToolDefinition[] = [
       description:
         'Finds how two Persons are related: the shortest blood path first, then the shortest ' +
         'path through a marriage when there is one. Each path has its kind (blood, marriage ' +
-        'or other), the chain of Persons, and the relation name worked out by code: what the ' +
-        'second Person is to the first (for example "first cousin", mother\'s side). Use that ' +
-        'name; name a relation yourself only when it is null. An empty list means not related.',
+        'or other) and its term: what the second Person is to the first, worked out by code ' +
+        '(for example "aunt, father\'s side" or "sister May Badran\'s stepson"). Use the term ' +
+        'exactly as given. An empty list means not related.',
       parameters: {
         type: 'object',
         properties: {
