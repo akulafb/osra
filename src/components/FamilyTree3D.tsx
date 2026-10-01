@@ -466,8 +466,9 @@ export const FamilyTree3DContent: React.FC<FamilyTree3DProps> = ({
         visibleClusters3D,
         uniqueClusters
       );
-      // One parent line per child, chosen by the 2D rule (ADR 0012); both
-      // parent links stay in the Tree Record.
+      // One parent line per child, chosen by the 2D rule with no family
+      // preset, so the father comes first (ADR 0012); both parent links stay
+      // in the Tree Record.
       const filtered = { ...visible, links: keepDrawnParentLinks(visible.nodes, visible.links) };
 
       // Synthetic dashed edges. Both reuse the same `isPreviewLink` rendering
@@ -851,9 +852,11 @@ export const FamilyTree3DContent: React.FC<FamilyTree3DProps> = ({
 
     const nodesInCluster = graphData.nodes.filter(n => n.familyCluster === clusterName);
     const clusterNodeIds = new Set(nodesInCluster.map(n => n.id));
+    // The drawn links only, so a child linked to both parents is reached once.
+    const drawnLinks = keepDrawnParentLinks(graphData.nodes, graphData.links);
     
     const roots = nodesInCluster.filter(node => {
-      const hasParentInCluster = graphData.links.some(link => {
+      const hasParentInCluster = drawnLinks.some(link => {
         const s = getNodeId(link.source);
         const t = getNodeId(link.target);
         return t === node.id && link.type === 'parent' && clusterNodeIds.has(s);
@@ -873,7 +876,7 @@ export const FamilyTree3DContent: React.FC<FamilyTree3DProps> = ({
     while (head < queue.length) {
       const { id, level } = queue[head++];
 
-      graphData.links.forEach(link => {
+      drawnLinks.forEach(link => {
         const s = getNodeId(link.source);
         const t = getNodeId(link.target);
 

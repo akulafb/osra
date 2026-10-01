@@ -39,7 +39,10 @@ INSERT INTO public.nodes (id, first_name, paternal_family_cluster, gender) VALUE
   ('00000000-0000-0000-0000-0000000000c6', 'Dina', 'Aziz', NULL),
   ('00000000-0000-0000-0000-0000000000f7', 'Walid', 'Aziz', 'male'),
   ('00000000-0000-0000-0000-0000000000c7', 'Sami', 'Aziz', 'male'),
-  ('00000000-0000-0000-0000-0000000000c8', 'Nour', 'Badran', 'female');
+  ('00000000-0000-0000-0000-0000000000c8', 'Nour', 'Badran', 'female'),
+  ('00000000-0000-0000-0000-0000000000f9', 'Majed', 'Saleh', NULL),
+  ('00000000-0000-0000-0000-0000000000e9', 'Lama', 'Saleh', 'female'),
+  ('00000000-0000-0000-0000-0000000000c9', 'Tarek', 'Saleh', 'male');
 
 INSERT INTO public.users (id, node_id, role) VALUES
   ('00000000-0000-0000-0000-00000000ad01', '00000000-0000-0000-0000-0000000000f1', 'admin'),
@@ -67,7 +70,10 @@ INSERT INTO public.links (source_node_id, target_node_id, type) VALUES
   ('00000000-0000-0000-0000-0000000000f6', '00000000-0000-0000-0000-0000000000e6', 'marriage'),
   ('00000000-0000-0000-0000-0000000000f6', '00000000-0000-0000-0000-0000000000c6', 'parent'),
   -- Walid has no spouse recorded.
-  ('00000000-0000-0000-0000-0000000000f7', '00000000-0000-0000-0000-0000000000c7', 'parent');
+  ('00000000-0000-0000-0000-0000000000f7', '00000000-0000-0000-0000-0000000000c7', 'parent'),
+  -- Majed has no gender and his link to Tarek no role, so Lama is not assumed.
+  ('00000000-0000-0000-0000-0000000000f9', '00000000-0000-0000-0000-0000000000e9', 'marriage'),
+  ('00000000-0000-0000-0000-0000000000f9', '00000000-0000-0000-0000-0000000000c9', 'parent');
 
 CREATE TEMP TABLE result (r jsonb);
 
@@ -102,7 +108,7 @@ BEGIN
   r := public.fill_in_both_parent_links();
   ASSERT (SELECT count(*) FROM public.links) = links_before, 'the dry run should write nothing';
   ASSERT (r -> 'counts' ->> 'will_link')::int = 3, format('three children should be linked, got %s', r -> 'will_link');
-  ASSERT (r -> 'counts' ->> 'needs_a_name')::int = 4, format('four children should be on the list, got %s', r -> 'needs_a_name');
+  ASSERT (r -> 'counts' ->> 'needs_a_name')::int = 5, format('five children should be on the list, got %s', r -> 'needs_a_name');
   ASSERT (r -> 'counts' ->> 'children_with_two_or_more_parents')::int = 1, 'Nour is the one child with both parents';
 
   -- Ali and Celine to Ebtisam as mother; Omar to Yusuf as father.
@@ -124,24 +130,29 @@ BEGIN
   ASSERT row_of ->> 'reason' = 'the spouse has no gender recorded', format('Dina: %s', row_of);
   SELECT e INTO row_of FROM jsonb_array_elements(r -> 'needs_a_name') e WHERE e ->> 'child_name' = 'Sami Aziz';
   ASSERT row_of ->> 'reason' = 'no spouse recorded', format('Sami: %s', row_of);
+  SELECT e INTO row_of FROM jsonb_array_elements(r -> 'needs_a_name') e WHERE e ->> 'child_name' = 'Tarek Saleh';
+  ASSERT row_of ->> 'reason' = 'the linked parent has no gender recorded', format('Tarek: %s', row_of);
   ASSERT NOT EXISTS (
-    SELECT 1 FROM jsonb_array_elements(r -> 'will_link') e WHERE e ->> 'child_name' IN ('Seif Shaban', 'Jad Qasim', 'Dina Aziz', 'Sami Aziz', 'Nour Badran')
+    SELECT 1 FROM jsonb_array_elements(r -> 'will_link') e WHERE e ->> 'child_name' IN ('Seif Shaban', 'Jad Qasim', 'Dina Aziz', 'Sami Aziz', 'Tarek Saleh', 'Nour Badran')
   ), 'nothing is assumed for a child on the list, or one with both parents';
 
   -- The owner names Seif's mother, and gets two names wrong.
   r := public.fill_in_both_parent_links(false, '[
     {"child_id": "00000000-0000-0000-0000-0000000000c3", "parent_id": "00000000-0000-0000-0000-0000000000e2"},
     {"child_id": "00000000-0000-0000-0000-0000000000c4", "parent_id": "00000000-0000-0000-0000-0000000000f3"},
-    {"child_id": "00000000-0000-0000-0000-0000000000c7", "parent_id": "00000000-0000-0000-0000-0000000000f1"}
+    {"child_id": "00000000-0000-0000-0000-0000000000c7", "parent_id": "00000000-0000-0000-0000-0000000000f1"},
+    {"child_id": "00000000-0000-0000-0000-0000000000c9", "parent_id": "00000000-0000-0000-0000-0000000000e9"}
   ]'::jsonb);
   SELECT e INTO row_of FROM jsonb_array_elements(r -> 'will_link') e WHERE e ->> 'child_name' = 'Seif Shaban';
   ASSERT row_of ->> 'other_parent_name' = 'Hala Badran' AND row_of ->> 'source' = 'named' AND row_of ->> 'parent_role' = 'mother',
     format('the named mother should be linked, got %s', row_of);
-  ASSERT (r -> 'counts' ->> 'refused_names')::int = 2, format('two names should be refused, got %s', r -> 'refused_names');
+  ASSERT (r -> 'counts' ->> 'refused_names')::int = 3, format('three names should be refused, got %s', r -> 'refused_names');
   SELECT e INTO row_of FROM jsonb_array_elements(r -> 'refused_names') e WHERE e ->> 'child_name' = 'Jad Qasim';
   ASSERT row_of ->> 'reason' = 'that Person is already the linked parent', format('Jad: %s', row_of);
   SELECT e INTO row_of FROM jsonb_array_elements(r -> 'refused_names') e WHERE e ->> 'child_name' = 'Sami Aziz';
   ASSERT row_of ->> 'reason' = 'the named parent would be a second father', format('Sami: %s', row_of);
+  SELECT e INTO row_of FROM jsonb_array_elements(r -> 'refused_names') e WHERE e ->> 'child_name' = 'Tarek Saleh';
+  ASSERT row_of ->> 'reason' = 'the linked parent has no gender recorded', format('Tarek named: %s', row_of);
   ASSERT NOT EXISTS (SELECT 1 FROM jsonb_array_elements(r -> 'needs_a_name') e WHERE e ->> 'child_name' = 'Seif Shaban'),
     'a named child is off the list';
 

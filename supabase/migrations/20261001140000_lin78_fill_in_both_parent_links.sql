@@ -9,12 +9,12 @@
 --
 -- For each child linked to exactly one parent:
 --
--- * The parent has had exactly one spouse, ever, by a `marriage` link, and that
---   spouse has a gender other than the parent's: the child is linked to the
+-- * The parent has had exactly one spouse, ever, by a `marriage` link, both
+--   have a gender (or the parent a parent_role) recorded, and they differ: the child is linked to the
 --   spouse. The trigger from 20261001130000_lin76_person_gender.sql gives the
 --   new link its parent_role from the spouse's gender.
--- * Anything else (more than one spouse, a divorce, a spouse with no gender
---   recorded, no spouse at all): the child goes on the list, with the reason
+-- * Anything else (more than one spouse, a divorce, a parent or spouse with
+--   no gender recorded, no spouse at all): the child goes on the list, with the reason
 --   and the parent's spouses, for the owner to name the other parent. Nothing
 --   is assumed for a child on the list.
 --
@@ -127,6 +127,7 @@ AS $$
         WHEN np.id IS NULL THEN 'no such Person to name as the parent'
         WHEN nm.parent_id = nm.child_id THEN 'a Person cannot be their own parent'
         WHEN nm.parent_id = k.parent_id THEN 'that Person is already the linked parent'
+        WHEN k.role IS NULL THEN 'the linked parent has no gender recorded'
         WHEN np.gender IS NULL THEN 'the named parent has no gender recorded'
         WHEN parent_role_for_gender(np.gender) = k.role THEN format('the named parent would be a second %s', k.role)
       END AS refusal
@@ -141,6 +142,7 @@ AS $$
         WHEN s.spouse_count = 0 THEN 'no spouse recorded'
         WHEN s.spouse_count > 1 THEN 'more than one spouse'
         WHEN s.any_divorce THEN 'divorced'
+        WHEN k.role IS NULL THEN 'the linked parent has no gender recorded'
         WHEN sp.gender IS NULL THEN 'the spouse has no gender recorded'
         WHEN parent_role_for_gender(sp.gender) = k.role THEN format('the spouse would be a second %s', k.role)
       END AS question
