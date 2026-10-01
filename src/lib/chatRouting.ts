@@ -15,9 +15,10 @@
  *   but a spouse and how two Persons are related; the subject for every kind
  *   but how two Persons are related);
  * - each name in the message matches exactly one Person, and the message names
- *   as many Persons as the question needs;
- * - the code has a name for the relation (a Kinship Path no fixed rule names
- *   goes to the model, decision 10 of LIN-31).
+ *   as many Persons as the question needs.
+ *
+ * "How is A related to B" is always answered here once both are found: every
+ * Kinship Path has a Kinship Term (LIN-77), so the model never names one.
  *
  * Jev never sees the Persons: the names are found here, with `findPersonsByName`.
  */
@@ -34,12 +35,12 @@ import {
   getFormerSpouses,
   getRecordedGender,
   getRelatives,
-  type KinshipPath,
   type KinshipRelation,
   type KinshipSide,
   type RecordedGender,
   type RelativeKind,
 } from './familyGraph';
+import { kinshipTermText } from './kinshipTerm';
 import { formatNodeDisplayName } from '../utils/nodeDisplayName';
 
 /** Below this, an answer the code would use sends the message to the model. */
@@ -54,8 +55,7 @@ export type ModelReason =
   | 'speaker_unknown'
   | 'person_not_found'
   | 'person_ambiguous'
-  | 'names_do_not_fit'
-  | 'relation_unnamed';
+  | 'names_do_not_fit';
 
 export type RouteDecision = { by: 'code'; answer: string } | { by: 'model'; why: ModelReason };
 
@@ -159,6 +159,39 @@ function inLawAsked(message: string): { of: InLawOf; gender: Gender } | null {
 }
 
 /**
+ * Arabic kinship words as the family writes them in English letters, and the
+ * Kinship Term each one is. Jev reads the same words (`questionKind.ts`); here
+ * they let a reply say back the word the question used. The plural adds an
+ * "s": khalos, amtos, jiddos.
+ */
+const ARABIC_KINSHIP_WORDS: Record<string, { label: 'aunt or uncle' | 'grandparent'; gender: RecordedGender; side?: ParentSide }> = {
+  khalo: { label: 'aunt or uncle', gender: 'male', side: 'mother' },
+  khal: { label: 'aunt or uncle', gender: 'male', side: 'mother' },
+  khalto: { label: 'aunt or uncle', gender: 'female', side: 'mother' },
+  khala: { label: 'aunt or uncle', gender: 'female', side: 'mother' },
+  ammo: { label: 'aunt or uncle', gender: 'male', side: 'father' },
+  amo: { label: 'aunt or uncle', gender: 'male', side: 'father' },
+  amto: { label: 'aunt or uncle', gender: 'female', side: 'father' },
+  amme: { label: 'aunt or uncle', gender: 'female', side: 'father' },
+  jiddo: { label: 'grandparent', gender: 'male' },
+  jeddo: { label: 'grandparent', gender: 'male' },
+  seedo: { label: 'grandparent', gender: 'male' },
+  teta: { label: 'grandparent', gender: 'female' },
+  sitto: { label: 'grandparent', gender: 'female' },
+  sitti: { label: 'grandparent', gender: 'female' },
+};
+
+type ArabicWord = keyof typeof ARABIC_KINSHIP_WORDS;
+
+/** The Arabic kinship words a message uses, each in the singular. */
+function arabicWordsIn(message: string): ArabicWord[] {
+  return words(message)
+    .map((word) => word.replace(/[^\p{L}]+/gu, ''))
+    .map((word) => (word in ARABIC_KINSHIP_WORDS ? word : word.endsWith('s') ? word.slice(0, -1) : ''))
+    .filter((word): word is ArabicWord => word in ARABIC_KINSHIP_WORDS);
+}
+
+/**
  * Words that are never read as part of a name, even when a Person has them as
  * a given name or cluster: they are how the question is asked. A Person
  * named by one of them is not found here, and the message goes to the model.
@@ -174,9 +207,10 @@ const NOT_NAMES: ReadonlySet<string> = new Set(
     'wife wives husband husbands spouse spouses uncle uncles aunt aunts cousin cousins ' +
     'niece nieces nephew nephews grandfather grandfathers grandmother grandmothers grandparent grandparents ' +
     'grandchild grandchildren grandkid grandkids grandson grandsons granddaughter granddaughters law laws ' +
-    'teta sitto sitti jiddo jeddo seedo khalo khalos khalto khaltos khala ammo ammos amto amtos amme ' +
     'maternal paternal'
-  ).split(' '),
+  )
+    .split(' ')
+    .concat(Object.keys(ARABIC_KINSHIP_WORDS).flatMap((word) => [word, `${word}s`])),
 );
 
 const FIRST_PERSON: ReadonlySet<string> = new Set(['i', "i'm", 'i’m', 'me', 'my', 'mine', 'myself']);
@@ -264,7 +298,7 @@ export function routeMessage({ message, questionKind: kind, speaker, record }: R
     persons.push(found.personId);
   }
 
-  const reply = new Reply(record, speaker?.personId ?? null);
+  const reply = new Reply(record, speaker?.personId ?? null, arabicWordsIn(message));
 
   if (relation === 'how_related') {
     // "How is A related to B": what A is to B. With one name, the other is the speaker.
@@ -275,8 +309,7 @@ export function routeMessage({ message, questionKind: kind, speaker, record }: R
       pair = [speaker.personId, persons[0]];
     } else return { by: 'model', why: 'names_do_not_fit' };
     if (pair[0] === pair[1]) return { by: 'model', why: 'names_do_not_fit' };
-    const answer = reply.howRelated(pair[0], pair[1], persons.length === 2);
-    return answer === null ? { by: 'model', why: 'relation_unnamed' } : { by: 'code', answer };
+    return { by: 'code', answer: reply.howRelated(pair[0], pair[1], persons.length === 2) };
   }
 
   let subjectId: string;
@@ -316,23 +349,10 @@ const PARENT_SIDE: Record<QuestionKind['side']['value'], ParentSide | null> = {
   family_name: null,
 };
 
-/** Labels for a relation the code has named, by the recorded gender of the relative. */
-const GENDERED: Partial<Record<string, Record<RecordedGender, string>>> = {
-  parent: { male: 'father', female: 'mother' },
-  child: { male: 'son', female: 'daughter' },
-  sibling: { male: 'brother', female: 'sister' },
-  'half-sibling': { male: 'half-brother', female: 'half-sister' },
-  spouse: { male: 'husband', female: 'wife' },
-  'former spouse': { male: 'former husband', female: 'former wife' },
-  grandparent: { male: 'grandfather', female: 'grandmother' },
-  grandchild: { male: 'grandson', female: 'granddaughter' },
-  'aunt or uncle': { male: 'uncle', female: 'aunt' },
-  'niece or nephew': { male: 'nephew', female: 'niece' },
-  'step-parent': { male: 'stepfather', female: 'stepmother' },
-  'step-child': { male: 'stepson', female: 'stepdaughter' },
-  'parent-in-law': { male: 'father-in-law', female: 'mother-in-law' },
-  'sibling-in-law': { male: 'brother-in-law', female: 'sister-in-law' },
-  'child-in-law': { male: 'son-in-law', female: 'daughter-in-law' },
+/** The Kinship Term each list relation is, for an Arabic word the question used. */
+const LIST_LABEL: Partial<Record<ListRelation, 'aunt or uncle' | 'grandparent'>> = {
+  aunts_uncles: 'aunt or uncle',
+  grandparents: 'grandparent',
 };
 
 /** The reply text, in the model's style: bold names, a bulleted list, the total for a count. */
@@ -340,10 +360,13 @@ class Reply {
   private readonly names: Map<string, string>;
   private readonly record: ChatRecord;
   private readonly speakerId: string | null;
+  /** The Arabic kinship words the question used: the reply says them back where they fit. */
+  private readonly arabic: ArabicWord[];
 
-  constructor(record: ChatRecord, speakerId: string | null) {
+  constructor(record: ChatRecord, speakerId: string | null, arabic: ArabicWord[]) {
     this.record = record;
     this.speakerId = speakerId;
+    this.arabic = arabic;
     this.names = new Map(record.nodes.map((node) => [node.id, formatNodeDisplayName(node)] as const));
   }
 
@@ -359,10 +382,25 @@ class Reply {
     return personId === this.speakerId;
   }
 
-  /** "first cousin" as "aunt" or "mother-in-law" when the record shows the relative's gender. */
-  private label(relation: KinshipRelation, personId: string): string {
-    const gender = getRecordedGender(personId, this.record.links, this.record.nodes);
-    return (gender && GENDERED[relation.label]?.[gender]) ?? relation.label;
+  /** The Kinship Term for `personId`, gendered when the record shows their gender. */
+  private term(relation: KinshipRelation, personId: string): string {
+    return kinshipTermText(relation, personId, {
+      genderOf: (id) => getRecordedGender(id, this.record.links, this.record.nodes),
+      nameOf: (id) => this.bold(id),
+    });
+  }
+
+  /**
+   * The Arabic word the question used, when it is the Kinship Term with this
+   * label, gender and side: "khalo" for an uncle on the mother's side.
+   */
+  private arabicWord(label: string, gender: Gender | RecordedGender | null, side: ParentSide | null | undefined): ArabicWord | null {
+    return (
+      this.arabic.find((word) => {
+        const meaning = ARABIC_KINSHIP_WORDS[word];
+        return meaning.label === label && meaning.gender === gender && (!meaning.side || meaning.side === side);
+      }) ?? null
+    );
   }
 
   /** What `personId` is to `subjectId` through a marriage, when it is an in-law. */
@@ -392,8 +430,11 @@ class Reply {
 
     const you = this.isSpeaker(subjectId);
     const owner = you ? 'Your' : `${this.bold(subjectId)}'s`;
-    const sideText = side ? ` on ${you ? 'your' : 'the'} ${side}'s side` : '';
-    const [one, many] = inLaw ? IN_LAW_NOUNS[inLaw][gender] : NOUNS[relation][gender];
+    const label = LIST_LABEL[relation];
+    const arabic = label ? this.arabicWord(label, gender, side) : null;
+    // "khalo" says the side itself.
+    const sideText = side && !(arabic && ARABIC_KINSHIP_WORDS[arabic].side) ? ` on ${you ? 'your' : 'the'} ${side}'s side` : '';
+    const [one, many] = arabic ? [arabic, `${arabic}s`] : inLaw ? IN_LAW_NOUNS[inLaw][gender] : NOUNS[relation][gender];
     const noun = ids.length === 1 ? one : many;
 
     const parts: string[] = [];
@@ -436,7 +477,7 @@ class Reply {
     if (relation === 'in_laws') {
       for (const id of ids) {
         const relation = this.inLawOf(subjectId, id);
-        if (relation) notes.set(id, this.label(relation, id));
+        if (relation) notes.set(id, this.term(relation, id));
       }
     } else if (USES_SIDE.has(relation) && side === null) {
       const kind = RELATIVE_KIND[relation];
@@ -452,10 +493,10 @@ class Reply {
   }
 
   /**
-   * What `toId` is to `fromId`, blood first, then "also related by marriage".
-   * Null when the code has no name for a path: the model names it.
+   * What `toId` is to `fromId` as a Kinship Term, blood first, then "also
+   * related by marriage". Every path has a term, so this always answers.
    */
-  howRelated(fromId: string, toId: string, bothNamed: boolean): string | null {
+  howRelated(fromId: string, toId: string, bothNamed: boolean): string {
     const paths = findKinshipPaths(fromId, toId, this.record.links);
     if (paths.length === 0) {
       const [first, second] = bothNamed ? [toId, fromId] : [fromId, toId];
@@ -463,19 +504,16 @@ class Reply {
         ? `You and ${this.bold(second)} are not related in the family tree.`
         : `${this.bold(first)} and ${this.bold(second)} are not related in the family tree.`;
     }
-    const named: Array<{ kind: KinshipPath['kind']; relation: KinshipRelation }> = [];
-    for (const path of paths) {
-      if (!path.relation) return null;
-      named.push({ kind: path.kind, relation: path.relation });
-    }
-
     const you = this.isSpeaker(fromId);
     const owner = you ? 'your' : `${this.bold(fromId)}'s`;
     const sentence = (relation: KinshipRelation) => {
+      const gender = getRecordedGender(toId, this.record.links, this.record.nodes);
+      const arabic = relation.via ? null : this.arabicWord(relation.label, gender, relation.side);
+      if (arabic && ARABIC_KINSHIP_WORDS[arabic].side) return `${this.bold(toId)} is ${owner} ${arabic}.`;
       const sideText = relation.side ? `, on ${you ? 'your' : 'the'} ${relation.side}'s side` : '';
-      return `${this.bold(toId)} is ${owner} ${this.label(relation, toId)}${sideText}.`;
+      return `${this.bold(toId)} is ${owner} ${arabic ?? this.term(relation, toId)}${sideText}.`;
     };
-    const [first, second] = named;
+    const [first, second] = paths;
     const parts = [first.kind === 'marriage' ? `Related by marriage: ${sentence(first.relation)}` : sentence(first.relation)];
     if (second) parts.push(`Also related by marriage: ${sentence(second.relation)}`);
     return parts.join('\n\n');

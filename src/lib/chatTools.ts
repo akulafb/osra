@@ -22,13 +22,8 @@ import {
   type ChatToolName,
 } from '../../supabase/functions/family-chat/tools.ts';
 import type { FamilyLink, FamilyNode } from '../types/graph';
-import {
-  findKinshipPaths,
-  findPersonsByName,
-  getRelatives,
-  type KinshipPath,
-  type KinshipRelation,
-} from './familyGraph';
+import { findKinshipPaths, findPersonsByName, getRecordedGender, getRelatives, type KinshipPath } from './familyGraph';
+import { kinshipTermText } from './kinshipTerm';
 import { formatNodeDisplayName } from '../utils/nodeDisplayName';
 
 /** The Persons and Kinship Links the tools read: the Working Record at send time. */
@@ -48,26 +43,18 @@ function optionalOneOf<T extends string>(value: unknown, allowed: readonly T[], 
   return value === undefined || value === null ? undefined : oneOf(value, allowed, what);
 }
 
-/** "first cousin, mother's side": the code's name for a relation, or null when no rule fits. */
-function relationText(relation: KinshipRelation | null): string | null {
-  if (!relation) return null;
-  return relation.side ? `${relation.label}, ${relation.side}'s side` : relation.label;
-}
-
-/** What each Person on a path is to the one before it, read from the Kinship Link. */
-function chainOf(path: KinshipPath, displayName: (personId: string) => string) {
-  return [
-    { displayName: displayName(path.personIds[0]), is: 'start' },
-    ...path.steps.map((step) => ({
-      displayName: displayName(step.toId),
-      is:
-        step.kind === 'parent'
-          ? (step.link.parentRole ?? 'parent')
-          : step.kind === 'formerSpouse'
-            ? 'former spouse'
-            : step.kind,
-    })),
-  ];
+/**
+ * The Kinship Term for a path, gendered where the record shows it, with the
+ * side: "aunt, father's side", or "sister May Badran's stepson" when no one
+ * word fits. The model is given the term, never the chain to name itself.
+ */
+function termOf(path: KinshipPath, record: ChatRecord, displayName: (personId: string) => string): string {
+  const toId = path.personIds[path.personIds.length - 1];
+  const term = kinshipTermText(path.relation, toId, {
+    genderOf: (personId) => getRecordedGender(personId, record.links, record.nodes),
+    nameOf: displayName,
+  });
+  return path.relation.side ? `${term}, ${path.relation.side}'s side` : term;
 }
 
 /**
@@ -177,8 +164,7 @@ function run(call: ToolCall, record: ChatRecord): string {
       const to = person(args.toPersonId, 'toPersonId');
       const paths = findKinshipPaths(from.personId, to.personId, record.links).map((path) => ({
         kind: path.kind,
-        relation: relationText(path.relation),
-        chain: chainOf(path, displayNameOf),
+        term: termOf(path, record, displayNameOf),
       }));
       return JSON.stringify({
         from: from.displayName,
@@ -187,7 +173,7 @@ function run(call: ToolCall, record: ChatRecord): string {
         note:
           paths.length === 0
             ? 'These two Persons are not related in the family tree.'
-            : 'relation is what the second Person is to the first. Give the blood relation first; when there is also a marriage path, add it after as "also related by marriage". When relation is null, name it yourself from the chain.',
+            : 'term is what the second Person is to the first. Use each term exactly as given: do not change it, add to it, or spell out how the two are linked. Give the blood term first; when there is also a marriage path, add it after as "also related by marriage".',
       });
     }
 

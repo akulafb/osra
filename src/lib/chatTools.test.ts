@@ -33,16 +33,18 @@ describe('runChatTool: findPersonsByName', () => {
 });
 
 describe('runChatTool: findKinshipPaths', () => {
-  it('gives the relation name from code, with the side', () => {
+  it('gives the Kinship Term from code, with the side, and no chain to name', () => {
     const result = run('findKinshipPaths', { fromPersonId: P.tala, toPersonId: P.omar });
-    expect(result.paths).toHaveLength(1);
-    expect(result.paths[0]).toMatchObject({ kind: 'blood', relation: "first cousin, father's side" });
-    expect(result.paths[0].chain).toEqual([
-      { displayName: 'Tala Mansour', is: 'start' },
-      { displayName: 'Samir Mansour', is: 'father' },
-      { displayName: 'Adel Mansour', is: 'father' },
-      { displayName: 'Huda Mansour', is: 'child' },
-      { displayName: 'Omar Haddad', is: 'child' },
+    expect(result.paths).toEqual([{ kind: 'blood', term: "first cousin, father's side" }]);
+    expect(result.note).toMatch(/exactly as given/i);
+  });
+
+  it('gives a gendered term at depth, and two terms joined by one Person when no one word fits', () => {
+    expect(run('findKinshipPaths', { fromPersonId: P.rima, toPersonId: P.idris }).paths).toEqual([
+      { kind: 'blood', term: "great-grandfather, father's side" },
+    ]);
+    expect(run('findKinshipPaths', { fromPersonId: P.tarek, toPersonId: P.nour }).paths).toEqual([
+      { kind: 'marriage', term: "former wife Layla Haddad's child" },
     ]);
   });
 
@@ -50,11 +52,11 @@ describe('runChatTool: findKinshipPaths', () => {
     const result = run('findKinshipPaths', { fromPersonId: P.omar, toPersonId: P.sara });
     expect(result.from).toBe('Omar Haddad');
     expect(result.to).toBe('Sara Khoury');
-    expect(result.paths.map((p: { kind: string; relation: string }) => [p.kind, p.relation])).toEqual([
-      ['blood', "first cousin, father's side"],
-      ['marriage', 'spouse'],
+    expect(result.paths).toEqual([
+      { kind: 'blood', term: "first cousin, father's side" },
+      { kind: 'marriage', term: 'wife' },
     ]);
-    expect(result.note).toMatch(/blood relation first.*also related by marriage/i);
+    expect(result.note).toMatch(/blood term first.*also related by marriage/i);
   });
 
   it('says when two Persons are not related', () => {
