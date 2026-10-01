@@ -123,6 +123,17 @@ describe('routeMessage: code answers the common kinds, with no model call', () =
     expect(reply('male')).toEqual({ by: 'code', answer: "Your uncle on your mother's side is **Samir Mansour**." });
   });
 
+  it("names a childless relative's Kinship Term from their recorded gender", () => {
+    const record = {
+      ...KINSHIP_FIXTURE_TREE,
+      nodes: KINSHIP_FIXTURE_TREE.nodes.map((node) => (node.id === P.nour ? { ...node, gender: 'female' as const } : node)),
+    };
+    const reply = (tree: typeof record) =>
+      routeMessage({ message: 'how am I related to Nour Qasim?', questionKind: reading({ relation: 'how_related' }), speaker: OMAR, record: tree });
+    expect(reply(KINSHIP_FIXTURE_TREE)).toEqual({ by: 'code', answer: '**Nour Qasim** is your niece or nephew.' });
+    expect(reply(record)).toEqual({ by: 'code', answer: '**Nour Qasim** is your niece.' });
+  });
+
   it('aunts and uncles on both sides say which side each one is on', () => {
     expect(route('who are my aunts and uncles', reading({ relation: 'aunts_uncles' }))).toEqual({
       by: 'code',

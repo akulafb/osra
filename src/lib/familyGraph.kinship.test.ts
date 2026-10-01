@@ -835,18 +835,22 @@ describe('Kinship Terms for any Kinship Path', () => {
     expect(terms('me', 'hisMum', tree)).toEqual(["sister may's mother-in-law"]);
   });
 
-  it('a chain no two terms fit is a relative by marriage', () => {
-    const tree = [married('a', 'b'), married('b', 'c'), married('c', 'd')];
+  it('a chain no two terms fit is the fewest terms joined at Persons on it, never step by step', () => {
+    const tree = [married('a', 'b'), married('b', 'c'), married('c', 'd'), gendered('b', 'female'), gendered('d', 'male')];
     const step = (fromId: string, toId: string): KinshipPath['steps'][number] => ({
       fromId,
       toId,
       kind: 'spouse',
-      link: tree.find(l => [l.source, l.target].includes(fromId) && [l.source, l.target].includes(toId)) as FamilyLink,
+      link: tree.find(l => l.type === 'marriage' && [l.source, l.target].includes(fromId) && [l.source, l.target].includes(toId)) as FamilyLink,
     });
-    expect(nameKinshipPath({ steps: [step('a', 'b'), step('b', 'c'), step('c', 'd')] }, tree)).toEqual({
-      name: 'relative',
-      label: 'relative by marriage',
+    const relation = nameKinshipPath({ steps: [step('a', 'b'), step('b', 'c'), step('c', 'd')] }, tree)!;
+    expect(relation).toMatchObject({
+      name: 'joined terms',
+      label: "spouse's spouse's spouse",
+      via: { personId: 'b', second: { name: 'two terms', via: { personId: 'c' } } },
     });
+    const genderOf = (id: string) => getRecordedGender(id, tree);
+    expect(kinshipTermText(relation, 'd', { genderOf, nameOf: id => id })).toBe("wife b's spouse c's husband");
   });
 
   it('names every path found on 400 small random trees', () => {

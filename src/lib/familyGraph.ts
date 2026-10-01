@@ -524,8 +524,12 @@ export type KinshipRelationName =
   | 'step-relative'
   /** No one word fits: two Kinship Terms joined by one Person, in `via`. */
   | 'two terms'
-  /** The last resort when not even two terms fit: "relative" or "relative by marriage". */
-  | 'relative';
+  /**
+   * The last resort when not even two terms fit: the fewest Kinship Terms
+   * joined at Persons on the path ("wife Rana's brother Sami's sister-in-law").
+   * `via.second` is itself joined terms or two terms.
+   */
+  | 'joined terms';
 
 /**
  * The Kinship Term (CONTEXT.md) for a Kinship Path: what the last Person is to
@@ -555,6 +559,7 @@ export interface KinshipRelation {
    * For `two terms`: the Person the two terms meet at, what they are to the
    * first Person, and what the last Person is to them. "Issa is your sister
    * May's stepson" has May as `personId`, sibling `first` and step-child `second`.
+   * For `joined terms`, `second` holds the rest of the terms the same way.
    */
   via?: { personId: string; first: KinshipRelation; second: KinshipRelation };
 }
@@ -1004,15 +1009,42 @@ function twoTerms(index: KinshipIndex, steps: readonly KinshipPathStep[]): Kinsh
   return null;
 }
 
+/**
+ * The fewest Kinship Terms joined at Persons on the chain, for a chain that
+ * neither one term nor two fit. Every single step has a term, so this always
+ * finds one.
+ */
+function joinedTerms(index: KinshipIndex, steps: readonly KinshipPathStep[]): KinshipRelation {
+  const fewest = new Map<number, { relation: KinshipRelation; count: number }>();
+  const from = (start: number): { relation: KinshipRelation; count: number } => {
+    const known = fewest.get(start);
+    if (known) return known;
+    const whole = oneTerm(index, steps.slice(start));
+    let best: { relation: KinshipRelation; count: number } | null = whole && { relation: whole, count: 1 };
+    for (let k = start + 1; k < steps.length && (!best || best.count > 2); k++) {
+      const first = oneTerm(index, steps.slice(start, k));
+      if (!first) continue;
+      const rest = from(k);
+      if (best && rest.count + 1 >= best.count) continue;
+      const second = rest.relation;
+      best = {
+        relation: {
+          name: rest.count === 1 ? 'two terms' : 'joined terms',
+          label: `${first.label}'s ${second.label}`,
+          via: { personId: steps[k].fromId, first, second },
+        },
+        count: rest.count + 1,
+      };
+    }
+    fewest.set(start, best!);
+    return best!;
+  };
+  return from(0).relation;
+}
+
 /** The Kinship Term for a chain of one or more steps. Never `null`. */
 function nameSteps(index: KinshipIndex, steps: readonly KinshipPathStep[]): KinshipRelation {
-  return (
-    oneTerm(index, steps) ??
-    twoTerms(index, steps) ?? {
-      name: 'relative',
-      label: steps.some(isAcross) ? 'relative by marriage' : 'relative',
-    }
-  );
+  return oneTerm(index, steps) ?? twoTerms(index, steps) ?? joinedTerms(index, steps);
 }
 
 /**

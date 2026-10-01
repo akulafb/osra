@@ -82,7 +82,8 @@ export function genderedLabel(label: string, gender: RecordedGender | null): str
 /**
  * The Kinship Term as it is said: what `toId` is, in gendered words where the
  * gender is recorded. A relation no one word names is two terms joined by one
- * Person: "sister **May Badran**'s stepson". The side is not included.
+ * Person: "sister **May Badran**'s stepson", or, only when two do not fit,
+ * more terms joined the same way. The side is not included.
  */
 export function kinshipTermText(
   relation: KinshipRelation,
@@ -91,5 +92,5 @@ export function kinshipTermText(
 ): string {
   if (!relation.via) return genderedLabel(relation.label, genderOf(toId));
   const { personId, first, second } = relation.via;
-  return `${genderedLabel(first.label, genderOf(personId))} ${nameOf(personId)}'s ${genderedLabel(second.label, genderOf(toId))}`;
+  return `${genderedLabel(first.label, genderOf(personId))} ${nameOf(personId)}'s ${kinshipTermText(second, toId, { genderOf, nameOf })}`;
 }
