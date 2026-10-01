@@ -364,12 +364,13 @@ function recordedGender(index: KinshipIndex, personId: string): RecordedGender |
   return null;
 }
 
-function genderLookup(persons: GenderedPersons | undefined): (personId: string) => RecordedGender | null {
+/** Reads each Person's own gender first, then `parent_role` where they are a parent. */
+function genderReader(index: KinshipIndex, persons: GenderedPersons | undefined): (personId: string) => RecordedGender | null {
   const byId = new Map<string, RecordedGender>();
   for (const person of persons ?? []) {
     if (person.gender) byId.set(person.id, person.gender);
   }
-  return personId => byId.get(personId) ?? null;
+  return personId => byId.get(personId) ?? recordedGender(index, personId);
 }
 
 /**
@@ -383,7 +384,7 @@ export function getRecordedGender(
   links: readonly FamilyLink[],
   persons?: GenderedPersons
 ): RecordedGender | null {
-  return genderLookup(persons)(personId) ?? recordedGender(buildKinshipIndex(links), personId);
+  return genderReader(buildKinshipIndex(links), persons)(personId);
 }
 
 /**
@@ -467,8 +468,8 @@ export function getRelatives(
   unique.delete(personId);
   const result = Array.from(unique);
   if (!gender) return result;
-  const ownGender = genderLookup(persons);
-  return result.filter(id => (ownGender(id) ?? recordedGender(index, id)) === gender);
+  const genderOf = genderReader(index, persons);
+  return result.filter(id => genderOf(id) === gender);
 }
 
 /**

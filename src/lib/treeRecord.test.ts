@@ -640,7 +640,7 @@ describe('treeRecord module', () => {
         new Response(
           JSON.stringify({
             code: 'P0001',
-            message: 'Gender female disagrees with parent_role father on a Kinship Link where this Person is the parent',
+            message: 'Farah is recorded as a father on a Kinship Link, so their gender cannot be female.',
           }),
           { status: 400, headers: { 'Content-Type': 'application/json' } }
         )
@@ -652,7 +652,7 @@ describe('treeRecord module', () => {
 
       await expect(record.editPerson({ id: 'node-1', gender: 'female' })).rejects.toMatchObject({
         kind: 'refused',
-        message: expect.stringContaining('disagrees with parent_role'),
+        message: expect.stringContaining('their gender cannot be female'),
       });
     });
 

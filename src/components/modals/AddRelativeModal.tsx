@@ -151,7 +151,7 @@ export default function AddRelativeModal({
     );
     const kinship: AddLinkParams =
       relationship === 'sibling'
-        ? { sourceId: targetNode.id, targetId: existingId, type: 'parent', parentRole: anchorParentRole }
+        ? { sourceId: targetNode.id, targetId: existingId, type: 'parent', parentRole: null }
         : relativeToKinshipLink(
             targetNode.id,
             existingId,
