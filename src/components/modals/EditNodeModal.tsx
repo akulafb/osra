@@ -54,7 +54,9 @@ export default function EditNodeModal({
   // path uses, so a rename can no longer miss a cluster match the Ghost Node sees,
   // Spelling Matches included. An unchanged name resolves to none and is never
   // looked up. A closed modal asks nothing, so a name left in the field is not
-  // looked up behind it.
+  // looked up behind it. On reopen, the one render before the reset effect sets
+  // the name still holds the old one; its lookup is only debounced, and the
+  // reset cancels it before anything is sent.
   const resolution = usePersonMatch({
     query: isOpen ? name : '',
     intent: 'renaming',
@@ -228,7 +230,7 @@ export default function EditNodeModal({
 
           {matches.length > 0 && (
             <div style={warningStyle}>
-              <strong style={{ fontSize: '0.75rem', letterSpacing: '0.05em' }}>SIMILAR NAMES IN ARCHIVE</strong>
+              <strong style={{ fontSize: '0.75rem', letterSpacing: '0.05em' }}>MATCHES DETECTED IN ARCHIVE</strong>
               <ul style={{ margin: '12px 0', paddingLeft: '20px', color: 'rgba(255,255,255,0.8)' }}>
                 {matches.map(({ person, isSpellingVariant, isVisible }) => (
                   <li key={person.id} style={{ fontSize: '0.85rem' }}>
