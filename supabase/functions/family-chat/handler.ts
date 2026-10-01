@@ -28,6 +28,7 @@ import {
   readJsonBody,
   type FetchLike,
 } from '../_shared/http.ts';
+import { projectKeys } from '../_shared/projectKeys.ts';
 import type { RetryOptions } from '../_shared/retry.ts';
 import { DatabaseError, type ServiceRoleEnv } from '../_shared/supabaseRest.ts';
 import { findSpeaker, recordModelCall, type QuotaOutcome } from './database.ts';
@@ -221,15 +222,14 @@ async function handle(req: Request, deps: FamilyChatDeps, log: (message: string)
   const now = (deps.now ?? (() => new Date()))();
 
   const supabaseUrl = deps.env('SUPABASE_URL');
-  const supabaseAnonKey = deps.env('SUPABASE_ANON_KEY');
-  const serviceRoleKey = deps.env('SUPABASE_SERVICE_ROLE_KEY');
-  if (!supabaseUrl || !supabaseAnonKey || !serviceRoleKey) {
-    log('family-chat: SUPABASE_URL, SUPABASE_ANON_KEY or SUPABASE_SERVICE_ROLE_KEY is missing');
+  const { publishableKey, secretKey: serviceRoleKey } = projectKeys(deps.env);
+  if (!supabaseUrl || !publishableKey || !serviceRoleKey) {
+    log('family-chat: SUPABASE_URL, the publishable key or the secret key (SUPABASE_PUBLISHABLE_KEYS, SUPABASE_SECRET_KEYS) is missing');
     return refuse(500, 'not_configured', 'failed', 'The chat is not configured.');
   }
 
   // 1. Who is asking. No session, no further work and no call to OpenRouter.
-  const auth = await requireSignedInUser(req, { supabaseUrl, supabaseAnonKey }, fetchImpl);
+  const auth = await requireSignedInUser(req, { supabaseUrl, publishableKey }, fetchImpl);
   if (!auth.ok) {
     const cause: RefusalCause = auth.reason === 'auth-unavailable' ? 'failed' : 'not_signed_in';
     return authRefusal(auth, { cause });

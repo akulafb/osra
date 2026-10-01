@@ -14,6 +14,7 @@ import {
   readJsonBody,
   type FetchLike,
 } from '../_shared/http.ts';
+import { projectKeys } from '../_shared/projectKeys.ts';
 import type { RetryOptions } from '../_shared/retry.ts';
 import { TYPESAFE_MODEL, validateRequest, type SpellingMatchResponse } from './spellingMatches.ts';
 import { scoreNames } from './typeSafe.ts';
@@ -34,13 +35,13 @@ export async function handleSpellingMatches(req: Request, deps: HandlerDeps): Pr
 
   const log = deps.log ?? ((m: string) => console.error(m));
   const supabaseUrl = deps.env('SUPABASE_URL');
-  const supabaseAnonKey = deps.env('SUPABASE_ANON_KEY');
-  if (!supabaseUrl || !supabaseAnonKey) {
-    log('spelling-matches: SUPABASE_URL or SUPABASE_ANON_KEY is missing');
+  const { publishableKey } = projectKeys(deps.env);
+  if (!supabaseUrl || !publishableKey) {
+    log('spelling-matches: SUPABASE_URL or the publishable key (SUPABASE_PUBLISHABLE_KEYS) is missing');
     return errorResponse(500, 'not_configured', 'The function is not configured.');
   }
 
-  const auth = await requireSignedInUser(req, { supabaseUrl, supabaseAnonKey }, deps.fetchImpl);
+  const auth = await requireSignedInUser(req, { supabaseUrl, publishableKey }, deps.fetchImpl);
   if (!auth.ok) return authRefusal(auth);
 
   const validation = validateRequest(await readJsonBody(req));

@@ -9,12 +9,13 @@
  *
  * Reads only: `GET /rest/v1/nodes` and `/rest/v1/links` through the Supabase
  * API. The key comes from $SUPABASE_SERVICE_ROLE_KEY (or .env.local, or
- * $ENV_FILE; scripts/readApiKey.mjs) and is never printed. A signed-in admin's
- * access token works too: set SUPABASE_ACCESS_TOKEN and the project's anon key
- * as SUPABASE_ANON_KEY instead.
+ * $ENV_FILE; scripts/readApiKey.mjs) and is never printed. It may be the
+ * project's secret key (sb_secret_…) or a legacy service_role key. A signed-in
+ * admin's access token works too: set SUPABASE_ACCESS_TOKEN and the project's
+ * publishable key (or legacy anon key) as SUPABASE_ANON_KEY instead.
  */
 import { writeFileSync } from 'node:fs';
-import { readApiKey } from '../readApiKey.mjs';
+import { readApiKey, supabaseKeyHeaders } from '../readApiKey.mjs';
 import { guessPersonGenders, toCsv, type LinkRowForList, type NodeRowForList } from './personGender';
 
 const PROJECTS = {
@@ -34,8 +35,7 @@ function headers(): Record<string, string> {
   if (process.env.SUPABASE_ACCESS_TOKEN) {
     return { apikey: readApiKey('SUPABASE_ANON_KEY'), Authorization: `Bearer ${process.env.SUPABASE_ACCESS_TOKEN}` };
   }
-  const key = readApiKey('SUPABASE_SERVICE_ROLE_KEY');
-  return { apikey: key, Authorization: `Bearer ${key}` };
+  return supabaseKeyHeaders(readApiKey('SUPABASE_SERVICE_ROLE_KEY'));
 }
 
 const PAGE = 1000;

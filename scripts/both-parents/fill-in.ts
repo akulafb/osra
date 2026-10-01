@@ -28,13 +28,14 @@
  * always run the dry run with the same `--names` just before the apply.
  *
  * The key comes from $SUPABASE_SERVICE_ROLE_KEY (or .env.local, or $ENV_FILE;
- * scripts/readApiKey.mjs) and is never printed. A signed-in admin's access token
- * works too: set SUPABASE_ACCESS_TOKEN and the project's anon key as
- * SUPABASE_ANON_KEY instead.
+ * scripts/readApiKey.mjs) and is never printed. It may be the project's secret
+ * key (sb_secret_…) or a legacy service_role key. A signed-in admin's access
+ * token works too: set SUPABASE_ACCESS_TOKEN and the project's publishable key
+ * (or legacy anon key) as SUPABASE_ANON_KEY instead.
  */
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { readApiKey } from '../readApiKey.mjs';
+import { readApiKey, supabaseKeyHeaders } from '../readApiKey.mjs';
 import {
   listCsv,
   parseNamesCsv,
@@ -76,8 +77,7 @@ function headers(): Record<string, string> {
   if (process.env.SUPABASE_ACCESS_TOKEN) {
     return { ...base, apikey: readApiKey('SUPABASE_ANON_KEY'), Authorization: `Bearer ${process.env.SUPABASE_ACCESS_TOKEN}` };
   }
-  const key = readApiKey('SUPABASE_SERVICE_ROLE_KEY');
-  return { ...base, apikey: key, Authorization: `Bearer ${key}` };
+  return { ...base, ...supabaseKeyHeaders(readApiKey('SUPABASE_SERVICE_ROLE_KEY')) };
 }
 
 async function fillIn(pApply: boolean, named: ParentChoice[]): Promise<FillInResult> {

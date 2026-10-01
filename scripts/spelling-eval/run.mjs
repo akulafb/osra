@@ -15,8 +15,11 @@
  * signed-in user's access token:
  *
  *   SPELLING_MATCHES_URL=https://<ref>.supabase.co/functions/v1/spelling-matches \
- *   SUPABASE_USER_JWT=<access token> SUPABASE_ANON_KEY=<anon key> \
+ *   SUPABASE_USER_JWT=<access token> SUPABASE_ANON_KEY=<publishable key> \
  *   node scripts/spelling-eval/run.mjs
+ *
+ * The project key (sb_publishable_…, or a legacy anon key) goes on `apikey`
+ * only; the bearer is always the user's access token.
  *
  * Needs Node 22.18 or later (it imports the function's TypeScript directly).
  */

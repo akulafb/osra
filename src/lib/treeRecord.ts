@@ -1,6 +1,7 @@
 import { getParents } from './familyGraph';
 import { FamilyLink, FamilyNode, PersonGender, RelativeDirection } from '../types/graph';
 import { kinshipLinksFromRows, personsFromRows } from './treeRecordRows';
+import { publishableKeyFor, supabaseHeaders } from './supabaseConfig';
 
 export type TreeRecordErrorKind = 'refused' | 'not-authorized' | 'network' | 'conflict' | 'unknown';
 
@@ -222,22 +223,17 @@ export function relativeToKinshipLinks(
 
 function resolveEnv(config?: TreeRecordConfig) {
   const supabaseUrl = config?.supabaseUrl ?? (typeof import.meta !== 'undefined' ? import.meta.env?.VITE_SUPABASE_URL : undefined) ?? '';
-  const supabaseKey = config?.supabaseKey ?? (typeof import.meta !== 'undefined' ? import.meta.env?.VITE_SUPABASE_ANON_KEY : undefined) ?? '';
+  const supabaseKey = config?.supabaseKey ?? publishableKeyFor(supabaseUrl);
   const fetchFn = config?.fetch ?? fetch;
   return { supabaseUrl, supabaseKey, fetchFn };
 }
 
 function buildHeaders(identity: TreeRecordIdentity, supabaseKey: string, prefer?: string): HeadersInit {
-  const authToken = identity.sessionToken || supabaseKey;
+  // The key is not a JWT: only the user's session token is ever the bearer.
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
+    ...supabaseHeaders(supabaseKey, identity.sessionToken),
   };
-  if (supabaseKey) {
-    headers['apikey'] = supabaseKey;
-  }
-  if (authToken) {
-    headers['Authorization'] = `Bearer ${authToken}`;
-  }
   if (prefer) {
     headers['Prefer'] = prefer;
   }

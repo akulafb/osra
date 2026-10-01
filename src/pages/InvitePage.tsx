@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import Button from '@mui/material/Button';
 import { useAuth } from '../contexts/AuthContext';
+import { supabaseHeaders, supabasePublishableKey, supabaseUrl } from '../lib/supabaseConfig';
 
 type InviteStatus = 
   | 'loading' 
@@ -48,17 +49,14 @@ export default function InvitePage() {
     const validateInvite = async () => {
       try {
         // Bypass Supabase client (websocket hangs) - use raw fetch to REST API
-        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-        const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-        
+        // Before sign-in: the publishable key on apikey, and no bearer.
         const response = await fetch(
-          `${supabaseUrl}/rest/v1/rpc/get_invite_by_token`,
+          `${supabaseUrl()}/rest/v1/rpc/get_invite_by_token`,
           {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              'apikey': supabaseKey,
-              'Authorization': `Bearer ${supabaseKey}`,
+              ...supabaseHeaders(supabasePublishableKey()),
             },
             body: JSON.stringify({ invite_token: token }),
           }
@@ -142,20 +140,16 @@ export default function InvitePage() {
     setInviteStatus('claiming');
 
     try {
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-      
       const authToken = session.access_token;
       
       // Call the secure RPC function that handles the entire claim flow atomically
       const response = await fetch(
-        `${supabaseUrl}/rest/v1/rpc/claim_invite_secure`,
+        `${supabaseUrl()}/rest/v1/rpc/claim_invite_secure`,
         {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'apikey': supabaseKey,
-            'Authorization': `Bearer ${authToken}`,
+            ...supabaseHeaders(supabasePublishableKey(), authToken),
           },
           body: JSON.stringify({
             invite_token: token,

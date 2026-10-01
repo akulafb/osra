@@ -4,6 +4,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { FamilyNode, FamilyLink } from '../../types/graph';
 import { formatNodeDisplayName } from '../../utils/nodeDisplayName';
 import { get1DegreeRelatives, KinshipDegree1Category } from '../../lib/familyGraph';
+import { supabaseHeaders, supabasePublishableKey, supabaseUrl } from '../../lib/supabaseConfig';
 
 interface BulkInviteModalProps {
   isOpen: boolean;
@@ -101,15 +102,13 @@ export default function BulkInviteModal({
 
   const fetchExistingInvites = async (relativesData: RelativeWithInvite[]) => {
     if (!relativesData.length) return;
-    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-    const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
     const authToken = session?.access_token;
     if (!authToken) return;
 
     try {
       const nodeIds = relativesData.map(r => r.node.id).join(',');
-      const response = await fetch(`${supabaseUrl}/rest/v1/node_invites?node_id=in.(${nodeIds})&select=node_id,expires_at,claimed_by_user_id`, {
-        headers: { 'apikey': supabaseKey, 'Authorization': `Bearer ${authToken}` },
+      const response = await fetch(`${supabaseUrl()}/rest/v1/node_invites?node_id=in.(${nodeIds})&select=node_id,expires_at,claimed_by_user_id`, {
+        headers: supabaseHeaders(supabasePublishableKey(), authToken),
       });
       if (!response.ok) return;
       const invites = await response.json();
@@ -134,8 +133,7 @@ export default function BulkInviteModal({
     setIsGenerating(true);
     setError(null);
 
-    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-    const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+    const url = supabaseUrl();
     const authToken = session?.access_token;
 
     if (!authToken) {
@@ -152,13 +150,12 @@ export default function BulkInviteModal({
       const selectedNodeIds = selected.map(r => r.node.id).join(',');
       const nowIso = new Date().toISOString();
       const patchRes = await fetch(
-        `${supabaseUrl}/rest/v1/node_invites?node_id=in.(${selectedNodeIds})&claimed_by_user_id=is.null`,
+        `${url}/rest/v1/node_invites?node_id=in.(${selectedNodeIds})&claimed_by_user_id=is.null`,
         {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
-            apikey: supabaseKey,
-            Authorization: `Bearer ${authToken}`,
+            ...supabaseHeaders(supabasePublishableKey(), authToken),
             Prefer: 'return=minimal',
           },
           body: JSON.stringify({
@@ -179,12 +176,11 @@ export default function BulkInviteModal({
         const token = `invite-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
         const expiresAt = new Date(); expiresAt.setDate(expiresAt.getDate() + 7);
         
-        const res = await fetch(`${supabaseUrl}/rest/v1/node_invites`, {
+        const res = await fetch(`${url}/rest/v1/node_invites`, {
           method: 'POST',
           headers: { 
             'Content-Type': 'application/json', 
-            'apikey': supabaseKey, 
-            'Authorization': `Bearer ${authToken}`,
+            ...supabaseHeaders(supabasePublishableKey(), authToken),
             'Prefer': 'return=minimal' 
           },
           body: JSON.stringify({ 

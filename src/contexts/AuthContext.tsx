@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
+import { supabaseHeaders, supabasePublishableKey, supabaseUrl } from '../lib/supabaseConfig';
 import { Database } from '../types/database';
 
 type UserProfile = Database['public']['Tables']['users']['Row'];
@@ -28,19 +29,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Fetch user profile from the users table using raw fetch (avoid websocket hang)
   const fetchUserProfile = async (userId: string, authToken?: string) => {
     try {
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-
-      const token = authToken || supabaseKey;
-
       const response = await fetch(
-        `${supabaseUrl}/rest/v1/users?id=eq.${userId}&select=*`,
+        `${supabaseUrl()}/rest/v1/users?id=eq.${userId}&select=*`,
         {
           method: 'GET',
-          headers: {
-            'apikey': supabaseKey,
-            'Authorization': `Bearer ${token}`,
-          },
+          headers: supabaseHeaders(supabasePublishableKey(), authToken),
         }
       );
 

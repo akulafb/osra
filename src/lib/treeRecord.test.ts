@@ -111,6 +111,25 @@ describe('treeRecord module', () => {
       });
     });
 
+    it('sends the publishable key on apikey only, never as the bearer, when there is no session', async () => {
+      const mockFetch = vi.fn().mockResolvedValue(
+        new Response(JSON.stringify([linkRow('link-9', 'p1', 'p2', 'marriage')]), {
+          status: 201,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      );
+      const record = createTreeRecord(
+        { userId: 'admin-1', isAdmin: true, sessionToken: null },
+        { supabaseUrl: 'https://example.supabase.co', supabaseKey: 'sb_publishable_test', fetch: mockFetch }
+      );
+
+      await record.addLink({ sourceId: 'p1', targetId: 'p2', type: 'marriage' });
+
+      const [, init] = mockFetch.mock.calls[0];
+      expect(init.headers['apikey']).toBe('sb_publishable_test');
+      expect(init.headers).not.toHaveProperty('Authorization');
+    });
+
     it('routes marriage to RPC link_existing_relative_secure for non-admin and returns its rows', async () => {
       const mockFetch = vi.fn().mockResolvedValue(
         new Response(
