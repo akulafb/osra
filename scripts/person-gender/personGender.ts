@@ -178,7 +178,7 @@ export function guessPersonGenders(
 // CSV
 // -----------------------------------------------------------------------------
 
-function csvField(value: string): string {
+export function csvField(value: string): string {
   return /[",\r\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
 }
 
@@ -189,7 +189,7 @@ export function toCsv(rows: readonly PersonGenderRow[]): string {
 }
 
 /** RFC 4180 records: quoted fields may hold commas, quotes and newlines. */
-function csvRecords(text: string): string[][] {
+export function csvRecords(text: string): string[][] {
   const records: string[][] = [];
   let record: string[] = [];
   let field = '';

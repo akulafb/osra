@@ -19,9 +19,11 @@ function getParentPreferenceScore(
 ): number {
   if (!parentNode || !childNode) return 100;
 
-  // 2D cluster preset: matrilineal children attach under the in-cluster parent (usually mother)
-  // before generic father preference, so missing parent_role in the DB does not hide them under dad.
-  if (viewCluster && childNode.maternalFamilyCluster === viewCluster) {
+  // 2D cluster preset: a child in the view through the mother's family only attaches under the
+  // in-cluster parent (usually the mother) before generic father preference, so missing
+  // parent_role in the DB does not hide them under dad. A child of the viewed family on both
+  // sides (a cousin marriage) stays under the father.
+  if (viewCluster && childNode.maternalFamilyCluster === viewCluster && childNode.familyCluster !== viewCluster) {
     if (link?.parentRole === 'mother') return -1;
     if (parentNode.familyCluster === viewCluster) return -1;
   }
@@ -57,6 +59,64 @@ function shouldPreferLayoutParent(
   }
 
   return candidateParentId < currentParentId;
+}
+
+/**
+ * The one parent link drawn to each child (ADR 0012): a child may have a
+ * `parent` Kinship Link to each parent, but 2D and 3D draw only one, chosen
+ * here. Only links between the given Persons count, so a parent who is not
+ * drawn leaves the other one. Returns the chosen link by child id.
+ *
+ * `viewCluster` is the 2D family preset; with one, a child in the view through
+ * the mother's family only is drawn under the mother. Otherwise the father
+ * comes first.
+ */
+export function chooseDrawnParentLinks<L extends FamilyLink>(
+  nodes: readonly FamilyNode[],
+  links: readonly L[],
+  viewCluster?: string
+): Map<string, L> {
+  const nodesById = new Map(nodes.map((n) => [n.id, n]));
+  const chosen = new Map<string, L>();
+
+  links.forEach((link) => {
+    if (link.type !== 'parent') return;
+    const sourceId = getNodeId(link.source);
+    const targetId = getNodeId(link.target);
+    if (!sourceId || !targetId) return;
+    if (!nodesById.has(sourceId) || !nodesById.has(targetId)) return;
+
+    const current = chosen.get(targetId);
+    if (
+      shouldPreferLayoutParent(
+        current ? getNodeId(current.source) : undefined,
+        sourceId,
+        nodesById.get(targetId),
+        nodesById,
+        current,
+        link,
+        viewCluster
+      )
+    ) {
+      chosen.set(targetId, link);
+    }
+  });
+
+  return chosen;
+}
+
+/**
+ * The links to draw: every marriage and divorce, and only the chosen parent
+ * link to each child ({@link chooseDrawnParentLinks}). The 3D view draws these,
+ * so it uses the same rule as 2D. Returns the given link objects, in order.
+ */
+export function keepDrawnParentLinks<L extends FamilyLink>(
+  nodes: readonly FamilyNode[],
+  links: readonly L[],
+  viewCluster?: string
+): L[] {
+  const drawn = new Set<L>(chooseDrawnParentLinks(nodes, links, viewCluster).values());
+  return links.filter((link) => link.type !== 'parent' || drawn.has(link));
 }
 
 function getRelationshipKey(
@@ -153,15 +213,12 @@ function buildHierarchy(
     : nodes;
 
   const nodeIdsInScope = new Set(nodesInScope.map(n => n.id));
-  const nodesById = new Map(nodesInScope.map((n) => [n.id, n]));
 
   // Find roots (nodes with no parents in scope)
   const childrenOf = new Map<string, string[]>();
   const parentsOf = new Map<string, string[]>();
   const layoutChildrenOf = new Map<string, string[]>();
   const layoutParentsOf = new Map<string, string[]>();
-  const canonicalParentOf = new Map<string, string>();
-  const canonicalParentLinkOf = new Map<string, FamilyLink>();
   const marriages = new Map<string, string>(); // node -> spouse
 
   // Initialize maps
@@ -188,29 +245,15 @@ function buildHierarchy(
       const parents = parentsOf.get(targetId) || [];
       parents.push(sourceId);
       parentsOf.set(targetId, parents);
-
-      const childNode = nodesById.get(targetId);
-      const currentParentId = canonicalParentOf.get(targetId);
-      const currentParentLink = canonicalParentLinkOf.get(targetId);
-
-      if (
-        shouldPreferLayoutParent(
-          currentParentId,
-          sourceId,
-          childNode,
-          nodesById,
-          currentParentLink,
-          link,
-          clusterName
-        )
-      ) {
-        canonicalParentOf.set(targetId, sourceId);
-        canonicalParentLinkOf.set(targetId, link);
-      }
     } else if (link.type === 'marriage' || link.type === 'divorce') {
       marriages.set(sourceId, targetId);
       marriages.set(targetId, sourceId);
     }
+  });
+
+  const canonicalParentOf = new Map<string, string>();
+  chooseDrawnParentLinks(nodesInScope, links, clusterName).forEach((link, childId) => {
+    canonicalParentOf.set(childId, getNodeId(link.source));
   });
 
   canonicalParentOf.forEach((parentId, childId) => {

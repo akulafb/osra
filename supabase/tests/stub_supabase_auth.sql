@@ -5,7 +5,7 @@
 --
 --   * the roles anon, authenticated, service_role (service_role bypasses RLS)
 --   * auth.users, with only the id column
---   * auth.uid(), read from request.jwt.claims the way Supabase's does
+--   * auth.uid() and auth.jwt(), read from request.jwt.claims the way Supabase's do
 -- =============================================================================
 
 DO $$
@@ -37,6 +37,13 @@ AS $$
   )::uuid
 $$;
 GRANT EXECUTE ON FUNCTION auth.uid() TO anon, authenticated, service_role;
+
+CREATE OR REPLACE FUNCTION auth.jwt() RETURNS jsonb
+LANGUAGE sql STABLE
+AS $$
+  SELECT coalesce(nullif(current_setting('request.jwt.claims', true), '')::jsonb, '{}'::jsonb)
+$$;
+GRANT EXECUTE ON FUNCTION auth.jwt() TO anon, authenticated, service_role;
 
 -- Supabase grants EXECUTE on new public functions to these roles by default;
 -- copy that, so the migration's REVOKE is tested against the same starting point.

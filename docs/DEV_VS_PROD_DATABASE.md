@@ -188,6 +188,28 @@ The functions' logic is in plain TypeScript modules with no Deno imports, so `np
 
 `npm run chat-questions` asks the 20 chat test questions (LIN-74, `src/lib/fixtures/chatTestQuestions.ts`) on the made-up test tree, signed in as its Person Maya Khoury, through the same chat code the browser uses with the real Jev and OpenRouter. For each question it prints correct or wrong, whether code or the model answered, the model calls and the cost (Jev's input tokens at `JEV_PRICE_PER_MILLION_INPUT_TOKENS` in `chatTestHarness.ts`, plus OpenRouter's `usage.cost`), then the totals: correct, routed to code, mean cost, highest cost. It needs `OPENROUTER_API_KEY` and `TYPESAFE_API_KEY` (from the environment, `.env.local`, or the file named by `$ENV_FILE`) and costs under a cent a run. It needs no deployed function: it runs the `family-chat` handler in-process with Supabase Auth and the database faked, so it reaches no Supabase project, makes no change to the Tree Record and does not use the daily limit. Add `-- --replies` to print each reply, or `-- --only <id>,<id>` to ask some of them. It exits 1 below 18 of 20. Run it after any change to the chat, the routing or the prompt.
 
+## Both parents linked: the one-time fill-in (LIN-78)
+
+A child has a `parent` Kinship Link to each parent the family knows (ADR 0012). Most children used to be linked to their father only. Migration `20261001140000_lin78_fill_in_both_parent_links.sql` adds `fill_in_both_parent_links`, which only an admin or the service role may call, and `scripts/both-parents/fill-in.ts` calls it. For each child linked to one parent, it links the parent's only spouse, when that parent has had exactly one spouse ever (by marriage, no divorce) and the spouse has the other gender. Every other child goes on a list in `/tmp` for the owner to name the other parent. Nothing is guessed for a child on the list.
+
+Run order: dev, then prod. On each, push the migration, run the dry run, check both files, then apply. The apply writes exactly the links in the will-link file from the last dry run, or nothing.
+
+```bash
+REF=your-dev-project-id; ENV=dev        # then prod
+npx supabase link --project-ref "$REF"
+npx supabase db push --dry-run          # lists only 20261001140000_lin78_fill_in_both_parent_links.sql
+npx supabase db push
+
+# Dry run: writes /tmp/both-parents-$ENV-will-link.csv (review) and /tmp/both-parents-$ENV-list.csv
+SUPABASE_SERVICE_ROLE_KEY=… npx vite-node scripts/both-parents/fill-in.ts $ENV
+# Put the other parent's id in named_parent_id on the list where you know it, then check the answers:
+SUPABASE_SERVICE_ROLE_KEY=… npx vite-node scripts/both-parents/fill-in.ts $ENV --names /tmp/both-parents-$ENV-list.csv
+# Apply, with the same --names (or none):
+SUPABASE_SERVICE_ROLE_KEY=… npx vite-node scripts/both-parents/fill-in.ts $ENV --apply --names /tmp/both-parents-$ENV-list.csv
+```
+
+Running it again links no one twice. The SQL checks are in `supabase/tests/both_parent_links.sql`, for a throwaway database only (as above for `chat_message_usage.sql`: the stub, then the schema migrations, then the checks).
+
 ## Verification
 
 1. Ensure `.env.local` has `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` pointing to the **dev** project.
