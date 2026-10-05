@@ -10,9 +10,6 @@ fixed, and the focus animation refuses a non-finite duration. The intro zoom is 
 > were written *before* the root cause was known and prescribed fixes that were built and then
 > deliberately deleted. This ADR exists so the deletion is not mistaken for an omission. The
 > decision itself shipped in PR #54 (`4720d49`), merged 2026-03-10.
->
-> Numbering note: `docs/adr/` contains two files numbered 0004, pre-existing on `main`.
-> Renumbering is left to a separate housekeeping change.
 
 ## Context & Problem
 

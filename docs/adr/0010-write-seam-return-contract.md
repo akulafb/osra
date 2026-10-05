@@ -5,8 +5,8 @@ the same functions the read path uses. `addLink` carries one extra bit, because 
 accept a write and write nothing.
 
 **Issue**: [LIN-64](https://linear.app/linearfb/issue/LIN-64) — Arch 06b, split out of
-[LIN-58](https://linear.app/linearfb/issue/LIN-58) as the one part that needs a SQL migration
-(`docs/plans/2026-08-26-lin-58-working-record-spec.md`, D1). It blocks LIN-58.
+[LIN-58](https://linear.app/linearfb/issue/LIN-58) as the one part that needs a SQL migration.
+It blocks LIN-58.
 
 ## Context & Problem
 

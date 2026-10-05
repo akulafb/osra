@@ -9,22 +9,24 @@
 
 | File | Purpose |
 |------|---------|
-| `.env.local` | Dev Supabase credentials. Loaded by Vite when running `npm run dev`. |
-| `.env.production` | Prod credentials. Used for `npm run build` (production mode). Vercel uses its own env vars. |
+| `.env.local` | `VITE_SUPABASE_URL` for dev. Loaded by Vite when running `npm run dev`. May also hold copies of `TYPESAFE_API_KEY` and `OPENROUTER_API_KEY`, used only to set function secrets and run the scripts (see `.env.example`). |
+| `.env.production` | `VITE_SUPABASE_URL` for prod. Used for `npm run build` (production mode). Vercel uses its own env vars. |
+
+No key goes in either file: the app picks each project's publishable key from `src/lib/supabaseConfig.ts` by the project ref in the URL (LIN-82).
 
 **Important:** `.env.local` and `.env.production` are gitignored. Never commit them.
 
 ## First-time setup
 
-For a new Supabase project, apply the schema with one command: `npx supabase db push` (after linking via `npx supabase link --project-ref YOUR_REF`). See the [README Database Setup](../README.md#database-setup) for full steps.
+For a new Supabase project, apply the schema with one command: `npx supabase db push` (after linking via `npx supabase link --project-ref YOUR_REF`). Then add the project's ref and `default` publishable key to `PUBLISHABLE_KEYS` in `src/lib/supabaseConfig.ts`; the app refuses any project ref not listed there. See the [README Database Setup](../README.md#database-setup) for full steps.
 
-## Schema Applied to Dev
+## Schema (from `supabase/migrations/`)
 
-The dev database has been set up with:
+Both databases are set up with:
 
-- Tables: `users`, `nodes`, `links`, `node_invites`, `audit_log`
+- Tables: `users`, `nodes` (with `gender`, LIN-76), `links`, `node_invites`, `audit_log`, `chat_message_usage`
 - RLS policies
-- Functions: `is_within_1_degree`, `create_relative_secure`, `get_invite_by_token`, `claim_invite_secure`, etc.
+- Functions: `is_within_1_degree`, `create_relative_secure`, `get_invite_by_token`, `claim_invite_secure`, `chat_use_model_call`, `fill_in_both_parent_links`, etc.
 - FK indexes
 
 ## Optional: Seed Dev with Sample Data
@@ -33,7 +35,7 @@ To populate the dev database with sample family tree data:
 
 1. Open [Supabase Dashboard](https://supabase.com/dashboard) → your dev project
 2. Go to **SQL Editor**
-3. Run your seed SQL (e.g. from a local `supabase/scripts/` or `supabase/seed/` folder)
+3. Run your seed SQL. `node scripts/run-seed-dev.mjs [path/to/seed.sql]` prints it ready to paste; with no path it reads `supabase/scripts/your-seed.sql` (`supabase/scripts/` is gitignored, so seed files stay local)
 
 **Note:** After sign-in, claim an invite (e.g. the token from your seed SQL) to create your user record and bind to a node. To make yourself admin, run in SQL Editor (replace with your auth user ID from Auth → Users):
 
@@ -54,12 +56,12 @@ For local sign-in to work:
 
 ## Edge Functions
 
-Server code lives in `supabase/functions/`. Each function is a folder with an `index.ts`; code that more than one function needs is in `supabase/functions/_shared/` (the sign-in check, CORS and JSON responses, retry on 429 and 529).
+Server code lives in `supabase/functions/`. Each function is a folder with an `index.ts`; code that more than one function needs is in `supabase/functions/_shared/` (the sign-in check, CORS and JSON responses, retry on 429 and 529, the project keys in `projectKeys.ts`, service-role PostgREST calls in `supabaseRest.ts`, and the TypeSafe call in `typeSafe.ts`).
 
 | Function | What it does | Secrets it reads |
 |----------|--------------|------------------|
 | `spelling-matches` | Scores given names against a typed name with TypeSafe Jev (LIN-67) | `TYPESAFE_API_KEY` |
-| `family-chat` | The family chat's model calls through OpenRouter, with 10 messages per account per UAE day (LIN-71). Needs the `chat_message_usage` migration. Its `route` operation asks TypeSafe Jev what kind of question a message is, so code can answer the common kinds with no model call (LIN-73). | `OPENROUTER_API_KEY`, `TYPESAFE_API_KEY` |
+| `family-chat` | The family chat's model calls through OpenRouter (`x-ai/grok-4.3`, `CHAT_MODEL` in `openRouter.ts`), with 10 messages per account per UAE day (LIN-71), a 220-token reply cap and a $0.01 cost cap per message (LIN-80, `limits.ts`). Needs the `chat_message_usage` migration. Its `route` operation asks TypeSafe Jev what kind of question a message is, so code can answer the common kinds with no model call (LIN-73). | `OPENROUTER_API_KEY`, `TYPESAFE_API_KEY` |
 
 A function's keys are **function secrets**, stored in the Supabase project. They are not in the repo, not in Vercel, and never carry a `VITE_` prefix — a `VITE_` variable is compiled into the browser bundle. Dev and prod are separate projects, so every secret is set twice and every function is deployed twice.
 
@@ -88,7 +90,7 @@ npx supabase functions list --project-ref "$REF"
 
 For another function or secret, change the secret name and the function name; the steps are the same. A secret can be changed without a new deploy. A code change needs step 2 again, on both projects.
 
-Whether the gateway checks the JWT is set per function in `supabase/config.toml` (`[functions.<name>] verify_jwt`). `spelling-matches` turns it off and checks the session itself, because the gateway check accepts the anon key.
+Whether the gateway checks the JWT is set per function in `supabase/config.toml` (`[functions.<name>] verify_jwt`). Both functions turn it off and check the session themselves (`_shared/auth.ts`), because the gateway check accepts the anon key.
 
 ### Check a deployed function from `npm run dev`
 
@@ -146,7 +148,7 @@ const chat = (body) => fetch(`https://${ref}.supabase.co/functions/v1/family-cha
 const messageId = crypto.randomUUID();
 console.log(await chat({ messageId, messages: [{ role: 'user', content: 'How many cousins do I have?' }] }));
 // 200 { message: { role: 'assistant', content: null, toolCalls: [{ id, name: 'getRelatives', arguments: {…} }] },
-//       done: false, usage: { messagesUsed: 1, dailyLimit: 10, modelCalls: 1, maxModelCalls: 6, resetsAt: '…' } }
+//       done: false, usage: { messagesUsed: 1, dailyLimit: 10, modelCalls: 1, maxModelCalls: 6, resetsAt: '…' }, cost: 0.0004 }
 ```
 
 Without a session the same call answers 401 with `cause: 'not_signed_in'` (try it with `Authorization` removed). Each new `messageId` uses one of the account's 10 messages for the UAE day; the count starts again at midnight UAE time (20:00 UTC). A `messageId` belongs to one question: tool rounds and retries reuse it, a new question needs a new one (reusing it answers 409 `message_id_reused`). To see the counts: Dashboard → Table Editor → `chat_message_usage`. To give a test account its messages back on dev, delete its rows there.
@@ -190,7 +192,7 @@ The functions' logic is in plain TypeScript modules with no Deno imports, so `np
 
 ## Both parents linked: the one-time fill-in (LIN-78)
 
-A child has a `parent` Kinship Link to each parent the family knows (ADR 0012). Most children used to be linked to their father only. Migration `20261001140000_lin78_fill_in_both_parent_links.sql` adds `fill_in_both_parent_links`, which only an admin or the service role may call, and `scripts/both-parents/fill-in.ts` calls it. For each child linked to one parent, it links the parent's only spouse, when that parent has had exactly one spouse ever (by marriage, no divorce) and the spouse has the other gender. Every other child goes on a list in `/tmp` for the owner to name the other parent. Nothing is guessed for a child on the list.
+A child has a `parent` Kinship Link to each parent the family knows (ADR 0012). Most children used to be linked to their father only. This fill-in fixes the existing children; a child added in the app still gets a link to the chosen parent only, until LIN-79. Migration `20261001140000_lin78_fill_in_both_parent_links.sql` adds `fill_in_both_parent_links`, which only an admin or the service role may call, and `scripts/both-parents/fill-in.ts` calls it. For each child linked to one parent, it links the parent's only spouse, when that parent has had exactly one spouse ever (by marriage, no divorce) and the spouse has the other gender. Every other child goes on a list in `/tmp` for the owner to name the other parent. Nothing is guessed for a child on the list.
 
 Run order: dev, then prod. On each, push the migration, run the dry run, check both files, then apply. The apply writes exactly the links in the will-link file from the last dry run, or nothing.
 

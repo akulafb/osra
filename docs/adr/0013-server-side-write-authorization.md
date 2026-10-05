@@ -1,4 +1,4 @@
-# 0004 Server-Side Write Authorization
+# 0013 Server-Side Write Authorization
 
 We decided to enforce database-level Row Level Security (RLS) policies, triggers, and RPC constraints on `nodes` and `links`, establishing true server-side authorization boundaries that back up the client-side `treeRecord` seam (LIN-59, LIN-61).
 
@@ -39,3 +39,8 @@ Prior to this decision:
 - The database is now self-protecting: forged client requests or direct PostgREST calls cannot bypass admin gating or link outside the caller's 1-degree network.
 - Divorce creation is strictly protected at the database tier as decided in LIN-61.
 - Cluster fields cannot be forged or modified by non-admins.
+
+## Amendments
+
+- LIN-76: non-admins may also set `gender` on 1-degree Persons (`20261001130000_lin76_person_gender.sql`); only the cluster fields stay admin-only.
+- The caller resolution in `is_within_1_degree` is now uuid-typed, `COALESCE((auth.jwt() ->> 'sub')::uuid, auth.uid())` (`20260830120000_reconcile_identity_column_types.sql`); see [ADR 0010](0010-write-seam-return-contract.md).

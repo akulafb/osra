@@ -73,9 +73,9 @@ So the module checks the thing the database doesn't, and leaves the database the
 
 - All tree writes now share uniform error handling, telemetry potential, and identity routing.
 - The defect where non-admins could create faulty parent links via divorce is closed at both the UI picker level and module level.
-- Server-side RLS gates and divorce restrictions are fully enforced by the database (LIN-59 / ADR-0004).
+- Server-side RLS gates and divorce restrictions are fully enforced by the database (LIN-59 / ADR-0013).
 - **Recording a divorce is admin-only.** This was previously an accident — the non-admin RPC takes a Relative Direction, and `divorce` has none — but it is now a deliberate product rule (LIN-61). Connect Mode disables the option for non-admins rather than letting the module refuse after the fact, and the module refuses as a backstop. Expect this to be re-proposed: `marriage` is unrestricted for the same users, so "why can they record the marriage but not the divorce?" is the obvious question. The answer is that a divorce is a claim about two living relatives that the tree should not let an arbitrary 1-degree relative assert unilaterally. Reversing it means a migration, not a client change.
-- That rule is **enforced by the database** via `links_insert_1degree_or_admin`, `links_update_1degree_or_admin`, and `link_existing_relative_secure` (ADR-0004).
+- That rule is **enforced by the database** via `links_insert_1degree_or_admin`, `links_update_1degree_or_admin`, and `link_existing_relative_secure` (ADR-0013).
 - The interface is the test surface. Six operations behind one injected `fetch`.
 - **Return values were not specified here, and that was an omission rather than a decision.** All
   six operations returned nothing usable, so no caller could confirm an optimistic write from a

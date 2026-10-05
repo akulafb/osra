@@ -5,11 +5,6 @@ We decided to answer "is this Person already in the Tree Record?" in one module
 match, and to keep matching against the whole Tree Record while labelling
 matches the active filter is hiding.
 
-> Numbering note: `docs/adr/` already contains two files numbered 0004
-> (`0004-direct-manipulation-state-machine.md`, `0004-server-side-write-authorization.md`),
-> pre-existing on `main`. Renumbering is left to a separate housekeeping change so
-> it does not muddy this behaviour diff.
-
 ## Context & Problem
 
 Three implementations answered the question with three different rules:

@@ -6,8 +6,8 @@ of Pending Changes**, derive the Working Record from those two, and project it i
 whose identity is reused whenever a Person's facts are unchanged. Changes go *in*; only a
 snapshot comes *out*.
 
-**Issue**: [LIN-58](https://linear.app/linearfb/issue/LIN-58) — Arch 06, from
-`docs/plans/2026-08-17-architecture-review.md`. Shipped on
+**Issue**: [LIN-58](https://linear.app/linearfb/issue/LIN-58) — Arch 06 of the August 2026
+architecture review. Shipped on
 `akulafb/lin-58-arch-06-a-graph-store-that-can-be-updated-not-only-refetched`; the module is
 `src/lib/workingRecord.ts` and its owner is `src/hooks/useWorkingRecord.ts`.
 
@@ -145,7 +145,6 @@ settle, not an explosion, and pinned Tree Nodes do not move at all.
   therefore clear a Person's claim indicator on every rename, so the fold keeps the held value
   when the reported row has none (`workingRecord.ts:231-242`). It is the one exception to that
   rule, and it is a carry, not a merge.
-
-Numbering note: `docs/adr/` contains two files numbered 0004
-(`0004-direct-manipulation-state-machine.md`, `0004-server-side-write-authorization.md`),
-pre-existing on `main`. Renumbering is left to a separate housekeeping change.
+- Not yet measured: the wall-clock cost of `warmupTicks` 160 vs 0 per `graphData` rebuild at
+  this graph's size (time it with `performance.mark` around the prop change), and how a Spawn
+  reads when it starts during the `alpha(1)` settle that every optimistic write still triggers.

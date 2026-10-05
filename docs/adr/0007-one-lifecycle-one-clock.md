@@ -7,9 +7,6 @@ Kinship Link), one React controller (`src/hooks/useLifecycles.ts`) owning the
 single frame loop and the write it is optimistic about, and the 2D and 3D
 renderings reduced to adapters that are handed a progress.
 
-> Numbering note: `docs/adr/` contains two files numbered 0004, pre-existing on
-> `main`. Renumbering is left to a separate housekeeping change.
-
 ## Context & Problem
 
 `CONTEXT.md` and ADR-0002 both say Spawn and Dissolve are one lifecycle rendered

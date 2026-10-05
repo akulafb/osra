@@ -36,7 +36,7 @@ Issues and specs for this repo live in the **LinearFB** workspace on Linear, und
 
 - **Create an issue**: Use `save_issue` with `title`, `team: "LinearFB"`, `project: "Osra"`, and `description` (Markdown). Add labels, priority, and state as needed.
 - **Read an issue**: Use `get_issue` with the identifier (e.g. `LIN-123`). Pass `includeRelations: true` for blocking/related edges.
-- **List issues**: Use `list_issues` with filters (`team`, `status`, `label`, `assignee`, `query`).
+- **List issues**: Use `list_issues` with filters (`team`, `state`, `label`, `assignee`, `query`).
 - **Update an issue**: Use `save_issue` with `id: "LIN-123"` plus the fields to change.
 - **Comment on an issue**: Use `save_comment` with `issueId` and `body`.
 - **Apply labels**: Use `save_issue` with `id` and `labels: ["Bug", "Feature"]`. Note: `labels` replaces the full set.

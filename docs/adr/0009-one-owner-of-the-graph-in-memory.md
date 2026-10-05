@@ -4,8 +4,8 @@ We decided to make the browser's copy of the Tree Record a single provider-owned
 (`src/contexts/FamilyDataContext.tsx`) rather than a hook each consumer may instantiate.
 
 **Issue**: [LIN-63](https://linear.app/linearfb/issue/LIN-63) — Arch 06a, split out of
-[LIN-58](https://linear.app/linearfb/issue/LIN-58) as the one user-visible *bug* in its evidence
-(`docs/plans/2026-08-26-lin-58-working-record-spec.md`, D1). It blocks LIN-58.
+[LIN-58](https://linear.app/linearfb/issue/LIN-58) as the one user-visible *bug* in its evidence.
+It blocks LIN-58.
 
 ## Context & Problem
 
@@ -79,8 +79,7 @@ production):
   because it reads the owner's array by reference — including anything a refetch has picked up.
 - Component and hook behaviour still has no test harness (`environment: 'node'`,
   `include: ['src/**/*.test.ts']` — `vite.config.ts:52-55`), so both claims above are verified in
-  the browser rather than in CI. The gap is recorded in
-  `docs/plans/2026-08-17-architecture-review.md` under "Not candidates — deliberately".
+  the browser rather than in CI. The gap is deliberate.
 - LIN-58 now has one seam to replace instead of two call sites to keep in step: the provider's
   internals become `useWorkingRecord`, and `write` reaches the modals through the same context.
 - `carryPositions` (`:59-109`) is pure and therefore the one part of this module the `.test.ts`
