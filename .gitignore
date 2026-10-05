@@ -37,6 +37,7 @@ supabase/.temp/
 # Confidential scripts
 supabase/scripts/
 scripts/generate-badran-additions.mjs
+Family Tree Bulk Upload.xlsx
 .aidesigner/*
 !.aidesigner/.gitkeep
 
