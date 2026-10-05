@@ -42,7 +42,8 @@ scripts/generate-badran-additions.mjs
 
 # Agent skill deployments (symlinks into local skills-manager library)
 .agents/skills/
-.claude/skills/
+.claude/skills/*
+!.claude/skills/verify-osra/
 .omp/skills/
 
 #Worktrees
