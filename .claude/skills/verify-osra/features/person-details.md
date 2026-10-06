@@ -1,6 +1,6 @@
 # Person details
 
-Selecting a person opens a details drawer with their given name, family, ID and the actions the signed-in user may take on them; in 2D the node also grows action pills. Above 600px wide the drawer is a 400px panel on the right and the right-docked controls (INSTRUMENTS, the family picker, AMBIANCE, NAV CONTROLS, See who's new) move left of it; below 600px it is a bottom sheet and those controls stay above it, scrolling when they do not fit.
+Selecting a person opens a details drawer with their given name, family, ID and the actions the signed-in user may take on them; in 2D the node also grows action pills. From 900px wide the drawer is a 400px panel on the right and the right-docked controls (INSTRUMENTS, the family picker, AMBIANCE, NAV CONTROLS, See who's new) move left of it; below 900px it is a bottom sheet and those controls stay above it, scrolling when they do not fit.
 
 ## Sub-features
 
@@ -33,7 +33,7 @@ Preconditions:
 
 - Every action button here writes to the Tree Record. Assert the buttons exist; leave them unclicked.
 - Keys reach the page only while it has focus, and it loses focus between commands. `ui.sh key` refuses when the page has no focus; tap a spot that changes nothing first.
-- The Orca viewport (about 930px) is above 600px, so it shows the side panel. For the bottom sheet, load the app in a same-origin iframe 390px wide (it shares the session): `orca eval --expression "(() => { const f=document.createElement('iframe'); f.id='phone'; f.src='/'; Object.assign(f.style,{position:'fixed',left:'0',top:'0',width:'390px',height:'812px',zIndex:2147483647,border:'0'}); document.body.appendChild(f); return 'ok'; })()"`, drive it with `tap` at the same coordinates, read it through `document.getElementById('phone').contentDocument`, and remove it before cleanup. A 1100px iframe with `transform: scale(0.8)` shows the desktop layout (`isMobile()` is true up to 1024px); taps are then in scaled page pixels. Switching view mode inside the iframe changes the owner's persisted mode too.
+- The Orca viewport (about 930px) is above 900px, so it shows the side panel. For the bottom sheet, load the app in a same-origin iframe narrower than 900px (390px for a phone) (it shares the session): `orca eval --expression "(() => { const f=document.createElement('iframe'); f.id='phone'; f.src='/'; Object.assign(f.style,{position:'fixed',left:'0',top:'0',width:'390px',height:'812px',zIndex:2147483647,border:'0'}); document.body.appendChild(f); return 'ok'; })()"`, drive it with `tap` at the same coordinates, read it through `document.getElementById('phone').contentDocument`, and remove it before cleanup. A 1100px iframe with `transform: scale(0.8)` shows the desktop layout (`isMobile()` is true up to 1024px); taps are then in scaled page pixels. Switching view mode inside the iframe changes the owner's persisted mode too.
 - `orca mouse wheel` does not scroll anything in Orca's browser, so a scrolling column cannot be proven by wheel; set `scrollTop` as setup and capture what it reveals.
 - `person` needs the exact given and family names as shown in the node; Arabic names work as written.
 - 3D picking has no accessibility handle; reach a person there through search (a search match selects it) or Tab/Enter, and prove by the drawer heading.

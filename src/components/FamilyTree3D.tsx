@@ -36,7 +36,7 @@ import {
   type LinkEndpoints,
 } from '../utils/cosmicFx';
 import { TreeSearchBar } from './TreeSearchBar';
-import { NO_DRAWER_INSET, type PersonDrawerInset } from '../hooks/usePersonDrawerInset';
+import { bottomRightControlsClear, topRightControlsClear, type PersonDrawerInset } from '../hooks/usePersonDrawerInset';
 import { Manipulation3DPanel, Connect3DControls, Dissolve3DControls } from './Manipulation3DPanel';
 import {
   Candidacy,
@@ -231,7 +231,7 @@ interface FamilyTree3DProps {
   onVisibleClusters3DChange: React.Dispatch<React.SetStateAction<Set<string>>>;
   uniqueClusters: string[];
   onEnsureClusterVisible3D: (cluster: string) => void;
-  drawerInset?: PersonDrawerInset;
+  drawerInset: PersonDrawerInset;
   /** Optional "See who's new!" control; rendered above NAV CONTROLS, same column */
   seeWhosNewButtonSlot?: React.ReactNode;
   /** Dashed preview edge while Add Relative connect-to-existing is focused */
@@ -299,7 +299,7 @@ export const FamilyTree3DContent: React.FC<FamilyTree3DProps> = ({
   onVisibleClusters3DChange,
   uniqueClusters,
   onEnsureClusterVisible3D,
-  drawerInset = NO_DRAWER_INSET,
+  drawerInset,
   seeWhosNewButtonSlot,
   pendingLinkPreview = null,
   isAdmin = false,
@@ -1784,7 +1784,7 @@ export const FamilyTree3DContent: React.FC<FamilyTree3DProps> = ({
       />
 
       {/* Settings Controls - Top Right */}
-      <div style={{ position: 'absolute', top: '24px', right: 24 + drawerInset.rightPx, ...(drawerInset.bottomVh > 0 && { maxHeight: `calc(100% - 48px - ${drawerInset.bottomVh}vh)`, overflowY: 'auto' }), display: 'flex', flexDirection: 'column', gap: '12px', zIndex: 1300, alignItems: 'flex-end' }}>
+      <div style={{ position: 'absolute', ...topRightControlsClear(drawerInset), display: 'flex', flexDirection: 'column', gap: '12px', zIndex: 1300, alignItems: 'flex-end' }}>
         {/* Settings Toggle - First */}
         <Button
           variant="contained"
@@ -2105,8 +2105,7 @@ export const FamilyTree3DContent: React.FC<FamilyTree3DProps> = ({
       <div
         style={{
           position: 'absolute',
-          bottom: `calc(20px + ${drawerInset.bottomVh}vh)`,
-          right: 20 + drawerInset.rightPx,
+          ...bottomRightControlsClear(drawerInset),
           zIndex: 1000,
           display: 'flex',
           flexDirection: 'column',

@@ -23,7 +23,7 @@ import { getNodeId } from '../lib/familyGraph';
 import { filterGraphData } from '../lib/filterGraphData';
 import { connectedPersonIds } from '../lib/personMatch';
 import { TreeSearchBar } from './TreeSearchBar';
-import { NO_DRAWER_INSET, type PersonDrawerInset } from '../hooks/usePersonDrawerInset';
+import { topRightControlsClear, type PersonDrawerInset } from '../hooks/usePersonDrawerInset';
 import { canEdit } from '../lib/permissions';
 import type { BackgroundTheme } from '../hooks/useBackgroundTheme';
 import { DirectManipulationController } from '../hooks/useDirectManipulation';
@@ -65,7 +65,7 @@ interface FamilyTree2DProps {
   uniqueClusters: string[];
   onPresetSelect: (preset: string | null) => void;
   isMobile?: boolean;
-  drawerInset?: PersonDrawerInset;
+  drawerInset: PersonDrawerInset;
   userNodeId?: string | null;
   /**
    * The *confirmed* Kinship Links, for the per-card edit affordance. The server
@@ -144,7 +144,7 @@ export const FamilyTree2D: React.FC<FamilyTree2DProps> = ({
   uniqueClusters,
   onPresetSelect,
   isMobile = false,
-  drawerInset = NO_DRAWER_INSET,
+  drawerInset,
   userNodeId = null,
   confirmedLinks,
   onFindMeRequest,
@@ -832,12 +832,7 @@ export const FamilyTree2D: React.FC<FamilyTree2DProps> = ({
       {/* 2D Controls Overlay - Top Right */}
       <div style={{
         position: 'absolute',
-        top: '24px',
-        right: 24 + drawerInset.rightPx,
-        ...(drawerInset.bottomVh > 0 && {
-          maxHeight: `calc(100% - 48px - ${drawerInset.bottomVh}vh)`,
-          overflowY: 'auto',
-        }),
+        ...topRightControlsClear(drawerInset),
         display: 'flex',
         flexDirection: 'column',
         gap: '12px',

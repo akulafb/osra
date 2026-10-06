@@ -22,7 +22,7 @@ import BulkInviteModal from './modals/BulkInviteModal';
 import { FamilyChat } from './FamilyChat';
 import { NewMembersModal } from './NewMembersModal';
 import { PersonDetailDrawer } from './PersonDetailDrawer';
-import { usePersonDrawerInset } from '../hooks/usePersonDrawerInset';
+import { bottomRightControlsClear, usePersonDrawerInset } from '../hooks/usePersonDrawerInset';
 import { isMobile } from '../utils/device';
 import {
   createTreeRecord,
@@ -570,8 +570,7 @@ export const FamilyTree: React.FC = () => {
         <div
           style={{
             position: 'absolute',
-            bottom: `calc(20px + ${drawerInset.bottomVh}vh)`,
-            right: 20 + drawerInset.rightPx,
+            ...bottomRightControlsClear(drawerInset),
             zIndex: 1010,
             minWidth: 180,
             width: 'min(92vw, 260px)',
