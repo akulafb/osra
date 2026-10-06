@@ -13,7 +13,9 @@
 --    from the other parent's gender. Any other `rel_type`, or a Person who is
 --    not the anchor's spouse, fails and writes nothing.
 -- 2. create_relative_secure derives the new Person's cluster fields from the
---    named other parent instead of an arbitrary current spouse.
+--    named other parent only. With none named (no spouse, or "Not known") the
+--    anchor alone gives them, as when the anchor has no spouse: an arbitrary
+--    current spouse no longer does.
 -- 3. link_existing_relative_secure keeps `already_connected` exactly as before
 --    when the anchor's link exists, and skips the other parent's link when that
 --    one exists already.
@@ -22,10 +24,18 @@
 -- anchor has had one spouse, ever, and chosen by the user when more than one
 -- ("Not known" omits it, and one link is written as before).
 --
--- Authorization is verbatim from 20261001130000_lin76_person_gender.sql: the
--- check is on the anchor (and the existing child), not on the other parent. The
--- other parent is accepted because the anchor's own Kinship Links record them
--- as the anchor's spouse, which is the only Person this parameter can name.
+-- Authorization of the anchor (and the existing child) is unchanged from
+-- 20261001130000_lin76_person_gender.sql. For the other parent (ADR 0013,
+-- Amendments):
+-- - link_existing_relative_secure holds a non-admin's other-parent link to the
+--   rule every link they write follows, both endpoints in their 1-Degree
+--   Network. When the other parent is outside it, the anchor's link is still
+--   written and the other parent's is skipped, so `links` reports only the one.
+--   The check runs before anything is written, since the anchor's new link can
+--   itself bring the other parent into the network.
+-- - create_relative_secure has no such check: its links all go to the Person
+--   the call creates, so they cannot widen the caller's network. The anchor is
+--   checked already, and the caller's own spouse is a direct link.
 -- A failure raised after the node is inserted (the role trigger, a key
 -- collision) is caught by the function's EXCEPTION block, which rolls back
 -- everything the block wrote, so a failed call leaves no Person behind.
@@ -124,19 +134,9 @@ BEGIN
     v_parent_role := COALESCE(v_parent_role, parent_role_for_gender(target_gender));
   END IF;
 
-  -- The named other parent, else an arbitrary current spouse as before.
+  -- Only the named other parent: none named ("Not known") borrows no spouse's cluster.
   IF rel_type = 'child' AND v_parent_role IS NOT NULL THEN
     spouse_id := p_other_parent_id;
-    IF spouse_id IS NULL THEN
-      SELECT CASE
-        WHEN l.source_node_id = v_target THEN l.target_node_id
-        ELSE l.source_node_id
-      END INTO spouse_id
-      FROM public.links l
-      WHERE l.type = 'marriage'
-        AND (l.source_node_id = v_target OR l.target_node_id = v_target)
-      LIMIT 1;
-    END IF;
 
     IF v_parent_role = 'mother' THEN
       maternal_cluster := target_cluster;
@@ -270,6 +270,7 @@ DECLARE
   missing_count INTEGER := 0;
   v_existing uuid := existing_node_id;
   v_target uuid := target_node_id;
+  v_link_other_parent boolean := false;
 BEGIN
   IF auth.uid() IS NULL OR auth.uid() != creator_id THEN
     RETURN json_build_object('success', false, 'message', 'Unauthorized');
@@ -291,6 +292,9 @@ BEGIN
     IF p_other_parent_id = v_existing OR NOT is_spouse_of(v_target, p_other_parent_id) THEN
       RETURN json_build_object('success', false, 'message', 'The other parent must be a spouse or former spouse of the parent.');
     END IF;
+    -- Checked before any write: the anchor's new link could bring the other
+    -- parent into the caller's network. Outside it, only the anchor's is written.
+    v_link_other_parent := is_admin() OR is_within_1_degree(p_other_parent_id);
   END IF;
 
   IF rel_type = 'parent' THEN
@@ -329,7 +333,7 @@ BEGIN
     RETURNING * INTO new_link;
     written_links := written_links || to_jsonb(new_link);
 
-    IF p_other_parent_id IS NOT NULL AND NOT EXISTS (
+    IF v_link_other_parent AND NOT EXISTS (
       SELECT 1 FROM public.links l
       WHERE l.type = 'parent' AND l.source_node_id = p_other_parent_id AND l.target_node_id = v_existing
     ) THEN

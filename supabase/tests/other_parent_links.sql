@@ -30,7 +30,11 @@ INSERT INTO public.nodes (id, first_name, paternal_family_cluster, gender) VALUE
   ('00000000-0000-0000-0000-0000000000e3', 'Mona', 'Aziz', 'female'),
   ('00000000-0000-0000-0000-0000000000e4', 'Rasha', 'Najjar', 'female'),
   ('00000000-0000-0000-0000-0000000000f5', 'Yusuf', 'Haddad', 'male'),
-  ('00000000-0000-0000-0000-0000000000e5', 'Huda', 'Mansour', 'female');
+  ('00000000-0000-0000-0000-0000000000e5', 'Huda', 'Mansour', 'female'),
+  ('00000000-0000-0000-0000-0000000000a1', 'Samira', 'Saleh', 'female'),
+  ('00000000-0000-0000-0000-0000000000a2', 'Nabil', 'Saleh', 'male'),
+  ('00000000-0000-0000-0000-0000000000b1', 'Mahmoud', 'Badran', 'male'),
+  ('00000000-0000-0000-0000-0000000000b2', 'Widad', 'Khoury', 'female');
 
 INSERT INTO public.users (id, node_id, role) VALUES
   ('00000000-0000-0000-0000-00000000ad01', '00000000-0000-0000-0000-0000000000f2', 'admin'),
@@ -47,7 +51,14 @@ INSERT INTO public.links (source_node_id, target_node_id, type) VALUES
   ('00000000-0000-0000-0000-0000000000f3', '00000000-0000-0000-0000-0000000000e3', 'marriage'),
   ('00000000-0000-0000-0000-0000000000e4', '00000000-0000-0000-0000-0000000000f3', 'marriage'),
   -- Huda's only spouse is Yusuf.
-  ('00000000-0000-0000-0000-0000000000e5', '00000000-0000-0000-0000-0000000000f5', 'marriage');
+  ('00000000-0000-0000-0000-0000000000e5', '00000000-0000-0000-0000-0000000000f5', 'marriage'),
+  -- Fadi's mother Samira, also Nabil's, is married to Mahmoud, who divorced
+  -- Widad. Samira, Nabil (a sibling) and Mahmoud (a parent's spouse) are in
+  -- Fadi's 1-Degree Network; Widad is not.
+  ('00000000-0000-0000-0000-0000000000a1', '00000000-0000-0000-0000-0000000000f1', 'parent'),
+  ('00000000-0000-0000-0000-0000000000a1', '00000000-0000-0000-0000-0000000000a2', 'parent'),
+  ('00000000-0000-0000-0000-0000000000a1', '00000000-0000-0000-0000-0000000000b1', 'marriage'),
+  ('00000000-0000-0000-0000-0000000000b1', '00000000-0000-0000-0000-0000000000b2', 'divorce');
 
 -- ---------------------------------------------------------------------------
 -- Called as the authenticated role, the way PostgREST calls them, by argument
@@ -71,6 +82,9 @@ DECLARE
   rasha uuid := '00000000-0000-0000-0000-0000000000e4';
   yusuf uuid := '00000000-0000-0000-0000-0000000000f5';
   huda uuid := '00000000-0000-0000-0000-0000000000e5';
+  nabil uuid := '00000000-0000-0000-0000-0000000000a2';
+  mahmoud uuid := '00000000-0000-0000-0000-0000000000b1';
+  widad uuid := '00000000-0000-0000-0000-0000000000b2';
   r jsonb;
   child uuid;
   links_before integer;
@@ -125,6 +139,15 @@ BEGIN
     new_first_name => 'Sami', rel_type => 'child', target_node_id => fadi, creator_id => admin_id
   )::jsonb;
   ASSERT (r ->> 'success')::boolean AND jsonb_array_length(r -> 'links') = 1, format('one link without an other parent: %s', r);
+  -- ...and "Not known" borrows no spouse's cluster: not Ebtisam's for Sami,
+  -- not Yusuf's for Rima.
+  ASSERT r -> 'nodes' -> 0 ->> 'maternal_family_cluster' IS NULL,
+    format('Sami''s maternal cluster is not his father''s wife''s: %s', r);
+  r := public.create_relative_secure(
+    new_first_name => 'Rima', rel_type => 'child', target_node_id => huda, creator_id => admin_id
+  )::jsonb;
+  ASSERT r -> 'nodes' -> 0 ->> 'paternal_family_cluster' = 'Mansour',
+    format('Rima''s paternal cluster is her mother''s, not her mother''s husband''s: %s', r);
 
   -- Someone who is not the anchor's spouse is refused, and no Person is left.
   r := public.create_relative_secure(
@@ -200,6 +223,29 @@ BEGIN
     p_other_parent_id => ebtisam
   )::jsonb;
   ASSERT (r ->> 'success')::boolean AND jsonb_array_length(r -> 'links') = 2, format('Fadi may add his own child with both parents: %s', r);
+
+  -- Linking an existing child with everyone in the network: both links.
+  r := public.link_existing_relative_secure(
+    existing_node_id => nabil, rel_type => 'child', target_node_id => fadi, creator_id => user_id,
+    p_other_parent_id => ebtisam
+  )::jsonb;
+  ASSERT (r ->> 'success')::boolean AND jsonb_array_length(r -> 'links') = 2,
+    format('everyone is in Fadi''s network, so both links: %s', r);
+  ASSERT (SELECT count(*) FROM public.links WHERE type = 'parent' AND target_node_id = nabil
+    AND source_node_id IN (fadi, ebtisam)) = 2, 'Nabil has links from Fadi and Ebtisam';
+
+  -- An other parent outside the network: the anchor's link only, no failure.
+  r := public.link_existing_relative_secure(
+    existing_node_id => fadi, rel_type => 'child', target_node_id => mahmoud, creator_id => user_id,
+    p_other_parent_id => widad
+  )::jsonb;
+  ASSERT (r ->> 'success')::boolean, format('Fadi may link himself to Mahmoud: %s', r);
+  ASSERT jsonb_array_length(r -> 'links') = 1 AND r -> 'links' -> 0 ->> 'source_node_id' = mahmoud::text,
+    format('only Mahmoud''s link is written and reported: %s', r);
+  ASSERT EXISTS (SELECT 1 FROM public.links WHERE type = 'parent' AND source_node_id = mahmoud AND target_node_id = fadi),
+    'Mahmoud''s link to Fadi is written';
+  ASSERT NOT EXISTS (SELECT 1 FROM public.links WHERE type = 'parent' AND source_node_id = widad AND target_node_id = fadi),
+    'Widad is outside Fadi''s network, so no link from her';
 
   -- ...and is still refused outside it, other parent or not.
   r := public.create_relative_secure(

@@ -1,10 +1,10 @@
 -- =============================================================================
 -- LIN-76: checks for nodes.gender and the rule that parent_role follows it
 -- =============================================================================
--- Runs against a database where the LIN-76 migration has been applied, as a
--- superuser (postgres). Everything happens inside one transaction that is
--- rolled back, so it leaves no rows behind. A failed check stops with an error
--- that names it; success prints "person_gender: all checks passed".
+-- Runs against a database where the LIN-76 and LIN-79 migrations have been
+-- applied, as a superuser (postgres). Everything happens inside one transaction
+-- that is rolled back, so it leaves no rows behind. A failed check stops with
+-- an error that names it; success prints "person_gender: all checks passed".
 --
 -- Local Supabase stack:   psql "$LOCAL_DB_URL" -v ON_ERROR_STOP=1 -f supabase/tests/person_gender.sql
 -- Plain Postgres (no Supabase): first run supabase/tests/stub_supabase_auth.sql,
@@ -114,8 +114,9 @@ DECLARE
   refused boolean := false;
 BEGIN
   -- Add a child of Fadi with no role: the role comes from Fadi's gender, and
-  -- the cluster fields follow it (paternal Fadi's, maternal his wife's).
-  r := public.create_relative_secure('Dalia', 'child', fadi, admin_id, NULL, NULL, 'female')::jsonb;
+  -- the cluster fields follow it (paternal Fadi's, maternal from his wife,
+  -- named as the other parent: LIN-79 borrows no unnamed spouse's cluster).
+  r := public.create_relative_secure('Dalia', 'child', fadi, admin_id, NULL, NULL, 'female', ebtisam)::jsonb;
   ASSERT (r->>'success')::boolean, format('adding a child should succeed: %s', r);
   ASSERT r->'nodes'->0->>'gender' = 'female', format('the new Person''s gender: %s', r);
   ASSERT r->'links'->0->>'parent_role' = 'father', format('the child link''s role: %s', r);
