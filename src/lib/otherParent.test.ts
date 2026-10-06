@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { otherParentChoice, resolveOtherParent } from './otherParent';
+import {
+  otherParentChoice,
+  otherParentChoiceKey,
+  resolveOtherParent,
+  stillOfferedOtherParent,
+} from './otherParent';
 import type { FamilyLink } from '../types/graph';
 
 const marriage = (a: string, b: string): FamilyLink => ({ source: a, target: b, type: 'marriage' });
@@ -101,5 +106,67 @@ describe('resolveOtherParent', () => {
 
   it('is nobody when the pick is not one of the candidates', () => {
     expect(resolveOtherParent(choose, 'huda')).toBeNull();
+  });
+});
+
+describe('otherParentChoiceKey', () => {
+  const karimLinks = [marriage('karim', 'rasha'), divorce('karim', 'mona')];
+
+  it('is the same for a choice recomputed after an unrelated write', () => {
+    const before = otherParentChoice('karim', karimLinks);
+    const after = otherParentChoice('karim', [...karimLinks, parent('karim', 'jad'), marriage('fadi', 'ebtisam')]);
+    expect(after).not.toBe(before);
+    expect(otherParentChoiceKey(after)).toBe(otherParentChoiceKey(before));
+  });
+
+  it('changes when the candidates change', () => {
+    const before = otherParentChoice('karim', karimLinks);
+    const after = otherParentChoice('karim', [...karimLinks, marriage('karim', 'huda')]);
+    expect(otherParentChoiceKey(after)).not.toBe(otherParentChoiceKey(before));
+  });
+
+  it('changes when the candidates are reordered', () => {
+    const before = otherParentChoice('karim', karimLinks);
+    const after = otherParentChoice('karim', [marriage('karim', 'mona'), divorce('karim', 'rasha')]);
+    expect(otherParentChoiceKey(after)).not.toBe(otherParentChoiceKey(before));
+  });
+
+  it('tells the kinds apart', () => {
+    const keys = [
+      otherParentChoiceKey({ kind: 'none' }),
+      otherParentChoiceKey({ kind: 'one', personId: 'rasha' }),
+      otherParentChoiceKey({ kind: 'choose', candidates: [{ personId: 'rasha', current: true }], preselectedId: 'rasha' }),
+    ];
+    expect(new Set(keys).size).toBe(3);
+  });
+});
+
+describe('stillOfferedOtherParent', () => {
+  const choose = otherParentChoice('karim', [marriage('karim', 'rasha'), divorce('karim', 'mona')]);
+
+  it('is nobody when the choice offers nobody', () => {
+    expect(stillOfferedOtherParent({ kind: 'none' }, 'ebtisam')).toBeNull();
+  });
+
+  it('is the only spouse when that is who was sent', () => {
+    expect(stillOfferedOtherParent({ kind: 'one', personId: 'ebtisam' }, 'ebtisam')).toBe('ebtisam');
+  });
+
+  it('is nobody when the form sent nobody, even with one spouse on offer now', () => {
+    expect(stillOfferedOtherParent({ kind: 'one', personId: 'ebtisam' }, null)).toBeNull();
+  });
+
+  it('is a candidate that was sent', () => {
+    expect(stillOfferedOtherParent(choose, 'mona')).toBe('mona');
+  });
+
+  it('is nobody for a stale pick the choice no longer offers', () => {
+    expect(stillOfferedOtherParent(choose, 'huda')).toBeNull();
+    expect(stillOfferedOtherParent({ kind: 'one', personId: 'rasha' }, 'mona')).toBeNull();
+  });
+
+  it('is nobody for "Not known"', () => {
+    expect(stillOfferedOtherParent(choose, null)).toBeNull();
+    expect(stillOfferedOtherParent(choose, undefined)).toBeNull();
   });
 });

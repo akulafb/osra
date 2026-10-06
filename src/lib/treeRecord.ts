@@ -212,6 +212,11 @@ function refuseOtherParentUnlessChild(otherParentId: string | null | undefined, 
   }
 }
 
+/** The other parent's link to a child, with the role the server gives it from their gender. */
+function otherParentLink(otherParentId: string, childId: string, gender: FamilyNode['gender'] | undefined): FamilyLink {
+  return { source: otherParentId, target: childId, type: 'parent', parentRole: parentRoleForGender(gender) };
+}
+
 /**
  * The Kinship Links an `addLink` write is about to create, as Working Record
  * values: the one it asks for and, with `otherParentId`, the other parent's
@@ -225,13 +230,8 @@ export function pendingKinshipLinks(
   refuseOtherParentUnlessChild(spec.otherParentId, spec.type === 'parent');
   const links = [pendingKinshipLink(spec)];
   if (spec.otherParentId) {
-    const otherParent = persons.find((p) => p.id === spec.otherParentId);
-    links.push({
-      source: spec.otherParentId,
-      target: spec.targetId,
-      type: 'parent',
-      parentRole: parentRoleForGender(otherParent?.gender),
-    });
+    const gender = persons.find((p) => p.id === spec.otherParentId)?.gender;
+    links.push(otherParentLink(spec.otherParentId, spec.targetId, gender));
   }
   return links;
 }
@@ -263,8 +263,9 @@ export function relativeToKinshipLinks(
     }));
   }
 
-  const spec = relativeToKinshipLink(anchorTargetId, otherNodeId, relation, parentRole);
-  return pendingKinshipLinks({ ...spec, otherParentId: otherParent?.id }, otherParent ? [otherParent] : []);
+  const pending = [pendingKinshipLink(relativeToKinshipLink(anchorTargetId, otherNodeId, relation, parentRole))];
+  if (otherParent) pending.push(otherParentLink(otherParent.id, otherNodeId, otherParent.gender));
+  return pending;
 }
 
 function resolveEnv(config?: TreeRecordConfig) {

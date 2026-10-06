@@ -17,7 +17,7 @@ import {
   relativeToKinshipLinks,
   type AddLinkParams,
 } from '../../lib/treeRecord';
-import { otherParentChoice } from '../../lib/otherParent';
+import { NO_OTHER_PARENT, otherParentChoice, stillOfferedOtherParent } from '../../lib/otherParent';
 import { useOtherParentPick } from '../../hooks/useOtherParentPick';
 import { useWorkingRecord } from '../../contexts/WorkingRecordContext';
 import { linkWriteOutcome } from '../../hooks/useWorkingRecord';
@@ -139,10 +139,16 @@ export default function AddRelativeModal({
     () =>
       isOpen && relationship === 'child'
         ? otherParentChoice(targetNode.id, existingLinks ?? [], selectedExistingId ?? undefined)
-        : ({ kind: 'none' } as const),
+        : NO_OTHER_PARENT,
     [isOpen, relationship, targetNode.id, existingLinks, selectedExistingId]
   );
   const [otherParentId, setOtherParentId] = useOtherParentPick(otherParent);
+  // At submit, the same rule as the canvas handlers: only someone the latest
+  // links still offer for this child is linked.
+  const otherParentToLink = (childId?: string) =>
+    relationship === 'child'
+      ? stillOfferedOtherParent(otherParentChoice(targetNode.id, existingLinks ?? [], childId), otherParentId)
+      : null;
   const personName = (id: string) => {
     const person = existingNodes.find((p) => p.id === id);
     return person ? formatNodeDisplayName(person) : 'Unknown';
@@ -167,6 +173,7 @@ export default function AddRelativeModal({
     const existingParentRole = parentRoleForGender(
       existingNodes.find((person) => person.id === existingId)?.gender
     );
+    const linkedOtherParentId = otherParentToLink(existingId);
     const kinship: AddLinkParams =
       relationship === 'sibling'
         ? { sourceId: targetNode.id, targetId: existingId, type: 'parent', parentRole: null }
@@ -177,7 +184,7 @@ export default function AddRelativeModal({
               relationship,
               relationship === 'parent' ? existingParentRole : childParentRole
             ),
-            otherParentId,
+            otherParentId: linkedOtherParentId,
           };
 
     await write(
@@ -199,6 +206,7 @@ export default function AddRelativeModal({
     // The new Person is the parent when adding a parent, so the link's role
     // comes from the gender being entered; the server derives the same.
     const linkRole = relationship === 'parent' ? parentRoleForGender(gender) : childParentRole;
+    const linkedOtherParentId = otherParentToLink();
 
     await write(
       [
@@ -209,7 +217,9 @@ export default function AddRelativeModal({
           relationship,
           existingLinks ?? [],
           linkRole,
-          otherParentId ? existingNodes.find((p) => p.id === otherParentId) ?? { id: otherParentId } : null
+          linkedOtherParentId
+            ? existingNodes.find((p) => p.id === linkedOtherParentId) ?? { id: linkedOtherParentId }
+            : null
         ).map((link) => ({ kind: 'link-upsert' as const, link })),
       ],
       async () => ({
@@ -218,7 +228,12 @@ export default function AddRelativeModal({
           id: personId,
           firstName: sanitizedName,
           gender,
-          link: { targetId: targetNode.id, relation: relationship, parentRole: childParentRole, otherParentId },
+          link: {
+            targetId: targetNode.id,
+            relation: relationship,
+            parentRole: childParentRole,
+            otherParentId: linkedOtherParentId,
+          },
         }),
       })
     );

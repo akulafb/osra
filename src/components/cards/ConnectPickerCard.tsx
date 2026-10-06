@@ -8,7 +8,7 @@ import {
   ParentRole,
 } from './connectOptions';
 import { OtherParentPicker } from './OtherParentPicker';
-import { otherParentChoice, type OtherParentChoice } from '../../lib/otherParent';
+import { NO_OTHER_PARENT, otherParentChoice } from '../../lib/otherParent';
 import { useOtherParentPick } from '../../hooks/useOtherParentPick';
 
 /**
@@ -37,8 +37,6 @@ export interface ConnectPickerCardProps {
 }
 
 export const PICKER_CARD_WIDTH = 260;
-
-const NO_OTHER_PARENT: OtherParentChoice = { kind: 'none' };
 
 export const ConnectPickerCard: React.FC<ConnectPickerCardProps> = ({
   sourceId,

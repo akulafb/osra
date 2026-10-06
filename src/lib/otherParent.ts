@@ -23,6 +23,9 @@ export type OtherParentChoice =
   | { kind: 'one'; personId: string }
   | { kind: 'choose'; candidates: OtherParentCandidate[]; preselectedId: string | null };
 
+/** No other parent to offer: the choice for anything but a child. */
+export const NO_OTHER_PARENT: OtherParentChoice = { kind: 'none' };
+
 function hasLink(a: string, b: string, type: FamilyLink['type'], links: readonly FamilyLink[]): boolean {
   return links.some((link) => {
     if (link.type !== type) return false;
@@ -67,5 +70,38 @@ export function resolveOtherParent(choice: OtherParentChoice, picked: string | n
       return choice.personId;
     case 'choose':
       return choice.candidates.find((c) => c.personId === picked)?.personId ?? null;
+  }
+}
+
+/**
+ * What a choice offers, as a string: its kind and candidates, in order. Two
+ * choices with the same key offer the same thing, so a pick made from one
+ * still stands for the other.
+ */
+export function otherParentChoiceKey(choice: OtherParentChoice): string {
+  switch (choice.kind) {
+    case 'none':
+      return 'none';
+    case 'one':
+      return `one:${choice.personId}`;
+    case 'choose':
+      return `choose:${choice.candidates.map((c) => c.personId).join(',')}`;
+  }
+}
+
+/**
+ * The other parent a form sent, if the current choice still offers them;
+ * otherwise `null`, one link. A form may have been showing an older choice,
+ * and nobody it did not show is linked.
+ */
+export function stillOfferedOtherParent(choice: OtherParentChoice, sent: string | null | undefined): string | null {
+  if (!sent) return null;
+  switch (choice.kind) {
+    case 'none':
+      return null;
+    case 'one':
+      return choice.personId === sent ? sent : null;
+    case 'choose':
+      return choice.candidates.some((c) => c.personId === sent) ? sent : null;
   }
 }

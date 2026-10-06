@@ -30,7 +30,7 @@ import {
   relativeToKinshipLinks,
   type AddLinkParams,
 } from '../lib/treeRecord';
-import { otherParentChoice, resolveOtherParent } from '../lib/otherParent';
+import { otherParentChoice, stillOfferedOtherParent } from '../lib/otherParent';
 import { getLinkEndpoints } from '../lib/familyGraph';
 import { useLifecycles } from '../hooks/useLifecycles';
 
@@ -232,12 +232,12 @@ export const FamilyTree: React.FC = () => {
   }, [selectedNode, canDissolveNode, interaction]);
 
   /**
-   * The other parent a new parent link takes with it (LIN-79): what the user
-   * picked, if the Working Record still offers it, or the only spouse.
+   * The other parent a new parent link takes with it (LIN-79): the one the form
+   * sent, if the Working Record still offers them, else none.
    */
   const resolveOtherParentFor = useCallback(
-    (parentId: string, picked: string | null | undefined, childId?: string): string | null =>
-      resolveOtherParent(otherParentChoice(parentId, working?.links ?? [], childId), picked),
+    (parentId: string, sent: string | null | undefined, childId?: string): string | null =>
+      stillOfferedOtherParent(otherParentChoice(parentId, working?.links ?? [], childId), sent),
     [working?.links]
   );
 
@@ -270,10 +270,16 @@ export const FamilyTree: React.FC = () => {
       const otherParent = otherParentId
         ? working?.nodes.find((n) => n.id === otherParentId) ?? { id: otherParentId }
         : null;
+      const pending = relativeToKinshipLinks(
+        params.targetNodeId,
+        personId,
+        params.relation,
+        working?.links ?? [],
+        undefined,
+        otherParent
+      );
       const nodeSubject = { kind: 'node' as const, id: personId };
-      const linkSubjects = [params.targetNodeId, otherParentId]
-        .filter((id): id is string => !!id)
-        .map((aId) => ({ kind: 'link' as const, aId, bId: personId }));
+      const linkSubjects = linkSpawnSubjects(pending);
 
       // The Person and the Kinship Links are subjects of the same Spawn, on
       // the same clock. Only one parent line is drawn to a child (ADR 0012), so
@@ -282,19 +288,12 @@ export const FamilyTree: React.FC = () => {
       linkSubjects.forEach((subject) => lifecycles.start('spawn', subject));
 
       // The two cluster fields are derived server-side from the anchor and the
-      // anchor's spouse, so they are deliberately absent until the server says
+      // other parent, so they are deliberately absent until the server says
       // what they are rather than guessed and corrected.
       void write(
         [
           { kind: 'person-upsert', person: { id: personId, firstName } },
-          ...relativeToKinshipLinks(
-            params.targetNodeId,
-            personId,
-            params.relation,
-            working?.links ?? [],
-            undefined,
-            otherParent
-          ).map((link) => ({ kind: 'link-upsert' as const, link })),
+          ...pending.map((link) => ({ kind: 'link-upsert' as const, link })),
         ],
         async () => ({
           kind: 'confirmed',

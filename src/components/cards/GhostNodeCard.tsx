@@ -4,7 +4,7 @@ import { readMatchResolution, SPELLING_MATCH_LABEL } from '../../lib/personMatch
 import { usePersonMatch } from '../../hooks/usePersonMatch';
 import { relationColor, relationLabel } from './relationStyle';
 import { OtherParentPicker } from './OtherParentPicker';
-import type { OtherParentChoice } from '../../lib/otherParent';
+import { NO_OTHER_PARENT, type OtherParentChoice } from '../../lib/otherParent';
 import { useOtherParentPick } from '../../hooks/useOtherParentPick';
 
 /**
@@ -45,8 +45,6 @@ export interface GhostNodeCardProps {
 }
 
 export const GHOST_CARD_WIDTH = 190;
-
-const NO_OTHER_PARENT: OtherParentChoice = { kind: 'none' };
 
 export const GhostNodeCard: React.FC<GhostNodeCardProps> = ({
   relation,
