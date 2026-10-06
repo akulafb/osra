@@ -36,6 +36,7 @@ import {
   type LinkEndpoints,
 } from '../utils/cosmicFx';
 import { TreeSearchBar } from './TreeSearchBar';
+import { NO_DRAWER_INSET, type PersonDrawerInset } from '../hooks/usePersonDrawerInset';
 import { Manipulation3DPanel, Connect3DControls, Dissolve3DControls } from './Manipulation3DPanel';
 import {
   Candidacy,
@@ -172,7 +173,7 @@ function SettingsPanelSpring({ isOpen, children }: { isOpen: boolean; children: 
     config: { tension: 300, friction: 30 },
   });
   return (
-    <animated.div style={{ ...spring, overflow: 'hidden' }}>
+    <animated.div style={{ ...spring, overflow: 'hidden', flexShrink: 0 }}>
       {children}
     </animated.div>
   );
@@ -230,6 +231,7 @@ interface FamilyTree3DProps {
   onVisibleClusters3DChange: React.Dispatch<React.SetStateAction<Set<string>>>;
   uniqueClusters: string[];
   onEnsureClusterVisible3D: (cluster: string) => void;
+  drawerInset?: PersonDrawerInset;
   /** Optional "See who's new!" control; rendered above NAV CONTROLS, same column */
   seeWhosNewButtonSlot?: React.ReactNode;
   /** Dashed preview edge while Add Relative connect-to-existing is focused */
@@ -297,6 +299,7 @@ export const FamilyTree3DContent: React.FC<FamilyTree3DProps> = ({
   onVisibleClusters3DChange,
   uniqueClusters,
   onEnsureClusterVisible3D,
+  drawerInset = NO_DRAWER_INSET,
   seeWhosNewButtonSlot,
   pendingLinkPreview = null,
   isAdmin = false,
@@ -1781,7 +1784,7 @@ export const FamilyTree3DContent: React.FC<FamilyTree3DProps> = ({
       />
 
       {/* Settings Controls - Top Right */}
-      <div style={{ position: 'absolute', top: '24px', right: '24px', display: 'flex', flexDirection: 'column', gap: '12px', zIndex: 1300, alignItems: 'flex-end' }}>
+      <div style={{ position: 'absolute', top: '24px', right: 24 + drawerInset.rightPx, ...(drawerInset.bottomVh > 0 && { maxHeight: `calc(100% - 48px - ${drawerInset.bottomVh}vh)`, overflowY: 'auto' }), display: 'flex', flexDirection: 'column', gap: '12px', zIndex: 1300, alignItems: 'flex-end' }}>
         {/* Settings Toggle - First */}
         <Button
           variant="contained"
@@ -2102,8 +2105,8 @@ export const FamilyTree3DContent: React.FC<FamilyTree3DProps> = ({
       <div
         style={{
           position: 'absolute',
-          bottom: '20px',
-          right: '20px',
+          bottom: `calc(20px + ${drawerInset.bottomVh}vh)`,
+          right: 20 + drawerInset.rightPx,
           zIndex: 1000,
           display: 'flex',
           flexDirection: 'column',

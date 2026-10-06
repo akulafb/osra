@@ -22,6 +22,7 @@ import BulkInviteModal from './modals/BulkInviteModal';
 import { FamilyChat } from './FamilyChat';
 import { NewMembersModal } from './NewMembersModal';
 import { PersonDetailDrawer } from './PersonDetailDrawer';
+import { usePersonDrawerInset } from '../hooks/usePersonDrawerInset';
 import { isMobile } from '../utils/device';
 import {
   createTreeRecord,
@@ -61,6 +62,8 @@ export const FamilyTree: React.FC = () => {
     if (!interaction.selectedNodeId || !working?.nodes) return null;
     return working.nodes.find((n) => n.id === interaction.selectedNodeId) ?? null;
   }, [interaction.selectedNodeId, working?.nodes]);
+  const drawerHidden = isMobile() && needsCanvas(interaction.state);
+  const drawerInset = usePersonDrawerInset(!!selectedNode && !drawerHidden);
 
   const [newMembersModalOpen, setNewMembersModalOpen] = useState(false);
   const [collapsedNodes, setCollapsedNodes] = useState<Set<string>>(new Set());
@@ -567,8 +570,8 @@ export const FamilyTree: React.FC = () => {
         <div
           style={{
             position: 'absolute',
-            bottom: 20,
-            right: 20,
+            bottom: `calc(20px + ${drawerInset.bottomVh}vh)`,
+            right: 20 + drawerInset.rightPx,
             zIndex: 1010,
             minWidth: 180,
             width: 'min(92vw, 260px)',
@@ -595,7 +598,7 @@ export const FamilyTree: React.FC = () => {
       <PersonDetailDrawer
         selectedNode={selectedNode}
         onClose={() => interaction.deselect()}
-        hidden={isMobile() && needsCanvas(interaction.state)}
+        hidden={drawerHidden}
         canEditSelected={canEditSelected}
         isAdmin={isAdmin}
         userProfile={userProfile}
@@ -709,6 +712,7 @@ export const FamilyTree: React.FC = () => {
             onVisibleClusters3DChange={setVisibleClusters3D}
             uniqueClusters={uniqueClusters}
             onEnsureClusterVisible3D={ensureClusterVisible3D}
+            drawerInset={drawerInset}
             seeWhosNewButtonSlot={
               showSeeWhosNewButton && newMembers.length > 0 ? (
                 <Button
@@ -743,6 +747,7 @@ export const FamilyTree: React.FC = () => {
             backgroundTheme={backgroundTheme}
             onBackgroundThemeChange={setBackgroundTheme}
             isMobile={isMobile()}
+            drawerInset={drawerInset}
             collapsedNodes={collapsedNodes}
             onToggleCollapse={handleToggleCollapse}
             onSetCollapsedNodes={handleSetCollapsedNodes}

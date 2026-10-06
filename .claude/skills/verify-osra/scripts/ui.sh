@@ -8,7 +8,7 @@
 #   ui.sh <run-dir> person <given> [family]       click a person node in the 2D tree (e.g. person <Given> Badran)
 #   ui.sh <run-dir> fill  <role> <name> <value>   fill a textbox/searchbox
 #   ui.sh <run-dir> tap   <x> <y>                 click at CSS-pixel coordinates (empty canvas, WebGL)
-#   ui.sh <run-dir> key   <key>                   press a key in the page (Enter, Escape, Tab, Meta+f)
+#   ui.sh <run-dir> key   <key>                   press a key in the page (Enter, Escape, Tab, Meta+f); refuses unless the page has focus
 #   ui.sh <run-dir> goto  <path>                  navigate to http://localhost:5173<path>
 #   ui.sh <run-dir> wait-text <text>              wait until text is on the page
 # Name matching is exact; prefix the name with ~ for a substring match (e.g. "~Badran").
@@ -65,7 +65,13 @@ case "$cmd" in
     orca mouse move --page "$page" --x "$1" --y "$2" --json >/dev/null
     orca mouse down --page "$page" --json >/dev/null
     orca mouse up --page "$page" --json >/dev/null && echo "tapped $1,$2" ;;
-  key) orca keypress --page "$page" --key "$1" --json >/dev/null && echo "pressed $1" ;;
+  key)
+    focused="$(orca eval --page "$page" --expression "document.hasFocus()" --json | python3 -c "import json,sys; print(json.load(sys.stdin)['result']['result'])")"
+    if [[ "$focused" != "True" && "$focused" != "true" ]]; then
+      echo "REFUSE: the page does not have focus, so '$1' would go nowhere. Tap a spot that changes nothing first (e.g. empty space inside the drawer), then retry." >&2
+      exit 1
+    fi
+    orca keypress --page "$page" --key "$1" --json >/dev/null && echo "pressed $1" ;;
   goto) orca goto --page "$page" --url "http://localhost:$OSRA_PORT$1" --json >/dev/null && echo "at $1" ;;
   wait-text) orca wait --page "$page" --text "$1" --json >/dev/null && echo "saw '$1'" ;;
   *) echo "unknown command $cmd" >&2; exit 2 ;;

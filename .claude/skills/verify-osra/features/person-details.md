@@ -1,13 +1,14 @@
 # Person details
 
-Selecting a person opens a details drawer on the right with their given name, family, ID and the actions the signed-in user may take on them; in 2D the node also grows action pills.
+Selecting a person opens a details drawer with their given name, family, ID and the actions the signed-in user may take on them; in 2D the node also grows action pills. Above 600px wide the drawer is a 400px panel on the right and the right-docked controls (INSTRUMENTS, the family picker, AMBIANCE, NAV CONTROLS, See who's new) move left of it; below 600px it is a bottom sheet and those controls stay above it, scrolling when they do not fit.
 
 ## Sub-features
 
 - `person-select` clicking a node outlines it and opens the drawer.
 - `person-drawer` the drawer shows the given name as a heading, "<FAMILY> FAMILY", and "ID: <uuid>".
 - `person-actions` the drawer lists Edit Registry, + Add Relative, Invite to Tree and, for admins, ADMINISTRATIVE TOOLS (Connect Nodes..., Manage Links, Delete Entry).
-- `person-close` clicking empty tree space deselects the person and closes the drawer.
+- `person-close` the drawer's close icon (`button "Close details"`), Escape, or clicking empty tree space deselects the person and closes the drawer.
+- `person-clear` no control draws over the open drawer, in 2D and 3D, side panel or sheet.
 
 ## How to get to it (user POV)
 
@@ -22,12 +23,17 @@ Preconditions:
 
 - **Select.** Take any person from `ui.sh tree` (a node group's two text lines: given name, then family) and run `$S/ui.sh "$RUN_DIR" person <Given> Badran`. `ui.sh tree` starts with `heading "<Given>" [level=4]` followed by buttons "Edit Registry", "+ Add Relative", "Invite to Tree"; the screenshot shows the node outlined in white with + Parent / + Spouse / + Child pills, and the drawer reads "BADRAN FAMILY".
 - **Cross-check.** The drawer's `ID:` value matches the person in the dev DB: Supabase MCP `execute_sql` on `djwqamcfllqziqiyvyjj`, `SELECT first_name, paternal_family_cluster FROM nodes WHERE id = '<id from the screenshot>';`.
-- **Close.** Click empty tree space: run `$S/ui.sh "$RUN_DIR" tap 250 650` (left half, below the first row; check the screenshot that the spot is empty). `ui.sh tree` no longer contains `heading "<Given>"`.
-- **Proof.** `capture.sh "$RUN_DIR" person-details open` after selecting and `capture.sh "$RUN_DIR" person-details closed` after closing.
+- **Select by keyboard.** Tap empty canvas to give the page focus, then press Tab: `$S/ui.sh "$RUN_DIR" tap 300 700` then `$S/ui.sh "$RUN_DIR" key Tab`. Tab selects the next person and pans to them, so it works even when the tree is off-screen. In 3D, a tap fires a background click a moment later; if the drawer does not open, press Tab again.
+- **Close icon.** Run `$S/ui.sh "$RUN_DIR" click button "Close details"`. `ui.sh tree` no longer contains `button "Close details"`. To prove nothing covers it, hit-test its centre: `orca eval --page "$(cat $RUN_DIR/state/page)" --expression "(() => { const b=document.querySelector('button[aria-label=\"Close details\"]'); const r=b.getBoundingClientRect(); return b.contains(document.elementFromPoint(r.x+r.width/2, r.y+r.height/2)); })()" --json` returns `true`, also with INSTRUMENTS open.
+- **Escape.** Reselect, tap empty space inside the drawer to give the page focus (`$S/ui.sh "$RUN_DIR" tap 830 780` at the default viewport), then `$S/ui.sh "$RUN_DIR" key Escape`. The close button is gone.
+- **Empty space.** Run `$S/ui.sh "$RUN_DIR" tap 250 650` (left half, below the first row; check the screenshot that the spot is empty). The close button is gone.
+- **Proof.** `capture.sh "$RUN_DIR" person-details open` after selecting and `capture.sh "$RUN_DIR" person-details closed` after each close.
 
 ## Gotchas
 
 - Every action button here writes to the Tree Record. Assert the buttons exist; leave them unclicked.
-- The drawer's own close icon (the unnamed `button` after the heading) sits under the INSTRUMENTS button, so clicking it does nothing. Escape does not close the drawer either. Close by tapping empty space.
+- Keys reach the page only while it has focus, and it loses focus between commands. `ui.sh key` refuses when the page has no focus; tap a spot that changes nothing first.
+- The Orca viewport (about 930px) is above 600px, so it shows the side panel. For the bottom sheet, load the app in a same-origin iframe 390px wide (it shares the session): `orca eval --expression "(() => { const f=document.createElement('iframe'); f.id='phone'; f.src='/'; Object.assign(f.style,{position:'fixed',left:'0',top:'0',width:'390px',height:'812px',zIndex:2147483647,border:'0'}); document.body.appendChild(f); return 'ok'; })()"`, drive it with `tap` at the same coordinates, read it through `document.getElementById('phone').contentDocument`, and remove it before cleanup. A 1100px iframe with `transform: scale(0.8)` shows the desktop layout (`isMobile()` is true up to 1024px); taps are then in scaled page pixels. Switching view mode inside the iframe changes the owner's persisted mode too.
+- `orca mouse wheel` does not scroll anything in Orca's browser, so a scrolling column cannot be proven by wheel; set `scrollTop` as setup and capture what it reveals.
 - `person` needs the exact given and family names as shown in the node; Arabic names work as written.
 - 3D picking has no accessibility handle; reach a person there through search (a search match selects it) or Tab/Enter, and prove by the drawer heading.
