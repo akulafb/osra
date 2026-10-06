@@ -781,7 +781,7 @@ export const FamilyTree: React.FC = () => {
       </div>
 
       {/* Family Chat Bot */}
-      <FamilyChat />
+      <FamilyChat behindSheet={drawerInset.bottomVh > 0} />
     </div>
   );
 };

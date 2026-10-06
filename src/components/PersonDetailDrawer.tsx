@@ -130,8 +130,7 @@ export const PersonDetailDrawer: React.FC<PersonDetailDrawerProps> = ({
       </Box>
 
       {/* Content */}
-      {/* The sheet's last rows scroll clear of the chat button docked bottom-left. */}
-      <Box sx={{ flex: 1, px: isSheet ? 2 : 3, pt: isSheet ? 0 : 2, pb: isSheet ? 10 : 2, overflowY: 'auto' }}>
+      <Box sx={{ flex: 1, px: isSheet ? 2 : 3, pt: isSheet ? 0 : 2, pb: 2, overflowY: 'auto' }}>
         <Typography 
           variant="caption" 
           sx={{ 
