@@ -8,6 +8,7 @@ The 🤖 button opens the Family Chat Bot, which answers questions about the sig
 - `chat-answer` a question gets a user bubble, "AI is thinking...", then an answer bubble.
 - `chat-clear` Clear empties the conversation (a limit line stays).
 - `chat-limit` after 10 messages a status line replaces answers and the input is disabled until UAE midnight.
+- `chat-stack` the chat sits above everything (z-index 10000), except below 900px while the person details sheet is open: then it drops to 1100, behind the sheet (1200), and returns on top when the sheet closes (see [person details](./person-details.md), Chat and sheet).
 
 ## How to get to it (user POV)
 

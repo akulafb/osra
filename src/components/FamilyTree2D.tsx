@@ -23,6 +23,7 @@ import { getNodeId } from '../lib/familyGraph';
 import { filterGraphData } from '../lib/filterGraphData';
 import { connectedPersonIds } from '../lib/personMatch';
 import { TreeSearchBar } from './TreeSearchBar';
+import { topRightControlsClear, type PersonDrawerInset } from '../hooks/usePersonDrawerInset';
 import { canEdit } from '../lib/permissions';
 import type { BackgroundTheme } from '../hooks/useBackgroundTheme';
 import { DirectManipulationController } from '../hooks/useDirectManipulation';
@@ -65,6 +66,7 @@ interface FamilyTree2DProps {
   uniqueClusters: string[];
   onPresetSelect: (preset: string | null) => void;
   isMobile?: boolean;
+  drawerInset: PersonDrawerInset;
   userNodeId?: string | null;
   /**
    * The *confirmed* Kinship Links, for the per-card edit affordance. The server
@@ -124,7 +126,7 @@ function ExpandableSpring({ isOpen, children }: { isOpen: boolean; children: Rea
     config: { tension: 300, friction: 30 },
   });
   return (
-    <animated.div style={{ ...spring, overflow: 'hidden' }}>
+    <animated.div style={{ ...spring, overflow: 'hidden', flexShrink: 0 }}>
       {children}
     </animated.div>
   );
@@ -144,6 +146,7 @@ export const FamilyTree2D: React.FC<FamilyTree2DProps> = ({
   uniqueClusters,
   onPresetSelect,
   isMobile = false,
+  drawerInset,
   userNodeId = null,
   confirmedLinks,
   onFindMeRequest,
@@ -839,8 +842,7 @@ export const FamilyTree2D: React.FC<FamilyTree2DProps> = ({
       {/* 2D Controls Overlay - Top Right */}
       <div style={{
         position: 'absolute',
-        top: '24px',
-        right: '24px',
+        ...topRightControlsClear(drawerInset),
         display: 'flex',
         flexDirection: 'column',
         gap: '12px',

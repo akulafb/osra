@@ -7,7 +7,13 @@ import Button from '@mui/material/Button';
 import { MAX_USER_MESSAGE_CHARS } from '../../supabase/functions/family-chat/limits.ts';
 import { useFamilyChat } from '../hooks/useFamilyChat';
 
-export const FamilyChat: React.FC = () => {
+interface FamilyChatProps {
+  // The person sheet is open: the chat sits behind it (the drawer is at 1200)
+  // so it never covers the sheet's rows.
+  behindSheet: boolean;
+}
+
+export const FamilyChat: React.FC<FamilyChatProps> = ({ behindSheet }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [inputValue, setInputValue] = useState('');
   const { messages, isLoading, notice, isLimited, sendMessage, clearChat } = useFamilyChat();
@@ -33,7 +39,7 @@ export const FamilyChat: React.FC = () => {
   };
 
   return (
-    <div style={{ position: 'fixed', bottom: '20px', left: '20px', zIndex: 10000 }}>
+    <div style={{ position: 'fixed', bottom: '20px', left: '20px', zIndex: behindSheet ? 1100 : 10000 }}>
       <AnimatePresence>
         {isOpen && (
           <motion.div

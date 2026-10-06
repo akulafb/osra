@@ -5,7 +5,6 @@ import {
   Button, 
   IconButton, 
   Drawer,
-  useMediaQuery,
   useTheme,
   alpha
 } from '@mui/material';
@@ -13,6 +12,7 @@ import CloseIcon from '@mui/icons-material/Close';
 import { FamilyNode, FamilyLink } from '../types/graph';
 import { canManageInvites } from '../lib/permissions';
 import type { Database } from '../types/database';
+import { SHEET_MAX_HEIGHT_VH, SIDE_DRAWER_WIDTH_PX, useIsDrawerSheet } from '../hooks/usePersonDrawerInset';
 
 type UserProfile = Database['public']['Tables']['users']['Row'];
 
@@ -57,9 +57,7 @@ export const PersonDetailDrawer: React.FC<PersonDetailDrawerProps> = ({
   onDelete,
 }) => {
   const theme = useTheme();
-  // A right-hand drawer at full width is the whole screen on a phone. There it
-  // is a bottom sheet instead, so the Tree Node it describes stays in view.
-  const isSheet = useMediaQuery(theme.breakpoints.down('sm'));
+  const isSheet = useIsDrawerSheet();
 
   if (!selectedNode) return null;
 
@@ -78,12 +76,12 @@ export const PersonDetailDrawer: React.FC<PersonDetailDrawerProps> = ({
       variant="persistent"
       sx={{
         '& .MuiDrawer-paper': {
-          width: isSheet ? '100%' : 400,
+          width: isSheet ? '100%' : SIDE_DRAWER_WIDTH_PX,
           background: 'rgba(5, 5, 5, 0.75)',
           backdropFilter: 'blur(24px)',
           ...(isSheet
             ? {
-                maxHeight: '45vh',
+                maxHeight: `${SHEET_MAX_HEIGHT_VH}vh`,
                 borderTop: '1px solid rgba(212, 175, 55, 0.2)',
                 borderTopLeftRadius: 16,
                 borderTopRightRadius: 16,
@@ -126,14 +124,13 @@ export const PersonDetailDrawer: React.FC<PersonDetailDrawerProps> = ({
             </Typography>
           )}
         </Box>
-        <IconButton onClick={onClose} sx={{ color: 'rgba(255,255,255,0.5)', '&:hover': { color: 'white' } }}>
+        <IconButton aria-label="Close details" onClick={onClose} sx={{ color: 'rgba(255,255,255,0.5)', '&:hover': { color: 'white' } }}>
           <CloseIcon />
         </IconButton>
       </Box>
 
       {/* Content */}
-      {/* The sheet's last rows scroll clear of the chat button docked bottom-left. */}
-      <Box sx={{ flex: 1, px: isSheet ? 2 : 3, pt: isSheet ? 0 : 2, pb: isSheet ? 10 : 2, overflowY: 'auto' }}>
+      <Box sx={{ flex: 1, px: isSheet ? 2 : 3, pt: isSheet ? 0 : 2, pb: 2, overflowY: 'auto' }}>
         <Typography 
           variant="caption" 
           sx={{ 
