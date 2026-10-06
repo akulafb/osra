@@ -15,7 +15,8 @@ export interface InlineConnectPickerProps {
   onConfirm: (
     type: 'parent' | 'marriage' | 'divorce',
     parentRole?: 'mother' | 'father' | null,
-    parentIsSource?: boolean
+    parentIsSource?: boolean,
+    otherParentId?: string | null
   ) => Promise<void> | void;
   onCancel: () => void;
 }
@@ -53,7 +54,7 @@ export const InlineConnectPicker: React.FC<InlineConnectPickerProps> = ({
         x={posX - PICKER_WIDTH / 2}
         y={Math.max(20, posY)}
         width={PICKER_WIDTH}
-        height={PICKER_HEIGHT + 60}
+        height={PICKER_HEIGHT + 90}
         style={{ overflow: 'visible' }}
       >
         <ConnectPickerCard

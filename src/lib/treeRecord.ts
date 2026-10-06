@@ -37,6 +37,12 @@ export interface AddPersonLinkSpec {
   targetId: string;
   relation: RelativeDirection;
   parentRole?: 'mother' | 'father' | null;
+  /**
+   * With `relation: 'child'` only: the anchor's spouse or former spouse, linked
+   * as the child's other parent in the same call (LIN-79, ADR 0012). The server
+   * refuses anyone who is not the anchor's spouse, and writes neither link.
+   */
+  otherParentId?: string | null;
 }
 
 export interface AddPersonParams {
@@ -62,6 +68,12 @@ export interface AddLinkParams {
   targetId: string;
   type: 'parent' | 'marriage' | 'divorce';
   parentRole?: 'mother' | 'father' | null;
+  /**
+   * With `type: 'parent'` only: the parent's spouse or former spouse, linked to
+   * the same child in the same write, so both parent links land or neither does
+   * (LIN-79, ADR 0012). Its role comes from that Person's gender, server-side.
+   */
+  otherParentId?: string | null;
 }
 
 export interface EditPersonParams {
@@ -193,6 +205,37 @@ export function pendingKinshipLink(spec: AddLinkParams): FamilyLink {
   };
 }
 
+/** Refuses an other parent on anything but a link from a parent to a child. */
+function refuseOtherParentUnlessChild(otherParentId: string | null | undefined, isChild: boolean): void {
+  if (otherParentId && !isChild) {
+    throw new TreeRecordError('refused', 'An other parent can only be linked to a child.');
+  }
+}
+
+/** The other parent's link to a child, with the role the server gives it from their gender. */
+function otherParentLink(otherParentId: string, childId: string, gender: FamilyNode['gender'] | undefined): FamilyLink {
+  return { source: otherParentId, target: childId, type: 'parent', parentRole: parentRoleForGender(gender) };
+}
+
+/**
+ * The Kinship Links an `addLink` write is about to create, as Working Record
+ * values: the one it asks for and, with `otherParentId`, the other parent's
+ * link to the same child (LIN-79). That link's role is the one the server gives
+ * it, from the other parent's gender, found in `persons`.
+ */
+export function pendingKinshipLinks(
+  spec: AddLinkParams,
+  persons: readonly Pick<FamilyNode, 'id' | 'gender'>[]
+): FamilyLink[] {
+  refuseOtherParentUnlessChild(spec.otherParentId, spec.type === 'parent');
+  const links = [pendingKinshipLink(spec)];
+  if (spec.otherParentId) {
+    const gender = persons.find((p) => p.id === spec.otherParentId)?.gender;
+    links.push(otherParentLink(spec.otherParentId, spec.targetId, gender));
+  }
+  return links;
+}
+
 /**
  * The Kinship Links a relative addition creates, as Working Record values, so
  * an optimistic apply and the write it is optimistic about cannot disagree
@@ -207,8 +250,10 @@ export function relativeToKinshipLinks(
   otherNodeId: string,
   relation: RelativeDirection,
   links: readonly FamilyLink[],
-  parentRole?: 'mother' | 'father' | null
+  parentRole?: 'mother' | 'father' | null,
+  otherParent?: Pick<FamilyNode, 'id' | 'gender'> | null
 ): FamilyLink[] {
+  refuseOtherParentUnlessChild(otherParent?.id, relation === 'child');
   if (relation === 'sibling') {
     return getParents(anchorTargetId, links).map((parentId) => ({
       source: parentId,
@@ -218,7 +263,9 @@ export function relativeToKinshipLinks(
     }));
   }
 
-  return [pendingKinshipLink(relativeToKinshipLink(anchorTargetId, otherNodeId, relation, parentRole))];
+  const pending = [pendingKinshipLink(relativeToKinshipLink(anchorTargetId, otherNodeId, relation, parentRole))];
+  if (otherParent) pending.push(otherParentLink(otherParent.id, otherNodeId, otherParent.gender));
+  return pending;
 }
 
 function resolveEnv(config?: TreeRecordConfig) {
@@ -353,6 +400,7 @@ export function createTreeRecord(
     }
 
     if (params.link) {
+      refuseOtherParentUnlessChild(params.link.otherParentId, params.link.relation === 'child');
       // Relative creation via RPC create_relative_secure
       const bodyPayload: Record<string, unknown> = {
         new_first_name: sanitizedName,
@@ -370,6 +418,9 @@ export function createTreeRecord(
       }
       if (params.id) {
         bodyPayload.p_new_node_id = params.id;
+      }
+      if (params.link.otherParentId) {
+        bodyPayload.p_other_parent_id = params.link.otherParentId;
       }
 
       let res: Response;
@@ -442,15 +493,22 @@ export function createTreeRecord(
   };
 
   const addLink = async (params: AddLinkParams): Promise<AddLinkResult> => {
+    refuseOtherParentUnlessChild(params.otherParentId, params.type === 'parent');
+
     if (identity.isAdmin) {
       // Admin: REST POST /links
-      const payload = {
+      const row = {
         source_node_id: params.sourceId,
         target_node_id: params.targetId,
         type: params.type,
         parent_role: params.type === 'parent' ? (params.parentRole ?? null) : null,
         created_by_user_id: identity.userId,
       };
+      // PostgREST inserts an array in one statement, so the other parent's link
+      // lands with the first or not at all. Its role comes from the trigger.
+      const payload = params.otherParentId
+        ? [row, { ...row, source_node_id: params.otherParentId, parent_role: null }]
+        : row;
 
       let res: Response;
       try {
@@ -498,6 +556,9 @@ export function createTreeRecord(
     };
     if (relType === 'child' && params.parentRole) {
       payload.p_parent_role = params.parentRole;
+    }
+    if (params.otherParentId) {
+      payload.p_other_parent_id = params.otherParentId;
     }
 
     let res: Response;

@@ -3,6 +3,9 @@ import { FamilyNode, RelativeDirection } from '../../types/graph';
 import { readMatchResolution, SPELLING_MATCH_LABEL } from '../../lib/personMatch';
 import { usePersonMatch } from '../../hooks/usePersonMatch';
 import { relationColor, relationLabel } from './relationStyle';
+import { OtherParentPicker } from './OtherParentPicker';
+import { NO_OTHER_PARENT, type OtherParentChoice } from '../../lib/otherParent';
+import { useOtherParentPick } from '../../hooks/useOtherParentPick';
 
 /**
  * The Ghost Node card: name input, Person Match dropdown, submit and cancel.
@@ -24,8 +27,14 @@ export interface GhostNodeCardProps {
   visibleIds?: ReadonlySet<string>;
   /** Ids already linked to the anchor, so they cannot be linked twice. */
   connectedIds?: ReadonlySet<string>;
-  onSubmit: (name: string) => Promise<void> | void;
-  onConnectExisting: (existingNodeId: string) => Promise<void> | void;
+  /**
+   * With `relation: 'child'`: who else the new child's parent could be, from
+   * the anchor's spouses (LIN-79). The card passes the pick up; the host
+   * decides what is linked.
+   */
+  otherParentChoice?: OtherParentChoice;
+  onSubmit: (name: string, otherParentId: string | null) => Promise<void> | void;
+  onConnectExisting: (existingNodeId: string, otherParentId: string | null) => Promise<void> | void;
   onCancel: () => void;
   /**
    * Observes the name as it is typed. The 3D view mirrors it onto the Ghost
@@ -44,12 +53,15 @@ export const GhostNodeCard: React.FC<GhostNodeCardProps> = ({
   existingNodes,
   visibleIds,
   connectedIds,
+  otherParentChoice,
   onSubmit,
   onConnectExisting,
   onCancel,
   onNameChange,
 }) => {
   const [name, setName] = useState('');
+  const choice = relation === 'child' && otherParentChoice ? otherParentChoice : NO_OTHER_PARENT;
+  const [otherParentId, setOtherParentId] = useOtherParentPick(choice);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [confirmedDifferentPerson, setConfirmedDifferentPerson] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -85,7 +97,7 @@ export const GhostNodeCard: React.FC<GhostNodeCardProps> = ({
 
     setIsSubmitting(true);
     try {
-      await Promise.resolve(onSubmit(trimmed));
+      await Promise.resolve(onSubmit(trimmed, otherParentId));
     } catch (err) {
       console.error('[GhostNodeCard] Submit error:', err);
     } finally {
@@ -212,6 +224,8 @@ export const GhostNodeCard: React.FC<GhostNodeCardProps> = ({
         </button>
       </form>
 
+      <OtherParentPicker choice={choice} people={existingNodes} value={otherParentId} onChange={setOtherParentId} />
+
       {/* Person Match dropdown: connect to one of these, or say it is someone new */}
       {matches.length > 0 && (
         <div
@@ -267,7 +281,7 @@ export const GhostNodeCard: React.FC<GhostNodeCardProps> = ({
             <button
               key={person.id}
               type="button"
-              onClick={() => onConnectExisting(person.id)}
+              onClick={() => onConnectExisting(person.id, otherParentId)}
               disabled={isAlreadyConnected}
               style={{
                 display: 'flex',

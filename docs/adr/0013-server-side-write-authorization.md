@@ -44,3 +44,5 @@ Prior to this decision:
 
 - LIN-76: non-admins may also set `gender` on 1-degree Persons (`20261001130000_lin76_person_gender.sql`); only the cluster fields stay admin-only.
 - The caller resolution in `is_within_1_degree` is now uuid-typed, `COALESCE((auth.jwt() ->> 'sub')::uuid, auth.uid())` (`20260830120000_reconcile_identity_column_types.sql`); see [ADR 0010](0010-write-seam-return-contract.md).
+- LIN-79: when `link_existing_relative_secure` also links a child's other parent, a non-admin's other-parent link follows Decision 3: if the other parent is outside the caller's 1-degree network, the anchor's link is written and the other parent's is skipped (`20261006120000_lin79_add_child_links_both_parents.sql`).
+- LIN-79: `create_relative_secure` does not check the other parent against the caller's network: both its links go to the Person the call creates, so they cannot widen that network, and the anchor is already checked.

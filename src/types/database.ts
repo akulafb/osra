@@ -198,6 +198,8 @@ export interface Database {
           p_new_node_id?: string | null;
           /** The new Person's gender: 'male', 'female', or omitted for not recorded. */
           p_gender?: string | null;
+          /** With rel_type 'child': the anchor's spouse or former spouse, linked as the other parent. */
+          p_other_parent_id?: string | null;
         };
         Returns: {
           success: boolean;
@@ -217,6 +219,8 @@ export interface Database {
           target_node_id: string;
           creator_id: string;
           p_parent_role?: string | null;
+          /** With rel_type 'child': the anchor's spouse or former spouse, linked as the other parent. */
+          p_other_parent_id?: string | null;
         };
         Returns: {
           success: boolean;

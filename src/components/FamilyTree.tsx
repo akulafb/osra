@@ -7,7 +7,7 @@ import { useBackgroundTheme } from '../hooks/useBackgroundTheme';
 import { useWorkingRecord } from '../contexts/WorkingRecordContext';
 import { linkWriteOutcome } from '../hooks/useWorkingRecord';
 import { useNewNodesSinceSignIn } from '../hooks/useNewNodesSinceSignIn';
-import { FamilyNode, RelativeDirection } from '../types/graph';
+import { FamilyLink, FamilyNode, RelativeDirection } from '../types/graph';
 import { useAuth } from '../contexts/AuthContext';
 import AdminManageLinksModal from './modals/AdminManageLinksModal';
 import AdminAddPersonModal from './modals/AdminAddPersonModal';
@@ -25,15 +25,25 @@ import { PersonDetailDrawer } from './PersonDetailDrawer';
 import { isMobile } from '../utils/device';
 import {
   createTreeRecord,
-  pendingKinshipLink,
+  pendingKinshipLinks,
   relativeToKinshipLink,
   relativeToKinshipLinks,
   type AddLinkParams,
 } from '../lib/treeRecord';
+import { otherParentChoice, stillOfferedOtherParent } from '../lib/otherParent';
+import { getLinkEndpoints } from '../lib/familyGraph';
 import { useLifecycles } from '../hooks/useLifecycles';
 
 /** What `treeRecord` sanitises a name to, so an optimistic Person reads the same as the confirmed one. */
 const MAX_PERSON_NAME_LENGTH = 200;
+
+/** The Spawn subjects of the Kinship Links a write is about to create, one per link. */
+function linkSpawnSubjects(links: readonly FamilyLink[]) {
+  return links.map((link) => {
+    const { sourceId, targetId } = getLinkEndpoints(link);
+    return { kind: 'link' as const, aId: sourceId, bId: targetId };
+  });
+}
 
 /**
  * A rejected write has already reverted itself and unwound its lifecycle, so
@@ -222,6 +232,16 @@ export const FamilyTree: React.FC = () => {
   }, [selectedNode, canDissolveNode, interaction]);
 
   /**
+   * The other parent a new parent link takes with it (LIN-79): the one the form
+   * sent, if the Working Record still offers them, else none.
+   */
+  const resolveOtherParentFor = useCallback(
+    (parentId: string, sent: string | null | undefined, childId?: string): string | null =>
+      stillOfferedOtherParent(otherParentChoice(parentId, working?.links ?? [], childId), sent),
+    [working?.links]
+  );
+
+  /**
    * Spawn a Person and the Kinship Link that carries them in.
    *
    * The Person's uuid is minted here (D11) so the lifecycle can be keyed on it
@@ -231,7 +251,12 @@ export const FamilyTree: React.FC = () => {
    * the Tree Node it had already become, and now dismisses immediately.
    */
   const handleCreateRelativeDirect = useCallback(
-    (params: { firstName: string; relation: RelativeDirection; targetNodeId: string }) => {
+    (params: {
+      firstName: string;
+      relation: RelativeDirection;
+      targetNodeId: string;
+      otherParentId?: string | null;
+    }) => {
       if (!user) return;
       const record = createTreeRecord({
         userId: user.id,
@@ -240,77 +265,90 @@ export const FamilyTree: React.FC = () => {
       });
       const personId = crypto.randomUUID();
       const firstName = params.firstName.trim().slice(0, MAX_PERSON_NAME_LENGTH);
+      const otherParentId =
+        params.relation === 'child' ? resolveOtherParentFor(params.targetNodeId, params.otherParentId) : null;
+      const otherParent = otherParentId
+        ? working?.nodes.find((n) => n.id === otherParentId) ?? { id: otherParentId }
+        : null;
+      const pending = relativeToKinshipLinks(
+        params.targetNodeId,
+        personId,
+        params.relation,
+        working?.links ?? [],
+        undefined,
+        otherParent
+      );
       const nodeSubject = { kind: 'node' as const, id: personId };
-      const linkSubject = { kind: 'link' as const, aId: params.targetNodeId, bId: personId };
+      const linkSubjects = linkSpawnSubjects(pending);
 
-      // The Person and the Kinship Link are two subjects of the same Spawn, on
-      // the same clock.
+      // The Person and the Kinship Links are subjects of the same Spawn, on
+      // the same clock. Only one parent line is drawn to a child (ADR 0012), so
+      // both parent links spawn and the drawn one shows it.
       lifecycles.start('spawn', nodeSubject);
-      lifecycles.start('spawn', linkSubject);
+      linkSubjects.forEach((subject) => lifecycles.start('spawn', subject));
 
       // The two cluster fields are derived server-side from the anchor and the
-      // anchor's spouse, so they are deliberately absent until the server says
+      // other parent, so they are deliberately absent until the server says
       // what they are rather than guessed and corrected.
       void write(
         [
           { kind: 'person-upsert', person: { id: personId, firstName } },
-          ...relativeToKinshipLinks(
-            params.targetNodeId,
-            personId,
-            params.relation,
-            working?.links ?? []
-          ).map((link) => ({ kind: 'link-upsert' as const, link })),
+          ...pending.map((link) => ({ kind: 'link-upsert' as const, link })),
         ],
         async () => ({
           kind: 'confirmed',
           rows: await record.addPerson({
             id: personId,
             firstName,
-            link: { targetId: params.targetNodeId, relation: params.relation },
+            link: { targetId: params.targetNodeId, relation: params.relation, otherParentId },
           }),
         })
       ).catch((e) => {
         lifecycles.abort('spawn', nodeSubject);
-        lifecycles.abort('spawn', linkSubject);
+        linkSubjects.forEach((subject) => lifecycles.abort('spawn', subject));
         reportWriteFailure(e, 'Failed to create relative.');
       });
     },
-    [user, isAdmin, session?.access_token, lifecycles, write, working?.links]
+    [user, isAdmin, session?.access_token, lifecycles, write, working?.links, working?.nodes, resolveOtherParentFor]
   );
 
   const handleConnectExistingRelativeDirect = useCallback(
-    (params: { existingNodeId: string; relation: RelativeDirection; targetNodeId: string }) => {
+    (params: {
+      existingNodeId: string;
+      relation: RelativeDirection;
+      targetNodeId: string;
+      otherParentId?: string | null;
+    }) => {
       if (!user) return;
-      const subject = {
-        kind: 'link' as const,
-        aId: params.targetNodeId,
-        bId: params.existingNodeId,
-      };
       try {
         // Refuses `sibling` outright: it is several Kinship Links, not one.
-        const kinship = relativeToKinshipLink(
-          params.targetNodeId,
-          params.existingNodeId,
-          params.relation
-        );
+        const kinship: AddLinkParams = {
+          ...relativeToKinshipLink(params.targetNodeId, params.existingNodeId, params.relation),
+          otherParentId:
+            params.relation === 'child'
+              ? resolveOtherParentFor(params.targetNodeId, params.otherParentId, params.existingNodeId)
+              : null,
+        };
+        const pending = pendingKinshipLinks(kinship, working?.nodes ?? []);
         const record = createTreeRecord({
           userId: user.id,
           isAdmin,
           sessionToken: session?.access_token,
         });
-        lifecycles.start('spawn', subject);
+        const subjects = linkSpawnSubjects(pending);
+        subjects.forEach((subject) => lifecycles.start('spawn', subject));
         void write(
-          [{ kind: 'link-upsert', link: pendingKinshipLink(kinship) }],
+          pending.map((link) => ({ kind: 'link-upsert' as const, link })),
           async () => linkWriteOutcome(await record.addLink(kinship))
         ).catch((e) => {
-          lifecycles.abort('spawn', subject);
+          subjects.forEach((subject) => lifecycles.abort('spawn', subject));
           reportWriteFailure(e, 'Failed to connect relative.');
         });
       } catch (e) {
         reportWriteFailure(e, 'Failed to connect relative.');
       }
     },
-    [user, isAdmin, session?.access_token, lifecycles, write]
+    [user, isAdmin, session?.access_token, lifecycles, write, working?.nodes, resolveOtherParentFor]
   );
 
   const handleConfirmDissolveDirect = useCallback(
@@ -377,6 +415,7 @@ export const FamilyTree: React.FC = () => {
       targetNodeId: string;
       type: 'parent' | 'marriage' | 'divorce';
       parentRole?: 'mother' | 'father' | null;
+      otherParentId?: string | null;
     }) => {
       if (!user) return;
       const record = createTreeRecord({
@@ -384,28 +423,29 @@ export const FamilyTree: React.FC = () => {
         isAdmin,
         sessionToken: session?.access_token,
       });
-      const subject = {
-        kind: 'link' as const,
-        aId: params.sourceNodeId,
-        bId: params.targetNodeId,
-      };
       const kinship: AddLinkParams = {
         sourceId: params.sourceNodeId,
         targetId: params.targetNodeId,
         type: params.type,
         parentRole: params.type === 'parent' ? params.parentRole ?? null : null,
+        otherParentId:
+          params.type === 'parent'
+            ? resolveOtherParentFor(params.sourceNodeId, params.otherParentId, params.targetNodeId)
+            : null,
       };
+      const pending = pendingKinshipLinks(kinship, working?.nodes ?? []);
+      const subjects = linkSpawnSubjects(pending);
 
-      lifecycles.start('spawn', subject);
+      subjects.forEach((subject) => lifecycles.start('spawn', subject));
       void write(
-        [{ kind: 'link-upsert', link: pendingKinshipLink(kinship) }],
+        pending.map((link) => ({ kind: 'link-upsert' as const, link })),
         async () => linkWriteOutcome(await record.addLink(kinship))
       ).catch((e) => {
-        lifecycles.abort('spawn', subject);
+        subjects.forEach((subject) => lifecycles.abort('spawn', subject));
         reportWriteFailure(e, 'Failed to create kinship link.');
       });
     },
-    [user, isAdmin, session?.access_token, lifecycles, write]
+    [user, isAdmin, session?.access_token, lifecycles, write, working?.nodes, resolveOtherParentFor]
   );
 
   // Visible nodes for search (depends on mode)

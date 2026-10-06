@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import { Node2D, FamilyNode, RelativeDirection } from '../types/graph';
 import { GhostNodeCard, GHOST_CARD_WIDTH } from './cards/GhostNodeCard';
 import { relationColor } from './cards/relationStyle';
+import type { OtherParentChoice } from '../lib/otherParent';
 
 /**
  * 2D shell for the Ghost Node: places the shared card in graph coordinates and
@@ -15,8 +16,9 @@ export interface GhostNodeProps {
   /** Passed straight to the card; see `GhostNodeCardProps`. */
   visibleIds?: ReadonlySet<string>;
   connectedIds?: ReadonlySet<string>;
-  onSubmit: (name: string) => Promise<void> | void;
-  onConnectExisting: (existingNodeId: string) => Promise<void> | void;
+  otherParentChoice?: OtherParentChoice;
+  onSubmit: (name: string, otherParentId: string | null) => Promise<void> | void;
+  onConnectExisting: (existingNodeId: string, otherParentId: string | null) => Promise<void> | void;
   onCancel: () => void;
 }
 
@@ -45,11 +47,11 @@ export function getGhostNodePosition(anchorNode: Node2D, relation: RelativeDirec
 }
 
 /**
- * Tall enough for the card with its Person Match dropdown open. Safe to fix at the
+ * Tall enough for the card with its other-parent row and Person Match dropdown open. Safe to fix at the
  * maximum because the viewport is click-transparent (see `pointerEvents` below),
  * so an oversized box costs nothing.
  */
-const GHOST_VIEWPORT_HEIGHT = GHOST_NODE_HEIGHT + 140;
+const GHOST_VIEWPORT_HEIGHT = GHOST_NODE_HEIGHT + 170;
 
 export const GhostNode: React.FC<GhostNodeProps> = ({
   anchorNode,
@@ -57,6 +59,7 @@ export const GhostNode: React.FC<GhostNodeProps> = ({
   existingNodes,
   visibleIds,
   connectedIds,
+  otherParentChoice,
   onSubmit,
   onConnectExisting,
   onCancel,
@@ -106,6 +109,7 @@ export const GhostNode: React.FC<GhostNodeProps> = ({
             existingNodes={existingNodes}
             visibleIds={visibleIds}
             connectedIds={connectedIds}
+            otherParentChoice={otherParentChoice}
             onSubmit={onSubmit}
             onConnectExisting={onConnectExisting}
             onCancel={onCancel}

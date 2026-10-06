@@ -9,5 +9,5 @@ A child has a `parent` Kinship Link to each biological parent the family knows, 
 
 ## Consequences
 
-- Adding a child links the other parent too, asking only when the parent has had more than one spouse. (Not built yet: LIN-79. Until then the app links the chosen parent only; existing children were filled in once by LIN-78.)
+- Adding a child links the other parent too, asking only when the parent has had more than one spouse (LIN-79). Both links are written in the same call, so they land together or not at all; existing children were filled in once by LIN-78.
 - In the 1-Degree Network a father's spouse becomes a parent, not a stepparent; half-siblings and "mother's side" start to work.

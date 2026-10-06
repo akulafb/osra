@@ -243,11 +243,13 @@ interface FamilyTree3DProps {
     firstName: string;
     relation: RelativeDirection;
     targetNodeId: string;
+    otherParentId?: string | null;
   }) => Promise<void> | void;
   onConnectExistingRelative?: (params: {
     existingNodeId: string;
     relation: RelativeDirection;
     targetNodeId: string;
+    otherParentId?: string | null;
   }) => Promise<void> | void;
   /** Connect Mode (LIN-50): creates the Kinship Link once a pair and kind are chosen. */
   onDirectConnectNodes?: (params: {
@@ -255,6 +257,7 @@ interface FamilyTree3DProps {
     targetNodeId: string;
     type: 'parent' | 'marriage' | 'divorce';
     parentRole?: 'mother' | 'father' | null;
+    otherParentId?: string | null;
   }) => Promise<void> | void;
   /**
    * Spawn and Dissolve (LIN-55, ADR-0007). Cosmic FX are the 3D *renderings*
@@ -715,7 +718,7 @@ export const FamilyTree3DContent: React.FC<FamilyTree3DProps> = ({
   );
 
   const handleConnectConfirm = useCallback(
-    async (type: KinshipLinkType, parentRole?: ParentRole, parentIsSource?: boolean) => {
+    async (type: KinshipLinkType, parentRole?: ParentRole, parentIsSource?: boolean, otherParentId?: string | null) => {
       if (!connectPair) return;
       // The picker may name the target as the parent, which flips the edge.
       const flipped = type === 'parent' && parentIsSource === false;
@@ -725,6 +728,7 @@ export const FamilyTree3DContent: React.FC<FamilyTree3DProps> = ({
           targetNodeId: flipped ? connectPair.source.id : connectPair.target.id,
           type,
           parentRole,
+          otherParentId,
         })
       );
       // Escape only steps back to targeting; a confirmed link is the end of
