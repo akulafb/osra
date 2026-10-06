@@ -7,6 +7,9 @@ import {
   KinshipLinkType,
   ParentRole,
 } from './connectOptions';
+import { OtherParentPicker } from './OtherParentPicker';
+import { otherParentChoice, type OtherParentChoice } from '../../lib/otherParent';
+import { useOtherParentPick } from '../../hooks/useOtherParentPick';
 
 /**
  * The inline kinship picker: choose which Kinship Link joins two people, with
@@ -26,12 +29,16 @@ export interface ConnectPickerCardProps {
   onConfirm: (
     type: KinshipLinkType,
     parentRole?: ParentRole,
-    parentIsSource?: boolean
+    parentIsSource?: boolean,
+    /** For a parent link: the parent's spouse, linked to the child too (LIN-79). */
+    otherParentId?: string | null
   ) => Promise<void> | void;
   onCancel: () => void;
 }
 
 export const PICKER_CARD_WIDTH = 260;
+
+const NO_OTHER_PARENT: OtherParentChoice = { kind: 'none' };
 
 export const ConnectPickerCard: React.FC<ConnectPickerCardProps> = ({
   sourceId,
@@ -53,6 +60,13 @@ export const ConnectPickerCard: React.FC<ConnectPickerCardProps> = ({
     [graphData, sourceId, targetId, parentRole, isAdmin]
   );
 
+  const choice = useMemo(() => {
+    if (selectedRel === 'parent-source') return otherParentChoice(sourceId, graphData.links, targetId);
+    if (selectedRel === 'parent-target') return otherParentChoice(targetId, graphData.links, sourceId);
+    return NO_OTHER_PARENT;
+  }, [selectedRel, graphData.links, sourceId, targetId]);
+  const [otherParentId, setOtherParentId] = useOtherParentPick(choice);
+
   const handleConfirm = async () => {
     const resolved = resolveConnectSelection(selectedRel, options, parentRole);
     if (!resolved.ok) {
@@ -64,7 +78,7 @@ export const ConnectPickerCard: React.FC<ConnectPickerCardProps> = ({
     setSubmitError(null);
     try {
       const { type, parentRole: role, parentIsSource } = resolved.confirmation;
-      await Promise.resolve(onConfirm(type, role, parentIsSource));
+      await Promise.resolve(onConfirm(type, role, parentIsSource, type === 'parent' ? otherParentId : null));
     } catch (err) {
       console.error('[ConnectPickerCard] Error:', err);
       setSubmitError(err instanceof Error ? err.message : 'Could not establish link.');
@@ -225,6 +239,8 @@ export const ConnectPickerCard: React.FC<ConnectPickerCardProps> = ({
           ))}
         </div>
       )}
+
+      <OtherParentPicker choice={choice} people={graphData.nodes} value={otherParentId} onChange={setOtherParentId} />
 
       {/* Error Message if any */}
       {submitError && (

@@ -34,5 +34,6 @@ Each feature file starts with an H1 and one paragraph of user-visible behaviour,
 - [Tree search](./tree-search.md): finding people by name, stepping through matches, keyboard entry.
 - [Person details](./person-details.md): selecting a person and the details drawer.
 - [Family chat](./family-chat.md): the 🤖 assistant, its answers and the daily message limit.
+- [Add relative](./add-relative.md): adding a child links both parents (owner performs the writes; the agent checks the dev DB).
 
-Not yet mapped: the invite claim page (`/invite/:token`; a bogus token shows heading "Invalid Invite"), FIND ME, the "See who's new!" modal, and every write flow (add/edit/connect/delete, invites).
+Not yet mapped: the invite claim page (`/invite/:token`; a bogus token shows heading "Invalid Invite"), FIND ME, the "See who's new!" modal, and the other write flows (edit, delete, invites; adding anything but a child).

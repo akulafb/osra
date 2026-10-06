@@ -12,11 +12,13 @@ import { usePersonMatch } from '../../hooks/usePersonMatch';
 import {
   createTreeRecord,
   parentRoleForGender,
-  pendingKinshipLink,
+  pendingKinshipLinks,
   relativeToKinshipLink,
   relativeToKinshipLinks,
   type AddLinkParams,
 } from '../../lib/treeRecord';
+import { otherParentChoice } from '../../lib/otherParent';
+import { useOtherParentPick } from '../../hooks/useOtherParentPick';
 import { useWorkingRecord } from '../../contexts/WorkingRecordContext';
 import { linkWriteOutcome } from '../../hooks/useWorkingRecord';
 
@@ -130,6 +132,22 @@ export default function AddRelativeModal({
     setSelectedExistingId(null);
   }, [name, relationship, parentRole, isOpen]);
 
+  // A child gets the anchor's spouse as its other parent too (LIN-79); an
+  // existing child who already has another parent gets none. Recomputed per
+  // opening, so a pick from last time is not kept.
+  const otherParent = useMemo(
+    () =>
+      isOpen && relationship === 'child'
+        ? otherParentChoice(targetNode.id, existingLinks ?? [], selectedExistingId ?? undefined)
+        : ({ kind: 'none' } as const),
+    [isOpen, relationship, targetNode.id, existingLinks, selectedExistingId]
+  );
+  const [otherParentId, setOtherParentId] = useOtherParentPick(otherParent);
+  const personName = (id: string) => {
+    const person = existingNodes.find((p) => p.id === id);
+    return person ? formatNodeDisplayName(person) : 'Unknown';
+  };
+
   /**
    * Both paths apply to the Working Record before the request goes out, and
    * confirm, revert or drop against what it answers (D9). The modal still
@@ -152,15 +170,18 @@ export default function AddRelativeModal({
     const kinship: AddLinkParams =
       relationship === 'sibling'
         ? { sourceId: targetNode.id, targetId: existingId, type: 'parent', parentRole: null }
-        : relativeToKinshipLink(
-            targetNode.id,
-            existingId,
-            relationship,
-            relationship === 'parent' ? existingParentRole : childParentRole
-          );
+        : {
+            ...relativeToKinshipLink(
+              targetNode.id,
+              existingId,
+              relationship,
+              relationship === 'parent' ? existingParentRole : childParentRole
+            ),
+            otherParentId,
+          };
 
     await write(
-      [{ kind: 'link-upsert', link: pendingKinshipLink(kinship) }],
+      pendingKinshipLinks(kinship, existingNodes).map((link) => ({ kind: 'link-upsert' as const, link })),
       async () => linkWriteOutcome(await record.addLink(kinship))
     );
   };
@@ -187,7 +208,8 @@ export default function AddRelativeModal({
           personId,
           relationship,
           existingLinks ?? [],
-          linkRole
+          linkRole,
+          otherParentId ? existingNodes.find((p) => p.id === otherParentId) ?? { id: otherParentId } : null
         ).map((link) => ({ kind: 'link-upsert' as const, link })),
       ],
       async () => ({
@@ -196,7 +218,7 @@ export default function AddRelativeModal({
           id: personId,
           firstName: sanitizedName,
           gender,
-          link: { targetId: targetNode.id, relation: relationship, parentRole: childParentRole },
+          link: { targetId: targetNode.id, relation: relationship, parentRole: childParentRole, otherParentId },
         }),
       })
     );
@@ -376,6 +398,31 @@ export default function AddRelativeModal({
               <p style={{ margin: '8px 0 0 0', fontSize: '0.7rem', color: 'rgba(255,255,255,0.4)', fontStyle: 'italic' }}>
                 Helps show children on both parents&apos; family trees
               </p>
+            </div>
+          )}
+
+          {otherParent.kind === 'one' && (
+            <div style={fieldStyle}>
+              <label style={labelStyle}>OTHER PARENT</label>
+              <p style={{ margin: 0, fontSize: '0.9rem', color: 'white' }}>{personName(otherParent.personId)}</p>
+            </div>
+          )}
+
+          {otherParent.kind === 'choose' && (
+            <div style={fieldStyle}>
+              <label style={labelStyle}>OTHER PARENT</label>
+              <select
+                value={otherParentId ?? ''}
+                onChange={(e) => setOtherParentId(e.target.value || null)}
+                style={inputStyle}
+              >
+                {otherParent.candidates.map(({ personId, current }) => (
+                  <option key={personId} value={personId}>
+                    {current ? personName(personId) : `${personName(personId)} (former)`}
+                  </option>
+                ))}
+                <option value="">Not known</option>
+              </select>
             </div>
           )}
 

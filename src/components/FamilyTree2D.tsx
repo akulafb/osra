@@ -27,6 +27,7 @@ import { canEdit } from '../lib/permissions';
 import type { BackgroundTheme } from '../hooks/useBackgroundTheme';
 import { DirectManipulationController } from '../hooks/useDirectManipulation';
 import { candidacyFor } from './cards/connectCandidates';
+import { otherParentChoice } from '../lib/otherParent';
 
 function getBackgroundForTheme(theme: BackgroundTheme): string {
   switch (theme) {
@@ -91,14 +92,15 @@ interface FamilyTree2DProps {
   isAdmin?: boolean;
   onAdminAddPersonClick?: () => void;
   /** Direct inline Ghost Node creation and linking handlers */
-  onCreateRelative?: (params: { firstName: string; relation: RelativeDirection; targetNodeId: string }) => Promise<void> | void;
-  onConnectExistingRelative?: (params: { existingNodeId: string; relation: RelativeDirection; targetNodeId: string }) => Promise<void> | void;
+  onCreateRelative?: (params: { firstName: string; relation: RelativeDirection; targetNodeId: string; otherParentId?: string | null }) => Promise<void> | void;
+  onConnectExistingRelative?: (params: { existingNodeId: string; relation: RelativeDirection; targetNodeId: string; otherParentId?: string | null }) => Promise<void> | void;
   /** Direct inline Two-Click Connect kinship linking handler */
   onDirectConnectNodes?: (params: {
     sourceNodeId: string;
     targetNodeId: string;
     type: 'parent' | 'marriage' | 'divorce';
     parentRole?: 'mother' | 'father' | null;
+    otherParentId?: string | null;
   }) => Promise<void> | void;
   /**
    * Spawn and Dissolve (LIN-55, ADR-0007). One controller replaces the loose
@@ -215,6 +217,10 @@ export const FamilyTree2D: React.FC<FamilyTree2DProps> = ({
   const ghostAnchorId = interaction.creatingRelative?.anchorNodeId ?? null;
   const ghostConnectedIds = useMemo(
     () => (ghostAnchorId ? connectedPersonIds(graphData?.links || [], ghostAnchorId) : undefined),
+    [graphData?.links, ghostAnchorId]
+  );
+  const ghostOtherParentChoice = useMemo(
+    () => (ghostAnchorId ? otherParentChoice(ghostAnchorId, graphData?.links || []) : undefined),
     [graphData?.links, ghostAnchorId]
   );
 
@@ -759,22 +765,25 @@ export const FamilyTree2D: React.FC<FamilyTree2DProps> = ({
                   existingNodes={graphData?.nodes || []}
                   visibleIds={visibleIds}
                   connectedIds={ghostConnectedIds}
-                  onSubmit={async (name) => {
+                  otherParentChoice={ghostOtherParentChoice}
+                  onSubmit={async (name, otherParentId) => {
                     if (onCreateRelative) {
                       await onCreateRelative({
                         firstName: name,
                         relation: interaction.creatingRelative!.relation,
                         targetNodeId: anchorNode.id,
+                        otherParentId,
                       });
                     }
                     interaction.handleEscape();
                   }}
-                  onConnectExisting={async (existingId) => {
+                  onConnectExisting={async (existingId, otherParentId) => {
                     if (onConnectExistingRelative) {
                       await onConnectExistingRelative({
                         existingNodeId: existingId,
                         relation: interaction.creatingRelative!.relation,
                         targetNodeId: anchorNode.id,
+                        otherParentId,
                       });
                     }
                     interaction.handleEscape();
@@ -797,7 +806,7 @@ export const FamilyTree2D: React.FC<FamilyTree2DProps> = ({
                   targetNode={targetNode}
                   graphData={graphData}
                   isAdmin={isAdmin}
-                  onConfirm={async (type, parentRole, parentIsSource) => {
+                  onConfirm={async (type, parentRole, parentIsSource, otherParentId) => {
                     const sourceId = type === 'parent' && parentIsSource === false ? targetNode.id : sourceNode.id;
                     const targetId = type === 'parent' && parentIsSource === false ? sourceNode.id : targetNode.id;
                     if (onDirectConnectNodes) {
@@ -806,6 +815,7 @@ export const FamilyTree2D: React.FC<FamilyTree2DProps> = ({
                         targetNodeId: targetId,
                         type,
                         parentRole,
+                        otherParentId,
                       });
                     }
                     interaction.selectNode(sourceId);

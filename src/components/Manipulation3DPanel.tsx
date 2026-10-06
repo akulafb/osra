@@ -9,6 +9,7 @@ import { Candidacy, ConnectPair, buildTargetOptions } from './cards/connectCandi
 import { CONNECT_ACCENT, relationColor } from './cards/relationStyle';
 import { ConnectTargetingBody } from './ConnectTargetingBody';
 import { connectedPersonIds } from '../lib/personMatch';
+import { otherParentChoice } from '../lib/otherParent';
 import { countUnreachable } from '../utils/connectTargeting';
 import { CONFIRM_PULSE_COLOR } from '../utils/cosmicFx';
 import { useGhostPreview } from '../hooks/useGhostPreview';
@@ -71,7 +72,8 @@ export interface Connect3DControls {
   onConfirm: (
     type: KinshipLinkType,
     parentRole?: ParentRole,
-    parentIsSource?: boolean
+    parentIsSource?: boolean,
+    otherParentId?: string | null
   ) => Promise<void> | void;
 }
 
@@ -120,11 +122,13 @@ export interface Manipulation3DPanelProps {
     firstName: string;
     relation: RelativeDirection;
     targetNodeId: string;
+    otherParentId?: string | null;
   }) => Promise<void> | void;
   onConnectExistingRelative?: (params: {
     existingNodeId: string;
     relation: RelativeDirection;
     targetNodeId: string;
+    otherParentId?: string | null;
   }) => Promise<void> | void;
 }
 
@@ -245,6 +249,10 @@ export const Manipulation3DPanel: React.FC<Manipulation3DPanelProps> = ({
     () => (selectedId ? connectedPersonIds(graphData?.links ?? [], selectedId) : undefined),
     [graphData?.links, selectedId]
   );
+  const ghostOtherParentChoice = useMemo(
+    () => (selectedId ? otherParentChoice(selectedId, graphData?.links ?? []) : undefined),
+    [graphData?.links, selectedId]
+  );
   const visible = Boolean(selectedNode && canEdit);
   const isTargeting = Boolean(connect.sourceNode && !connect.pair);
 
@@ -297,10 +305,10 @@ export const Manipulation3DPanel: React.FC<Manipulation3DPanelProps> = ({
   }, []);
 
   const handleSubmit = useCallback(
-    async (firstName: string) => {
+    async (firstName: string, otherParentId: string | null) => {
       if (!selectedId || !relation) return;
       await Promise.resolve(
-        onCreateRelative?.({ firstName, relation, targetNodeId: selectedId })
+        onCreateRelative?.({ firstName, relation, targetNodeId: selectedId, otherParentId })
       );
       closeGhostNode();
     },
@@ -308,10 +316,10 @@ export const Manipulation3DPanel: React.FC<Manipulation3DPanelProps> = ({
   );
 
   const handleConnectExisting = useCallback(
-    async (existingNodeId: string) => {
+    async (existingNodeId: string, otherParentId: string | null) => {
       if (!selectedId || !relation) return;
       await Promise.resolve(
-        onConnectExistingRelative?.({ existingNodeId, relation, targetNodeId: selectedId })
+        onConnectExistingRelative?.({ existingNodeId, relation, targetNodeId: selectedId, otherParentId })
       );
       closeGhostNode();
     },
@@ -517,6 +525,7 @@ export const Manipulation3DPanel: React.FC<Manipulation3DPanelProps> = ({
             existingNodes={existingNodes}
             visibleIds={visibleIds}
             connectedIds={connectedIds}
+            otherParentChoice={ghostOtherParentChoice}
             onSubmit={handleSubmit}
             onConnectExisting={handleConnectExisting}
             onCancel={closeGhostNode}
