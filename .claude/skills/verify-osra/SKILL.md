@@ -14,7 +14,7 @@ Helpers live in `.claude/skills/verify-osra/scripts/` (run them from anywhere in
 - **Dev only.** `launch.sh` refuses unless `.env.local` points at dev (`djwqamcfllqziqiyvyjj`). The dev database holds real family names: evidence stays local, never in a commit, ticket, or artifact link.
 - **Read-only drives.** The owner's account is an admin. Drive only controls that read: family picker, search, selecting a person, view toggles, opening the chat. Leave the Tree Record writes alone (`Edit Registry`, `+ Add Relative`, `Invite to Tree`, `Connect Nodes...`, `Manage Links`, `Delete Entry`, `+ ADD PERSON`, and the `+ Parent` / `+ Spouse` / `+ Child` / `Delete` pills around a selected 2D node). When a ticket's acceptance is a write, stop and hand the owner exact steps instead.
 - **Keep the session.** Leave `Sign Out` untouched: the owner signed in with Google in Orca's browser and an agent cannot sign back in. For signed-out pages use the `127.0.0.1` origin (see [landing](features/landing.md)).
-- **One instance.** The session and Google redirect URLs are bound to port 5173, so only one verification server can run. If 5173 is taken, `launch.sh` refuses; ask the owner rather than driving a server you did not start.
+- **One instance, in turn.** The session and Google redirect URLs are bound to port 5173, so only one verification server can run at a time, across all worktrees. When 5173 is taken, `launch.sh` prints `WAIT` lines and starts once the port frees, for up to 20 minutes (`OSRA_WAIT_SECS`). After that it refuses: ask the owner rather than driving or killing a server you did not start. Run `cleanup.sh` as soon as your check is done, because the next run waits on it.
 
 ## Launch
 
