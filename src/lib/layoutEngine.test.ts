@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { calculateLayout, keepDrawnParentLinks } from './layoutEngine';
 import { filterGraphData } from './filterGraphData';
 import { getNodeId } from './familyGraph';
+import { relativeToKinshipLinks } from './treeRecord';
 import type { FamilyGraph, FamilyLink, FamilyNode } from '../types/graph';
 
 /**
@@ -144,6 +145,14 @@ describe('keepDrawnParentLinks (the 3D view)', () => {
     const links = AFTER.links.filter(l => getNodeId(l.source) !== 'hisham' && getNodeId(l.target) !== 'hisham');
     const kept = keepDrawnParentLinks(visible, links).filter(l => getNodeId(l.target) === 'seif');
     expect(kept.map(l => getNodeId(l.source))).toEqual(['hala']);
+  });
+
+  it('draws one line to a child just added to a mother with the father linked too (LIN-79)', () => {
+    const baby = person('baby', 'Badran');
+    const pending = relativeToKinshipLinks('ebtisam', 'baby', 'child', AFTER.links, null, { id: 'fahd', gender: 'male' });
+    expect(pending).toHaveLength(2);
+    const kept = keepDrawnParentLinks([...AFTER.nodes, baby], [...AFTER.links, ...pending]);
+    expect(kept.filter(l => l.type === 'parent' && getNodeId(l.target) === 'baby')).toHaveLength(1);
   });
 
   it('returns the same link objects it was given, so the 3D view keeps its simulation state', () => {

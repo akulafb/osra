@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import {
   createTreeRecord,
   parentRoleForGender,
+  pendingKinshipLinks,
   relativeToKinshipLink,
   relativeToKinshipLinks,
   TreeRecordError,
@@ -233,6 +234,85 @@ describe('treeRecord module', () => {
     });
   });
 
+  describe('addLink with the other parent (LIN-79)', () => {
+    const bothRows = [
+      linkRow('link-20', 'fadi', 'ali', 'parent', 'father'),
+      linkRow('link-21', 'ebtisam', 'ali', 'parent', 'mother'),
+    ];
+    const bothLinks = [
+      { id: 'link-20', source: 'fadi', target: 'ali', type: 'parent', parentRole: 'father' },
+      { id: 'link-21', source: 'ebtisam', target: 'ali', type: 'parent', parentRole: 'mother' },
+    ];
+
+    it('sends the other parent to link_existing_relative_secure for a non-admin and folds both links', async () => {
+      const mockFetch = vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ success: true, already_connected: false, links: bothRows }), { status: 200 })
+      );
+      const record = createTreeRecord(
+        { userId: 'user-1', isAdmin: false, sessionToken: 'user-token' },
+        { ...TEST_CONFIG, fetch: mockFetch }
+      );
+
+      const rows = await record.addLink({ sourceId: 'fadi', targetId: 'ali', type: 'parent', otherParentId: 'ebtisam' });
+
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+      const [url, init] = mockFetch.mock.calls[0];
+      expect(url).toBe('https://example.supabase.co/rest/v1/rpc/link_existing_relative_secure');
+      expect(JSON.parse(init.body)).toEqual({
+        existing_node_id: 'ali',
+        rel_type: 'child',
+        target_node_id: 'fadi',
+        creator_id: 'user-1',
+        p_other_parent_id: 'ebtisam',
+      });
+      expect(rows).toEqual({ links: bothLinks, alreadyConnected: false });
+    });
+
+    it('posts both parent links as one array for an admin, so they are inserted together', async () => {
+      const mockFetch = vi.fn().mockResolvedValue(new Response(JSON.stringify(bothRows), { status: 201 }));
+      const record = createTreeRecord(
+        { userId: 'admin-1', isAdmin: true, sessionToken: 'admin-token' },
+        { ...TEST_CONFIG, fetch: mockFetch }
+      );
+
+      const rows = await record.addLink({ sourceId: 'fadi', targetId: 'ali', type: 'parent', otherParentId: 'ebtisam' });
+
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+      const [url, init] = mockFetch.mock.calls[0];
+      expect(url).toBe('https://example.supabase.co/rest/v1/links');
+      expect(init.headers['Prefer']).toBe('return=representation');
+      expect(JSON.parse(init.body)).toEqual([
+        { source_node_id: 'fadi', target_node_id: 'ali', type: 'parent', parent_role: null, created_by_user_id: 'admin-1' },
+        { source_node_id: 'ebtisam', target_node_id: 'ali', type: 'parent', parent_role: null, created_by_user_id: 'admin-1' },
+      ]);
+      expect(rows).toEqual({ links: bothLinks, alreadyConnected: false });
+    });
+
+    it('sends no other parent when none is given', async () => {
+      const mockFetch = vi.fn().mockResolvedValue(
+        new Response(JSON.stringify([linkRow('link-20', 'fadi', 'ali', 'parent', 'father')]), { status: 201 })
+      );
+      const record = createTreeRecord(
+        { userId: 'admin-1', isAdmin: true, sessionToken: 'admin-token' },
+        { ...TEST_CONFIG, fetch: mockFetch }
+      );
+
+      await record.addLink({ sourceId: 'fadi', targetId: 'ali', type: 'parent', otherParentId: null });
+
+      expect(Array.isArray(JSON.parse(mockFetch.mock.calls[0][1].body))).toBe(false);
+    });
+
+    it.each([true, false])('refuses an other parent on a link that is not a parent link (admin: %s)', async (isAdmin) => {
+      const mockFetch = vi.fn();
+      const record = createTreeRecord({ userId: 'user-1', isAdmin, sessionToken: 't' }, { ...TEST_CONFIG, fetch: mockFetch });
+
+      await expect(
+        record.addLink({ sourceId: 'fadi', targetId: 'ebtisam', type: 'marriage', otherParentId: 'huda' })
+      ).rejects.toMatchObject({ kind: 'refused' });
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+  });
+
   describe('addPerson', () => {
     it('creates relative atomically via RPC and returns the Person and every Kinship Link written', async () => {
       const mockFetch = vi.fn().mockResolvedValue(
@@ -286,6 +366,55 @@ describe('treeRecord module', () => {
         p_parent_role: 'mother',
         p_new_node_id: 'node-1',
       });
+    });
+
+    it('sends the other parent with a new child and returns both parent links', async () => {
+      const mockFetch = vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            success: true,
+            nodes: [NODE_ROW],
+            links: [
+              linkRow('link-1', 'huda', 'node-1', 'parent', 'mother'),
+              linkRow('link-2', 'yusuf', 'node-1', 'parent', 'father'),
+            ],
+          }),
+          { status: 200 }
+        )
+      );
+      const record = createTreeRecord(
+        { userId: 'user-1', isAdmin: false, sessionToken: 'user-token' },
+        { ...TEST_CONFIG, fetch: mockFetch }
+      );
+
+      const rows = await record.addPerson({
+        id: 'node-1',
+        firstName: 'Farah',
+        link: { targetId: 'huda', relation: 'child', otherParentId: 'yusuf' },
+      });
+
+      expect(JSON.parse(mockFetch.mock.calls[0][1].body)).toEqual({
+        new_first_name: 'Farah',
+        rel_type: 'child',
+        target_node_id: 'huda',
+        creator_id: 'user-1',
+        p_new_node_id: 'node-1',
+        p_other_parent_id: 'yusuf',
+      });
+      expect(rows.links).toEqual([
+        { id: 'link-1', source: 'huda', target: 'node-1', type: 'parent', parentRole: 'mother' },
+        { id: 'link-2', source: 'yusuf', target: 'node-1', type: 'parent', parentRole: 'father' },
+      ]);
+    });
+
+    it('refuses an other parent for any relation but child', async () => {
+      const mockFetch = vi.fn();
+      const record = createTreeRecord({ userId: 'user-1', isAdmin: true, sessionToken: 't' }, { ...TEST_CONFIG, fetch: mockFetch });
+
+      await expect(
+        record.addPerson({ firstName: 'Farah', link: { targetId: 'huda', relation: 'spouse', otherParentId: 'yusuf' } })
+      ).rejects.toMatchObject({ kind: 'refused' });
+      expect(mockFetch).not.toHaveBeenCalled();
     });
 
     it("sends the new Person's gender and reads it back", async () => {
@@ -961,6 +1090,20 @@ describe('treeRecord module', () => {
       }
     });
 
+    it('adds the other parent of a new child, with the role from their gender', () => {
+      const links = relativeToKinshipLinks('huda', 'child-1', 'child', [], null, { id: 'yusuf', gender: 'male' });
+      expect(links).toEqual([
+        { source: 'huda', target: 'child-1', type: 'parent', parentRole: null },
+        { source: 'yusuf', target: 'child-1', type: 'parent', parentRole: 'father' },
+      ]);
+    });
+
+    it('refuses an other parent for any relation but child', () => {
+      expect(() =>
+        relativeToKinshipLinks('huda', 'x', 'spouse', [], null, { id: 'yusuf', gender: 'male' })
+      ).toThrow(TreeRecordError);
+    });
+
     it('converts relative sibling to one parent link per parent of the anchor', () => {
       const links = relativeToKinshipLinks('anchor-1', 'sibling-1', 'sibling', TWO_PARENT_LINKS);
       expect(links).toHaveLength(2);
@@ -991,6 +1134,35 @@ describe('treeRecord module', () => {
       expect(links).toEqual([
         { source: 'father', target: 'sibling-1', type: 'parent', parentRole: null },
       ]);
+    });
+  });
+
+  describe('pendingKinshipLinks', () => {
+    const persons: FamilyNode[] = [
+      { id: 'fadi', firstName: 'Fadi', gender: 'male' },
+      { id: 'ebtisam', firstName: 'Ebtisam', gender: 'female' },
+      { id: 'dana', firstName: 'Dana' },
+    ];
+
+    it('is the one link a write asks for when there is no other parent', () => {
+      expect(pendingKinshipLinks({ sourceId: 'fadi', targetId: 'ali', type: 'parent', parentRole: 'father' }, persons)).toEqual([
+        { source: 'fadi', target: 'ali', type: 'parent', parentRole: 'father' },
+      ]);
+    });
+
+    it("adds the other parent's link, with the role from their gender", () => {
+      expect(
+        pendingKinshipLinks({ sourceId: 'fadi', targetId: 'ali', type: 'parent', otherParentId: 'ebtisam' }, persons)
+      ).toEqual([
+        { source: 'fadi', target: 'ali', type: 'parent', parentRole: undefined },
+        { source: 'ebtisam', target: 'ali', type: 'parent', parentRole: 'mother' },
+      ]);
+    });
+
+    it('leaves the role empty for an other parent with no gender recorded', () => {
+      expect(
+        pendingKinshipLinks({ sourceId: 'fadi', targetId: 'ali', type: 'parent', otherParentId: 'dana' }, persons)[1]
+      ).toEqual({ source: 'dana', target: 'ali', type: 'parent', parentRole: null });
     });
   });
 
