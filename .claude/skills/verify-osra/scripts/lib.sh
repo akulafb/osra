@@ -1,5 +1,6 @@
 # Shared settings for the verify-osra helpers. Sourced, not run.
 OSRA_PORT=5173
+OSRA_WAIT_SECS="${OSRA_WAIT_SECS:-1200}"   # how long launch.sh waits for another run to free the port
 OSRA_DEV_REF=djwqamcfllqziqiyvyjj
 OSRA_VERIFY_ROOT=/tmp/osra-verify
 
