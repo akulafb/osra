@@ -532,7 +532,7 @@ export type KinshipRelationName =
   | 'joined terms';
 
 /**
- * The Kinship Term (CONTEXT.md) for a Kinship Path: what the last Person is to
+ * The Kinship Term (GLOSSARY.md) for a Kinship Path: what the last Person is to
  * the first. `label` is the neutral word; `genderedLabel` in `kinshipTerm.ts`
  * gives the gendered one.
  */

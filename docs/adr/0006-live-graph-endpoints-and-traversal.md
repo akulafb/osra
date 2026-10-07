@@ -11,7 +11,7 @@ This mismatch produced:
 2. **Type escapes (`any`)**: Handlers across `permissions.ts`, `familyContext.ts`, `FamilyTree3D.tsx`, and `BulkInviteModal.tsx` routinely cast link objects to `any` to avoid TypeScript errors when accessing `.source` or `.target`.
 3. **Duplicated kinship traversal**: `permissions.ts` and `BulkInviteModal.tsx` independently implemented algorithms to find parents, children, spouses, siblings, stepparents, stepchildren, and co-parents.
 4. **Fragile property access in 3D**: `FamilyTree3D.tsx` relied on d3's in-place mutation to read `link.source.familyCluster`, which is undefined before simulation ticks.
-5. **Vocabulary gap in types**: `RelativeDirection` omitted `'sibling'` in `src/types/graph.ts`, despite `CONTEXT.md` and database RPCs supporting it.
+5. **Vocabulary gap in types**: `RelativeDirection` omitted `'sibling'` in `src/types/graph.ts`, despite `GLOSSARY.md` and database RPCs supporting it.
 
 ## Decision
 
@@ -35,7 +35,7 @@ This mismatch produced:
    - `FamilyTree3D.tsx`: Uses `getNodeId` and a node map lookup for cluster attributes instead of reading mutated link objects.
    - `src/utils/getNodeId.ts`: Deleted; all 14 callers migrated to `src/lib/familyGraph.ts`.
 
-4. **Domain Model (`CONTEXT.md`)**:
+4. **Domain Model (`GLOSSARY.md`)**:
    - Formally documented **1-Degree Network** as a core domain entity.
 
 ## Considered and Rejected

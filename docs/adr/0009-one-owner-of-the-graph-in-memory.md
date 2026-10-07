@@ -43,7 +43,7 @@ production):
    this bug, and it is visible in the one place providers are mounted — so it is left unguarded.
 3. **No vocabulary change.** The names `useFamilyData` / `graphData` stay as they are, and the
    new identifiers (`FamilyDataContext`, `FamilyDataProvider`) are named to match them rather
-   than to introduce a third vocabulary alongside them. `CONTEXT.md` documents the browser-held
+   than to introduce a third vocabulary alongside them. `GLOSSARY.md` documents the browser-held
    set as the **Working Record**, and that is the name this should eventually carry — but
    `useWorkingRecord` is already reserved by LIN-58's spec for a *different* contract
    (`working`, `confirmedLinks`, `write`, `reload`), so taking the name now would collide with

@@ -349,7 +349,7 @@ supabase/
 docs/
 ├── adr/                          # Architecture decision records
 └── DEV_VS_PROD_DATABASE.md       # Dev/prod projects, Edge Function secrets and deploys
-CONTEXT.md                        # Domain glossary (Person, Tree Record, Working Record…)
+GLOSSARY.md                        # Domain glossary (Person, Tree Record, Working Record…)
 ```
 
 ## Getting Started
@@ -493,4 +493,4 @@ Admins or existing family members can generate invite tokens for specific nodes.
 
 ### Tree Record and Working Record
 
-The **Tree Record** is the family tree as stored in Supabase. Every write goes through one seam (`src/lib/treeRecord.ts`) and returns the rows it wrote. The browser holds a **Working Record**: the last Confirmed Snapshot with the user's Pending Changes on top, recomputed rather than patched, so a refused write rolls back without leaving the view out of step ([ADR 0003](docs/adr/0003-tree-record-write-seam.md), [ADR 0008](docs/adr/0008-working-record-representation.md), [ADR 0009](docs/adr/0009-one-owner-of-the-graph-in-memory.md)). The terms are defined in [CONTEXT.md](CONTEXT.md).
+The **Tree Record** is the family tree as stored in Supabase. Every write goes through one seam (`src/lib/treeRecord.ts`) and returns the rows it wrote. The browser holds a **Working Record**: the last Confirmed Snapshot with the user's Pending Changes on top, recomputed rather than patched, so a refused write rolls back without leaving the view out of step ([ADR 0003](docs/adr/0003-tree-record-write-seam.md), [ADR 0008](docs/adr/0008-working-record-representation.md), [ADR 0009](docs/adr/0009-one-owner-of-the-graph-in-memory.md)). The terms are defined in [GLOSSARY.md](GLOSSARY.md).

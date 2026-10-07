@@ -1,5 +1,5 @@
 /**
- * The words of a Kinship Term (CONTEXT.md): the everyday word for what one
+ * The words of a Kinship Term (GLOSSARY.md): the everyday word for what one
  * Person is to another. `nameKinshipPath` in `familyGraph.ts` reads the shape
  * of a Kinship Path and builds the neutral word here ("niece or nephew",
  * "great-grandparent"); `genderedLabel` turns it into the gendered word when

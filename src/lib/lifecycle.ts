@@ -1,7 +1,7 @@
 /**
  * Spawn and Dissolve — one lifecycle, one clock (LIN-55, ADR-0007).
  *
- * `CONTEXT.md` names **Spawn** and **Dissolve** as single lifecycles rendered
+ * `GLOSSARY.md` names **Spawn** and **Dissolve** as single lifecycles rendered
  * differently per view. This module is that lifecycle: it owns the phase, the
  * clock and the abort semantics for every Lifecycle Subject, and the 2D and 3D
  * renderings are adapters that read a normalized progress out of it.
@@ -13,7 +13,7 @@
  * `useLifecycles.ts`, not here.
  */
 
-/** The two lifecycles named in `CONTEXT.md`. */
+/** The two lifecycles named in `GLOSSARY.md`. */
 export type LifecycleKind = 'spawn' | 'dissolve';
 
 /** Which rendering is mounted. Only one view is ever on screen at a time. */
