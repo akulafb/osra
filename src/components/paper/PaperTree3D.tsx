@@ -8,7 +8,7 @@ import { paperLines } from '../../lib/paperLayout';
 import { filterGraphDataFor3D } from '../../lib/filterGraphData';
 import { GRAYSCALE_PAIR, LIVE_PAIR } from '../../theme/paperPair';
 import type { DirectManipulationController } from '../../hooks/useDirectManipulation';
-import type { PersonDrawerInset } from '../../hooks/usePersonDrawerInset';
+import { usePersonDrawerInset, type PersonDrawerInset } from '../../hooks/usePersonDrawerInset';
 import type { PaperLayoutState } from '../../hooks/usePaperLayout';
 import { Tree3DOverlay, type Tree3DSceneCamera, type Tree3DSearch } from '../tree3d/Tree3DOverlay';
 import { useIsMobileDevice } from '../tree3d/useIsMobileDevice';
@@ -16,6 +16,14 @@ import { PaperDiscs } from './PaperDiscs';
 import { PaperLines } from './PaperLines';
 import { PaperLabels } from './PaperLabels';
 import { PaperDuotone } from './PaperDuotone';
+import { PaperHover } from './PaperHover';
+import { PaperHoverRing } from './PaperHoverRing';
+import { PaperParticles } from './PaperParticles';
+import { PaperRipple } from './PaperRipple';
+import { PaperFocus } from './PaperFocus';
+import { wakePaperTap } from './paperTap';
+import { paperFlySmoothTime, PAPER_FLY_SECONDS } from '../../lib/paperFocus';
+import { emptyEmphasisState, type PaperEmphasisState } from './paperEmphasis';
 import { PaperWebGLBoundary, PaperWebGLFallback } from './PaperWebGLFallback';
 import { browserHasWebGL } from './browserHasWebGL';
 import { isBackgroundTap, isTap, paperFrame, type ScreenPoint } from './paperScene';
@@ -54,8 +62,7 @@ const PARENT_INK = `#${new THREE.Color(INK).lerp(new THREE.Color(PAPER), 0.45).g
 
 const FOG_NEAR = 0.9;
 const FOG_FAR = 2.6;
-const FOCUS_DISTANCE_PER_RADIUS = 10;
-const MIN_FOCUS_DISTANCE = 60;
+const FLY_SMOOTH_TIME = paperFlySmoothTime(PAPER_FLY_SECONDS);
 
 /** Paper's own 3D scene (ADR 0014): the still layout as ink discs, lines and labels, drawn in grayscale and painted in the live Paper Pair. */
 export function PaperTree3D({
@@ -96,8 +103,12 @@ export function PaperTree3D({
 
   const controlsRef = useRef<CameraControls | null>(null);
   const pointerDown = useRef<ScreenPoint | null>(null);
+  const hoverPointer = useRef<ScreenPoint | null>(null);
+  const emphasisState = useRef<PaperEmphasisState>(emptyEmphasisState());
   const personClick = useRef<MouseEvent | null>(null);
   const viewDistance = useRef(0);
+  const flyTo = useRef<((id: string) => void) | null>(null);
+  const openDrawerInset = usePersonDrawerInset(true);
   const layout = layoutState.status === 'ready' ? layoutState.layout : null;
 
   const shown = useMemo(() => {
@@ -125,25 +136,12 @@ export function PaperTree3D({
   const focusPerson = useCallback(
     (nodeId: string) => {
       interaction.selectNode(nodeId);
-      const disc = layout?.get(nodeId);
-      const controls = controlsRef.current;
-      if (!disc || !controls) return;
-      const target = new THREE.Vector3(disc.x, disc.y, disc.z);
-      const offset = controls.camera.position.clone().sub(controls.getTarget(new THREE.Vector3()));
-      if (offset.lengthSq() === 0) offset.set(0, 0, 1);
-      offset.setLength(Math.max(MIN_FOCUS_DISTANCE, disc.radius * FOCUS_DISTANCE_PER_RADIUS));
-      void controls.setLookAt(
-        target.x + offset.x,
-        target.y + offset.y,
-        target.z + offset.z,
-        target.x,
-        target.y,
-        target.z,
-        true
-      );
+      flyTo.current?.(nodeId);
     },
-    [interaction, layout]
+    [interaction]
   );
+
+  const flyToOverview = useCallback(() => fitFrame(true), [fitFrame]);
 
   const resetView = useCallback(() => {
     interaction.handleBackgroundClick();
@@ -177,6 +175,17 @@ export function PaperTree3D({
   );
 
   const handleSceneFailed = useCallback(() => setSceneFailed(true), []);
+
+  const handlePointerMove = useCallback((event: React.PointerEvent) => {
+    const { nativeEvent } = event;
+    const overCanvas = nativeEvent.target instanceof HTMLCanvasElement;
+    const dragging = nativeEvent.buttons !== 0 && !isTap(pointerDown.current, { x: event.clientX, y: event.clientY });
+    hoverPointer.current =
+      event.pointerType === 'mouse' && overCanvas && !dragging ? { x: nativeEvent.offsetX, y: nativeEvent.offsetY } : null;
+  }, []);
+  const handlePointerLeave = useCallback(() => {
+    hoverPointer.current = null;
+  }, []);
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -219,6 +228,10 @@ export function PaperTree3D({
         pointerDown.current = { x: e.clientX, y: e.clientY };
       }}
       onClick={handleSceneClick}
+      onClickCapture={wakePaperTap}
+      onKeyDownCapture={wakePaperTap}
+      onPointerMove={handlePointerMove}
+      onPointerLeave={handlePointerLeave}
     >
       {!loaded && (
         <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: panel.loader.scrim, zIndex: 1000, color: panel.ink.strong, fontSize: '18px', pointerEvents: 'none' }}>
@@ -238,17 +251,49 @@ export function PaperTree3D({
           >
             <color attach="background" args={[PAPER]} />
             <fog attach="fog" args={[PAPER, 1, 100000]} />
-            <CameraControls ref={controlsRef} makeDefault />
+            <CameraControls ref={controlsRef} makeDefault smoothTime={FLY_SMOOTH_TIME} />
             <ContextLossWatch onLost={handleSceneFailed} />
             {layout && frame && (
               <>
                 <PaperView viewDistance={viewDistance} />
                 <InitialFraming fit={fitFrame} />
-                <PaperDiscs ids={shownIds} layout={layout} ink={INK} onPersonClick={handlePersonClick} />
+                <PaperFocus
+                  selectedId={interaction.selectedNodeId}
+                  layout={layout}
+                  ids={shownIds}
+                  links={graphData.links}
+                  drawerInset={openDrawerInset}
+                  onOverview={flyToOverview}
+                  flyTo={flyTo}
+                />
+                <PaperHover
+                  state={emphasisState}
+                  pointer={hoverPointer}
+                  layout={layout}
+                  ids={shownIds}
+                  links={graphData.links}
+                  selectedId={interaction.selectedNodeId}
+                />
+                <PaperDiscs ids={shownIds} layout={layout} ink={INK} paper={PAPER} state={emphasisState} onPersonClick={handlePersonClick} />
+                <PaperHoverRing state={emphasisState} layout={layout} ink={INK} />
                 {showLinks && (
-                  <PaperLines lines={shown.lines} layout={layout} ink={INK} parentInk={PARENT_INK} showArrows={showArrows} />
+                  <>
+                    <PaperLines
+                      lines={shown.lines}
+                      layout={layout}
+                      ink={INK}
+                      parentInk={PARENT_INK}
+                      paper={PAPER}
+                      state={emphasisState}
+                      showArrows={showArrows}
+                    />
+                    <PaperParticles state={emphasisState} layout={layout} lines={shown.lines} ink={INK} />
+                    <PaperRipple state={emphasisState} layout={layout} lines={shown.lines} ink={INK} />
+                  </>
                 )}
-                {showNames && <PaperLabels nodes={shown.nodes} layout={layout} ink={INK} viewDistance={viewDistance} />}
+                {showNames && (
+                  <PaperLabels nodes={shown.nodes} layout={layout} ink={INK} viewDistance={viewDistance} state={emphasisState} />
+                )}
                 <FirstFrame onDrawn={() => setFirstFrameDrawn(true)} />
               </>
             )}

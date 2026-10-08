@@ -1,5 +1,6 @@
 import { mixOklab } from './colourBlend';
-import { PAPER_PAIRS, type PaperPair } from '../theme/paperPair';
+import { GRAYSCALE_PAIR, PAPER_PAIRS, type PaperPair } from '../theme/paperPair';
+import type { CanvasMode, PaperColour } from './canvasMode';
 
 export const PAIR_FADE_MS = 400;
 
@@ -13,6 +14,22 @@ function hashFamily(familyCluster: string): number {
 
 export function pairForFamily(familyCluster: string): PaperPair {
   return PAPER_PAIRS[Math.abs(hashFamily(familyCluster)) % PAPER_PAIRS.length];
+}
+
+/** The pair the scene fades to: the focused Person's family pair in Paper colour, else the overview pair; grayscale otherwise. */
+export function paperTargetPair({
+  mode,
+  paperColour,
+  focused,
+  overview,
+}: {
+  mode: CanvasMode;
+  paperColour: PaperColour;
+  focused: { familyCluster?: string } | null;
+  overview: PaperPair;
+}): PaperPair {
+  if (mode !== 'paper' || paperColour === 'grayscale') return GRAYSCALE_PAIR;
+  return focused?.familyCluster ? pairForFamily(focused.familyCluster) : overview;
 }
 
 export function drawOverviewPair(previous: PaperPair | null, random: () => number = Math.random): PaperPair {

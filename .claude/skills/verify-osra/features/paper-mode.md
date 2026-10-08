@@ -66,11 +66,11 @@ Preconditions:
 
 ### Sub-features
 
-- `paper-3d` draws every shown Person as a flat ink disc that faces the camera, larger with more Kinship Links, on grayscale paper. The layout is still: nothing drifts. Labels are uppercase monospace (bundled Kawkab Mono, Arabic too), bigger and bolder on larger discs, and fade with distance. Parent lines are thin and grey, marriages thick ink, divorces dashed ink. No planet textures, starfield or family bubbles; INSTRUMENTS has no TEXTURE or FAMILY PRESETS.
+- `paper-3d` draws every shown Person as a flat ink disc that faces the camera, larger with more Kinship Links, on grayscale paper. The layout is still: nothing drifts on its own (a hover leans relatives in on top of it, see [Paper 3D hover](#paper-3d-hover-lin-94-pass-94a)). Labels are uppercase monospace (bundled Kawkab Mono, Arabic too), bigger and bolder on larger discs, and fade with distance. Parent lines are thin and grey, marriages thick ink, divorces dashed ink. No planet textures, starfield or family bubbles; INSTRUMENTS has no TEXTURE or FAMILY PRESETS.
 - `paper-3d-click` selects the clicked Person: the drawer opens (desktop side drawer, phone bottom sheet). A pointer that moves more than 6 px is a camera drag, not a click. Clicking empty paper (up to 6 px of movement) or pressing Escape clears the selection.
 - `paper-3d-stable` keeps the layout for the whole page load: switching to Cosmos or 2D and back shows the same positions.
 - `paper-3d-no-webgl` shows "THE 3D TREE NEEDS WEBGL" in place of the canvas when WebGL is missing, the renderer throws, the layout throws or the WebGL context is lost; INSTRUMENTS still works. The WebGL check runs once per page and gives its context back, so switching Paper and Cosmos never logs "Too many active WebGL contexts".
-- `paper-3d-unwired` hides what Paper 3D does not do yet: no AMBIANCE toggle (LIN-94), no previous/next match buttons (the count and highlight stay; LIN-97), only `Esc` under NAV CONTROLS (LIN-96) and no `Connect Nodes...` in the drawer (LIN-96). Cosmos 3D and Paper 2D keep all of them.
+- `paper-3d-unwired` hides what Paper 3D does not do yet: no AMBIANCE toggle (Cosmos-only: the Paper focus tap always plays, product decision 10), no previous/next match buttons (the count and highlight stay; LIN-97), only `Esc` under NAV CONTROLS (LIN-96) and no `Connect Nodes...` in the drawer (LIN-96). Cosmos 3D and Paper 2D keep all of them.
 
 ### Driving it with ui.sh
 
@@ -112,3 +112,50 @@ Preconditions:
 - An occluded Orca window runs about 1-3 rAF a second, so a 0.4 s fade shows up as 2 or 3 frames. To see the steps, slow the page clock for the recording (wrap `performance.now` and the rAF timestamp at 1/20 speed with `orca eval`), and say so in the report.
 - In the phone sheet, the drawer's buttons sit high: a tap meant to focus the page can land on `+ Add Relative` and open its modal. Tap the heading text (`.MuiDrawer-paper h4`) instead, and Cancel any modal that opens.
 
+
+## Paper 3D hover (LIN-94 pass 94a)
+
+### Sub-features
+
+- `paper-3d-hover` (mouse only): the Person under the pointer gets a thin ink ring, the same width at any zoom, and a pointer cursor. Their direct relatives (parents, children, spouses and ex-spouses) keep full ink; everyone else and their labels fade to half ink. Each end of a line fades with its own Person, and lines draw beneath every disc, so no line crosses a disc as a light wedge. The hovered Person's own lines darken to full ink and carry ink dots flowing out from them.
+- `paper-3d-hover-lean`: the relatives lean toward the hovered Person by a small share of the distance (at most 6 world units, never into the 4-unit gap between discs) with an easing of 0.12 s time constant (most of the way in about 0.35 s), and ease back when the hover ends. Their labels, lines and arrows follow, and arrows dim with their lines. The layout itself never changes.
+- `paper-3d-hover-rules`: emphasis comes from `focusEmphasis`, as in Paper 2D: while a Person is selected the selection outranks the hover, so hovering shows only the pointer cursor. Where discs overlap, a click selects the ringed Person (the nearest centre on screen), not the front-most disc. A camera drag (more than 6 px with a button down), the pointer over INSTRUMENTS or the drawer, or leaving the canvas hovers nobody. Touch has no hover: a phone tap opens the bottom sheet as before.
+
+### Driving it with ui.sh
+
+- Paper 3D, loaded, the tab visible, nobody selected. Pick a disc with several relatives from a screenshot (PNG pixels ÷ 2 at the 879 px tab).
+- **Hover.** `orca mouse move --x <x> --y <y> --page "$(cat $RUN_DIR/state/page)"`, wait a second, capture. Then move to empty paper and capture again: the overview is back.
+- **Lean and dots.** Both move: take two captures about 0.2 s apart over the same hovered disc. The dots sit at different places along the lines; the relatives' discs are a few pixels nearer the hovered one than in the overview capture.
+- **Selection outranks hover.** `ui.sh tap` a disc (the drawer opens), then hover another disc: no ring and no dimming.
+- **Proof.** Capture `paper-3d-hover overview`, `hover`, `hover-off`, `hover-selected`.
+
+### Gotchas
+
+- `orca mouse move` sends a mouse pointer, so it hovers; `ui.sh tap` also leaves the pointer where it tapped, so a disc you just tapped stays hovered until the pointer moves.
+- The dots and the lean need rAF: in an occluded tab they freeze, and a screenshot pumps only one frame.
+
+## Paper 3D focus (LIN-94 pass 94b)
+
+### Sub-features
+
+- `paper-3d-focus-fly`: selecting a Person (click, search pick, FIND ME) flies the camera to them in about 1 s, from the side the camera is already on. The Person lands in the middle of the space the open drawer leaves free: left of the 400 px side drawer on desktop, above the bottom sheet below 900 px. The distance frames their relatives (the farthest relative's disc, at least 5 disc radii, at most 150 units), so a portrait phone stands about twice as far back.
+- `paper-3d-focus-emphasis`: the focused Person and their direct relatives keep full ink; everyone else is a ghost at 0.2 ink, lines fading per end as in hover. The focused Person's own lines darken and carry the hover's ink dots.
+- `paper-3d-focus-ripple`: 0.4 s after the focus, as the camera nears, a 6 px ink pulse runs out along the focused Person's lines (at most 64) over 0.9 s, once.
+- `paper-3d-focus-wobble`: the relatives wobble gently around their places (at most 1.5 units, easing in over 0.6 s) while the focus lasts; the layout never changes.
+- `paper-3d-focus-colour`: with colour on, the panels fade from the default pair to the focused Person's family pair.
+- `paper-3d-focus-tap`: each new focus plays a short Web Audio tap (880 Hz falling, 0.11 s, quiet). Any click or key press inside Paper wakes the audio first, so browsers that need a gesture still play it. It always plays: AMBIANCE is Cosmos-only (product decision 10). Nothing plays when the page loads with a Person already selected.
+- `paper-3d-focus-clear`: Escape or a tap on empty paper clears the selection, closes the drawer and flies back to the overview.
+
+### Driving it with ui.sh
+
+- Paper 3D, loaded, the tab visible. `ui.sh tap` a disc with several relatives: the drawer opens and the camera flies. Wait 2 s, capture `focused`: the Person sits in the middle of the free space, the relatives are in view and darker than the ghosts.
+- **Phone.** `orca exec "set viewport 820 812 2"` (or 390x844): the drawer is a bottom sheet; the focused Person sits in the middle of the space above it.
+- **Clear.** Press Escape, wait 2 s, capture `overview`: everyone at full ink, no drawer. Then tap again and tap empty paper: the same.
+- **Tap.** Before tapping, run an eval that wraps `window.AudioContext` and counts `createOscillator().start` calls; each focus adds one and the context's `state` is `running`.
+- **Colour.** With colour on, watch `--paper-pair-paper` on `document.documentElement` with a MutationObserver: it steps from the default pair to the family's pair.
+- **Proof.** Capture `paper-3d-focus focused`, `phone-focused`, `escape-overview`, `background-overview`.
+
+### Gotchas
+
+- The flight, ripple and wobble need rAF: in an occluded tab they crawl or freeze. A tab can drop to 0 fps; close it and open a fresh one. Report motion unverified unless the tab is visible (STANDING 14).
+- Consecutive screenshots under a viewport override sometimes come out half-scale in the top-left quadrant; retake.

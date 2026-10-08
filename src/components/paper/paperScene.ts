@@ -20,6 +20,9 @@ export interface PaperFrame {
 
 export const TAP_SLOP_PX = 6;
 
+/** Lines draw before the discs and write no depth, so every disc covers the lines that cross it. */
+export const PAPER_LINE_RENDER_ORDER = -2;
+
 const EMPTY_FRAME_RADIUS = 50;
 
 export function paperFrame(layout: PaperLayout, ids: Iterable<string>): PaperFrame {
