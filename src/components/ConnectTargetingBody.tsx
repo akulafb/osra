@@ -2,7 +2,6 @@ import React from 'react';
 import { useTheme } from '@mui/material/styles';
 import { FamilyNode } from '../types/graph';
 import { TargetOption } from './cards/connectCandidates';
-import { CONNECT_ACCENT } from './cards/relationStyle';
 
 /**
  * The body of the docked panel while Connect Mode is aiming (LIN-50).
@@ -51,7 +50,7 @@ export const ConnectTargetingBody: React.FC<ConnectTargetingBodyProps> = ({
 
   return (
     <>
-      <div style={{ fontSize: 11, fontWeight: 700, color: CONNECT_ACCENT }}>
+      <div style={{ fontSize: 11, fontWeight: 700, color: hud.connect.accent }}>
         🔗 Connect {sourceNode.firstName} to…
       </div>
       <div style={{ fontSize: 10, color: hud.editor.caption, lineHeight: 1.4 }}>
@@ -107,7 +106,7 @@ export const ConnectTargetingBody: React.FC<ConnectTargetingBodyProps> = ({
               alignItems: 'center',
               background: candidacy.ok ? hud.targeting.option : hud.targeting.optionOffSurface,
               border: candidacy.ok
-                ? `1px solid ${CONNECT_ACCENT}66`
+                ? `1px solid ${hud.connect.optionBorder}`
                 : `1px solid ${hud.targeting.optionOffBorder}`,
               borderRadius: 6,
               color: candidacy.ok ? panel.ink.strong : hud.targeting.optionOffInk,
