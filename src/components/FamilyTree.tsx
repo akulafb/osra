@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import Button from '@mui/material/Button';
+import { useTheme } from '@mui/material/styles';
 import FamilyTree3D from './FamilyTree3D';
 import { FamilyTree2D } from './FamilyTree2D';
 import { useViewMode } from '../hooks/useViewMode';
@@ -471,15 +472,17 @@ export const FamilyTree: React.FC = () => {
 
   const searchHighlightedNodeId = searchMatches[searchIndex]?.id ?? null;
 
+  const { panel } = useTheme().palette;
+
   const seeWhosNewButtonSx = {
     fontWeight: 700,
     ...(buttonGlowActive && {
       '@keyframes seeWhosNewGlow': {
         '0%, 100%': {
-          boxShadow: '0 0 14px rgba(168, 85, 247, 0.65)',
+          boxShadow: `0 0 14px ${panel.attention.glow}`,
         },
         '50%': {
-          boxShadow: '0 0 28px rgba(236, 72, 153, 0.9)',
+          boxShadow: `0 0 28px ${panel.attention.glowPeak}`,
         },
       },
       animation: 'seeWhosNewGlow 1.15s ease-in-out infinite',
@@ -528,8 +531,8 @@ export const FamilyTree: React.FC = () => {
           width: '100%',
           height: '100vh',
           minHeight: '100vh',
-          background: '#0a0a0a',
-          color: '#fff',
+          background: panel.page,
+          color: panel.ink.strong,
         }}
         aria-busy="true"
         aria-live="polite"
@@ -540,8 +543,8 @@ export const FamilyTree: React.FC = () => {
             style={{
               width: '40px',
               height: '40px',
-              border: '4px solid rgba(255,255,255,0.3)',
-              borderTop: '4px solid #3b82f6',
+              border: `4px solid ${panel.loader.track}`,
+              borderTop: `4px solid ${panel.loader.pageHead}`,
               borderRadius: '50%',
               animation: 'spin 1s linear infinite',
               margin: '16px auto',
@@ -562,8 +565,8 @@ export const FamilyTree: React.FC = () => {
         justifyContent: 'center',
         width: '100%',
         height: '100vh',
-        background: '#0a0a0a',
-        color: '#ef4444',
+        background: panel.page,
+        color: panel.loader.error,
         textAlign: 'center',
         padding: '20px',
       }}>
@@ -586,8 +589,8 @@ export const FamilyTree: React.FC = () => {
         justifyContent: 'center',
         width: '100%',
         height: '100vh',
-        background: '#0a0a0a',
-        color: '#fff',
+        background: panel.page,
+        color: panel.ink.strong,
         textAlign: 'center',
       }}>
         <div>
@@ -604,7 +607,7 @@ export const FamilyTree: React.FC = () => {
       width: '100%',
       height: '100vh',
       overflow: 'hidden',
-      background: '#0a0a0a',
+      background: panel.page,
     }}>
       {mode === '2D' && showSeeWhosNewButton && newMembers.length > 0 && (
         <div
