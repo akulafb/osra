@@ -225,16 +225,18 @@ export const FamilyTree2D: React.FC<FamilyTree2DProps> = ({
   // Calculate bounds and center the view
   const bounds = useMemo(() => calculateBounds(nodes), [nodes]);
 
+  const isConnecting =
+    interaction.state.phase === 'targeting-connect' || interaction.state.phase === 'choosing-kinship';
   const emphasis = useMemo(() => {
     if (!isPaper) return null;
     return focusEmphasis({
       personIds: nodes.map((n) => n.id),
       links: graphData?.links ?? [],
       hoveredId: hoveredNodeId,
-      focusedId: interaction.selectedNodeId,
+      focusedId: isConnecting ? null : interaction.selectedNodeId,
       searchMatchIds: searchQuery.trim() ? new Set(searchMatches.map((m) => m.id)) : null,
     });
-  }, [isPaper, nodes, graphData?.links, hoveredNodeId, interaction.selectedNodeId, searchQuery, searchMatches]);
+  }, [isPaper, nodes, graphData?.links, hoveredNodeId, isConnecting, interaction.selectedNodeId, searchQuery, searchMatches]);
   // Read inside the fit effect without making a layout change re-trigger it.
   const boundsRef = useRef(bounds);
   boundsRef.current = bounds;
@@ -703,7 +705,7 @@ export const FamilyTree2D: React.FC<FamilyTree2DProps> = ({
                     y1={y1}
                     x2={x2}
                     y2={y2}
-                    stroke="#22d3ee"
+                    stroke={isPaper ? pair.ink : '#22d3ee'}
                     strokeWidth={2.5}
                     strokeDasharray="6 4"
                     opacity={0.95}
@@ -828,6 +830,7 @@ export const FamilyTree2D: React.FC<FamilyTree2DProps> = ({
                     interaction.selectNode(sourceId);
                   }}
                   onCancel={() => interaction.handleEscape()}
+                  previewStroke={isPaper ? pair.ink : undefined}
                 />
               );
             })()}

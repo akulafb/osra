@@ -63,6 +63,7 @@ function lightenColors(base: { bg: string; border: string; text: string }) {
 }
 
 const HIGHLIGHT_GLOW_COLOR = '#10b981';
+const SEARCH_GLOW_COLOR = '#ef4444';
 
 function PaperHighlights({
   width,
@@ -104,7 +105,6 @@ function PaperHighlights({
     </>
   );
 }
-const SEARCH_GLOW_COLOR = '#ef4444';
 
 const NodeCardComponent: React.FC<NodeCardProps> = ({
   node,
@@ -157,6 +157,10 @@ const NodeCardComponent: React.FC<NodeCardProps> = ({
 
   // A card can unmount under the pointer (family switch, collapse) without a mouseleave.
   React.useEffect(() => () => onHoverChange?.(node.id, false), [node.id, onHoverChange]);
+
+  const inkOr = (cosmos: string) => (paperPair ? paperPair.ink : cosmos);
+  const paperOr = (cosmos: string) => (paperPair ? paperPair.paper : cosmos);
+  const accentOr = (cosmos: string) => (paperPair ? PAPER_ACCENT : cosmos);
 
   const showActionHandles = canEdit && (isHovered || isSelected || isConfirmingDissolve);
 
@@ -362,15 +366,15 @@ const NodeCardComponent: React.FC<NodeCardProps> = ({
               width={60}
               height={20}
               rx={10}
-              fill={paperPair ? paperPair.paper : 'rgba(15, 23, 42, 0.95)'}
-              stroke={paperPair ? paperPair.ink : 'rgba(212, 175, 55, 0.9)'}
+              fill={paperOr('rgba(15, 23, 42, 0.95)')}
+              stroke={inkOr('rgba(212, 175, 55, 0.9)')}
               strokeWidth={1.5}
             />
             <text
               x={0}
               y={4}
               textAnchor="middle"
-              fill={paperPair ? paperPair.ink : '#fef08a'}
+              fill={inkOr('#fef08a')}
               fontSize={10}
               fontWeight={700}
               style={{ pointerEvents: 'none', userSelect: 'none' }}
@@ -395,15 +399,15 @@ const NodeCardComponent: React.FC<NodeCardProps> = ({
               width={56}
               height={20}
               rx={10}
-              fill={paperPair ? paperPair.paper : 'rgba(15, 23, 42, 0.95)'}
-              stroke={paperPair ? paperPair.ink : 'rgba(59, 130, 246, 0.9)'}
+              fill={paperOr('rgba(15, 23, 42, 0.95)')}
+              stroke={inkOr('rgba(59, 130, 246, 0.9)')}
               strokeWidth={1.5}
             />
             <text
               x={0}
               y={4}
               textAnchor="middle"
-              fill={paperPair ? paperPair.ink : '#93c5fd'}
+              fill={inkOr('#93c5fd')}
               fontSize={10}
               fontWeight={700}
               style={{ pointerEvents: 'none', userSelect: 'none' }}
@@ -428,15 +432,15 @@ const NodeCardComponent: React.FC<NodeCardProps> = ({
               width={60}
               height={20}
               rx={10}
-              fill={paperPair ? paperPair.paper : 'rgba(15, 23, 42, 0.95)'}
-              stroke={paperPair ? paperPair.ink : 'rgba(236, 72, 153, 0.9)'}
+              fill={paperOr('rgba(15, 23, 42, 0.95)')}
+              stroke={inkOr('rgba(236, 72, 153, 0.9)')}
               strokeWidth={1.5}
             />
             <text
               x={0}
               y={4}
               textAnchor="middle"
-              fill={paperPair ? paperPair.ink : '#f472b6'}
+              fill={inkOr('#f472b6')}
               fontSize={10}
               fontWeight={700}
               style={{ pointerEvents: 'none', userSelect: 'none' }}
@@ -459,8 +463,8 @@ const NodeCardComponent: React.FC<NodeCardProps> = ({
                   width={130}
                   height={22}
                   rx={11}
-                  fill="rgba(239, 68, 68, 0.98)"
-                  stroke="#fff"
+                  fill={accentOr('rgba(239, 68, 68, 0.98)')}
+                  stroke={paperOr('#fff')}
                   strokeWidth={1.5}
                   style={{ filter: 'drop-shadow(0 0 8px rgba(239, 68, 68, 0.6))' }}
                 />
@@ -468,7 +472,7 @@ const NodeCardComponent: React.FC<NodeCardProps> = ({
                   x={-24}
                   y={4}
                   textAnchor="middle"
-                  fill="#fff"
+                  fill={paperOr('#fff')}
                   fontSize={10}
                   fontWeight={700}
                   style={{ pointerEvents: 'none', userSelect: 'none' }}
@@ -495,13 +499,13 @@ const NodeCardComponent: React.FC<NodeCardProps> = ({
                     width={28}
                     height={16}
                     rx={8}
-                    fill="#fff"
+                    fill={paperOr('#fff')}
                   />
                   <text
                     x={0}
                     y={4}
                     textAnchor="middle"
-                    fill={paperPair ? paperPair.ink : '#dc2626'}
+                    fill={accentOr('#dc2626')}
                     fontSize={10}
                     fontWeight={800}
                     style={{ pointerEvents: 'none', userSelect: 'none' }}
@@ -531,7 +535,7 @@ const NodeCardComponent: React.FC<NodeCardProps> = ({
                     x={0}
                     y={4}
                     textAnchor="middle"
-                    fill="#fff"
+                    fill={paperOr('#fff')}
                     fontSize={9}
                     fontWeight={700}
                     style={{ pointerEvents: 'none', userSelect: 'none' }}
@@ -558,15 +562,15 @@ const NodeCardComponent: React.FC<NodeCardProps> = ({
                     width={50}
                     height={16}
                     rx={8}
-                    fill={paperPair ? paperPair.paper : 'rgba(15, 23, 42, 0.95)'}
-                    stroke={paperPair ? paperPair.ink : 'rgba(168, 85, 247, 0.85)'}
+                    fill={paperOr('rgba(15, 23, 42, 0.95)')}
+                    stroke={inkOr('rgba(168, 85, 247, 0.85)')}
                     strokeWidth={1.2}
                   />
                   <text
                     x={0}
                     y={4}
                     textAnchor="middle"
-                    fill={paperPair ? paperPair.ink : '#c084fc'}
+                    fill={inkOr('#c084fc')}
                     fontSize={9}
                     fontWeight={600}
                     style={{ pointerEvents: 'none', userSelect: 'none' }}
@@ -592,15 +596,15 @@ const NodeCardComponent: React.FC<NodeCardProps> = ({
                     width={54}
                     height={16}
                     rx={8}
-                    fill={paperPair ? paperPair.paper : 'rgba(15, 23, 42, 0.95)'}
-                    stroke={paperPair ? paperPair.ink : 'rgba(239, 68, 68, 0.85)'}
+                    fill={paperOr('rgba(15, 23, 42, 0.95)')}
+                    stroke={inkOr('rgba(239, 68, 68, 0.85)')}
                     strokeWidth={1.2}
                   />
                   <text
                     x={0}
                     y={4}
                     textAnchor="middle"
-                    fill={paperPair ? paperPair.ink : '#f87171'}
+                    fill={inkOr('#f87171')}
                     fontSize={9}
                     fontWeight={600}
                     style={{ pointerEvents: 'none', userSelect: 'none' }}

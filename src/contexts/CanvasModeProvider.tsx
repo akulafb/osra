@@ -11,7 +11,7 @@ import type { CanvasMode } from '../lib/canvasMode';
 import { createPaperTheme, osraTheme } from '../theme/osraTheme';
 import { GRAYSCALE_PAIR } from '../theme/paperPair';
 
-const grayscale: CurrentPaperPair = { pair: GRAYSCALE_PAIR };
+const currentPaperPair: CurrentPaperPair = { pair: GRAYSCALE_PAIR };
 
 export function CanvasModeProvider({ children }: { children: ReactNode }) {
   const [preference, setPreference] = useState(readStoredCanvasMode);
@@ -23,13 +23,13 @@ export function CanvasModeProvider({ children }: { children: ReactNode }) {
 
   const controller = useMemo(() => ({ ...preference, setMode }), [preference, setMode]);
   const theme = useMemo(
-    () => (preference.mode === 'paper' ? createPaperTheme(grayscale.pair) : osraTheme),
+    () => (preference.mode === 'paper' ? createPaperTheme(currentPaperPair.pair) : osraTheme),
     [preference.mode]
   );
 
   return (
     <CanvasModeContext.Provider value={controller}>
-      <CurrentPaperPairContext.Provider value={grayscale}>
+      <CurrentPaperPairContext.Provider value={currentPaperPair}>
         <ThemeProvider theme={theme}>{children}</ThemeProvider>
       </CurrentPaperPairContext.Provider>
     </CanvasModeContext.Provider>

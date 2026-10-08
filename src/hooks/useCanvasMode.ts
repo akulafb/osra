@@ -25,7 +25,8 @@ export function readStoredCanvasMode(): CanvasModePreference {
       mode: localStorage.getItem(CANVAS_MODE_STORAGE_KEY),
       paperColour: localStorage.getItem(PAPER_COLOUR_STORAGE_KEY),
     });
-  } catch {
+  } catch (e) {
+    console.warn('[useCanvasMode] Failed to load stored preference:', e);
     return resolveCanvasMode({ mode: null, paperColour: null });
   }
 }

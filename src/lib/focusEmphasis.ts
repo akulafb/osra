@@ -1,5 +1,5 @@
 import type { FamilyLink } from '../types/graph';
-import { getLinkEndpoints } from './familyGraph';
+import { getChildren, getParents, getSpouses } from './familyGraph';
 
 export type Emphasis = 'normal' | 'hovered' | 'focused' | 'relative' | 'dimmed' | 'ghost' | 'hidden';
 
@@ -11,14 +11,8 @@ export interface FocusEmphasisInput {
   searchMatchIds: ReadonlySet<string> | null;
 }
 
-function directNeighbours(personId: string, links: readonly FamilyLink[]): Set<string> {
-  const neighbours = new Set<string>();
-  for (const link of links) {
-    const { sourceId, targetId } = getLinkEndpoints(link);
-    if (sourceId === personId) neighbours.add(targetId);
-    else if (targetId === personId) neighbours.add(sourceId);
-  }
-  return neighbours;
+function directRelatives(personId: string, links: readonly FamilyLink[]): Set<string> {
+  return new Set([...getParents(personId, links), ...getChildren(personId, links), ...getSpouses(personId, links)]);
 }
 
 export function focusEmphasis(input: FocusEmphasisInput): Map<string, Emphasis> {
@@ -29,7 +23,7 @@ export function focusEmphasis(input: FocusEmphasisInput): Map<string, Emphasis> 
   const subjectId = focusedSubject ?? hoveredSubject;
   const subjectState: Emphasis = focusedSubject ? 'focused' : 'hovered';
   const othersState: Emphasis = focusedSubject ? 'ghost' : 'dimmed';
-  const relatives = subjectId ? directNeighbours(subjectId, links) : new Set<string>();
+  const relatives = subjectId ? directRelatives(subjectId, links) : new Set<string>();
 
   const emphasis = new Map<string, Emphasis>();
   for (const id of personIds) {

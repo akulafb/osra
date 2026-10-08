@@ -97,7 +97,7 @@ describe('focusEmphasis', () => {
 
   it('resolves links whose endpoints are node objects', () => {
     const objectLinks: FamilyLink[] = [
-      { source: { id: 'dad', name: 'Dad' } as never, target: { id: 'kid', name: 'Kid' } as never, type: 'parent' },
+      { source: { id: 'dad', firstName: 'Dad' }, target: { id: 'kid', firstName: 'Kid' }, type: 'parent' },
     ];
     const emphasis = focusEmphasis({ ...rest, links: objectLinks, hoveredId: 'kid' });
     expect(emphasis.get('dad')).toBe('relative');
