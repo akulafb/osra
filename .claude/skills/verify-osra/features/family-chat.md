@@ -45,3 +45,4 @@ Preconditions:
 - Messages are capped in length (`MAX_USER_MESSAGE_CHARS`); longer input is cut silently.
 - The answer is about the signed-in owner's own node, so the expected answer depends on their place in the dev tree; check it against the tree, not a fixed string.
 - The chat calls the dev `family-chat` Edge Function; if it is not deployed to dev with its secrets, every send ends in a failure notice. That is an environment gap to report, not a pass.
+- Routing (`routeMessage` in `src/lib/chatRouting.ts`, called from `src/lib/familyChat.ts`) runs in the browser, including the code answers and the "Is <Person> my <word>?" yes/no. A change there ships with the frontend deploy, not a `family-chat` deploy. When TypeSafe fails, the route call still returns 200 with `questionKind: null` and the speaker, so browser routing still runs.
