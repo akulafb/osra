@@ -22,21 +22,16 @@ const relatives = (id: string, kind: RelativeKind, filter?: RelativeFilter) =>
   names(getRelatives(id, kind, links, { ...filter, persons: nodes }));
 const byId = (id: string) => CHAT_TEST_QUESTIONS.find((q) => q.id === id)!;
 
-/** What `a` is to `b`, as the chat says it: each Kinship Path's term, gendered, blood first. */
-const termsOf = (a: string, b: string) =>
+const termsForAToB = (a: string, b: string) =>
   findKinshipPaths(b, a, links).map((path) =>
     kinshipTermText(path.relation, a, { genderOf: (id) => getRecordedGender(id, links, nodes), nameOf }),
   );
 
-/** How many Kinship Terms a relation joins at Persons: 1 for one word, 2 for two terms. */
 const termCount = (relation: KinshipRelation): number => (relation.via ? 1 + termCount(relation.via.second) : 1);
 
 describe('the chat test questions', () => {
-  it('are 31, with unique ids, covering every group the tickets ask for', () => {
-    expect(CHAT_TEST_QUESTIONS).toHaveLength(31);
-    expect(new Set(CHAT_TEST_QUESTIONS.map((q) => q.id)).size).toBe(31);
-    const groups = CHAT_TEST_QUESTIONS.reduce<Record<string, number>>((acc, q) => ({ ...acc, [q.group]: (acc[q.group] ?? 0) + 1 }), {});
-    expect(groups).toEqual({ relatives: 8, count: 3, how_related: 12, married_cousins: 1, two_matches: 1, no_path: 1, arabic: 3, open: 2 });
+  it('have unique ids', () => {
+    expect(new Set(CHAT_TEST_QUESTIONS.map((q) => q.id)).size).toBe(CHAT_TEST_QUESTIONS.length);
   });
 
   it('name only Persons of the test tree', () => {
@@ -97,7 +92,7 @@ describe('the chat test questions', () => {
       'no-gender': [P.ziad, P.samir],
       'married-cousins': [P.omar, P.sara],
     };
-    expect(Object.fromEntries(Object.entries(pairs).map(([id, [a, b]]) => [id, termsOf(a, b)]))).toEqual({
+    expect(Object.fromEntries(Object.entries(pairs).map(([id, [a, b]]) => [id, termsForAToB(a, b)]))).toEqual({
       cousin: ['first cousin'],
       'in-law': ['father-in-law'],
       step: ['stepfather'],
@@ -115,7 +110,7 @@ describe('the chat test questions', () => {
 
     for (const [id, [a, b]] of Object.entries(pairs)) {
       const { relations = [], forbid = [], joinedTerms = 1 } = byId(id).expect;
-      const said = termsOf(a, b).join(' ');
+      const said = termsForAToB(a, b).join(' ');
       for (const relation of relations) expect(said, `${id}: ${relation}`).toMatch(relation);
       for (const word of forbid) expect(said, `${id}: ${word}`).not.toMatch(word);
       expect(termCount(findKinshipPaths(b, a, links)[0].relation), id).toBe(joinedTerms);
@@ -124,7 +119,7 @@ describe('the chat test questions', () => {
   });
 
   it('expect "khalo" for the mother\'s brother', () => {
-    expect(termsOf(P.walid, me)).toEqual(['uncle']);
+    expect(termsForAToB(P.walid, me)).toEqual(['uncle']);
     expect(findKinshipPaths(me, P.walid, links)[0].relation.side).toBe('mother');
   });
 

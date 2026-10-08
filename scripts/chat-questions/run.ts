@@ -28,7 +28,6 @@ const showReplies = args.includes('--replies');
 const onlyAt = args.indexOf('--only');
 const only = onlyAt === -1 ? null : new Set(args[onlyAt + 1]?.split(','));
 
-/** The share of questions a full run must get correct. */
 const PASS_SHARE = 0.9;
 const PASS_MARK = Math.ceil(PASS_SHARE * CHAT_TEST_QUESTIONS.length);
 

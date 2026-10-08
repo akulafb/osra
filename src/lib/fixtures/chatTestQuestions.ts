@@ -1,5 +1,5 @@
 /**
- * The chat test questions (LIN-74, LIN-81): 31 questions on the made-up chat
+ * The chat test questions (LIN-74, LIN-81): questions on the made-up chat
  * test tree (`CHAT_TEST_TREE` in `kinshipFixtureTree.ts`), each with one
  * answer that can be checked exactly.
  *
@@ -80,7 +80,6 @@ export const CHAT_TEST_QUESTIONS: readonly ChatTestQuestion[] = [
     id: 'my-nieces-nephews',
     group: 'relatives',
     question: 'Who are my nieces and nephews?',
-    // Hani's son, and his daughter with Joumana; Hani is the only sibling.
     expect: { names: ['Lara Khoury', 'Sami Khoury'], allow: ['Hani Khoury', 'Joumana Saab'] },
   },
   {
@@ -141,7 +140,7 @@ export const CHAT_TEST_QUESTIONS: readonly ChatTestQuestion[] = [
     expect: { number: 43 },
   },
 
-  // How two Persons are related: the Kinship Term, never the Persons on the path between them.
+  // How two Persons are related.
   {
     id: 'cousin',
     group: 'how_related',
@@ -177,7 +176,6 @@ export const CHAT_TEST_QUESTIONS: readonly ChatTestQuestion[] = [
     id: 'niece-both-parents',
     group: 'how_related',
     question: 'How is Lara Khoury related to me?',
-    // Hani's daughter with Joumana, linked to both: a niece, not a sister-in-law's daughter.
     expect: { relations: [/\bniece\b/i], forbid: [/nephew/i, /in[\s-]law/i, /\bstep/i] },
   },
   {
@@ -214,14 +212,12 @@ export const CHAT_TEST_QUESTIONS: readonly ChatTestQuestion[] = [
     id: 'two-terms',
     group: 'how_related',
     question: 'How is Karim Qasim related to me?',
-    // No one word: Layla Haddad, Maya's father's first cousin, is his wife.
     expect: { relations: [/first cousin,? once removed/i, /husband/i], allow: ['Layla Haddad'], joinedTerms: 2 },
   },
   {
     id: 'no-gender',
     group: 'how_related',
     question: 'How is Ziad Mansour related to Samir Mansour?',
-    // Ziad's gender is not recorded: the neutral word.
     expect: { relations: [/\bchild\b/i], forbid: [/\bson\b/i, /\bdaughter\b/i] },
   },
 
@@ -258,30 +254,27 @@ export const CHAT_TEST_QUESTIONS: readonly ChatTestQuestion[] = [
     id: 'amto',
     group: 'arabic',
     question: 'Who is my amto?',
-    // The father's sister, called by the same word. Walid Aziz, the mother's brother, is a wrong name.
+    // The father's sister. Walid Aziz, the mother's brother, is a wrong name.
     expect: { names: ['Sara Khoury'], relations: [/\bamto\b/i], allow: ['Nabil Khoury'] },
   },
   {
     id: 'jiddo-mama-side',
     group: 'arabic',
     question: "Who is my jiddo on my mama's side?",
-    // The mother's father, called by the same word. Faris Khoury, the father's father, is a wrong name.
+    // The mother's father. Faris Khoury, the father's father, is a wrong name.
     expect: { names: ['Bashir Aziz'], relations: [/\bjiddo\b/i], allow: ['Dina Aziz'] },
   },
   {
     id: 'is-he-my-khalo',
     group: 'arabic',
     question: 'Is Walid Aziz my khalo?',
-    // The mother's brother: the reply says "khalo" back.
     expect: { relations: [/\bkhalo\b/i] },
   },
 
-  // Open questions: counts from the family overview, never a list of its Persons.
   {
     id: 'about-the-family',
     group: 'open',
     question: 'Tell me about the family',
-    // The founders with the most descendants are the only Persons the overview names.
     expect: { number: 43, allow: ['Idris Haddad', 'Salma Darwish', 'Adel Mansour'] },
   },
   {

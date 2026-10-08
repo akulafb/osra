@@ -288,7 +288,8 @@ const GENDERS: Record<keyof typeof CHAT_TEST_IDS, PersonGender | null> = {
 };
 
 const C = CHAT_TEST_IDS;
-const genderById = new Map<string, PersonGender | null>(Object.entries(GENDERS).map(([key, gender]) => [C[key as keyof typeof C], gender]));
+const gendersByKey: Record<string, PersonGender | null> = GENDERS;
+const genderById = new Map<string, PersonGender | null>(Object.entries(CHAT_TEST_IDS).map(([key, id]) => [id, gendersByKey[key] ?? null]));
 
 export const CHAT_TEST_PERSONS: FamilyNode[] = [
   ...FIXTURE_PERSONS,

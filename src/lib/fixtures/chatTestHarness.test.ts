@@ -100,7 +100,6 @@ describe('createChatTestRunner', () => {
 
     const [first, second] = requests.filter((r) => r.url === OPENROUTER_URL);
     expect(first.authorization).toBe('Bearer or-test-key');
-    // The function's prompt names the test speaker; the tool result is from the chat test tree.
     const system = (first.body as { messages: Array<{ content: string }> }).messages[0].content;
     expect(system).toContain('**Maya Khoury**');
     const toolTurn = (second.body as { messages: Array<{ role: string; content: string }> }).messages.find((m) => m.role === 'tool');

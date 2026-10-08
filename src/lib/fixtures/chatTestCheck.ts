@@ -25,10 +25,9 @@ export interface ChatTestReply {
   cost: number;
 }
 
-/** The reply as the checks read it: Markdown emphasis taken out. */
 interface ReplyUnderCheck {
   question: ChatTestQuestion;
-  text: string;
+  plainText: string;
   cost: number;
 }
 
@@ -48,38 +47,30 @@ const NOT_RELATED =
 
 const ARABIC_KINSHIP_WORDS = 'khalo|khal|khalto|khala|ammo|amo|amto|amme|jiddo|jeddo|seedo|teta|sitto|sitti';
 
-/** A kinship word: "mother", "great-grandson", "stepdaughter", "sister-in-law", "khalo". */
 const KINSHIP_WORD = new RegExp(
   '(?<![\\p{L}-])(?:great-|grand|step-?|half-)*' +
-    '(?:mother|father|mom|dad|mama|baba|parent|son|daughter|child|children|kid|brother|sister|sibling|' +
+    '(?:mother|father|mom|mum|dad|mama|baba|papa|grandma|grandpa|parent|son|daughter|child|children|kid|brother|sister|sibling|' +
     'wife|wives|husband|spouse|aunt|uncle|niece|nephew|cousin|' +
     ARABIC_KINSHIP_WORDS +
     ')s?(?:-in-laws?)?(?![\\p{L}-])',
   'giu',
 );
 
-/** Words between a possessive and the kinship word it owns: "Layla's former husband", "his first cousin". */
-const MODIFIERS = String.raw`(?:(?:first|second|third|fourth|fifth|former|late|elder|older|younger|paternal|maternal)\s+)*`;
+const KINSHIP_MODIFIERS = String.raw`(?:(?:first|second|third|fourth|fifth|former|late|only|own|little|big|baby|elder|older|eldest|oldest|younger|youngest|paternal|maternal)\s+)*`;
 
-/**
- * How a kinship word is joined to the next one, when the reply walks a
- * Kinship Path: "mother's brother", "daughter of his uncle", or, through a
- * named Person, "brother **Hani Khoury**'s son".
- */
-const UNNAMED_JOIN = new RegExp(String.raw`^(?:['’]s\s+|\s+of\s+(?:(?:the|your|his|her|their|my)\s+)?)${MODIFIERS}$`, 'iu');
-const NAMED_JOIN = new RegExp(
-  String.raw`^(?:,?\s+(?:once|twice|\w+ times) removed)?,?\s+(?:\p{Lu}[\p{L}\p{M}'’-]*\s+){0,2}\p{Lu}[\p{L}\p{M}-]*['’]s\s+${MODIFIERS}$`,
+const PATH_JOIN = new RegExp(String.raw`^(?:['’]s\s+|\s+of\s+(?:(?:the|your|his|her|their|my)\s+)?)${KINSHIP_MODIFIERS}$`, 'iu');
+const PATH_JOIN_THROUGH_A_NAME = new RegExp(
+  String.raw`^(?:,?\s+(?:once|twice|\w+ times) removed)?,?\s+(?:\p{Lu}[\p{L}\p{M}'’-]*\s+){0,2}\p{Lu}[\p{L}\p{M}-]*['’]s\s+${KINSHIP_MODIFIERS}$`,
   'u',
 );
 
-/** A follow-up offered after the answer. */
-const OFFER =
-  /\b(let me know|would you like|do you want|want me to|i can also|feel free|ask me|if you(?:'d| would) like|happy to)\b/i;
+const FOLLOW_UP_OFFER =
+  /\b(let me know|would you like|do you want|want me to|i can (?:also )?(?:tell|show|list|look|find|give|help)|feel free|ask me|if you(?:'d| would)? (?:like|want)|happy to)\b/i;
 
-/** At most this many words for an open question (LIN-80). */
-const MAX_OPEN_WORDS = 150;
-/** At most this many lines for any other question, not counting a bulleted list (LIN-80). */
-const MAX_LINES = 2;
+const MAX_WORDS = 150;
+const MAX_PROSE_LINES = 2;
+
+const SIDE = /^['’]s side\b/i;
 
 const BULLET = /^\s*(?:[-*•+]|\d+[.)])\s/;
 
@@ -95,7 +86,7 @@ function mentions(text: string, name: string): boolean {
 function holdsNumber(text: string, n: number): boolean {
   if (new RegExp(`(?<![\\d.])${n}(?![\\d.]*\\d)`).test(text)) return true;
   const word = NUMBER_WORDS[n];
-  return word !== undefined && new RegExp(`\\b${word}\\b`, 'i').test(text);
+  return word !== undefined && new RegExp(`(?<![\\p{L}-])${word}(?![\\p{L}-])`, 'iu').test(text);
 }
 
 function kinshipWords(text: string): Array<{ word: string; start: number; end: number }> {
@@ -104,7 +95,7 @@ function kinshipWords(text: string): Array<{ word: string; start: number; end: n
 
 const dollars = (n: number) => `$${n.toFixed(5)}`;
 
-function namesProblems({ question: { expect }, text }: ReplyUnderCheck): string[] {
+function namesProblems({ question: { expect }, plainText: text }: ReplyUnderCheck): string[] {
   return (expect.names ?? []).filter((name) => !mentions(text, name)).map((name) => `missing ${name}`);
 }
 
@@ -113,7 +104,7 @@ function namesProblems({ question: { expect }, text }: ReplyUnderCheck): string[
  * Person the reply may name has that given name ("Walid", but not "Yusuf"
  * when Yusuf Haddad is in the answer).
  */
-function wrongNameProblems({ question: { question, expect }, text }: ReplyUnderCheck): string[] {
+function wrongNameProblems({ question: { question, expect }, plainText: text }: ReplyUnderCheck): string[] {
   const allowed = new Set([CHAT_TEST_SPEAKER.displayName, ...(expect.names ?? []), ...(expect.allow ?? [])]);
   const mayName = PERSON_NAMES.filter(({ displayName }) => allowed.has(displayName) || mentions(question, displayName));
   const allowedGivenNames = new Set(mayName.map(({ givenName }) => givenName));
@@ -125,12 +116,11 @@ function wrongNameProblems({ question: { question, expect }, text }: ReplyUnderC
   return [...wrong].map((name) => `wrong name ${name}`);
 }
 
-function numberProblems({ question: { expect }, text }: ReplyUnderCheck): string[] {
+function numberProblems({ question: { expect }, plainText: text }: ReplyUnderCheck): string[] {
   return expect.number !== undefined && !holdsNumber(text, expect.number) ? [`missing the number ${expect.number}`] : [];
 }
 
-/** Each relation word, first found after the one before. */
-function relationProblems({ question: { expect }, text }: ReplyUnderCheck): string[] {
+function relationProblems({ question: { expect }, plainText: text }: ReplyUnderCheck): string[] {
   const problems: string[] = [];
   let lastFoundAt = -1;
   let lastRelation: RegExp | null = null;
@@ -144,68 +134,62 @@ function relationProblems({ question: { expect }, text }: ReplyUnderCheck): stri
   return problems;
 }
 
-function forbiddenProblems({ question: { expect }, text }: ReplyUnderCheck): string[] {
+function forbiddenProblems({ question: { expect }, plainText: text }: ReplyUnderCheck): string[] {
   return (expect.forbid ?? []).filter((word) => word.test(text)).map((word) => `says ${word}`);
 }
 
-function asksWhichProblems({ question: { expect }, text }: ReplyUnderCheck): string[] {
+function asksWhichProblems({ question: { expect }, plainText: text }: ReplyUnderCheck): string[] {
   return expect.asksWhich && !(/\?/.test(text) || /\bwhich\b/i.test(text)) ? ['does not ask which Person'] : [];
 }
 
-function notRelatedProblems({ question: { expect }, text }: ReplyUnderCheck): string[] {
+function notRelatedProblems({ question: { expect }, plainText: text }: ReplyUnderCheck): string[] {
   return expect.notRelated && !NOT_RELATED.test(text) ? ['does not say they are not related'] : [];
 }
 
-function idProblems({ text }: ReplyUnderCheck): string[] {
+function idProblems({ plainText: text }: ReplyUnderCheck): string[] {
   return Object.values(CHAT_TEST_IDS).some((id) => text.includes(id)) ? ['shows a Person id'] : [];
 }
 
-/** No kinship word before the Kinship Term the question expects; a missing term is `relations`' to report. */
-function termFirstProblems({ question: { expect }, text }: ReplyUnderCheck): string[] {
+function termFirstProblems({ question: { expect }, plainText: text }: ReplyUnderCheck): string[] {
   const term = expect.relations?.[0];
   if (!term) return [];
   const at = text.search(term);
   if (at === -1) return [];
-  const before = kinshipWords(text).find((word) => word.start < at);
+  const before = kinshipWords(text).find((word) => word.start < at && !SIDE.test(text.slice(word.end)));
   return before ? [`the Kinship Term does not come first: "${before.word}" comes before it`] : [];
 }
 
-/**
- * No kinship word joined to the next one ("mother's brother", "daughter of
- * his uncle"). A Kinship Term that joins terms at named Persons ("your first
- * cousin once removed **Layla Haddad**'s husband") may have as many named
- * joins as it has terms less one, and no more.
- */
-function spelledOutPathProblems({ question: { expect }, text }: ReplyUnderCheck): string[] {
+function spelledOutPathProblems({ question: { expect }, plainText: text }: ReplyUnderCheck): string[] {
   const problems: string[] = [];
-  let namedJoinsLeft = (expect.joinedTerms ?? 1) - 1;
+  const allowedNamedJoins = (expect.joinedTerms ?? 1) - 1;
+  let namedJoins = 0;
   const words = kinshipWords(text);
   words.slice(1).forEach((next, i) => {
     const word = words[i];
     const between = text.slice(word.end, next.start);
     const joined = text.slice(word.start, next.end);
-    if (UNNAMED_JOIN.test(between)) problems.push(`spells out the Kinship Path: "${joined}"`);
-    else if (NAMED_JOIN.test(between) && namedJoinsLeft-- <= 0) problems.push(`spells out the Kinship Path: "${joined}"`);
+    const throughAName = PATH_JOIN_THROUGH_A_NAME.test(between) && ++namedJoins > allowedNamedJoins;
+    if (PATH_JOIN.test(between) || throughAName) problems.push(`spells out the Kinship Path: "${joined}"`);
   });
   return problems;
 }
 
-/** A question only when the reply must ask which Person; never an offer. */
-function followUpProblems({ question: { expect }, text }: ReplyUnderCheck): string[] {
+function followUpProblems({ question: { expect }, plainText: text }: ReplyUnderCheck): string[] {
   const problems: string[] = [];
   if (!expect.asksWhich && text.includes('?')) problems.push('asks a follow-up question');
-  const offer = text.match(OFFER);
+  const offer = text.match(FOLLOW_UP_OFFER);
   if (offer) problems.push(`offers a follow-up: "${offer[0]}"`);
   return problems;
 }
 
-function lengthProblems({ question, text }: ReplyUnderCheck): string[] {
-  if (question.group === 'open') {
-    const words = text.split(/\s+/).filter((word) => /[\p{L}\p{N}]/u.test(word)).length;
-    return words > MAX_OPEN_WORDS ? [`is ${words} words; at most ${MAX_OPEN_WORDS} for an open question`] : [];
-  }
+function lengthProblems({ question, plainText: text }: ReplyUnderCheck): string[] {
+  const problems: string[] = [];
+  const open = question.group === 'open';
+  const words = text.split(/\s+/).filter((word) => /[\p{L}\p{N}]/u.test(word)).length;
+  if (words > MAX_WORDS) problems.push(`is ${words} words; at most ${MAX_WORDS} for ${open ? 'an open question' : 'any reply'}`);
   const lines = text.split('\n').filter((line) => line.trim() !== '' && !BULLET.test(line)).length;
-  return lines > MAX_LINES ? [`is ${lines} lines; at most ${MAX_LINES} for this question`] : [];
+  if (!open && lines > MAX_PROSE_LINES) problems.push(`is ${lines} lines; at most ${MAX_PROSE_LINES} for this question`);
+  return problems;
 }
 
 function costProblems({ cost }: ReplyUnderCheck): string[] {
@@ -230,7 +214,7 @@ export const REPLY_CHECKS = {
 } satisfies Record<string, (reply: ReplyUnderCheck) => string[]>;
 
 export function checkChatTestReply(question: ChatTestQuestion, { text, cost }: ChatTestReply): ChatTestCheck {
-  const reply: ReplyUnderCheck = { question, text: text.replace(/[*_`]/g, ''), cost };
+  const reply: ReplyUnderCheck = { question, plainText: text.replace(/[*_`]/g, ''), cost };
   const problems = Object.values(REPLY_CHECKS).flatMap((check) => check(reply));
   return { correct: problems.length === 0, problems };
 }
