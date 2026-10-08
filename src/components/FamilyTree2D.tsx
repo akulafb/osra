@@ -632,7 +632,7 @@ export const FamilyTree2D: React.FC<FamilyTree2DProps> = ({
           justifyContent: 'center',
           width: '100%',
           height: '100%',
-          color: 'text.primary',
+          color: 'inherit',
           fontSize: '1rem',
           textAlign: 'center',
           padding: '24px',

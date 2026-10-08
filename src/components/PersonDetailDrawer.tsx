@@ -5,8 +5,7 @@ import {
   Button, 
   IconButton, 
   Drawer,
-  useTheme,
-  alpha
+  useTheme
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import { FamilyNode, FamilyLink } from '../types/graph';
@@ -37,7 +36,8 @@ interface PersonDetailDrawerProps {
   onEdit: () => void;
   onAdd: () => void;
   onInvite: () => void;
-  onConnect: () => void;
+  /** Without it Connect Nodes is not offered; Paper 3D has no connect picker yet (LIN-96). */
+  onConnect?: () => void;
   onManageLinks: () => void;
   onDelete: () => void;
 }
@@ -57,8 +57,7 @@ export const PersonDetailDrawer: React.FC<PersonDetailDrawerProps> = ({
   onManageLinks,
   onDelete,
 }) => {
-  const theme = useTheme();
-  const { panel } = theme.palette;
+  const { panel } = useTheme().palette;
   const isSheet = useIsDrawerSheet();
 
   const { setFocusedPerson } = useCanvasMode();
@@ -176,7 +175,7 @@ export const PersonDetailDrawer: React.FC<PersonDetailDrawerProps> = ({
                 sx={{ 
                   borderColor: panel.role.secondary,
                   color: panel.role.secondary,
-                  '&:hover': { borderColor: 'secondary.light', background: alpha(theme.palette.secondary.main, 0.1) }
+                  '&:hover': { borderColor: panel.role.secondaryLight, background: panel.tint.secondaryHover }
                 }}
               >
                 + Add Relative
@@ -189,7 +188,7 @@ export const PersonDetailDrawer: React.FC<PersonDetailDrawerProps> = ({
                   sx={{ 
                     borderColor: panel.role.success,
                     color: panel.role.success,
-                    '&:hover': { borderColor: 'success.light', background: alpha(theme.palette.success.main, 0.1) }
+                    '&:hover': { borderColor: panel.role.successLight, background: panel.tint.successHover }
                   }}
                 >
                   Invite to Tree
@@ -204,14 +203,16 @@ export const PersonDetailDrawer: React.FC<PersonDetailDrawerProps> = ({
                 Administrative Tools
               </Typography>
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-                <Button 
-                  variant="text" 
-                  fullWidth
-                  onClick={onConnect}
-                  sx={{ justifyContent: 'flex-start', color: panel.role.textSecondary }}
-                >
-                  Connect Nodes...
-                </Button>
+                {onConnect && (
+                  <Button 
+                    variant="text" 
+                    fullWidth
+                    onClick={onConnect}
+                    sx={{ justifyContent: 'flex-start', color: panel.role.textSecondary }}
+                  >
+                    Connect Nodes...
+                  </Button>
+                )}
                 <Button 
                   variant="text" 
                   fullWidth
