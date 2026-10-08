@@ -3,11 +3,16 @@ import { Canvas, useFrame, useThree, type ThreeEvent } from '@react-three/fiber'
 import { CameraControls } from '@react-three/drei';
 import * as THREE from 'three';
 import { useTheme } from '@mui/material/styles';
-import type { FamilyGraph, FamilyNode } from '../../types/graph';
+import type { FamilyGraph, FamilyNode, RelativeDirection } from '../../types/graph';
+import type { ForceGraphHandle, LiveNodePosition } from '../../types/forceGraph';
 import { paperLines } from '../../lib/paperLayout';
 import { filterGraphDataFor3D } from '../../lib/filterGraphData';
 import { GRAYSCALE_PAIR, LIVE_PAIR } from '../../theme/paperPair';
 import type { DirectManipulationController } from '../../hooks/useDirectManipulation';
+import { needsCanvas } from '../../lib/directManipulation';
+import { hexToRgb } from '../../lib/colourBlend';
+import { Manipulation3DPanel } from '../Manipulation3DPanel';
+import type { GhostPreviewLook } from '../../hooks/useGhostPreview';
 import { usePersonDrawerInset, type PersonDrawerInset } from '../../hooks/usePersonDrawerInset';
 import type { PaperLayoutState } from '../../hooks/usePaperLayout';
 import { Tree3DOverlay, type Tree3DSceneCamera, type Tree3DSearch } from '../tree3d/Tree3DOverlay';
@@ -34,6 +39,8 @@ import { emptyEmphasisState, type PaperEmphasisState } from './paperEmphasis';
 import { PaperWebGLBoundary, PaperWebGLFallback } from './PaperWebGLFallback';
 import { browserHasWebGL } from './browserHasWebGL';
 import { isBackgroundTap, isTap, paperFrame, type ScreenPoint } from './paperScene';
+import { PaperGraphHandle } from './PaperGraphHandle';
+import { usePaperEditing, type PaperConnectParams } from './usePaperEditing';
 
 export interface PaperTree3DProps {
   graphData: FamilyGraph;
@@ -62,6 +69,24 @@ export interface PaperTree3DProps {
   seeWhosNewButtonSlot?: React.ReactNode;
   isAdmin: boolean;
   onAdminAddPersonClick?: () => void;
+  selectedNode: FamilyNode | null;
+  /** Action Handles appear only when the active user may edit the selected Person. */
+  canEditSelected: boolean;
+  onCreateRelative?: (params: {
+    firstName: string;
+    relation: RelativeDirection;
+    targetNodeId: string;
+    otherParentId?: string | null;
+  }) => Promise<void> | void;
+  onConnectExistingRelative?: (params: {
+    existingNodeId: string;
+    relation: RelativeDirection;
+    targetNodeId: string;
+    otherParentId?: string | null;
+  }) => Promise<void> | void;
+  onDirectConnectNodes?: (params: PaperConnectParams) => Promise<void> | void;
+  canDissolveSelected: boolean;
+  onDissolveNode?: (node: FamilyNode) => Promise<void> | void;
 }
 
 const PAPER = GRAYSCALE_PAIR.paper;
@@ -72,6 +97,11 @@ const FOG_NEAR = 0.9;
 const FOG_FAR = 2.6;
 const FLY_SMOOTH_TIME = paperFlySmoothTime(PAPER_FLY_SECONDS);
 const CROSSFADE_MS = 500;
+const GHOST_LOOK: GhostPreviewLook = {
+  color: INK,
+  labelColor: INK,
+  labelBackground: `rgba(${hexToRgb(PAPER).join(', ')}, 0.85)`,
+};
 
 type PaperArrival = 'loader' | 'revealing' | 'crossfade' | 'settled';
 
@@ -103,6 +133,13 @@ export function PaperTree3D({
   seeWhosNewButtonSlot,
   isAdmin,
   onAdminAddPersonClick,
+  selectedNode,
+  canEditSelected,
+  onCreateRelative,
+  onConnectExistingRelative,
+  onDirectConnectNodes,
+  canDissolveSelected,
+  onDissolveNode,
 }: PaperTree3DProps) {
   const { panel } = useTheme().palette;
   const isMobileDevice = useIsMobileDevice();
@@ -121,6 +158,7 @@ export function PaperTree3D({
   const personClick = useRef<MouseEvent | null>(null);
   const viewDistance = useRef(0);
   const flyTo = useRef<((id: string) => void) | null>(null);
+  const graphHandle = useRef<ForceGraphHandle | null>(null);
   const openDrawerInset = usePersonDrawerInset(true);
   const layout = layoutState.status === 'ready' ? layoutState.layout : null;
 
@@ -131,6 +169,26 @@ export function PaperTree3D({
     return { nodes, lines: paperLines(nodes, visible.links) };
   }, [graphData, layout, collapsedNodes, visibleClusters3D, uniqueClusters]);
   const shownIds = useMemo(() => shown.nodes.map((n) => n.id), [shown.nodes]);
+  const shownIdSet = useMemo(() => new Set(shownIds), [shownIds]);
+  const liveNodes = useMemo<LiveNodePosition[]>(
+    () => (layout ? shownIds.map((id) => ({ id, ...layout.get(id)! })) : []),
+    [layout, shownIds]
+  );
+
+  const { connect, dissolve, pickConnectTarget } = usePaperEditing({
+    graphData,
+    shownNodes: shown.nodes,
+    interaction,
+    selectedNode,
+    canDissolveSelected,
+    onDirectConnectNodes,
+    onDissolveNode,
+  });
+  const connectSourceId = connect.sourceNode?.id ?? null;
+  const connectEmphasis = useMemo(
+    () => (connectSourceId ? { sourceId: connectSourceId, candidateIds: connect.candidateIds } : null),
+    [connectSourceId, connect.candidateIds]
+  );
 
   const frame = useMemo(() => (layout ? paperFrame(layout, layout.keys()) : null), [layout]);
 
@@ -165,16 +223,11 @@ export function PaperTree3D({
     (id: string, event: ThreeEvent<MouseEvent>) => {
       personClick.current = event.nativeEvent;
       if (!isTap(pointerDown.current, { x: event.nativeEvent.clientX, y: event.nativeEvent.clientY })) return;
-      interaction.selectNode(id);
+      if (interaction.connectSourceId) pickConnectTarget(id);
+      else interaction.selectNode(id);
     },
-    [interaction]
+    [interaction, pickConnectTarget]
   );
-
-  // Paper 3D has no connect picker until LIN-96, so a connect started in another view steps back out on arrival.
-  const { connectSourceId, handleEscape } = interaction;
-  useEffect(() => {
-    if (connectSourceId) handleEscape();
-  }, [connectSourceId, handleEscape]);
 
   // R3F reports a missed click only within 2 px, so the scene decides background taps itself, after R3F has handled the disc clicks.
   const handleSceneClick = useCallback(
@@ -310,7 +363,9 @@ export function PaperTree3D({
                   ids={shownIds}
                   links={graphData.links}
                   selectedId={interaction.selectedNodeId}
+                  connect={connectEmphasis}
                 />
+                <PaperGraphHandle handle={graphHandle} />
                 {arrival === 'revealing' && (
                   <PaperReveal frame={frame} layout={layout} ids={shownIds} state={emphasisState} onDone={handleArrived} />
                 )}
@@ -369,6 +424,25 @@ export function PaperTree3D({
         onEnsureClusterVisible3D={onEnsureClusterVisible3D}
         navKeys={navKeys}
         seeWhosNewButtonSlot={seeWhosNewButtonSlot}
+      />
+
+      <Manipulation3DPanel
+        selectedNode={selectedNode}
+        canEdit={isMobileDevice ? needsCanvas(interaction.state) : canEditSelected}
+        dock={isMobileDevice ? 'bottom' : 'side'}
+        existingNodes={graphData.nodes}
+        visibleIds={shownIdSet}
+        graphData={graphData}
+        fgRef={graphHandle}
+        nodes={liveNodes}
+        connect={connect}
+        dissolve={dissolve}
+        searchQuery={searchQuery}
+        onSearchQueryChange={onSearchQueryChange}
+        searchMatches={searchMatches}
+        onCreateRelative={onCreateRelative}
+        onConnectExistingRelative={onConnectExistingRelative}
+        ghostLook={GHOST_LOOK}
       />
     </div>
   );

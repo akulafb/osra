@@ -1,3 +1,4 @@
+import * as THREE from 'three';
 import type { FamilyLink } from '../../types/graph';
 import type { PaperLayout, PaperLine } from '../../lib/paperLayout';
 
@@ -58,6 +59,14 @@ export function depthFade(distance: number, start: number, end: number): number 
   if (distance <= start) return 1;
   if (distance >= end) return 0;
   return (end - distance) / (end - start);
+}
+
+const projected = new THREE.Vector3();
+
+/** Where a scene point lands on a canvas of `size`, in CSS pixels from its top left: what Cosmos's `graph2ScreenCoords` gives. */
+export function paperScreenPoint(point: Point3, camera: THREE.Camera, size: { width: number; height: number }): ScreenPoint {
+  projected.set(point.x, point.y, point.z).project(camera);
+  return { x: ((projected.x + 1) / 2) * size.width, y: ((1 - projected.y) / 2) * size.height };
 }
 
 export function isTap(down: ScreenPoint | null, up: ScreenPoint): boolean {

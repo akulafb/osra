@@ -36,7 +36,7 @@ interface PersonDetailDrawerProps {
   onEdit: () => void;
   onAdd: () => void;
   onInvite: () => void;
-  /** Without it Connect Nodes is not offered; Paper 3D has no connect picker yet (LIN-96). */
+  /** Without it Connect Nodes is not offered. */
   onConnect?: () => void;
   onManageLinks: () => void;
   onDelete: () => void;

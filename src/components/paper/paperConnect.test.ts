@@ -1,0 +1,24 @@
+import { describe, it, expect } from 'vitest';
+import { paperConnectEmphasis } from './paperConnect';
+
+describe('paperConnectEmphasis: Connect Mode in ink', () => {
+  const ids = ['source', 'candidate', 'other', 'second'];
+  const candidates = new Set(['candidate', 'second']);
+
+  it('keeps the source focused and the candidates in full ink, and fades everyone else', () => {
+    expect(Object.fromEntries(paperConnectEmphasis(ids, 'source', candidates, null))).toEqual({
+      source: 'focused',
+      candidate: 'normal',
+      other: 'ghost',
+      second: 'normal',
+    });
+  });
+
+  it('marks the candidate under the pointer', () => {
+    expect(paperConnectEmphasis(ids, 'source', candidates, 'candidate').get('candidate')).toBe('hovered');
+  });
+
+  it('does not mark a Person under the pointer who cannot be a target', () => {
+    expect(paperConnectEmphasis(ids, 'source', candidates, 'other').get('other')).toBe('ghost');
+  });
+});

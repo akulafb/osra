@@ -15,6 +15,7 @@ import {
 } from '../../lib/paperHover';
 import { placeOf, type PaperEmphasisState, type PaperFocus } from './paperEmphasis';
 import { PAPER_HOVER_FRAME_PRIORITY, type ScreenPoint } from './paperScene';
+import { paperConnectEmphasis } from './paperConnect';
 
 const LONGEST_FRAME_SECONDS = 0.1;
 
@@ -25,16 +26,18 @@ interface PaperHoverProps {
   ids: readonly string[];
   links: readonly FamilyLink[];
   selectedId: string | null;
+  /** Connect Mode's source and the Persons it may link to; null outside Connect Mode. */
+  connect: { sourceId: string; candidateIds: ReadonlySet<string> } | null;
 }
 
 /**
  * Finds the Person under the mouse, at most once a frame, and turns it into
- * the scene's emphasis (focusEmphasis: a selected Person outranks the hover),
- * the lean of the hovered Person's relatives and the wobble of the focused
+ * the scene's emphasis (focusEmphasis: a selected Person outranks the hover;
+ * in Connect Mode, paperConnectEmphasis), the lean of the hovered Person's relatives and the wobble of the focused
  * Person's relatives.
  */
-export function PaperHover({ state, pointer, layout, ids, links, selectedId }: PaperHoverProps) {
-  const inputs = useMemo(() => ({ layout, ids, links, selectedId }), [layout, ids, links, selectedId]);
+export function PaperHover({ state, pointer, layout, ids, links, selectedId, connect }: PaperHoverProps) {
+  const inputs = useMemo(() => ({ layout, ids, links, selectedId, connect }), [layout, ids, links, selectedId, connect]);
   const seen = useRef({
     pointer: null as ScreenPoint | null,
     inputs: null as typeof inputs | null,
@@ -65,7 +68,9 @@ export function PaperHover({ state, pointer, layout, ids, links, selectedId }: P
     }
 
     if (hoveredId !== last.hoveredId || inputs !== last.inputs) {
-      const emphasis = focusEmphasis({ personIds: ids, links, hoveredId, focusedId: selectedId, searchMatchIds: null });
+      const emphasis = connect
+        ? paperConnectEmphasis(ids, connect.sourceId, connect.candidateIds, hoveredId)
+        : focusEmphasis({ personIds: ids, links, hoveredId, focusedId: selectedId, searchMatchIds: null });
       const focus = focusOf(emphasis, selectedId, state.current.focus, clock.elapsedTime);
       // A new focus or none: relatives ease from wherever the last wobble left them.
       if (focus !== state.current.focus) lean.current = wrote.current;

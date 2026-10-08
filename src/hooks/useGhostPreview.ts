@@ -16,6 +16,13 @@ import {
 } from '../utils/ghostPreview';
 import { relationColor } from '../components/cards/relationStyle';
 
+/** The marker's colours; Cosmos draws it in the relation's colour with a light label. */
+export interface GhostPreviewLook {
+  color: string;
+  labelColor: string;
+  labelBackground: string;
+}
+
 /**
  * Ghost Preview (LIN-46, ADR 0002): a translucent marker in the 3D scene
  * showing where a new Tree Node will land while its name is being typed.
@@ -39,8 +46,9 @@ export function useGhostPreview(params: {
   name: string;
   /** Off on touch: 3D manipulation is desktop-only for v1 (ADR 0002). */
   enabled: boolean;
+  look?: GhostPreviewLook;
 }): void {
-  const { fgRef, nodes, anchorNodeId, relation, name, enabled } = params;
+  const { fgRef, nodes, anchorNodeId, relation, name, enabled, look } = params;
 
   // Held in a ref so the render loop is not torn down and rebuilt whenever the
   // caller passes a new array identity — the useClusterBubbles precedent.
@@ -60,7 +68,7 @@ export function useGhostPreview(params: {
     // Resolved once, then held — the preview must not swing around as the
     // camera orbits, only follow its anchor.
     const offset = computeGhostPreviewOffset(camera.quaternion, relation);
-    const color = new THREE.Color(relationColor(relation));
+    const color = new THREE.Color(look?.color ?? relationColor(relation));
 
     const bodyGeometry = new THREE.SphereGeometry(GHOST_PREVIEW_RADIUS, 16, 16);
     const shellGeometry = new THREE.SphereGeometry(
@@ -87,8 +95,8 @@ export function useGhostPreview(params: {
     );
 
     const label = new SpriteText('…');
-    label.color = '#ffffff';
-    label.backgroundColor = 'rgba(5, 5, 5, 0.6)';
+    label.color = look?.labelColor ?? '#ffffff';
+    label.backgroundColor = look?.labelBackground ?? 'rgba(5, 5, 5, 0.6)';
     label.textHeight = 4;
     label.padding = 2;
     label.borderRadius = 2;
@@ -171,7 +179,7 @@ export function useGhostPreview(params: {
       labelMaterial.dispose();
       labelRef.current = null;
     };
-  }, [active, relation, anchorNodeId, fgRef]);
+  }, [active, relation, anchorNodeId, fgRef, look]);
 
   // The label is updated in place rather than by rebuilding the marker, so
   // typing does not restart the breathing animation on every keystroke.
