@@ -185,9 +185,13 @@ export function PaperTree3D({
     onDissolveNode,
   });
   const connectSourceId = connect.sourceNode?.id ?? null;
+  const connectTargetId = connect.pair?.target.id ?? null;
   const connectEmphasis = useMemo(
-    () => (connectSourceId ? { sourceId: connectSourceId, candidateIds: connect.candidateIds } : null),
-    [connectSourceId, connect.candidateIds]
+    () =>
+      connectSourceId
+        ? { sourceId: connectSourceId, candidateIds: connect.candidateIds, targetId: connectTargetId }
+        : null,
+    [connectSourceId, connect.candidateIds, connectTargetId]
   );
 
   const frame = useMemo(() => (layout ? paperFrame(layout, layout.keys()) : null), [layout]);

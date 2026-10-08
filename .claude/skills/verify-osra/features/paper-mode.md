@@ -218,8 +218,8 @@ Preconditions:
 
 - `paper-3d-add-person`: INSTRUMENTS → `+ ADD PERSON` opens the same form as Cosmos, in paper and ink. A Person added during the session (from any path) gets a disc beside their relatives, or at the edge of the cloud with none, and nobody else moves; the full layout is recomputed on the next load. A newcomer who leaves the Working Record again (an aborted Spawn) is dropped.
 - `paper-3d-handles` (desktop, 1025 px and wider): selecting a Person docks the Action Handles panel at the left, as in Cosmos: `+ Parent`, `+ Child`, `+ Spouse` in ink, `🔗 Connect` and `✕ Dissolve` in the pair's accent, with a dashed leader line and a ring on the disc. Phones keep the drawer path: no handles (ADR 0002, LIN-62 amendment).
-- `paper-3d-ghost`: a handle opens the Ghost Node card and the Ghost Preview in ink: a wireframe disc shell, a dashed tether to the Person and an ink label. ✕ or Escape closes it.
-- `paper-3d-connect`: the drawer's `Connect Nodes...` (desktop and phone) or the panel's `🔗 Connect` enters Connect Mode: the drawer hides, the panel shows "Connect <name> to…", the candidates keep full ink, the Person and their relatives are ghosted at 0.2 ink. Clicking a candidate disc opens the kinship picker; `Establish Link` writes through the same handler as Cosmos. `Cancel (Esc)` or Escape leaves it. On a phone the panel docks at the bottom with only the ring on the disc.
+- `paper-3d-ghost`: a handle opens the Ghost Node card and the Ghost Preview in ink: a sphere with a wireframe shell (Cosmos's geometry and size), a dashed tether to the Person and an ink label. ✕ or Escape closes it.
+- `paper-3d-connect`: the drawer's `Connect Nodes...` (desktop and phone) or the panel's `🔗 Connect` enters Connect Mode: the panel shows "Connect <name> to…" (on a phone the sheet hides first), the Person stays focused, the candidates keep full ink and everyone else, their relatives included, is ghosted at 0.2 ink. Clicking a candidate disc opens the kinship picker and keeps that disc marked; `Establish Link` writes through the same handler as Cosmos. `Cancel (Esc)` or Escape leaves it. On a phone the panel docks at the bottom with only the ring on the disc.
 - The panel, the Ghost Node card and the Connect picker read the live pair's tokens only in Paper; Cosmos keeps its colours.
 
 ### Driving it with ui.sh
@@ -233,5 +233,6 @@ Preconditions:
 
 ### Gotchas
 
+- The Ghost Preview keeps Cosmos's size and offset, so it is larger than a Paper disc and does not sit where `placeNewcomer` puts the newcomer.
 - The targeting copy still says "Click a glowing planet" in Paper, and the dashed preview edge for Add Relative's connect-to-existing is not drawn yet (LIN-96 pass 96c). Spawn and Dissolve play without their ink animation until pass 96b.
 - Fingerprinting Cosmos for no change: open VISIBILITY and wait about 6 s before capturing; at 3 s its body can still be animating and differ by one element.

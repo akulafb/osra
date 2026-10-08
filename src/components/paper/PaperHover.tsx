@@ -26,8 +26,8 @@ interface PaperHoverProps {
   ids: readonly string[];
   links: readonly FamilyLink[];
   selectedId: string | null;
-  /** Connect Mode's source and the Persons it may link to; null outside Connect Mode. */
-  connect: { sourceId: string; candidateIds: ReadonlySet<string> } | null;
+  /** Connect Mode's source, the Persons it may link to and the one picked; null outside Connect Mode. */
+  connect: { sourceId: string; candidateIds: ReadonlySet<string>; targetId: string | null } | null;
 }
 
 /**
@@ -69,7 +69,7 @@ export function PaperHover({ state, pointer, layout, ids, links, selectedId, con
 
     if (hoveredId !== last.hoveredId || inputs !== last.inputs) {
       const emphasis = connect
-        ? paperConnectEmphasis(ids, connect.sourceId, connect.candidateIds, hoveredId)
+        ? paperConnectEmphasis(ids, connect.sourceId, connect.candidateIds, hoveredId, connect.targetId)
         : focusEmphasis({ personIds: ids, links, hoveredId, focusedId: selectedId, searchMatchIds: null });
       const focus = focusOf(emphasis, selectedId, state.current.focus, clock.elapsedTime);
       // A new focus or none: relatives ease from wherever the last wobble left them.
