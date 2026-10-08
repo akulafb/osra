@@ -48,7 +48,10 @@ Paper does not restyle Cosmos. Its Persons sit still in a seeded layout (`src/li
 
   It uses `focusEmphasis` and does not change it.
 - **LIN-95.**
-  - `src/components/paper/*`: camera rig momentum, idle rotation, zoom bounds, intro loader and reveal, depth of field and grain, resize;
+  - `src/components/paper/*`: camera rig momentum, idle rotation, zoom bounds, intro loader and reveal, depth of field and grain, resize. The composer runs depth of field, then grain, then the duotone, so the live pair paints the final image. Lines write no depth, so the depth of field leaves the empty paper's depth sharp rather than blurring the lines away;
+  - new pure `src/lib/paperCamera.ts` and `src/lib/paperEffects.ts` with tests: the idle gate and turn speed, the zoom limits and the orbit box, and the effects for a phone or a desktop;
+  - new pure `src/lib/paperIntro.ts` with tests: each Person's reveal share and progress by distance from the centre, the hint copy for a coarse or fine pointer, and the hint's seen key `family-tree-paper-hint-seen`;
+  - the intro plays once a page session, and only when the page opens on Paper 3D: `FamilyTree.tsx`'s Paper 3D loading branch starts the title, and the first Paper scene takes the same loader over (`paperIntroSession.ts`). Any later mount, after a COSMOS ⇄ PAPER or 2D/3D switch, fades in from paper (product decision 7). The reveal and the camera swing run on R3F's clock and end within 1.8 s (ADR 0011); the idle turn holds during the reveal and behind any modal (`isModalOpen` on `PaperTree3D`);
   - a new hint component and its storage key;
   - `features/paper-mode.md`.
 - **LIN-96.**

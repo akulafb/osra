@@ -26,6 +26,8 @@ export interface PaperEmphasisState {
   pointedId: string | null;
   /** The focused Person, and the scene clock's time when the focus began. */
   focus: PaperFocus | null;
+  /** How far each Person has grown in during the intro reveal; null once it is over. */
+  reveal: ReadonlyMap<string, number> | null;
 }
 
 export interface PaperFocus {
@@ -34,11 +36,15 @@ export interface PaperFocus {
 }
 
 export function emptyEmphasisState(): PaperEmphasisState {
-  return { emphasis: new Map(), drift: new Map(), pointedId: null, focus: null };
+  return { emphasis: new Map(), drift: new Map(), pointedId: null, focus: null, reveal: null };
 }
 
 export function inkOf(state: PaperEmphasisState, id: string): number {
   return PAPER_3D_INK[state.emphasis.get(id) ?? 'normal'];
+}
+
+export function revealOf(state: PaperEmphasisState, id: string): number {
+  return state.reveal?.get(id) ?? 1;
 }
 
 /** The ink each end of a line keeps: its own Person's. */

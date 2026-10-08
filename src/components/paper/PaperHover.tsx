@@ -14,9 +14,8 @@ import {
   type ScreenDisc,
 } from '../../lib/paperHover';
 import { placeOf, type PaperEmphasisState, type PaperFocus } from './paperEmphasis';
-import type { ScreenPoint } from './paperScene';
+import { PAPER_HOVER_FRAME_PRIORITY, type ScreenPoint } from './paperScene';
 
-const HOVER_FRAME_PRIORITY = -1;
 const LONGEST_FRAME_SECONDS = 0.1;
 
 interface PaperHoverProps {
@@ -45,6 +44,7 @@ export function PaperHover({ state, pointer, layout, ids, links, selectedId }: P
   const seenCamera = useRef({ world: new THREE.Matrix4(), projection: new THREE.Matrix4() });
   const target = useRef(new Map<string, Point3>());
   const lean = useRef<ReadonlyMap<string, Point3>>(new Map());
+  const wrote = useRef<ReadonlyMap<string, Point3>>(new Map());
   const scratch = useMemo(() => ({ place: new THREE.Vector3(), view: new THREE.Vector3(), discs: [] as ScreenDisc[] }), []);
 
   const canvas = useThree((three) => three.gl.domElement);
@@ -68,7 +68,7 @@ export function PaperHover({ state, pointer, layout, ids, links, selectedId }: P
       const emphasis = focusEmphasis({ personIds: ids, links, hoveredId, focusedId: selectedId, searchMatchIds: null });
       const focus = focusOf(emphasis, selectedId, state.current.focus, clock.elapsedTime);
       // A new focus or none: relatives ease from wherever the last wobble left them.
-      if (focus !== state.current.focus) lean.current = state.current.drift;
+      if (focus !== state.current.focus) lean.current = wrote.current;
       state.current = { ...state.current, emphasis, pointedId: hoveredId, focus };
       target.current = paperDrift(layout, emphasis);
     }
@@ -77,8 +77,9 @@ export function PaperHover({ state, pointer, layout, ids, links, selectedId }: P
     lean.current = easeDrift(lean.current, target.current, Math.min(delta, LONGEST_FRAME_SECONDS));
     const { focus, emphasis } = state.current;
     const drift = focus ? withWobble(lean.current, paperWobble(layout, emphasis, clock.elapsedTime - focus.since)) : lean.current;
+    wrote.current = drift;
     if (drift !== state.current.drift) state.current = { ...state.current, drift };
-  }, HOVER_FRAME_PRIORITY);
+  }, PAPER_HOVER_FRAME_PRIORITY);
 
   return null;
 }
