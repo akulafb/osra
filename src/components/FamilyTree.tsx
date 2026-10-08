@@ -2,8 +2,11 @@ import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react'
 import Button from '@mui/material/Button';
 import { useTheme } from '@mui/material/styles';
 import FamilyTree3D from './FamilyTree3D';
+import { PaperTree3D } from './paper/PaperTree3D';
 import { FamilyTree2D } from './FamilyTree2D';
 import { useViewMode } from '../hooks/useViewMode';
+import { useCanvasMode } from '../hooks/useCanvasMode';
+import { usePaperLayout } from '../hooks/usePaperLayout';
 import { useWorkingRecord } from '../contexts/WorkingRecordContext';
 import { linkWriteOutcome } from '../hooks/useWorkingRecord';
 import { useNewNodesSinceSignIn } from '../hooks/useNewNodesSinceSignIn';
@@ -58,8 +61,11 @@ function reportWriteFailure(error: unknown, fallback: string): void {
 export const FamilyTree: React.FC = () => {
   const { user, userProfile, isAdmin, session } = useAuth();
   const { mode, switchMode, isHydrated } = useViewMode();
+  const { mode: canvasMode } = useCanvasMode();
   const { working, confirmedNodes, confirmedLinks, isLoading, error, reload, write } =
     useWorkingRecord();
+  const isPaper3D = mode === '3D' && canvasMode === 'paper';
+  const paperLayout = usePaperLayout(working, isPaper3D);
   const {
     newMembers,
     showSeeWhosNewButton,
@@ -488,6 +494,19 @@ export const FamilyTree: React.FC = () => {
     }),
   } as const;
 
+  const seeWhosNewButtonSlot =
+    showSeeWhosNewButton && newMembers.length > 0 ? (
+      <Button
+        variant="contained"
+        color="secondary"
+        onClick={() => setNewMembersModalOpen(true)}
+        fullWidth
+        sx={seeWhosNewButtonSx}
+      >
+        See who&apos;s new!
+      </Button>
+    ) : null;
+
   const handleSearchPrev = useCallback(() => {
     setSearchIndex((i) => (i <= 0 ? searchMatches.length - 1 : i - 1));
     setSearchNavigateTrigger((n) => n + 1);
@@ -724,7 +743,37 @@ export const FamilyTree: React.FC = () => {
         width: '100%',
         height: '100%',
       }}>
-        {mode === '3D' ? (
+        {isPaper3D ? (
+          <PaperTree3D
+            graphData={working}
+            layout={paperLayout}
+            interaction={interaction}
+            collapsedNodes={collapsedNodes}
+            onSetCollapsedNodes={handleSetCollapsedNodes}
+            mode={mode}
+            onModeChange={handleModeChange}
+            isAddModalOpen={isAddModalOpen}
+            isEditModalOpen={isEditModalOpen}
+            isBulkInviteOpen={isBulkInviteOpen}
+            searchQuery={searchQuery}
+            onSearchQueryChange={setSearchQuery}
+            searchMatches={searchMatches}
+            searchIndex={searchIndex}
+            onSearchPrev={handleSearchPrev}
+            onSearchNext={handleSearchNext}
+            onSearchClose={handleSearchClose}
+            searchOpenRequested={searchOpenRequested}
+            searchDisabled={false}
+            visibleClusters3D={visibleClusters3D}
+            onVisibleClusters3DChange={setVisibleClusters3D}
+            uniqueClusters={uniqueClusters}
+            onEnsureClusterVisible3D={ensureClusterVisible3D}
+            drawerInset={drawerInset}
+            seeWhosNewButtonSlot={seeWhosNewButtonSlot}
+            isAdmin={isAdmin}
+            onAdminAddPersonClick={() => setAdminAddPersonOpen(true)}
+          />
+        ) : mode === '3D' ? (
           <FamilyTree3D
             graphData={working}
             interaction={interaction}
@@ -753,19 +802,7 @@ export const FamilyTree: React.FC = () => {
             uniqueClusters={uniqueClusters}
             onEnsureClusterVisible3D={ensureClusterVisible3D}
             drawerInset={drawerInset}
-            seeWhosNewButtonSlot={
-              showSeeWhosNewButton && newMembers.length > 0 ? (
-                <Button
-                  variant="contained"
-                  color="secondary"
-                  onClick={() => setNewMembersModalOpen(true)}
-                  fullWidth
-                  sx={seeWhosNewButtonSx}
-                >
-                  See who&apos;s new!
-                </Button>
-              ) : null
-            }
+            seeWhosNewButtonSlot={seeWhosNewButtonSlot}
             pendingLinkPreview={pendingLinkPreview}
             isAdmin={isAdmin}
             onAdminAddPersonClick={() => setAdminAddPersonOpen(true)}

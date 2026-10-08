@@ -1,0 +1,93 @@
+import type { FamilyLink } from '../../types/graph';
+import type { PaperLayout, PaperLine } from '../../lib/paperLayout';
+
+export interface Point3 {
+  x: number;
+  y: number;
+  z: number;
+}
+
+export interface ScreenPoint {
+  x: number;
+  y: number;
+}
+
+/** The sphere the camera frames: it holds every shown disc whole. */
+export interface PaperFrame {
+  center: Point3;
+  radius: number;
+}
+
+/** A pointer that moves further than this between press and release is dragging the camera, not clicking. */
+export const TAP_SLOP_PX = 6;
+
+const EMPTY_FRAME_RADIUS = 50;
+
+export function paperFrame(layout: PaperLayout, ids: Iterable<string>): PaperFrame {
+  const discs = [...ids].flatMap((id) => {
+    const disc = layout.get(id);
+    return disc ? [disc] : [];
+  });
+  if (discs.length === 0) return { center: { x: 0, y: 0, z: 0 }, radius: EMPTY_FRAME_RADIUS };
+
+  const min = { x: Infinity, y: Infinity, z: Infinity };
+  const max = { x: -Infinity, y: -Infinity, z: -Infinity };
+  for (const d of discs) {
+    min.x = Math.min(min.x, d.x);
+    min.y = Math.min(min.y, d.y);
+    min.z = Math.min(min.z, d.z);
+    max.x = Math.max(max.x, d.x);
+    max.y = Math.max(max.y, d.y);
+    max.z = Math.max(max.z, d.z);
+  }
+  const center = { x: (min.x + max.x) / 2, y: (min.y + max.y) / 2, z: (min.z + max.z) / 2 };
+  let radius = 0;
+  for (const d of discs) {
+    radius = Math.max(radius, Math.hypot(d.x - center.x, d.y - center.y, d.z - center.z) + d.radius);
+  }
+  return { center, radius };
+}
+
+/** How much ink is left at `distance` from the camera: all of it up to `start`, none from `end`. */
+export function depthFade(distance: number, start: number, end: number): number {
+  if (distance <= start) return 1;
+  if (distance >= end) return 0;
+  return (end - distance) / (end - start);
+}
+
+export function isTap(down: ScreenPoint | null, up: ScreenPoint): boolean {
+  if (!down) return true;
+  return Math.hypot(up.x - down.x, up.y - down.y) <= TAP_SLOP_PX;
+}
+
+const LABEL_BASE_SIZE = 3;
+const LABEL_SIZE_PER_RADIUS = 0.3;
+const LABEL_MIN_RADIUS = 4;
+const LABEL_MAX_RADIUS = 14;
+
+/**
+ * A label's size for a disc of this radius. `weight` runs from 0 (regular) to
+ * 1 (bold): the one bundled font has a single weight, so the scene draws the
+ * extra weight as an ink outline.
+ */
+export function paperLabelSize(discRadius: number): { fontSize: number; weight: number } {
+  const r = Math.min(LABEL_MAX_RADIUS, Math.max(LABEL_MIN_RADIUS, discRadius));
+  return {
+    fontSize: LABEL_BASE_SIZE + LABEL_SIZE_PER_RADIUS * r,
+    weight: (r - LABEL_MIN_RADIUS) / (LABEL_MAX_RADIUS - LABEL_MIN_RADIUS),
+  };
+}
+
+export type PaperLineSegments = Record<FamilyLink['type'], [number, number, number][]>;
+
+/** Each kind of line as consecutive start and end points, for one draw call per kind. */
+export function paperLineSegments(lines: readonly PaperLine[], layout: PaperLayout): PaperLineSegments {
+  const segments: PaperLineSegments = { parent: [], marriage: [], divorce: [] };
+  for (const line of lines) {
+    const a = layout.get(line.sourceId);
+    const b = layout.get(line.targetId);
+    if (!a || !b) continue;
+    segments[line.type].push([a.x, a.y, a.z], [b.x, b.y, b.z]);
+  }
+  return segments;
+}
