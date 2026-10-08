@@ -86,4 +86,27 @@ Preconditions:
 - An occluded Orca tab runs no `requestAnimationFrame`, so the layout never starts and "Loading Osra" stays. Each `orca screenshot` forces a frame: take a few to pump it, or bring Orca forward.
 - The Orca tab is 879 px wide, under the 1024 px `isMobile()` cutoff, so the desktop side drawer and NAV CONTROLS can't be reached. `orca set device` offers only phones taller than the pane, and their screenshots repeat the top ~540 px: prove the phone sheet with `.MuiDrawer-paper` `getBoundingClientRect()` instead. Device emulation clears on reload.
 - `orca keypress Meta+f` does not reach the page; dispatch `new KeyboardEvent('keydown', { key: 'f', metaKey: true })` on `window` and say so.
-- Paper 3D stays grayscale with Paper colour on until the duotone pass lands; the panels follow the pair.
+
+## Paper 3D in colour (LIN-93 pass 93d)
+
+### Sub-features
+
+- `paper-3d-colour` paints the grayscale scene in the live Paper Pair with a duotone pass (`PaperDuotone`): scene ink becomes the pair's ink, scene paper the pair's paper, and greys in between (parent lines, fog, label edges) land in between. With colour off it is an identity: discs, lines and labels are exactly `#1c1c1c` and the paper `236 236 234`. The scene renders untone-mapped, so far discs and lines fog fully into the paper.
+- `paper-3d-fade` fades the scene with the panels: focusing a Person or closing one moves the composer's colours each frame in step with `--paper-pair-*`. INSTRUMENTS (toggle, + ADD PERSON, switch labels, VISIBILITY header and checkboxes), the search counter, the drawer's hover states and the 2D empty state read live pair tokens, so none of them snap.
+- `paper-connect-accent`: the Connect picker's selected choice in Paper is the pair's accent at 20%, not ink. Only grayscale has an accent (`#c8361d`) that differs from ink.
+
+### Driving it with ui.sh
+
+- **Colour.** In Paper 3D open INSTRUMENTS and click `Paper colour`. The scene turns into the overview pair. Sample the canvas pixels of a screenshot: the background equals `--paper-pair-paper` and the discs `--paper-pair-ink`.
+- **Fade.** A per-frame proof needs a probe on the composer (a temporary `useFrame` at priority 2 in `PaperDuotone` that reads the `paper` uniform and `gl.readPixels` a corner pixel into `window.__duoLog`; never commit it). Record `--paper-pair-paper` and the INSTRUMENTS button colour in the same rAF loop, then tap a disc. Every frame the uniform, the read-back pixel and the variable agree.
+- **Fog.** Open INSTRUMENTS and click `FIND ME`: the camera flies to the owner. The nearest lines are full ink; lines and discs at the back are lighter. Mouse-wheel zoom right into the orbit target fogs everything out, because the fog scales with the distance to the target.
+- **Connect accent.** Grayscale, 2D, a family picked, a Person selected: DOM-click `.handle-connect` (`🔗 Link`), DOM-click another `.node-card`, then click a choice. Its computed background is `color(srgb 0.784 0.212 0.114 / 0.2)`. Leave with the picker's `Cancel` (next to `Establish Link`), then `Cancel (Esc)`. Never click `Establish Link`.
+- **Cosmos unchanged.** Diff a computed-style fingerprint of every element (Cosmos 2D with INSTRUMENTS open; Cosmos 3D with INSTRUMENTS and VISIBILITY open) and the drawer's `+ Add Relative` / `Invite to Tree` hover colours, between the base files and the branch, after a reload each time.
+- **Proof.** Capture `paper-3d-duotone grayscale`, `colour-on-overview`, `focus-<person>`, `fog-near-far` and `paper-connect picker-accent`.
+
+### Gotchas
+
+- An occluded Orca window runs about 1-3 rAF a second, so a 0.4 s fade shows up as 2 or 3 frames. To see the steps, slow the page clock for the recording (wrap `performance.now` and the rAF timestamp at 1/20 speed with `orca eval`), and say so in the report.
+- `Next match` in Paper 3D does not fly the camera; `FIND ME` does.
+- In the phone sheet, the drawer's buttons sit high: a tap meant to focus the page can land on `+ Add Relative` and open its modal. Tap the heading text (`.MuiDrawer-paper h4`) instead, and Cancel any modal that opens.
+
