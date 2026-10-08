@@ -39,3 +39,26 @@ Preconditions:
 - 3D in Paper still shows the starfield scene; only its panels are Paper (temporary until the Paper 3D scene lands).
 - `hidden` (search non-match) is dimmed in 2D rather than removed, because 2D keeps its layout.
 - The Action Handle pills around a selected 2D card are drawn in ink in Paper. Their Cosmos colours are untouched.
+
+## Paper colour and the pair fade (LIN-92)
+
+### Sub-features
+
+- `paper-colour` is the palette button `Paper colour` (aria-pressed) beside COSMOS ⇄ PAPER in CANVAS MODE, in both INSTRUMENTS and on phones, shown only in Paper. Grayscale is the default. Pressing it writes `family-tree-paper-colour` (`colour` or `grayscale`); nothing else writes that key, and the choice survives a reload.
+- `paper-pair-fade` (colour on): each load and each closed Person draws a random overview pair that differs from the last one. Selecting a Person fades to their family's pair; a Person with no family keeps the overview pair. The fade is an OKLab blend of about 0.4 s. The scene, INSTRUMENTS, the drawer, the chat, the Ghost Node card and its dashed connector line all follow the `--paper-pair-{paper,ink,accent}` variables on `<html>` (`"r g b"` channels).
+
+### Driving it with ui.sh
+
+- Record `localStorage.getItem('family-tree-paper-colour')` with the other keys, and restore it before cleanup (remove it when it was `null`).
+- **Colour.** Open INSTRUMENTS and run `$S/ui.sh "$RUN_DIR" click button "Paper colour"`. The paper turns into a colour pair, the button reads `aria-pressed=true` and the key reads `colour`. `orca reload` keeps colour on with a different overview pair. Click again for grayscale (paper `236 236 234`).
+- **Fade.** Before selecting a Person, start an rAF recorder with `orca eval`: each frame push `getComputedStyle(document.documentElement).getPropertyValue('--paper-pair-paper')` into `window.__pairLog`, stopping after 1 s. Then `$S/ui.sh "$RUN_DIR" person <Given> <Family>` and read `window.__pairLog`: the values step from the old pair to the family pair over about 0.4 s.
+- **Ghost line.** With a Person selected, click a `+ Child` handle and read `getComputedStyle(document.querySelector('.ghost-node-layer line')).stroke`: it equals the live ink in Paper and the neon relation colour in Cosmos. Close with Escape; submit nothing.
+- **Proof.** Capture `paper colour-off`, `paper colour-on`, `paper colour-reload` and `paper focus-fade`.
+
+### Gotchas
+
+- Badran hashes to indigo, which can match the overview pair. Pick a Hajjaj Person to see a change.
+- The open chat panel covers the lower-left cards.
+- Right after `orca reload` the family picker can ignore Orca clicks. Use a DOM click (`orca eval`) for setup steps.
+- Motion needs a visible tab; a throttled tab stalls the fade.
+- 2D card fills trail the variables by about 150 ms (NodeCard's own fill transition) and MUI buttons by up to about 170 ms (MUI's transition). Both read the same source.
