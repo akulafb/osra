@@ -52,7 +52,7 @@
  * - No parents recorded: Idris Haddad, Karim Qasim, Hana Rahhal and others.
  * - No Kinship Path to a second Person: anyone on the island, or Hana Rahhal.
  */
-import type { FamilyGraph, FamilyLink, FamilyNode } from '../../types/graph';
+import type { FamilyGraph, FamilyLink, FamilyNode, PersonGender } from '../../types/graph';
 
 function person(id: string, firstName: string, familyCluster: string): FamilyNode {
   return { id, firstName, familyCluster };
@@ -226,4 +226,78 @@ export const FIXTURE_LINKS: FamilyLink[] = [
 export const KINSHIP_FIXTURE_TREE: FamilyGraph = {
   nodes: FIXTURE_PERSONS,
   links: FIXTURE_LINKS,
+};
+
+/**
+ * The chat test tree (LIN-81): the fixture above, with each Person's gender,
+ * as every Person in the Tree Record has one since LIN-76, except Ziad
+ * Mansour's, left not recorded. It adds Hani Khoury's wife Joumana Saab and
+ * their daughter Lara Khoury, a sibling's child linked through both parents.
+ * The Kinship Path tests keep the fixture without genders.
+ */
+export const CHAT_TEST_IDS = {
+  ...FIXTURE_IDS,
+  joumana: 'fx-joumana-saab',
+  lara: 'fx-lara-khoury',
+} as const;
+
+const GENDERS: Record<keyof typeof CHAT_TEST_IDS, PersonGender | null> = {
+  idris: 'male',
+  salma: 'female',
+  yusuf: 'male',
+  mariam: 'female',
+  khalil: 'male',
+  huda: 'female',
+  faris: 'male',
+  omar: 'male',
+  layla: 'female',
+  sara: 'female',
+  nabil: 'male',
+  yusufJr: 'male',
+  rima: 'female',
+  tarek: 'male',
+  jad: 'male',
+  karim: 'male',
+  nour: 'female',
+  adel: 'male',
+  widad: 'female',
+  samir: 'male',
+  amal: 'female',
+  rana: 'female',
+  tala: 'female',
+  ziad: null,
+  dina: 'female',
+  bashir: 'male',
+  walid: 'male',
+  hani: 'male',
+  maya: 'female',
+  sami: 'male',
+  jamil: 'male',
+  nadia: 'female',
+  fuad: 'male',
+  munir: 'male',
+  ghada: 'female',
+  omarZaher: 'male',
+  laylaZaher: 'female',
+  dalia: 'female',
+  hana: 'female',
+  majed: 'male',
+  lina: 'female',
+  joumana: 'female',
+  lara: 'female',
+};
+
+const C = CHAT_TEST_IDS;
+const gendersByKey: Record<string, PersonGender | null> = GENDERS;
+const genderById = new Map<string, PersonGender | null>(Object.entries(CHAT_TEST_IDS).map(([key, id]) => [id, gendersByKey[key] ?? null]));
+
+export const CHAT_TEST_PERSONS: FamilyNode[] = [
+  ...FIXTURE_PERSONS,
+  person(C.joumana, 'Joumana', 'Saab'),
+  person(C.lara, 'Lara', 'Khoury'),
+].map((node) => ({ ...node, gender: genderById.get(node.id) ?? null }));
+
+export const CHAT_TEST_TREE: FamilyGraph = {
+  nodes: CHAT_TEST_PERSONS,
+  links: [...FIXTURE_LINKS, married(C.hani, C.joumana), ...childOf(C.lara, C.hani, C.joumana)],
 };

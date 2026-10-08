@@ -1,5 +1,5 @@
 /**
- * Chat test questions (LIN-74). Not part of `npm test`: it needs the keys and
+ * Chat test questions (LIN-74, LIN-81). Not part of `npm test`: it needs the keys and
  * the network, and it costs a little (under a cent for a full run).
  *
  *   npm run chat-questions
@@ -8,12 +8,12 @@
  *   npm run chat-questions -- --only amto,no-path
  *
  * Asks each question in src/lib/fixtures/chatTestQuestions.ts through the
- * family chat, on the made-up test tree, with the real TypeSafe Jev and
+ * family chat, on the made-up chat test tree, with the real TypeSafe Jev and
  * OpenRouter (src/lib/fixtures/chatTestHarness.ts runs the family-chat
  * function's handler in this process; no Supabase project is called). Prints,
  * for each question, correct or wrong, where it went (code or the model), the
  * number of model calls and the cost, then the totals. Exits 1 when fewer than
- * 18 of 20 are correct.
+ * 90% of the questions are correct.
  *
  * Keys: `OPENROUTER_API_KEY` and `TYPESAFE_API_KEY`, from the environment, or
  * from `.env.local`, or from the file named by $ENV_FILE (scripts/readApiKey.mjs).
@@ -28,7 +28,8 @@ const showReplies = args.includes('--replies');
 const onlyAt = args.indexOf('--only');
 const only = onlyAt === -1 ? null : new Set(args[onlyAt + 1]?.split(','));
 
-const PASS_MARK = 18;
+const PASS_SHARE = 0.9;
+const PASS_MARK = Math.ceil(PASS_SHARE * CHAT_TEST_QUESTIONS.length);
 
 const runner = createChatTestRunner({
   openRouterApiKey: readApiKey('OPENROUTER_API_KEY'),
@@ -42,7 +43,7 @@ const started = Date.now();
 for (const q of questions) {
   const answer = await runner.ask(q.question);
   const check: ChatTestCheck = answer.outcome.ok
-    ? checkChatTestReply(q, answer.outcome.answer)
+    ? checkChatTestReply(q, { text: answer.outcome.answer, cost: answer.cost.total })
     : { correct: false, problems: [`no answer: ${answer.outcome.cause}`] };
   rows.push({ id: q.id, question: q.question, answer, check });
   process.stderr.write(check.correct ? '.' : 'x');
@@ -69,7 +70,7 @@ const correct = rows.filter((r) => r.check.correct).length;
 const toCode = rows.filter((r) => routeOf(r.answer) === 'code').length;
 const sum = costs.reduce((a, b) => a + b, 0);
 console.log('');
-console.log(`Correct:       ${correct} of ${rows.length}`);
+console.log(`Correct:       ${correct} of ${rows.length}${only ? '' : ` (pass mark ${PASS_MARK})`}`);
 console.log(`Routed to code: ${toCode} of ${rows.length} (no model call)`);
 console.log(`Model calls:   ${rows.reduce((n, r) => n + r.answer.cost.modelCalls, 0)}`);
 console.log(`Jev cost:      ${dollars(rows.reduce((n, r) => n + r.answer.cost.jevCost, 0))} (${rows.reduce((n, r) => n + r.answer.cost.jevInputTokens, 0)} input tokens at $${JEV_PRICE_PER_MILLION_INPUT_TOKENS} a million)`);

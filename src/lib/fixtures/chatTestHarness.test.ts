@@ -100,11 +100,10 @@ describe('createChatTestRunner', () => {
 
     const [first, second] = requests.filter((r) => r.url === OPENROUTER_URL);
     expect(first.authorization).toBe('Bearer or-test-key');
-    // The function's prompt names the test speaker; the tool result is from the test tree.
     const system = (first.body as { messages: Array<{ content: string }> }).messages[0].content;
     expect(system).toContain('**Maya Khoury**');
     const toolTurn = (second.body as { messages: Array<{ role: string; content: string }> }).messages.find((m) => m.role === 'tool');
-    expect(toolTurn?.content).toContain('41');
+    expect(JSON.parse(toolTurn!.content)).toMatchObject({ persons: 43 });
   });
 
   it('stops the tool loop at the cost cap and still replies (LIN-80)', async () => {

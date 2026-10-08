@@ -6,8 +6,8 @@
  *
  * The handler runs in this process rather than deployed, so that:
  * - the signed-in Person is the test speaker, Maya Khoury, not a real account;
- * - the tools read the test tree, never the Tree Record;
- * - the 20 questions are not held to the daily limit of 10 messages.
+ * - the tools read the chat test tree, never the Tree Record;
+ * - the questions are not held to the daily limit of 10 messages.
  * Supabase Auth and the database are answered here, and no request reaches
  * any Supabase project. Only TypeSafe and OpenRouter go over the network, and
  * the token usage and cost in each of their answers are added up per question.
@@ -19,7 +19,7 @@ import { TYPESAFE_URL } from '../../../supabase/functions/_shared/typeSafe.ts';
 import { askFamilyChat, type ChatOutcome } from '../familyChat';
 import { readChatReply, readRouteReply } from '../familyChatClient';
 import { CHAT_TEST_SPEAKER } from './chatTestQuestions';
-import { FIXTURE_PERSONS, KINSHIP_FIXTURE_TREE } from './kinshipFixtureTree';
+import { CHAT_TEST_PERSONS, CHAT_TEST_TREE } from './kinshipFixtureTree';
 
 /** Jev's price, US dollars for each million input tokens (TypeSafe, 2026-09-30). */
 export const JEV_PRICE_PER_MILLION_INPUT_TOKENS = 0.042;
@@ -75,7 +75,7 @@ function usageOf(body: unknown): Record<string, unknown> {
  */
 function fakeSupabase() {
   const callsByMessage = new Map<string, { hash: string; calls: number }>();
-  const speaker = FIXTURE_PERSONS.find((person) => person.id === CHAT_TEST_SPEAKER.personId)!;
+  const speaker = CHAT_TEST_PERSONS.find((person) => person.id === CHAT_TEST_SPEAKER.personId)!;
 
   return (url: string, init?: RequestInit): Response => {
     const path = url.slice(FAKE_SUPABASE_URL.length);
@@ -158,7 +158,7 @@ export function createChatTestRunner({ openRouterApiKey, typeSafeApiKey, network
       const outcome = await askFamilyChat({
         question,
         history: [],
-        record: KINSHIP_FIXTURE_TREE,
+        record: CHAT_TEST_TREE,
         route: async (request) => readRouteReply(await invoke(request)),
         send: async (request) => readChatReply(await invoke(request)),
         messageId: crypto.randomUUID(),
