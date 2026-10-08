@@ -14,12 +14,12 @@ export interface PaperEffectSettings {
 
 const DESKTOP: PaperEffectSettings = {
   depthOfField: { bokehScale: 2.5, focusRangePerDistance: 0.6 },
-  grain: 0.22,
+  grain: 0.25,
 };
 
 const PHONE: PaperEffectSettings = {
   depthOfField: null,
-  grain: 0.12,
+  grain: 0.16,
 };
 
 /** The scene's post effects: a soft depth of field and a light grain on a desktop, a lighter grain alone on a phone. */

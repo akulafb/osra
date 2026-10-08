@@ -1,6 +1,6 @@
 # Paper mode
 
-Paper is the default Canvas Mode: everyone lands on it unless they switched to Cosmos in this browser. In 2D it draws flat ink cards and ink lines on grayscale paper. Hovering a Person rings them and dims everyone but their direct relatives. Selecting a Person ghosts everyone but their relatives. A search dims the non-matches. FIND ME and the current search match get accent rings. INSTRUMENTS, the drawer, the chat, the cards, the banners and the modals take the same paper and ink. In 3D, Paper draws its own still scene of ink discs, lines and labels (see [Paper 3D scene](#paper-3d-scene-lin-93)).
+Paper is the default Canvas Mode: everyone lands on it unless they switched to Cosmos in this browser. In 2D it draws flat ink cards and ink lines on grayscale paper. Hovering a Person rings them and dims everyone but their direct relatives. Selecting a Person ghosts everyone but their relatives. A search dims the non-matches. FIND ME and the current search match get accent rings. INSTRUMENTS, the drawer, the chat, the cards, the banners and the modals take the same paper and ink. In 3D, Paper draws its own scene of ink discs, lines and labels in a still layout (see [Paper 3D scene](#paper-3d-scene-lin-93)); the camera glides, turns slowly when idle and zooms toward the cursor (see [Paper 3D camera and effects](#paper-3d-camera-and-effects-lin-95-pass-95a)).
 
 ## Sub-features
 
@@ -66,7 +66,7 @@ Preconditions:
 
 ### Sub-features
 
-- `paper-3d` draws every shown Person as a flat ink disc that faces the camera, larger with more Kinship Links, on grayscale paper. The layout is still: nothing drifts on its own (a hover leans relatives in on top of it, see [Paper 3D hover](#paper-3d-hover-lin-94-pass-94a)). Labels are uppercase monospace (bundled Kawkab Mono, Arabic too), bigger and bolder on larger discs, and fade with distance. Parent lines are thin and grey, marriages thick ink, divorces dashed ink. No planet textures, starfield or family bubbles; INSTRUMENTS has no TEXTURE or FAMILY PRESETS.
+- `paper-3d` draws every shown Person as a flat ink disc that faces the camera, larger with more Kinship Links, on grayscale paper. The layout is still: no Person drifts on its own (a hover leans relatives in on top of it, see [Paper 3D hover](#paper-3d-hover-lin-94-pass-94a)), though the idle camera turns the whole view. Labels are uppercase monospace (bundled Kawkab Mono, Arabic too), bigger and bolder on larger discs, and fade with distance. Parent lines are thin and grey, marriages thick ink, divorces dashed ink. No planet textures, starfield or family bubbles; INSTRUMENTS has no TEXTURE or FAMILY PRESETS.
 - `paper-3d-click` selects the clicked Person: the drawer opens (desktop side drawer, phone bottom sheet). A pointer that moves more than 6 px is a camera drag, not a click. Clicking empty paper (up to 6 px of movement) or pressing Escape clears the selection.
 - `paper-3d-stable` keeps the layout for the whole page load: switching to Cosmos or 2D and back shows the same positions.
 - `paper-3d-no-webgl` shows "THE 3D TREE NEEDS WEBGL" in place of the canvas when WebGL is missing, the renderer throws, the layout throws or the WebGL context is lost; INSTRUMENTS still works. The WebGL check runs once per page and gives its context back, so switching Paper and Cosmos never logs "Too many active WebGL contexts".
@@ -75,10 +75,10 @@ Preconditions:
 ### Driving it with ui.sh
 
 - Record the view-mode and canvas-mode keys. In Paper, open INSTRUMENTS and click `3D`. Wait until `document.body.innerText.includes('Loading Osra')` is false.
-- **Overview.** `capture.sh` after two identical consecutive captures. Expect ink discs, Arabic and Latin labels, and the three line styles.
+- **Overview.** `capture.sh` once the loader is gone. The grain and the idle turn mean no two captures match. Expect ink discs, Arabic and Latin labels, and the three line styles.
 - **Click.** Nodes have no accessibility handles: pick an isolated disc from the screenshot (PNG pixels ÷ 2 at the 879 px tab) and run `$S/ui.sh "$RUN_DIR" tap <x> <y>`. The drawer heading is the Person's name (`.MuiDrawer-paper h4`). Below 1024 px wide (the Orca tab) it is the phone bottom sheet.
 - **Escape.** Probe first with `window.addEventListener('keydown', …)`, then `$S/ui.sh "$RUN_DIR" key Escape`; `.MuiDrawer-paper h4` disappears.
-- **Stable layout.** Capture, switch CANVAS MODE to `COSMOS` and back to `PAPER`, close INSTRUMENTS and capture again: the scene pixels match.
+- **Stable layout.** Capture, switch CANVAS MODE to `COSMOS` and back to `PAPER`, close INSTRUMENTS and capture again: the same Persons sit in the same places relative to each other (the idle turn and the grain change the pixels).
 - **Background tap.** With a Person selected, press on empty paper, move 4 px and release (`orca mouse move --x <x> --y <y>`, `orca mouse down`, `orca mouse move --x <x+4> --y <y>`, `orca mouse up`, each with `--page`): the drawer closes. The same with a 20 px move is a camera drag and keeps it.
 - **Unwired controls.** In Paper 3D with INSTRUMENTS open: `AMBIANCE` is absent from `document.body.innerText`; type a name in SEARCH ARCHIVE: the count shows and `[aria-label="Next match"]` is `display: none`; NAV CONTROLS' text is only `Esc: Deselect`; select a Person as admin: the drawer has no `Connect Nodes...`. Cosmos 3D shows all four.
 - **No WebGL.** The WebGL check runs once per page, so reload first, go to 2D, then `orca eval` `HTMLCanvasElement.prototype.getContext` to return `null` for `webgl*` (keep the original on `window`), then click `3D`. The `role=alert` fallback shows. Restore `getContext` afterwards.
@@ -94,14 +94,14 @@ Preconditions:
 
 ### Sub-features
 
-- `paper-3d-colour` paints the grayscale scene in the live Paper Pair with a duotone pass (`PaperDuotone`): scene ink becomes the pair's ink, scene paper the pair's paper, and greys in between (parent lines, fog, label edges) land in between. With colour off it is an identity: discs, lines and labels are exactly `#1c1c1c` and the paper `236 236 234`. The scene renders untone-mapped, so far discs and lines fog fully into the paper.
+- `paper-3d-colour` paints the grayscale scene in the live Paper Pair with a duotone pass (`PaperEffects`, last after the depth of field and the grain): scene ink becomes the pair's ink, scene paper the pair's paper, and greys in between (parent lines, fog, label edges) land in between. With colour off it is an identity: discs, lines and labels are exactly `#1c1c1c` and the paper `236 236 234`. The scene renders untone-mapped, so far discs and lines fog fully into the paper.
 - `paper-3d-fade` fades the scene with the panels: focusing a Person or closing one moves the composer's colours each frame in step with `--paper-pair-*`. INSTRUMENTS (toggle, + ADD PERSON, switch labels, VISIBILITY header and checkboxes), the search counter, and the drawer's hover states read live pair tokens, so none of them snap. The 2D empty state's own colour is `inherit`; its text reads ink tokens.
 - `paper-connect-accent`: the Connect picker's selected choice in Paper is the pair's accent at 20%, not ink. Only grayscale has an accent (`#c8361d`) that differs from ink.
 
 ### Driving it with ui.sh
 
 - **Colour.** In Paper 3D open INSTRUMENTS and click `Paper colour`. The scene turns into the overview pair. Sample the canvas pixels of a screenshot: the background equals `--paper-pair-paper` and the discs `--paper-pair-ink`.
-- **Fade.** A per-frame proof needs a probe on the composer (a temporary `useFrame` at priority 2 in `PaperDuotone` that reads the `paper` uniform and `gl.readPixels` a corner pixel into `window.__duoLog`; never commit it). Record `--paper-pair-paper` and the INSTRUMENTS button colour in the same rAF loop, then tap a disc. Every frame the uniform, the read-back pixel and the variable agree.
+- **Fade.** A per-frame proof needs a probe on the composer (a temporary `useFrame` at priority 2 in `PaperEffects` that reads the `paper` uniform and `gl.readPixels` a corner pixel into `window.__duoLog`; never commit it). Record `--paper-pair-paper` and the INSTRUMENTS button colour in the same rAF loop, then tap a disc. Every frame the uniform, the read-back pixel and the variable agree.
 - **Fog.** Open INSTRUMENTS and click `FIND ME`: the camera flies to the owner. The nearest lines are full ink; lines and discs at the back are lighter. Mouse-wheel zoom right into the orbit target fogs everything out, because the fog scales with the distance to the target.
 - **Connect accent.** Grayscale, 2D, a family picked, a Person selected: DOM-click `.handle-connect` (`🔗 Link`), DOM-click another `.node-card`, then click a choice. Its computed background is `color(srgb 0.784 0.212 0.114 / 0.2)`. Leave with the picker's `Cancel` (next to `Establish Link`), then `Cancel (Esc)`. Never click `Establish Link`.
 - **Cosmos unchanged.** Diff a computed-style fingerprint of every element (Cosmos 2D with INSTRUMENTS open; Cosmos 3D with INSTRUMENTS and VISIBILITY open) and the drawer's `+ Add Relative` / `Invite to Tree` hover colours, between the base files and the branch, after a reload each time.
@@ -159,3 +159,30 @@ Preconditions:
 
 - The flight, ripple and wobble need rAF: in an occluded tab they crawl or freeze. A tab can drop to 0 fps; close it and open a fresh one. Report motion unverified unless the tab is visible (STANDING 14).
 - Consecutive screenshots under a viewport override sometimes come out half-scale in the top-left quadrant; retake.
+
+## Paper 3D camera and effects (LIN-95 pass 95a)
+
+### Sub-features
+
+- `paper-3d-momentum`: a drag keeps the view gliding for a moment after release (CameraControls `draggingSmoothTime` 0.3 s) and settles without bouncing back.
+- `paper-3d-idle-rotate`: 3 s after the last pointer, wheel or key input anywhere on the page, with nobody focused, the view turns slowly about the vertical axis: a point as far out as the screen edge moves about 15 px a second. It stops while a Person is focused (the camera holds still while the relatives wobble) and pauses on any input.
+- `paper-3d-zoom`: the wheel or a pinch zooms toward the cursor, on the plane through the orbit point, so discs in front of or behind that plane drift by parallax. The camera stops 32 units from its orbit point and at 3 overview distances back, and the orbit point stays in a box 2 tree radii around the tree's centre, so a full zoom-out always brings the tree back.
+- `paper-3d-effects`: on a desktop (`isMobile()` false: wider than 1024 px and no phone UA) a soft depth of field keeps the orbit point sharp and blurs discs in front and behind, with a light animated grain. Lines stay sharp, because they write no depth. On a phone there is no depth of field and the grain is lighter. The duotone runs last, so the pair still paints the final image.
+- `paper-3d-reframe`: a resize or a turned phone reframes without a reload: the overview refits the tree, and a focused Person is framed again in the space the drawer leaves free (side drawer at 900 px and wider, bottom sheet below).
+
+### Driving it with ui.sh
+
+- Paper 3D, loaded. Set `window.__noReload = 'yes'` with `orca eval` before resizing; it must survive every step.
+- **Idle turn.** No input for 3 s, then two `capture.sh` 15 s apart: discs move between them. Compare blurred greyscale crops (PIL `GaussianBlur(3)`, then count pixels changed by more than 20 levels) so the grain does not count.
+- **Holds on focus.** `ui.sh tap` a disc (or FIND ME), wait 6 s, then two captures 15 s apart: no pixels change by more than 20 levels after the blur.
+- **Zoom.** Dispatch wheel events on the canvas with `orca eval` (`new WheelEvent('wheel', { deltaY: ±100, clientX, clientY, bubbles: true, cancelable: true })`; one event is about one notch, 0.6× the distance). Two notches at an off-centre disc move the view toward it. Twenty more notches past either limit leave the capture unchanged. Before each capture, dispatch one tiny wheel event so the idle turn stays paused.
+- **Effects.** `orca exec "set viewport 1280 812 2"` gives a desktop: discs off the orbit point have soft edges and the empty paper has grain (pixel standard deviation about 3 against about 2 at 935 px). Say in the report that the desktop size is an override.
+- **Reframe.** With the overview and again with a Person focused, `orca exec "set viewport <w> <h> 2"` through 935x812, 820x812, 390x844 and 844x390, 5 s each: the tree refits, or the focused Person moves into the free space beside the drawer or above the sheet.
+- **Proof.** Capture `paper-3d-camera idle-a`, `idle-b`, `focus-a`, `focus-b`, `zoom-toward-cursor`, `zoom-min-a/b`, `zoom-max-a/b`, `desktop-size-final`, `resize-*` and `focus-*` for each size.
+
+### Gotchas
+
+- `orca exec "mouse wheel …"` closes Orca's connection; use dispatched wheel events and say so.
+- Under a 1280 px override the Orca pane still paints only its own width (about 935 px). The rest of the screenshot repeats the left edge, so judge the effects inside the left 935 px.
+- Drag momentum and the feel of the idle turn need a visible tab at full frame rate. An unfocused Orca tab runs a few frames a second, so report motion feel unverified (STANDING 14).
+- Never run an eval that awaits `requestAnimationFrame` in a throttled tab: it can hang Orca's connection. Start a counter in one eval and read it in a later one.

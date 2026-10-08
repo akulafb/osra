@@ -48,7 +48,8 @@ Paper does not restyle Cosmos. Its Persons sit still in a seeded layout (`src/li
 
   It uses `focusEmphasis` and does not change it.
 - **LIN-95.**
-  - `src/components/paper/*`: camera rig momentum, idle rotation, zoom bounds, intro loader and reveal, depth of field and grain, resize;
+  - `src/components/paper/*`: camera rig momentum, idle rotation, zoom bounds, intro loader and reveal, depth of field and grain, resize. The composer runs depth of field, then grain, then the duotone, so the live pair paints the final image. Lines write no depth, so the depth of field leaves the empty paper's depth sharp rather than blurring the lines away;
+  - new pure `src/lib/paperCamera.ts` and `src/lib/paperEffects.ts` with tests: the idle gate and turn speed, the zoom limits and the orbit box, and the effects for a phone or a desktop;
   - a new hint component and its storage key;
   - `features/paper-mode.md`.
 - **LIN-96.**
