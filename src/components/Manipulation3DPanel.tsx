@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import * as THREE from 'three';
+import { useTheme } from '@mui/material/styles';
 import { FamilyGraph, FamilyNode, RelativeDirection } from '../types/graph';
 import { ForceGraphRef, LiveNodePosition } from '../types/forceGraph';
 import { GhostNodeCard, GHOST_CARD_WIDTH } from './cards/GhostNodeCard';
@@ -239,6 +240,7 @@ export const Manipulation3DPanel: React.FC<Manipulation3DPanelProps> = ({
   onCreateRelative,
   onConnectExistingRelative,
 }) => {
+  const { panel, hud } = useTheme().palette;
   const [relation, setRelation] = useState<RelativeDirection | null>(null);
   const [previewName, setPreviewName] = useState('');
 
@@ -378,16 +380,16 @@ export const Manipulation3DPanel: React.FC<Manipulation3DPanelProps> = ({
           zIndex: 1250,
           width: panelWidth,
           boxSizing: 'border-box',
-          background: 'rgba(15, 23, 42, 0.95)',
+          background: hud.panel.surface,
           backdropFilter: 'blur(16px)',
-          border: '1px solid rgba(255,255,255,0.15)',
+          border: `1px solid ${hud.card.border}`,
           borderRadius: 12,
           padding: PANEL_PADDING,
-          color: '#fff',
+          color: panel.ink.strong,
           display: 'flex',
           flexDirection: 'column',
           gap: 8,
-          boxShadow: '0 10px 40px rgba(0,0,0,0.7)',
+          boxShadow: `0 10px 40px ${hud.card.shadow}`,
         }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -395,7 +397,7 @@ export const Manipulation3DPanel: React.FC<Manipulation3DPanelProps> = ({
           style={{
             fontSize: 11,
             fontWeight: 700,
-            color: 'rgba(255,255,255,0.65)',
+            color: hud.panel.caption,
             overflow: 'hidden',
             textOverflow: 'ellipsis',
             whiteSpace: 'nowrap',
@@ -412,7 +414,7 @@ export const Manipulation3DPanel: React.FC<Manipulation3DPanelProps> = ({
            * pixels at distance.
            */
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.75)', lineHeight: 1.4 }}>
+            <div style={{ fontSize: 11, color: hud.panel.prompt, lineHeight: 1.4 }}>
               Dissolve <strong>{selectedNode.firstName}</strong>? This cannot be undone.
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
@@ -425,7 +427,7 @@ export const Manipulation3DPanel: React.FC<Manipulation3DPanelProps> = ({
                   background: DISSOLVE_ACCENT,
                   border: `1.5px solid ${DISSOLVE_ACCENT}`,
                   borderRadius: 999,
-                  color: '#0f172a',
+                  color: hud.card.onAccent,
                   cursor: 'pointer',
                   fontSize: 13,
                   fontWeight: 800,
@@ -440,10 +442,10 @@ export const Manipulation3DPanel: React.FC<Manipulation3DPanelProps> = ({
                 aria-label="Keep this person"
                 style={{
                   flex: 1,
-                  background: 'rgba(15, 23, 42, 0.92)',
-                  border: '1.5px solid rgba(255,255,255,0.3)',
+                  background: hud.panel.pill,
+                  border: `1.5px solid ${hud.panel.pillBorder}`,
                   borderRadius: 999,
-                  color: 'rgba(255,255,255,0.85)',
+                  color: hud.panel.pillInk,
                   cursor: 'pointer',
                   fontSize: 13,
                   fontWeight: 800,
@@ -464,7 +466,7 @@ export const Manipulation3DPanel: React.FC<Manipulation3DPanelProps> = ({
                 type="button"
                 onClick={() => setRelation(rel)}
                 style={{
-                  background: 'rgba(15, 23, 42, 0.92)',
+                  background: hud.panel.pill,
                   border: `1.5px solid ${relationColor(rel)}`,
                   borderRadius: 999,
                   color: relationColor(rel),
@@ -482,7 +484,7 @@ export const Manipulation3DPanel: React.FC<Manipulation3DPanelProps> = ({
               type="button"
               onClick={startConnect}
               style={{
-                background: 'rgba(15, 23, 42, 0.92)',
+                background: hud.panel.pill,
                 border: `1.5px solid ${CONNECT_ACCENT}`,
                 borderRadius: 999,
                 color: CONNECT_ACCENT,
@@ -500,7 +502,7 @@ export const Manipulation3DPanel: React.FC<Manipulation3DPanelProps> = ({
                 type="button"
                 onClick={startDissolve}
                 style={{
-                  background: 'rgba(15, 23, 42, 0.92)',
+                  background: hud.panel.pill,
                   border: `1.5px solid ${DISSOLVE_ACCENT}`,
                   borderRadius: 999,
                   color: DISSOLVE_ACCENT,
