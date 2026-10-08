@@ -1,12 +1,10 @@
 export interface PaperDepthOfField {
-  /** How wide the blur grows. */
   bokehScale: number;
   /** How far either side of the orbit point the image goes fully soft, as a share of the camera's distance to it. */
   focusRangePerDistance: number;
 }
 
 export interface PaperEffectSettings {
-  /** None on phones, to keep the scene smooth. */
   depthOfField: PaperDepthOfField | null;
   /** How strongly the grain shows, from 0 to 1. */
   grain: number;

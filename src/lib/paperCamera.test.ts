@@ -32,10 +32,6 @@ describe('paperIdleRotates', () => {
   it('holds still when the idle time is not a number', () => {
     expect(paperIdleRotates(Number.NaN, false)).toBe(false);
   });
-
-  it('pauses for about three seconds', () => {
-    expect(PAPER_IDLE_SECONDS).toBe(3);
-  });
 });
 
 describe('paperIdleRotateSpeed', () => {

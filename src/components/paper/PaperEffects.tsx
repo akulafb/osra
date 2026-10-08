@@ -32,21 +32,25 @@ class DuotoneEffect extends Effect {
 
 const COC_DEPTH_READ = 'float depth=readDepth(vUv);';
 
-/** Lines write no depth, so they read as the empty paper behind them; the blur leaves that depth sharp so it does not wipe the lines out. */
-function depthOfField(camera: THREE.Camera, { bokehScale }: PaperDepthOfField): DepthOfFieldEffect {
+/**
+ * Lines write no depth, so they read as the empty paper behind them; the blur
+ * leaves that depth sharp so it does not wipe the lines out. Without that
+ * patch the scene goes without depth of field.
+ */
+function depthOfField(camera: THREE.Camera, { bokehScale }: PaperDepthOfField): DepthOfFieldEffect | null {
   const effect = new DepthOfFieldEffect(camera, { bokehScale });
   const coc = effect.cocMaterial;
+  if (!coc.fragmentShader.includes(COC_DEPTH_READ)) {
+    effect.dispose();
+    return null;
+  }
   coc.fragmentShader = coc.fragmentShader.replace(COC_DEPTH_READ, `${COC_DEPTH_READ}if(depth>=1.0){gl_FragColor=vec4(0.0);return;}`);
   coc.needsUpdate = true;
   effect.target = new THREE.Vector3();
   return effect;
 }
 
-/**
- * The scene's post effects in order: a soft depth of field on the orbit point,
- * a grain, then the duotone, which repaints the grayscale result in the live
- * Paper Pair so the 3D scene fades with the panels.
- */
+/** Depth of field and grain, then the duotone last, so the live Paper Pair paints the final image. */
 export function PaperEffects({ ink, paper, settings }: { ink: string; paper: string; settings: PaperEffectSettings }) {
   const camera = useThree((three) => three.camera);
   const duotone = useMemo(() => new DuotoneEffect(ink, paper), [ink, paper]);
@@ -93,7 +97,7 @@ function FocusOnTarget({ effect, rangePerDistance }: { effect: DepthOfFieldEffec
   useFrame(({ camera, controls }) => {
     const target = effect.target;
     if (!controls || !target) return;
-    (controls as CameraControls).getTarget(target);
+    (controls as CameraControls).getTarget(target, false);
     effect.cocMaterial.focusRange = camera.getWorldPosition(position.current).distanceTo(target) * rangePerDistance;
   });
   return null;

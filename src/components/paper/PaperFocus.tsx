@@ -79,10 +79,11 @@ export function PaperFocus({ selectedId, layout, ids, links, drawerInset, onOver
     if (selectedId) fly(selectedId, true);
     else onOverview();
   };
-  const sized = useRef(false);
+  const framedFor = useRef<string | null>(null);
   useEffect(() => {
-    if (sized.current) reframe.current();
-    sized.current = true;
+    const key = `${size.width}x${size.height}:${drawerInset.rightPx}:${drawerInset.bottomVh}`;
+    if (framedFor.current !== null && framedFor.current !== key) reframe.current();
+    framedFor.current = key;
   }, [size.width, size.height, drawerInset.rightPx, drawerInset.bottomVh]);
 
   return null;

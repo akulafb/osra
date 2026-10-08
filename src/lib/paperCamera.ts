@@ -3,7 +3,7 @@ import type { Point3 } from './paperHover';
 /** How long the view must sit without pointer, wheel or key input before it starts to turn on its own. */
 export const PAPER_IDLE_SECONDS = 3;
 
-/** How long the camera keeps gliding after a drag is let go. */
+/** The camera's smoothing time while dragging: it sets how long the view glides after a release. */
 export const PAPER_DRAG_SMOOTH_SECONDS = 0.3;
 
 const IDLE_EDGE_PX_PER_SECOND = 15;
