@@ -272,7 +272,6 @@ describe('routeMessage: code answers the common kinds, with no model call', () =
 });
 
 describe('routeMessage: "Is <Person> my <word>?" is answered yes or no in code', () => {
-  /** How Jev reads "Is Samir my khalo?": the speaker's aunts and uncles, though a Person is named. */
   const khaloReading = reading({ relation: 'aunts_uncles', side: 'maternal', gender: 'male' });
 
   it('yes, in the word the user wrote, when the Kinship Term is what an Arabic word means', () => {
@@ -304,7 +303,6 @@ describe('routeMessage: "Is <Person> my <word>?" is answered yes or no in code',
       by: 'code',
       answer: '**Adel Mansour** is your grandparent.',
     });
-    // A cousin of any degree is a cousin; a "first cousin" is only that.
     expect(route('Is Tala my cousin?', reading({ relation: 'cousins' }))).toEqual({ by: 'code', answer: '**Tala Mansour** is your cousin.' });
     expect(route('Is Tala my first cousin?', reading({ relation: 'cousins' }))).toEqual({
       by: 'code',

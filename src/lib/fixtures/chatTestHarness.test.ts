@@ -38,7 +38,6 @@ function jevOther(inputTokens: number) {
   });
 }
 
-/** Jev's answers for "Is Walid Aziz my khalo?": the speaker's aunts and uncles, though a Person is named. */
 function jevKhalo(inputTokens: number) {
   return json({
     model: 'jev-1.13.0',

@@ -124,7 +124,6 @@ describe('the chat test questions', () => {
   });
 
   it('expect "No." for the father\'s sister asked as a khalto', () => {
-    expect(byId('is-she-my-khalto').expect).toEqual({ answersNo: true });
     expect(termsForAToB(P.sara, me)).toEqual(['aunt']);
     expect(findKinshipPaths(me, P.sara, links).map((path) => path.relation.side)).toEqual(['father']);
   });

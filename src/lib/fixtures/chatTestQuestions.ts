@@ -276,9 +276,8 @@ export const CHAT_TEST_QUESTIONS: readonly ChatTestQuestion[] = [
     expect: { relations: [/\bkhalo\b/i] },
   },
   {
-    id: 'is-she-my-khalto',
+    id: 'fathers-sister-as-khalto',
     group: 'arabic',
-    // The father's sister: a khalto is the mother's sister.
     question: 'Is Sara Khoury my khalto?',
     expect: { answersNo: true },
   },

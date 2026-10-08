@@ -196,100 +196,83 @@ function arabicWordsIn(message: string): ArabicWord[] {
     .filter((word): word is ArabicWord => word in ARABIC_KINSHIP_WORDS);
 }
 
-/**
- * What a kinship word means, as Kinship Terms. A word fits a Person when one
- * of its terms is the Kinship Term and the Person's gender and the path's side
- * are the word's, where the word gives them. "uncle" gives no side, so it fits
- * an uncle on either side; "khalo" fits only the mother's brother.
- */
-interface KinshipWord {
-  /** Neutral Kinship Terms (`KinshipRelation.label`): "aunt or uncle", "parent-in-law". */
-  terms?: readonly string[];
-  /** Kinds of term the word means at any degree: "cousin" is a first cousin or a third cousin twice removed. */
-  kinds?: readonly KinshipRelationName[];
+type KinshipWord = ({ labels: readonly string[] } | { anyDegreeOf: KinshipRelationName }) & {
   gender?: RecordedGender;
   side?: ParentSide;
-}
+};
 
-/** English kinship words, comma-separated, by meaning; spaces stand for spaces or hyphens. */
-const ENGLISH_KINSHIP_WORDS: ReadonlyArray<[words: string, meaning: KinshipWord]> = [
-  ['parent', { terms: ['parent'] }],
-  ['mother, mom, mum, mama', { terms: ['parent'], gender: 'female' }],
-  ['father, dad, baba, papa', { terms: ['parent'], gender: 'male' }],
-  ['child, kid', { terms: ['child'] }],
-  ['son', { terms: ['child'], gender: 'male' }],
-  ['daughter', { terms: ['child'], gender: 'female' }],
-  ['sibling', { terms: ['sibling', 'half-sibling'] }],
-  ['brother', { terms: ['sibling', 'half-sibling'], gender: 'male' }],
-  ['sister', { terms: ['sibling', 'half-sibling'], gender: 'female' }],
-  ['half sibling', { terms: ['half-sibling'] }],
-  ['half brother', { terms: ['half-sibling'], gender: 'male' }],
-  ['half sister', { terms: ['half-sibling'], gender: 'female' }],
-  ['spouse', { terms: ['spouse'] }],
-  ['husband', { terms: ['spouse'], gender: 'male' }],
-  ['wife', { terms: ['spouse'], gender: 'female' }],
-  ['former spouse, ex spouse, ex', { terms: ['former spouse'] }],
-  ['former husband, ex husband', { terms: ['former spouse'], gender: 'male' }],
-  ['former wife, ex wife', { terms: ['former spouse'], gender: 'female' }],
-  ['grandparent', { terms: ['grandparent'] }],
-  ['grandfather, grandpa, granddad', { terms: ['grandparent'], gender: 'male' }],
-  ['grandmother, grandma, granny', { terms: ['grandparent'], gender: 'female' }],
-  ['great grandparent', { terms: ['great-grandparent'] }],
-  ['great grandfather', { terms: ['great-grandparent'], gender: 'male' }],
-  ['great grandmother', { terms: ['great-grandparent'], gender: 'female' }],
-  ['grandchild, grandkid', { terms: ['grandchild'] }],
-  ['grandson', { terms: ['grandchild'], gender: 'male' }],
-  ['granddaughter', { terms: ['grandchild'], gender: 'female' }],
-  ['uncle', { terms: ['aunt or uncle', 'aunt or uncle by marriage'], gender: 'male' }],
-  ['aunt', { terms: ['aunt or uncle', 'aunt or uncle by marriage'], gender: 'female' }],
-  ['great uncle', { terms: ['great-aunt or great-uncle', 'great-aunt or great-uncle by marriage'], gender: 'male' }],
-  ['great aunt', { terms: ['great-aunt or great-uncle', 'great-aunt or great-uncle by marriage'], gender: 'female' }],
-  ['nephew', { terms: ['niece or nephew'], gender: 'male' }],
-  ['niece', { terms: ['niece or nephew'], gender: 'female' }],
-  ['cousin', { kinds: ['cousin'] }],
-  ['first cousin', { terms: ['first cousin'] }],
-  ['second cousin', { terms: ['second cousin'] }],
-  ['parent in law', { terms: ['parent-in-law'] }],
-  ['mother in law', { terms: ['parent-in-law'], gender: 'female' }],
-  ['father in law', { terms: ['parent-in-law'], gender: 'male' }],
-  ['sibling in law', { terms: ['sibling-in-law'] }],
-  ['brother in law', { terms: ['sibling-in-law'], gender: 'male' }],
-  ['sister in law', { terms: ['sibling-in-law'], gender: 'female' }],
-  ['child in law', { terms: ['child-in-law'] }],
-  ['son in law', { terms: ['child-in-law'], gender: 'male' }],
-  ['daughter in law', { terms: ['child-in-law'], gender: 'female' }],
-  ['stepparent', { terms: ['step-parent'] }],
-  ['stepmother', { terms: ['step-parent'], gender: 'female' }],
-  ['stepfather', { terms: ['step-parent'], gender: 'male' }],
-  ['stepchild', { terms: ['step-child'] }],
-  ['stepson', { terms: ['step-child'], gender: 'male' }],
-  ['stepdaughter', { terms: ['step-child'], gender: 'female' }],
-  ['stepsibling', { terms: ['step-sibling'] }],
-  ['stepbrother', { terms: ['step-sibling'], gender: 'male' }],
-  ['stepsister', { terms: ['step-sibling'], gender: 'female' }],
+const ENGLISH_KINSHIP_WORDS: ReadonlyArray<[synonyms: readonly string[], meaning: KinshipWord]> = [
+  [['parent'], { labels: ['parent'] }],
+  [['mother', 'mom', 'mum', 'mama'], { labels: ['parent'], gender: 'female' }],
+  [['father', 'dad', 'baba', 'papa'], { labels: ['parent'], gender: 'male' }],
+  [['child', 'kid'], { labels: ['child'] }],
+  [['son'], { labels: ['child'], gender: 'male' }],
+  [['daughter'], { labels: ['child'], gender: 'female' }],
+  [['sibling'], { labels: ['sibling', 'half-sibling'] }],
+  [['brother'], { labels: ['sibling', 'half-sibling'], gender: 'male' }],
+  [['sister'], { labels: ['sibling', 'half-sibling'], gender: 'female' }],
+  [['half sibling'], { labels: ['half-sibling'] }],
+  [['half brother'], { labels: ['half-sibling'], gender: 'male' }],
+  [['half sister'], { labels: ['half-sibling'], gender: 'female' }],
+  [['spouse'], { labels: ['spouse'] }],
+  [['husband'], { labels: ['spouse'], gender: 'male' }],
+  [['wife'], { labels: ['spouse'], gender: 'female' }],
+  [['former spouse', 'ex spouse', 'ex'], { labels: ['former spouse'] }],
+  [['former husband', 'ex husband'], { labels: ['former spouse'], gender: 'male' }],
+  [['former wife', 'ex wife'], { labels: ['former spouse'], gender: 'female' }],
+  [['grandparent'], { labels: ['grandparent'] }],
+  [['grandfather', 'grandpa', 'granddad'], { labels: ['grandparent'], gender: 'male' }],
+  [['grandmother', 'grandma', 'granny'], { labels: ['grandparent'], gender: 'female' }],
+  [['great grandparent'], { labels: ['great-grandparent'] }],
+  [['great grandfather'], { labels: ['great-grandparent'], gender: 'male' }],
+  [['great grandmother'], { labels: ['great-grandparent'], gender: 'female' }],
+  [['grandchild', 'grandkid'], { labels: ['grandchild'] }],
+  [['grandson'], { labels: ['grandchild'], gender: 'male' }],
+  [['granddaughter'], { labels: ['grandchild'], gender: 'female' }],
+  [['uncle'], { labels: ['aunt or uncle', 'aunt or uncle by marriage'], gender: 'male' }],
+  [['aunt'], { labels: ['aunt or uncle', 'aunt or uncle by marriage'], gender: 'female' }],
+  [['great uncle'], { labels: ['great-aunt or great-uncle', 'great-aunt or great-uncle by marriage'], gender: 'male' }],
+  [['great aunt'], { labels: ['great-aunt or great-uncle', 'great-aunt or great-uncle by marriage'], gender: 'female' }],
+  [['nephew'], { labels: ['niece or nephew'], gender: 'male' }],
+  [['niece'], { labels: ['niece or nephew'], gender: 'female' }],
+  [['cousin'], { anyDegreeOf: 'cousin' }],
+  [['first cousin'], { labels: ['first cousin'] }],
+  [['second cousin'], { labels: ['second cousin'] }],
+  [['parent in law'], { labels: ['parent-in-law'] }],
+  [['mother in law'], { labels: ['parent-in-law'], gender: 'female' }],
+  [['father in law'], { labels: ['parent-in-law'], gender: 'male' }],
+  [['sibling in law'], { labels: ['sibling-in-law'] }],
+  [['brother in law'], { labels: ['sibling-in-law'], gender: 'male' }],
+  [['sister in law'], { labels: ['sibling-in-law'], gender: 'female' }],
+  [['child in law'], { labels: ['child-in-law'] }],
+  [['son in law'], { labels: ['child-in-law'], gender: 'male' }],
+  [['daughter in law'], { labels: ['child-in-law'], gender: 'female' }],
+  [['stepparent'], { labels: ['step-parent'] }],
+  [['stepmother'], { labels: ['step-parent'], gender: 'female' }],
+  [['stepfather'], { labels: ['step-parent'], gender: 'male' }],
+  [['stepchild'], { labels: ['step-child'] }],
+  [['stepson'], { labels: ['step-child'], gender: 'male' }],
+  [['stepdaughter'], { labels: ['step-child'], gender: 'female' }],
+  [['stepsibling'], { labels: ['step-sibling'] }],
+  [['stepbrother'], { labels: ['step-sibling'], gender: 'male' }],
+  [['stepsister'], { labels: ['step-sibling'], gender: 'female' }],
 ];
 
-/**
- * Every kinship word "Is <Person> my <word>?" is answered for in code. The
- * Arabic words mean exactly one term, gender and side: "khalo" is the
- * mother's brother, never an uncle by marriage.
- */
 const KINSHIP_WORDS: ReadonlyMap<string, KinshipWord> = new Map([
   ...Object.entries(ARABIC_KINSHIP_WORDS).map(([word, { label, gender, side }]): [string, KinshipWord] => [
     word,
-    { terms: [label], gender, side },
+    { labels: [label], gender, side },
   ]),
-  ...ENGLISH_KINSHIP_WORDS.flatMap(([words, meaning]) => words.split(', ').map((word): [string, KinshipWord] => [word, meaning])),
+  ...ENGLISH_KINSHIP_WORDS.flatMap(([synonyms, meaning]) => synonyms.map((word): [string, KinshipWord] => [word, meaning])),
 ]);
 
-/** "Step-mother" and "step mother" are "stepmother"; "mother-in-law" is "mother in law". */
 function kinshipWordKey(word: string): string {
   return word.toLowerCase().replace(/[\s-]+/g, ' ').replace(/^step /, 'step');
 }
 
-/** Whether a word fits one Kinship Term of the Person: yes, no, or the tree cannot tell. */
 function wordFits(word: KinshipWord, relation: KinshipRelation, gender: RecordedGender | null): 'yes' | 'no' | 'unknown' {
-  if (!word.terms?.includes(relation.label) && !word.kinds?.includes(relation.name)) return 'no';
+  const namesTerm = 'labels' in word ? word.labels.includes(relation.label) : word.anyDegreeOf === relation.name;
+  if (!namesTerm) return 'no';
   if (word.gender && word.gender !== gender) return gender ? 'no' : 'unknown';
   if (word.side && word.side !== relation.side) return relation.side ? 'no' : 'unknown';
   return 'yes';
@@ -366,19 +349,16 @@ function readMessage(message: string, record: ChatRecord): MessageWords {
   return { names, firstPerson };
 }
 
-/**
- * "Is <Person> my <word>?" with a word in `KINSHIP_WORDS` and only a name
- * between "is" and "my": the name, the word's meaning, and the word as the
- * user wrote it. Null for any other message, which is routed by Jev's reading:
- * "Is Walid's son my cousin?" names no one Person.
- */
-function readIsMy(message: string, record: ChatRecord): { name: string; word: KinshipWord; said: string } | null {
+function exactlyOneName(text: string, record: ChatRecord): string | null {
+  const { names } = readMessage(text, record);
+  return names.length === 1 && names[0] === words(text).join(' ') ? names[0] : null;
+}
+
+function readIsMy(message: string, record: ChatRecord): { name: string; word: KinshipWord; wordAsWritten: string } | null {
   const asked = message.normalize('NFC').match(/^\s*is\s+(.+?)\s+my\s+(\p{L}[\p{L}\s'’-]*?)[\s?.!]*$/iu);
   const word = asked && KINSHIP_WORDS.get(kinshipWordKey(asked[2]));
-  if (!asked || !word) return null;
-  const { names } = readMessage(asked[1], record);
-  if (names.length !== 1 || names[0] !== words(asked[1]).join(' ')) return null;
-  return { name: names[0], word, said: asked[2].toLowerCase().replace(/\s+/g, ' ') };
+  const name = asked && word && exactlyOneName(asked[1], record);
+  return name && word ? { name, word, wordAsWritten: asked[2].toLowerCase().replace(/\s+/g, ' ') } : null;
 }
 
 type Found = { ok: true; personId: string } | { ok: false; why: ModelReason };
@@ -407,7 +387,7 @@ export function routeMessage({ message, questionKind: kind, speaker, record }: R
     const found = findOne(isMy.name, record);
     if (!found.ok) return { by: 'model', why: found.why };
     if (found.personId === speaker.personId) return { by: 'model', why: 'names_do_not_fit' };
-    return { by: 'code', answer: new Reply(record, speaker.personId, []).isMy(speaker.personId, found.personId, isMy.word, isMy.said) };
+    return { by: 'code', answer: new Reply(record, speaker.personId, []).isMy(speaker.personId, found.personId, isMy.word, isMy.wordAsWritten) };
   }
 
   if (!kind) return { by: 'model', why: 'no_reading' };
@@ -620,17 +600,12 @@ class Reply {
     return notes;
   }
 
-  /**
-   * "Is <Person> my <word>?": yes, in the word as the user wrote it, when the
-   * word fits the term of any Kinship Path from the speaker; "No." and nothing
-   * more when it fits none. When they are not related, or the tree does not
-   * record the gender or side the word needs, the how-related answer.
-   */
-  isMy(speakerId: string, personId: string, word: KinshipWord, said: string): string {
+  isMy(speakerId: string, personId: string, word: KinshipWord, wordAsWritten: string): string {
     const gender = getRecordedGender(personId, this.record.links, this.record.nodes);
     const fits = findKinshipPaths(speakerId, personId, this.record.links).map((path) => wordFits(word, path.relation, gender));
-    if (fits.includes('yes')) return `${this.bold(personId)} is your ${said}.`;
-    if (fits.length > 0 && !fits.includes('unknown')) return 'No.';
+    const related = fits.length > 0;
+    if (fits.includes('yes')) return `${this.bold(personId)} is your ${wordAsWritten}.`;
+    if (related && !fits.includes('unknown')) return 'No.';
     return this.howRelated(speakerId, personId, false);
   }
 
