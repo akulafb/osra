@@ -13,7 +13,6 @@ import { GRAYSCALE_PAIR } from '../theme/paperPair';
 
 const grayscale: CurrentPaperPair = { pair: GRAYSCALE_PAIR };
 
-/** Holds the viewer's Canvas Mode and themes everything inside it to match. */
 export function CanvasModeProvider({ children }: { children: ReactNode }) {
   const [preference, setPreference] = useState(readStoredCanvasMode);
 

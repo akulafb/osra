@@ -607,7 +607,7 @@ export const FamilyTree: React.FC = () => {
       height: '100vh',
       overflow: 'hidden',
       background: panel.page,
-      color: panel.ink.base,
+      color: panel.ink.inherited,
     }}>
       {mode === '2D' && showSeeWhosNewButton && newMembers.length > 0 && (
         <div

@@ -8,7 +8,6 @@ export interface FocusEmphasisInput {
   links: readonly FamilyLink[];
   hoveredId: string | null;
   focusedId: string | null;
-  /** null while no search is active. */
   searchMatchIds: ReadonlySet<string> | null;
 }
 
@@ -22,17 +21,14 @@ function directNeighbours(personId: string, links: readonly FamilyLink[]): Set<s
   return neighbours;
 }
 
-/**
- * Each Person's emphasis in a Paper view. Focus outranks hover; a search hides
- * every non-match whatever else applies. Relatives are direct Kinship Link
- * neighbours only.
- */
 export function focusEmphasis(input: FocusEmphasisInput): Map<string, Emphasis> {
   const { personIds, links, hoveredId, focusedId, searchMatchIds } = input;
   const present = new Set(personIds);
-  const subjectId = focusedId && present.has(focusedId) ? focusedId : hoveredId && present.has(hoveredId) ? hoveredId : null;
-  const subjectState: Emphasis = subjectId === focusedId ? 'focused' : 'hovered';
-  const othersState: Emphasis = subjectId === focusedId ? 'ghost' : 'dimmed';
+  const focusedSubject = focusedId && present.has(focusedId) ? focusedId : null;
+  const hoveredSubject = hoveredId && present.has(hoveredId) ? hoveredId : null;
+  const subjectId = focusedSubject ?? hoveredSubject;
+  const subjectState: Emphasis = focusedSubject ? 'focused' : 'hovered';
+  const othersState: Emphasis = focusedSubject ? 'ghost' : 'dimmed';
   const relatives = subjectId ? directNeighbours(subjectId, links) : new Set<string>();
 
   const emphasis = new Map<string, Emphasis>();

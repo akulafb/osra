@@ -3,7 +3,6 @@ import { useTheme } from '@mui/material/styles';
 import { useCanvasMode } from '../hooks/useCanvasMode';
 import type { CanvasMode } from '../lib/canvasMode';
 
-/** The COSMOS ⇄ PAPER switch in INSTRUMENTS, shared by 2D and 3D. */
 export function CanvasModeSwitch() {
   const { mode, setMode } = useCanvasMode();
   const { panel } = useTheme().palette;

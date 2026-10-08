@@ -16,7 +16,6 @@ interface OrthogonalLinksProps {
    * path growth; the 3D one is a beam pulse (LIN-55). Same lifecycle.
    */
   lifecycles: LifecycleController;
-  /** Set in Paper: every line is drawn in this ink, faded with its fainter end. */
   paperInk?: string;
   emphasis?: ReadonlyMap<string, Emphasis> | null;
 }

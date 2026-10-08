@@ -2,8 +2,6 @@ import { describe, it, expect } from 'vitest';
 import type { FamilyLink } from '../types/graph';
 import { focusEmphasis, type FocusEmphasisInput } from './focusEmphasis';
 
-// Grandpa + Grandma -> Dad (married Mum, once married Ex) -> Kid and Kid's sister Sis.
-// Stranger has no links at all.
 const personIds = ['grandpa', 'grandma', 'dad', 'mum', 'ex', 'kid', 'sis', 'stranger'];
 const links: FamilyLink[] = [
   { source: 'grandpa', target: 'grandma', type: 'marriage' },

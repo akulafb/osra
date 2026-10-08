@@ -9,11 +9,9 @@ import {
 import { GRAYSCALE_PAIR, type PaperPair } from '../theme/paperPair';
 
 export interface CanvasModeController extends CanvasModePreference {
-  /** An explicit switch: the only path that writes the stored choice. */
   setMode: (mode: CanvasMode) => void;
 }
 
-/** The pair the Paper scene and panels draw with right now. */
 export interface CurrentPaperPair {
   pair: PaperPair;
 }

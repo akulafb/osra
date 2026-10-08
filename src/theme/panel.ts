@@ -30,8 +30,7 @@ export interface PanelTokens {
     secondary: string;
   };
   ink: {
-    /** What text inherits on the tree page. */
-    base: string;
+    inherited: string;
     strong: string;
     soft: string;
     body: string;
@@ -112,7 +111,7 @@ export const cosmosPanel: PanelTokens = {
     secondary: 'rgba(124, 58, 237, 0.1)',
   },
   ink: {
-    base: 'rgba(255, 255, 255, 0.87)',
+    inherited: 'rgba(255, 255, 255, 0.87)',
     strong: '#fff',
     soft: 'rgba(255,255,255,0.9)',
     body: 'rgba(255,255,255,0.7)',
@@ -185,7 +184,7 @@ export function paperPanel({ paper, ink }: PaperPair): PanelTokens {
       secondary: alpha(ink, 0.04),
     },
     ink: {
-      base: ink,
+      inherited: ink,
       strong: ink,
       soft: alpha(ink, 0.9),
       body: alpha(ink, 0.75),

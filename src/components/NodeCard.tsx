@@ -39,7 +39,6 @@ export interface NodeCardProps {
   lifecycles: LifecycleController;
   isConfirmingDissolve?: boolean;
   onConfirmDissolve?: (node: Node2D) => void;
-  /** Set in Paper: the card is drawn flat in this pair's ink. */
   paperPair?: PaperPair;
   emphasis?: Emphasis;
   onHoverChange?: (nodeId: string, hovering: boolean) => void;
@@ -65,11 +64,6 @@ function lightenColors(base: { bg: string; border: string; text: string }) {
 
 const HIGHLIGHT_GLOW_COLOR = '#10b981';
 
-/**
- * Paper's state rings, drawn outside the card: a thin ink ring on hover, a
- * heavier offset ink ring when selected, a solid accent ring for FIND ME and a
- * dashed accent ring for the current search match.
- */
 function PaperHighlights({
   width,
   height,
