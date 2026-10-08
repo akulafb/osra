@@ -20,6 +20,10 @@
  * "How is A related to B" is always answered here once both are found: every
  * Kinship Path has a Kinship Term (LIN-77), so the model never names one.
  *
+ * "Is <Person> my <word>?" (LIN-88) is read from the words alone, before Jev's
+ * reading: it is answered here when the word is in `KINSHIP_WORDS`, the Person
+ * is found once and the speaker is known, however Jev read the message.
+ *
  * Jev never sees the Persons: the names are found here, with `findPersonsByName`.
  */
 import type { Speaker } from '../../supabase/functions/family-chat/prompt.ts';
@@ -31,11 +35,14 @@ import type {
 import type { ChatRecord } from './chatTools';
 import {
   findKinshipPaths,
+  findKinshipTerms,
   findPersonsByName,
   getFormerSpouses,
+  getParents,
   getRecordedGender,
   getRelatives,
   type KinshipRelation,
+  type KinshipRelationName,
   type KinshipSide,
   type RecordedGender,
   type RelativeKind,
@@ -191,6 +198,105 @@ function arabicWordsIn(message: string): ArabicWord[] {
     .filter((word): word is ArabicWord => word in ARABIC_KINSHIP_WORDS);
 }
 
+type KinshipWord = ({ labels: readonly string[] } | { anyDegreeOf: KinshipRelationName }) & {
+  gender?: RecordedGender;
+  side?: ParentSide;
+};
+
+const ENGLISH_KINSHIP_WORDS: ReadonlyArray<[synonyms: readonly string[], meaning: KinshipWord]> = [
+  [['parent'], { labels: ['parent'] }],
+  [['mother', 'mom', 'mum', 'mama'], { labels: ['parent'], gender: 'female' }],
+  [['father', 'dad', 'baba', 'papa'], { labels: ['parent'], gender: 'male' }],
+  [['child', 'kid'], { labels: ['child'] }],
+  [['son'], { labels: ['child'], gender: 'male' }],
+  [['daughter'], { labels: ['child'], gender: 'female' }],
+  [['sibling'], { labels: ['sibling', 'half-sibling'] }],
+  [['brother'], { labels: ['sibling', 'half-sibling'], gender: 'male' }],
+  [['sister'], { labels: ['sibling', 'half-sibling'], gender: 'female' }],
+  [['half sibling'], { labels: ['half-sibling'] }],
+  [['half brother'], { labels: ['half-sibling'], gender: 'male' }],
+  [['half sister'], { labels: ['half-sibling'], gender: 'female' }],
+  [['spouse'], { labels: ['spouse'] }],
+  [['husband'], { labels: ['spouse'], gender: 'male' }],
+  [['wife'], { labels: ['spouse'], gender: 'female' }],
+  [['former spouse', 'ex spouse', 'ex'], { labels: ['former spouse'] }],
+  [['former husband', 'ex husband'], { labels: ['former spouse'], gender: 'male' }],
+  [['former wife', 'ex wife'], { labels: ['former spouse'], gender: 'female' }],
+  [['grandparent'], { labels: ['grandparent'] }],
+  [['grandfather', 'grandpa', 'granddad'], { labels: ['grandparent'], gender: 'male' }],
+  [['grandmother', 'grandma', 'granny'], { labels: ['grandparent'], gender: 'female' }],
+  [['great grandparent'], { labels: ['great-grandparent'] }],
+  [['great grandfather'], { labels: ['great-grandparent'], gender: 'male' }],
+  [['great grandmother'], { labels: ['great-grandparent'], gender: 'female' }],
+  [['grandchild', 'grandkid'], { labels: ['grandchild'] }],
+  [['grandson'], { labels: ['grandchild'], gender: 'male' }],
+  [['granddaughter'], { labels: ['grandchild'], gender: 'female' }],
+  [['uncle'], { labels: ['aunt or uncle', 'aunt or uncle by marriage'], gender: 'male' }],
+  [['aunt'], { labels: ['aunt or uncle', 'aunt or uncle by marriage'], gender: 'female' }],
+  [['great uncle'], { labels: ['great-aunt or great-uncle', 'great-aunt or great-uncle by marriage'], gender: 'male' }],
+  [['great aunt'], { labels: ['great-aunt or great-uncle', 'great-aunt or great-uncle by marriage'], gender: 'female' }],
+  [['nephew'], { labels: ['niece or nephew'], gender: 'male' }],
+  [['niece'], { labels: ['niece or nephew'], gender: 'female' }],
+  [['cousin'], { anyDegreeOf: 'cousin' }],
+  [['first cousin'], { labels: ['first cousin'] }],
+  [['second cousin'], { labels: ['second cousin'] }],
+  [['parent in law'], { labels: ['parent-in-law'] }],
+  [['mother in law'], { labels: ['parent-in-law'], gender: 'female' }],
+  [['father in law'], { labels: ['parent-in-law'], gender: 'male' }],
+  [['sibling in law'], { labels: ['sibling-in-law'] }],
+  [['brother in law'], { labels: ['sibling-in-law'], gender: 'male' }],
+  [['sister in law'], { labels: ['sibling-in-law'], gender: 'female' }],
+  [['child in law'], { labels: ['child-in-law'] }],
+  [['son in law'], { labels: ['child-in-law'], gender: 'male' }],
+  [['daughter in law'], { labels: ['child-in-law'], gender: 'female' }],
+  [['stepparent'], { labels: ['step-parent'] }],
+  [['stepmother'], { labels: ['step-parent'], gender: 'female' }],
+  [['stepfather'], { labels: ['step-parent'], gender: 'male' }],
+  [['stepchild'], { labels: ['step-child'] }],
+  [['stepson'], { labels: ['step-child'], gender: 'male' }],
+  [['stepdaughter'], { labels: ['step-child'], gender: 'female' }],
+  [['stepsibling'], { labels: ['step-sibling'] }],
+  [['stepbrother'], { labels: ['step-sibling'], gender: 'male' }],
+  [['stepsister'], { labels: ['step-sibling'], gender: 'female' }],
+];
+
+/**
+ * A second cousin's six steps: the longest Kinship Path that a word in
+ * `KINSHIP_WORDS` with `labels` can name. "cousin" of any degree has no
+ * longest path, so it is never answered "No.".
+ */
+const LONGEST_WORD_STEPS = 6;
+
+const KINSHIP_WORDS: ReadonlyMap<string, KinshipWord> = new Map([
+  ...Object.entries(ARABIC_KINSHIP_WORDS).map(([word, { label, gender, side }]): [string, KinshipWord] => [
+    word,
+    { labels: [label], gender, side },
+  ]),
+  ...ENGLISH_KINSHIP_WORDS.flatMap(([synonyms, meaning]) => synonyms.map((word): [string, KinshipWord] => [word, meaning])),
+]);
+
+function kinshipWordKey(word: string): string {
+  return word.toLowerCase().replace(/[\s-]+/g, ' ').replace(/^step /, 'step');
+}
+
+/**
+ * `parentMissing`: the record lacks a parent of either Person, so a "sibling"
+ * may be a half-sibling (`familyGraph.ts` names a half-sibling only from both
+ * Persons' two parents).
+ */
+function wordFits(
+  word: KinshipWord,
+  relation: KinshipRelation,
+  { gender, parentMissing }: { gender: RecordedGender | null; parentMissing: boolean },
+): 'yes' | 'no' | 'unknown' {
+  const namesTerm = 'labels' in word ? word.labels.includes(relation.label) : word.anyDegreeOf === relation.name;
+  const mayBeHalf = parentMissing && relation.name === 'sibling' && 'labels' in word && word.labels.includes('half-sibling');
+  if (!namesTerm) return mayBeHalf ? 'unknown' : 'no';
+  if (word.gender && word.gender !== gender) return gender ? 'no' : 'unknown';
+  if (word.side && word.side !== relation.side) return relation.side ? 'no' : 'unknown';
+  return 'yes';
+}
+
 /**
  * Words that are never read as part of a name, even when a Person has them as
  * a given name or cluster: they are how the question is asked. A Person
@@ -262,6 +368,18 @@ function readMessage(message: string, record: ChatRecord): MessageWords {
   return { names, firstPerson };
 }
 
+function exactlyOneName(text: string, record: ChatRecord): string | null {
+  const { names } = readMessage(text, record);
+  return names.length === 1 && names[0] === words(text).join(' ') ? names[0] : null;
+}
+
+function readIsMy(message: string, record: ChatRecord): { name: string; word: KinshipWord; wordAsWritten: string } | null {
+  const asked = message.normalize('NFC').match(/^\s*is\s+(.+?)\s+my\s+(\p{L}[\p{L}\s'’-]*?)[\s?.!؟…]*$/iu);
+  const word = asked && KINSHIP_WORDS.get(kinshipWordKey(asked[2]));
+  const name = asked && word && exactlyOneName(asked[1], record);
+  return name && word ? { name, word, wordAsWritten: asked[2].toLowerCase().replace(/\s+/g, ' ') } : null;
+}
+
 type Found = { ok: true; personId: string } | { ok: false; why: ModelReason };
 
 function findOne(name: string, record: ChatRecord): Found {
@@ -282,6 +400,15 @@ function confident(kind: QuestionKind): boolean {
 }
 
 export function routeMessage({ message, questionKind: kind, speaker, record }: RouteMessage): RouteDecision {
+  const isMy = readIsMy(message, record);
+  if (isMy) {
+    if (!speaker) return { by: 'model', why: 'speaker_unknown' };
+    const found = findOne(isMy.name, record);
+    if (!found.ok) return { by: 'model', why: found.why };
+    if (found.personId === speaker.personId) return { by: 'model', why: 'names_do_not_fit' };
+    return { by: 'code', answer: new Reply(record, speaker.personId, []).isMy(speaker.personId, found.personId, isMy.word, isMy.wordAsWritten) };
+  }
+
   if (!kind) return { by: 'model', why: 'no_reading' };
   const relation = kind.relation.value;
   if (relation === 'other') return { by: 'model', why: 'other' };
@@ -490,6 +617,21 @@ class Reply {
       }
     }
     return notes;
+  }
+
+  /** "No." only when it is proved; when it is not, what the Person is instead. */
+  isMy(speakerId: string, personId: string, word: KinshipWord, wordAsWritten: string): string {
+    const { links, nodes } = this.record;
+    const known = {
+      gender: getRecordedGender(personId, links, nodes),
+      parentMissing: [speakerId, personId].some((id) => getParents(id, links).length < 2),
+    };
+    const fits = findKinshipTerms(speakerId, personId, links, LONGEST_WORD_STEPS).map((relation) => wordFits(word, relation, known));
+    if (fits.includes('yes')) return `${this.bold(personId)} is your ${wordAsWritten}.`;
+    const searchedEveryPath = 'labels' in word;
+    const related = findKinshipPaths(speakerId, personId, links).length > 0;
+    if (searchedEveryPath && related && !fits.includes('unknown')) return 'No.';
+    return this.howRelated(speakerId, personId, false);
   }
 
   /**
