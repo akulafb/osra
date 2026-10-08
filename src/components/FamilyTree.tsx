@@ -546,11 +546,7 @@ export const FamilyTree: React.FC = () => {
   }
 
   if (isPaper3D && isLoading) {
-    return (
-      <div style={{ position: 'relative', width: '100%', height: '100vh' }}>
-        <PaperLoader stage="record" />
-      </div>
-    );
+    return <PaperLoader stage="record" />;
   }
 
   if (!isHydrated || isLoading) {

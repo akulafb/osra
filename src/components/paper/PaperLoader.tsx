@@ -19,6 +19,8 @@ const WORD_STAGGER_MS = 120;
 const FALL_MS = 500;
 const BAR_MS = 600;
 const BAR_WIDTH_PX = 208;
+/** Above every control on the page, the chat button included, until it fades. */
+const LOADER_Z_INDEX = 10001;
 
 const { paper, ink } = GRAYSCALE_PAIR;
 
@@ -98,16 +100,16 @@ export function PaperLoader({ stage, leaving = false, onLeave }: PaperLoaderProp
       aria-label="Loading"
       aria-busy={!leaving}
       style={{
-        position: 'absolute',
+        position: 'fixed',
         inset: 0,
-        zIndex: 1000,
+        zIndex: LOADER_Z_INDEX,
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
         background: paper,
         color: ink,
-        pointerEvents: 'none',
+        pointerEvents: leaving ? 'none' : 'auto',
       }}
     >
       <div

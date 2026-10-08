@@ -14,7 +14,7 @@ const REVEAL_FRAME_PRIORITY = -0.5;
 /** Where the camera swings in from: turned aside, tipped up and further back than where it lands. */
 const SWING_AZIMUTH = 0.9;
 const SWING_POLAR = 0.35;
-const SWING_BACK = 2.2;
+const SWING_BACK = 1.6;
 
 interface PaperRevealProps {
   frame: PaperFrame;
