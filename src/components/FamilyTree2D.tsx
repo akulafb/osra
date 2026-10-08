@@ -605,7 +605,7 @@ export const FamilyTree2D: React.FC<FamilyTree2DProps> = ({
           <span>
             🔗 Connect Mode: Select a relative to link with <strong style={{ color: hud.banner.highlight }}>{connectSourceNode.firstName}</strong>
             {interaction.rejectedTarget && (
-              <span style={{ marginLeft: 8, color: hud.banner.error, fontSize: 11 }}>
+              <span style={{ marginLeft: 8, color: hud.error, fontSize: 11 }}>
                 ({interaction.rejectedTarget.reason})
               </span>
             )}

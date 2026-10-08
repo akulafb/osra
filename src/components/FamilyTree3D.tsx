@@ -1703,13 +1703,13 @@ export const FamilyTree3DContent: React.FC<FamilyTree3DProps> = ({
         <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: panel.loader.scrim, zIndex: 1000, color: panel.ink.strong, fontSize: '18px', pointerEvents: 'none' }}>
           <div style={{ textAlign: 'center' }}>
             <div>Loading <span style={{ fontFamily: 'cursive', fontWeight: 'bold' }}>Osra</span>...</div>
-            <div style={{ width: '40px', height: '40px', border: `4px solid ${panel.loader.track}`, borderTop: `4px solid ${panel.loader.head}`, borderRadius: '50%', animation: 'spin 1s linear infinite', margin: '10px auto' }} />
+            <div style={{ width: '40px', height: '40px', border: `4px solid ${panel.loader.track}`, borderTop: `4px solid ${panel.loader.spinner}`, borderRadius: '50%', animation: 'spin 1s linear infinite', margin: '10px auto' }} />
           </div>
         </div>
       )}
       {isStarfieldLoading && (
         <div style={{ position: 'absolute', bottom: '24px', left: '50%', transform: 'translateX(-50%)', zIndex: 1000, display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 20px', background: panel.loader.toast, borderRadius: '8px', color: panel.ink.strong, fontSize: '0.9rem', pointerEvents: 'none', boxShadow: `0 4px 12px ${panel.shadow.soft}` }}>
-          <div style={{ width: 20, height: 20, border: `2px solid ${panel.loader.track}`, borderTop: `2px solid ${panel.loader.head}`, borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+          <div style={{ width: 20, height: 20, border: `2px solid ${panel.loader.track}`, borderTop: `2px solid ${panel.loader.spinner}`, borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
           Loading background…
         </div>
       )}

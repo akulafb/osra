@@ -23,7 +23,7 @@ export interface ModalTokens {
     errorSurface: string;
     errorBorder: string;
   };
-  flat: {
+  adminTool: {
     scrim: string;
     surface: string;
     raised: string;
@@ -46,7 +46,7 @@ export interface ModalTokens {
       ink: string;
     };
   };
-  admin: {
+  adminForm: {
     scrim: string;
     surface: string;
     rule: string;
@@ -91,7 +91,7 @@ export const cosmosModal: ModalTokens = {
     errorSurface: 'rgba(239, 68, 68, 0.1)',
     errorBorder: 'rgba(239, 68, 68, 0.3)',
   },
-  flat: {
+  adminTool: {
     scrim: 'rgba(0, 0, 0, 0.85)',
     surface: '#1a1a1a',
     raised: '#252525',
@@ -114,7 +114,7 @@ export const cosmosModal: ModalTokens = {
       ink: '#667eea',
     },
   },
-  admin: {
+  adminForm: {
     scrim: 'rgba(0,0,0,0.75)',
     surface: '#1a1a24',
     rule: '#444',

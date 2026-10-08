@@ -244,7 +244,7 @@ export const ConnectPickerCard: React.FC<ConnectPickerCardProps> = ({
 
       {/* Error Message if any */}
       {submitError && (
-        <div style={{ fontSize: '10px', color: hud.card.error, fontWeight: 600 }}>{submitError}</div>
+        <div style={{ fontSize: '10px', color: hud.error, fontWeight: 600 }}>{submitError}</div>
       )}
 
       {/* Actions */}

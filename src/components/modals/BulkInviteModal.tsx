@@ -256,7 +256,7 @@ export default function BulkInviteModal({
         </h2>
         {step === 'select' ? (
           <>
-            <p style={{ color: modal.flat.ink.muted, marginBottom: '20px', lineHeight: '1.5' }}>
+            <p style={{ color: modal.adminTool.ink.muted, marginBottom: '20px', lineHeight: '1.5' }}>
               {inviteForNodeId
                 ? 'Create a link so this person can claim their profile. Link expires in 7 days.'
                 : 'Select family members to invite. Links expire in 7 days.'}
@@ -264,7 +264,7 @@ export default function BulkInviteModal({
             {error && <div style={errorStyle(theme)}>{error}</div>}
             <div style={listContainerStyle}>
               {Object.keys(groupedRelatives).length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '40px', color: modal.flat.ink.ghost }}>
+                <div style={{ textAlign: 'center', padding: '40px', color: modal.adminTool.ink.ghost }}>
                   {inviteForNodeId ? 'Node not found.' : 'No family members found to invite.'}
                 </div>
               ) : (
@@ -315,22 +315,22 @@ export default function BulkInviteModal({
   );
 }
 
-const modalOverlayStyle = ({ palette }: Theme): React.CSSProperties => ({ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: palette.modal.flat.scrim, display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 2000 });
-const modalContentStyle = ({ palette }: Theme): React.CSSProperties => ({ backgroundColor: palette.modal.flat.surface, color: palette.panel.ink.strong, padding: '30px', borderRadius: '12px', width: '100%', maxWidth: '600px', maxHeight: '80vh', overflow: 'auto', boxShadow: `0 10px 40px ${palette.modal.flat.shadow}`, border: `1px solid ${palette.modal.flat.border}` });
+const modalOverlayStyle = ({ palette }: Theme): React.CSSProperties => ({ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: palette.modal.adminTool.scrim, display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 2000 });
+const modalContentStyle = ({ palette }: Theme): React.CSSProperties => ({ backgroundColor: palette.modal.adminTool.surface, color: palette.panel.ink.strong, padding: '30px', borderRadius: '12px', width: '100%', maxWidth: '600px', maxHeight: '80vh', overflow: 'auto', boxShadow: `0 10px 40px ${palette.modal.adminTool.shadow}`, border: `1px solid ${palette.modal.adminTool.border}` });
 const listContainerStyle: React.CSSProperties = { maxHeight: '400px', overflowY: 'auto', marginBottom: '20px' };
 const groupStyle: React.CSSProperties = { marginBottom: '20px' };
-const groupHeaderStyle = ({ palette }: Theme): React.CSSProperties => ({ margin: '0 0 10px 0', paddingBottom: '8px', borderBottom: `1px solid ${palette.modal.flat.border}`, color: palette.modal.flat.ink.muted, fontSize: '0.9rem', textTransform: 'uppercase', letterSpacing: '0.5px' });
-const relativeItemStyle = ({ palette }: Theme): React.CSSProperties => ({ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px', backgroundColor: palette.modal.flat.raised, borderRadius: '8px', marginBottom: '8px', border: `1px solid ${palette.modal.flat.border}` });
+const groupHeaderStyle = ({ palette }: Theme): React.CSSProperties => ({ margin: '0 0 10px 0', paddingBottom: '8px', borderBottom: `1px solid ${palette.modal.adminTool.border}`, color: palette.modal.adminTool.ink.muted, fontSize: '0.9rem', textTransform: 'uppercase', letterSpacing: '0.5px' });
+const relativeItemStyle = ({ palette }: Theme): React.CSSProperties => ({ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px', backgroundColor: palette.modal.adminTool.raised, borderRadius: '8px', marginBottom: '8px', border: `1px solid ${palette.modal.adminTool.border}` });
 const checkboxLabelStyle: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer', flex: 1 };
 const checkboxStyle: React.CSSProperties = { width: '20px', height: '20px', cursor: 'pointer' };
 const nameStyle: React.CSSProperties = { fontSize: '1rem', fontWeight: 'bold' };
-const existingBadgeStyle = ({ palette }: Theme): React.CSSProperties => ({ fontSize: '0.75rem', padding: '4px 8px', backgroundColor: palette.modal.flat.badge.existing, color: palette.warning.main, borderRadius: '4px' });
-const generatedBadgeStyle = ({ palette }: Theme): React.CSSProperties => ({ fontSize: '0.75rem', padding: '4px 8px', backgroundColor: palette.modal.flat.badge.generated, color: palette.success.main, borderRadius: '4px' });
-const errorStyle = ({ palette }: Theme): React.CSSProperties => ({ backgroundColor: palette.modal.flat.errorSurface, border: `1px solid ${palette.error.main}`, color: palette.error.main, padding: '12px', borderRadius: '6px', marginBottom: '15px', fontSize: '0.9rem' });
-const actionsStyle = ({ palette }: Theme): React.CSSProperties => ({ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '20px', paddingTop: '20px', borderTop: `1px solid ${palette.modal.flat.border}` });
+const existingBadgeStyle = ({ palette }: Theme): React.CSSProperties => ({ fontSize: '0.75rem', padding: '4px 8px', backgroundColor: palette.modal.adminTool.badge.existing, color: palette.warning.main, borderRadius: '4px' });
+const generatedBadgeStyle = ({ palette }: Theme): React.CSSProperties => ({ fontSize: '0.75rem', padding: '4px 8px', backgroundColor: palette.modal.adminTool.badge.generated, color: palette.success.main, borderRadius: '4px' });
+const errorStyle = ({ palette }: Theme): React.CSSProperties => ({ backgroundColor: palette.modal.adminTool.errorSurface, border: `1px solid ${palette.error.main}`, color: palette.error.main, padding: '12px', borderRadius: '6px', marginBottom: '15px', fontSize: '0.9rem' });
+const actionsStyle = ({ palette }: Theme): React.CSSProperties => ({ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '20px', paddingTop: '20px', borderTop: `1px solid ${palette.modal.adminTool.border}` });
 const generatedListStyle: React.CSSProperties = { maxHeight: '350px', overflowY: 'auto', marginBottom: '20px' };
-const generatedItemStyle = ({ palette }: Theme): React.CSSProperties => ({ backgroundColor: palette.modal.flat.raised, border: `1px solid ${palette.modal.flat.border}`, borderRadius: '8px', padding: '15px', marginBottom: '12px' });
+const generatedItemStyle = ({ palette }: Theme): React.CSSProperties => ({ backgroundColor: palette.modal.adminTool.raised, border: `1px solid ${palette.modal.adminTool.border}`, borderRadius: '8px', padding: '15px', marginBottom: '12px' });
 const generatedHeaderStyle: React.CSSProperties = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' };
-const relationshipTagStyle = ({ palette }: Theme): React.CSSProperties => ({ fontSize: '0.75rem', padding: '4px 10px', backgroundColor: palette.modal.flat.tag.surface, color: palette.modal.flat.tag.ink, borderRadius: '12px', textTransform: 'uppercase' });
+const relationshipTagStyle = ({ palette }: Theme): React.CSSProperties => ({ fontSize: '0.75rem', padding: '4px 10px', backgroundColor: palette.modal.adminTool.tag.surface, color: palette.modal.adminTool.tag.ink, borderRadius: '12px', textTransform: 'uppercase' });
 const linkRowStyle: React.CSSProperties = { display: 'flex', gap: '10px', alignItems: 'center' };
-const tokenStyle = ({ palette }: Theme): React.CSSProperties => ({ flex: 1, fontFamily: 'monospace', fontSize: '0.85rem', backgroundColor: palette.modal.flat.well, padding: '8px 12px', borderRadius: '4px', color: palette.modal.flat.ink.muted, wordBreak: 'break-all' });
+const tokenStyle = ({ palette }: Theme): React.CSSProperties => ({ flex: 1, fontFamily: 'monospace', fontSize: '0.85rem', backgroundColor: palette.modal.adminTool.well, padding: '8px 12px', borderRadius: '4px', color: palette.modal.adminTool.ink.muted, wordBreak: 'break-all' });

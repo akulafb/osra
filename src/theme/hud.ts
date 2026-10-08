@@ -1,11 +1,11 @@
 export interface HudTokens {
+  error: string;
   banner: {
     surface: string;
     border: string;
     glow: string;
     ink: string;
     highlight: string;
-    error: string;
   };
   card: {
     border: string;
@@ -17,9 +17,8 @@ export interface HudTokens {
     highlight: string;
     onAccent: string;
     disabledFill: string;
-    error: string;
   };
-  panel: {
+  editor: {
     surface: string;
     caption: string;
     prompt: string;
@@ -31,6 +30,7 @@ export interface HudTokens {
     field: string;
     warning: string;
     option: string;
+    optionOffSurface: string;
     optionOffBorder: string;
     optionOffInk: string;
   };
@@ -74,13 +74,13 @@ declare module '@mui/material/styles' {
 }
 
 export const cosmosHud: HudTokens = {
+  error: '#f87171',
   banner: {
     surface: 'rgba(15, 23, 42, 0.95)',
     border: 'rgba(168, 85, 247, 0.8)',
     glow: 'rgba(168, 85, 247, 0.4)',
     ink: '#e2e8f0',
     highlight: '#c084fc',
-    error: '#f87171',
   },
   card: {
     border: 'rgba(255,255,255,0.15)',
@@ -92,9 +92,8 @@ export const cosmosHud: HudTokens = {
     highlight: '#c084fc',
     onAccent: '#0f172a',
     disabledFill: 'rgba(255,255,255,0.1)',
-    error: '#f87171',
   },
-  panel: {
+  editor: {
     surface: 'rgba(15, 23, 42, 0.95)',
     caption: 'rgba(255,255,255,0.65)',
     prompt: 'rgba(255,255,255,0.75)',
@@ -106,6 +105,7 @@ export const cosmosHud: HudTokens = {
     field: 'rgba(0,0,0,0.35)',
     warning: '#fbbf24',
     option: 'rgba(192, 132, 252, 0.12)',
+    optionOffSurface: 'rgba(255,255,255,0.03)',
     optionOffBorder: 'rgba(255,255,255,0.08)',
     optionOffInk: 'rgba(255,255,255,0.35)',
   },

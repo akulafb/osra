@@ -40,7 +40,6 @@ export interface PanelTokens {
     raised: string;
     floating: string;
     soft: string;
-    low: string;
   };
   fill: {
     findMe: string;
@@ -57,9 +56,8 @@ export interface PanelTokens {
     scrim: string;
     toast: string;
     track: string;
-    head: string;
-    pageHead: string;
-    error: string;
+    spinner: string;
+    pageSpinner: string;
   };
   zoomBadge: {
     surface: string;
@@ -122,7 +120,6 @@ export const cosmosPanel: PanelTokens = {
     raised: 'rgba(0,0,0,0.6)',
     floating: 'rgba(0,0,0,0.5)',
     soft: 'rgba(0,0,0,0.4)',
-    low: 'rgba(0,0,0,0.3)',
   },
   fill: {
     findMe: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
@@ -139,9 +136,8 @@ export const cosmosPanel: PanelTokens = {
     scrim: 'rgba(0, 0, 0, 0.7)',
     toast: 'rgba(0,0,0,0.6)',
     track: 'rgba(255,255,255,0.3)',
-    head: '#fff',
-    pageHead: '#3b82f6',
-    error: '#ef4444',
+    spinner: '#fff',
+    pageSpinner: '#3b82f6',
   },
   zoomBadge: {
     surface: 'rgba(255,255,255,0.85)',

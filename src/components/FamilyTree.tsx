@@ -472,7 +472,8 @@ export const FamilyTree: React.FC = () => {
 
   const searchHighlightedNodeId = searchMatches[searchIndex]?.id ?? null;
 
-  const { panel } = useTheme().palette;
+  const { palette } = useTheme();
+  const { panel } = palette;
 
   const seeWhosNewButtonSx = {
     fontWeight: 700,
@@ -544,7 +545,7 @@ export const FamilyTree: React.FC = () => {
               width: '40px',
               height: '40px',
               border: `4px solid ${panel.loader.track}`,
-              borderTop: `4px solid ${panel.loader.pageHead}`,
+              borderTop: `4px solid ${panel.loader.pageSpinner}`,
               borderRadius: '50%',
               animation: 'spin 1s linear infinite',
               margin: '16px auto',
@@ -566,7 +567,7 @@ export const FamilyTree: React.FC = () => {
         width: '100%',
         height: '100vh',
         background: panel.page,
-        color: panel.loader.error,
+        color: palette.error.main,
         textAlign: 'center',
         padding: '20px',
       }}>

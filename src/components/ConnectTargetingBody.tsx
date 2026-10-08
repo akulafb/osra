@@ -54,7 +54,7 @@ export const ConnectTargetingBody: React.FC<ConnectTargetingBodyProps> = ({
       <div style={{ fontSize: 11, fontWeight: 700, color: CONNECT_ACCENT }}>
         🔗 Connect {sourceNode.firstName} to…
       </div>
-      <div style={{ fontSize: 10, color: hud.panel.caption, lineHeight: 1.4 }}>
+      <div style={{ fontSize: 10, color: hud.editor.caption, lineHeight: 1.4 }}>
         {candidateCount === 0
           ? 'No one in view can be linked to this person yet.'
           : 'Click a glowing planet, or pick from the list.'}
@@ -105,7 +105,7 @@ export const ConnectTargetingBody: React.FC<ConnectTargetingBodyProps> = ({
             title={candidacy.ok ? undefined : candidacy.reason}
             style={{
               alignItems: 'center',
-              background: candidacy.ok ? hud.targeting.option : panel.surface.well,
+              background: candidacy.ok ? hud.targeting.option : hud.targeting.optionOffSurface,
               border: candidacy.ok
                 ? `1px solid ${CONNECT_ACCENT}66`
                 : `1px solid ${hud.targeting.optionOffBorder}`,
@@ -151,7 +151,7 @@ export const ConnectTargetingBody: React.FC<ConnectTargetingBodyProps> = ({
       )}
 
       {rejected && (
-        <div style={{ fontSize: 10, color: hud.card.error, lineHeight: 1.4 }}>
+        <div style={{ fontSize: 10, color: hud.error, lineHeight: 1.4 }}>
           {rejected.node.firstName}: {rejected.reason}
         </div>
       )}
