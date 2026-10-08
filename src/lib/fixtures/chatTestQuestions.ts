@@ -21,7 +21,9 @@ export type ChatTestGroup =
   | 'married_cousins'
   | 'two_matches'
   | 'no_path'
-  | 'arabic';
+  | 'arabic'
+  /** "Tell me about the family": up to 150 words, where every other reply is one or two lines. */
+  | 'open';
 
 /**
  * What a correct reply holds. Every check given must pass. Names are display
@@ -43,6 +45,12 @@ export interface ChatTestExpect {
   asksWhich?: true;
   /** The reply says the two Persons are not related. */
   notRelated?: true;
+  /**
+   * How many Kinship Terms the expected term joins at named Persons, when no
+   * one term names the relation: 2 for "your first cousin once removed
+   * **Layla Haddad**'s husband". One when not given.
+   */
+  joinedTerms?: number;
 }
 
 export interface ChatTestQuestion {
