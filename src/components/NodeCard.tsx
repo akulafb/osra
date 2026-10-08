@@ -42,7 +42,7 @@ export interface NodeCardProps {
   /** Set in Paper: the card is drawn flat in this pair's ink. */
   paperPair?: PaperPair;
   emphasis?: Emphasis;
-  onHoverChange?: (nodeId: string | null) => void;
+  onHoverChange?: (nodeId: string, hovering: boolean) => void;
 }
 
 /** Lighten colors for maternal-only nodes (same hue, lighter tint) */
@@ -161,6 +161,9 @@ const NodeCardComponent: React.FC<NodeCardProps> = ({
     onDoubleClick?.(node);
   };
 
+  // A card can unmount under the pointer (family switch, collapse) without a mouseleave.
+  React.useEffect(() => () => onHoverChange?.(node.id, false), [node.id, onHoverChange]);
+
   const showActionHandles = canEdit && (isHovered || isSelected || isConfirmingDissolve);
 
   // Spawn and Dissolve, on the lifecycle's clock. Confirmation is not a
@@ -187,11 +190,11 @@ const NodeCardComponent: React.FC<NodeCardProps> = ({
       onDoubleClick={handleDoubleClick}
       onMouseEnter={() => {
         setIsHovered(true);
-        onHoverChange?.(node.id);
+        onHoverChange?.(node.id, true);
       }}
       onMouseLeave={() => {
         setIsHovered(false);
-        onHoverChange?.(null);
+        onHoverChange?.(node.id, false);
       }}
       style={{
         cursor: 'pointer',

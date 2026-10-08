@@ -156,6 +156,9 @@ export const FamilyTree2D: React.FC<FamilyTree2DProps> = ({
   const isPaper = canvasMode === 'paper';
   const background = isPaper ? pair.paper : COSMOS_BACKGROUND;
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
+  const handleHoverChange = useCallback((nodeId: string, hovering: boolean) => {
+    setHoveredNodeId((current) => (hovering ? nodeId : current === nodeId ? null : current));
+  }, []);
   const svgRef = useRef<SVGSVGElement>(null);
   const gRef = useRef<SVGGElement>(null);
   const zoomBehaviorRef = useRef<ZoomBehavior<SVGSVGElement, unknown> | null>(null);
@@ -732,7 +735,7 @@ export const FamilyTree2D: React.FC<FamilyTree2DProps> = ({
                 onConfirmDissolve={onConfirmDissolve}
                 paperPair={isPaper ? pair : undefined}
                 emphasis={emphasis?.get(node.id)}
-                onHoverChange={isPaper ? setHoveredNodeId : undefined}
+                onHoverChange={isPaper ? handleHoverChange : undefined}
               />
             ))}
 
