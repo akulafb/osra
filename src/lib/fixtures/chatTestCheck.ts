@@ -2,7 +2,7 @@
  * Checks a family-chat reply to a chat test question (LIN-74, LIN-81). Two
  * kinds of check run on every reply, each named in `REPLY_CHECKS`:
  * - the answer: the names, number and relation words the question expects,
- *   and no fixture Person outside the answer;
+ *   or a bare "No." (LIN-88), and no fixture Person outside the answer;
  * - the shape: the Kinship Term first, no Kinship Path spelled out, no
  *   follow-up, the length, and the message's cost under the cap.
  * Each check reads only words, names and numbers, never the meaning of the prose.
@@ -146,6 +146,10 @@ function notRelatedProblems({ question: { expect }, plainText: text }: ReplyUnde
   return expect.notRelated && !NOT_RELATED.test(text) ? ['does not say they are not related'] : [];
 }
 
+function answersNoProblems({ question: { expect }, plainText: text }: ReplyUnderCheck): string[] {
+  return expect.answersNo && text.trim() !== 'No.' ? ['does not answer "No." and nothing more'] : [];
+}
+
 function idProblems({ plainText: text }: ReplyUnderCheck): string[] {
   return Object.values(CHAT_TEST_IDS).some((id) => text.includes(id)) ? ['shows a Person id'] : [];
 }
@@ -205,6 +209,7 @@ export const REPLY_CHECKS = {
   'no forbidden words': forbiddenProblems,
   'asks which Person': asksWhichProblems,
   'says not related': notRelatedProblems,
+  'answers "No."': answersNoProblems,
   'no Person ids': idProblems,
   'Kinship Term first': termFirstProblems,
   'no spelled-out Kinship Path': spelledOutPathProblems,

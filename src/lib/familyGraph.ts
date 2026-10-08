@@ -1106,6 +1106,48 @@ export function findKinshipPaths(
   return paths;
 }
 
+/**
+ * The one-word Kinship Term of every Kinship Path from `fromId` to `toId` of
+ * at most `maxSteps` steps, not only the shortest ones `findKinshipPaths`
+ * gives. In a cousin marriage a longer path can say more: Faris is Omar's
+ * father-in-law, and his uncle by marriage. A path that no one word names is
+ * left out.
+ */
+export function findKinshipTerms(
+  fromId: string,
+  toId: string,
+  links: readonly FamilyLink[],
+  maxSteps: number
+): KinshipRelation[] {
+  if (!fromId || !toId || fromId === toId) return [];
+  const index = buildKinshipIndex(links);
+  if (!index.has(fromId) || !index.has(toId)) return [];
+
+  const toEnd = linkDistances(index, toId);
+  const terms: KinshipRelation[] = [];
+  const steps: KinshipPathStep[] = [];
+  const onPath = new Set([fromId]);
+  const walk = (personId: string) => {
+    if (personId === toId) {
+      const term = oneTerm(index, steps);
+      if (term) terms.push(term);
+      return;
+    }
+    const adjacency = adjacencyOf(index, personId);
+    for (const hop of [...adjacency.parents, ...adjacency.spouses, ...adjacency.children]) {
+      const left = toEnd.get(hop.personId);
+      if (onPath.has(hop.personId) || left === undefined || steps.length + 1 + left > maxSteps) continue;
+      steps.push(stepAlong(hop.link, personId, hop.personId));
+      onPath.add(hop.personId);
+      walk(hop.personId);
+      onPath.delete(hop.personId);
+      steps.pop();
+    }
+  };
+  walk(fromId);
+  return terms;
+}
+
 // ---------------------------------------------------------------------------
 // Find a Person by name
 // ---------------------------------------------------------------------------
