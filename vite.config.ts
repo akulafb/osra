@@ -42,7 +42,7 @@ export default defineConfig(({ command }) => {
         output: {
           manualChunks: {
             'vendor-react': ['react', 'react-dom', 'react-router-dom'],
-            'vendor-three': ['three', '@react-three/fiber', '@react-three/drei', 'react-force-graph-3d', 'three-spritetext'],
+            'vendor-three': ['three', '@react-three/fiber', '@react-three/drei', 'react-force-graph-3d', 'three-spritetext', '@react-three/postprocessing', 'postprocessing'],
             'vendor-d3': ['d3-drag', 'd3-hierarchy', 'd3-selection', 'd3-shape', 'd3-zoom'],
             'vendor-motion': ['motion'],
           },

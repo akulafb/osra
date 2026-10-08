@@ -6,7 +6,7 @@ import { useTheme } from '@mui/material/styles';
 import type { FamilyGraph, FamilyNode } from '../../types/graph';
 import { paperLines, type PaperLayout } from '../../lib/paperLayout';
 import { filterGraphDataFor3D } from '../../lib/filterGraphData';
-import { GRAYSCALE_PAIR } from '../../theme/paperPair';
+import { GRAYSCALE_PAIR, LIVE_PAIR } from '../../theme/paperPair';
 import type { DirectManipulationController } from '../../hooks/useDirectManipulation';
 import type { PersonDrawerInset } from '../../hooks/usePersonDrawerInset';
 import { candidacyFor } from '../cards/connectCandidates';
@@ -15,6 +15,7 @@ import { useIsMobileDevice } from '../tree3d/useIsMobileDevice';
 import { PaperDiscs } from './PaperDiscs';
 import { PaperLines } from './PaperLines';
 import { PaperLabels } from './PaperLabels';
+import { PaperDuotone } from './PaperDuotone';
 import { PaperWebGLBoundary, PaperWebGLFallback } from './PaperWebGLFallback';
 import { browserHasWebGL } from './browserHasWebGL';
 import { isTap, paperFrame, type ScreenPoint } from './paperScene';
@@ -58,7 +59,7 @@ const FOG_FAR = 2.6;
 const FOCUS_DISTANCE_PER_RADIUS = 10;
 const MIN_FOCUS_DISTANCE = 60;
 
-/** Paper's own 3D scene (ADR 0014): the still layout as ink discs, lines and labels on grayscale paper. */
+/** Paper's own 3D scene (ADR 0014): the still layout as ink discs, lines and labels, drawn in grayscale and painted in the live Paper Pair. */
 export function PaperTree3D({
   graphData,
   layout,
@@ -210,11 +211,11 @@ export function PaperTree3D({
   );
 
   const loaded = !hasWebGL || sceneFailed || (!!frame && firstFrameDrawn);
-  const fallback = <PaperWebGLFallback paper={PAPER} ink={INK} />;
+  const fallback = <PaperWebGLFallback paper={LIVE_PAIR.paper} ink={LIVE_PAIR.ink} />;
 
   return (
     <div
-      style={{ position: 'relative', width: '100%', height: '100%', background: PAPER }}
+      style={{ position: 'relative', width: '100%', height: '100%', background: LIVE_PAIR.paper }}
       onPointerDownCapture={(e) => {
         pointerDown.current = { x: e.clientX, y: e.clientY };
       }}
@@ -251,6 +252,7 @@ export function PaperTree3D({
                 <FirstFrame onDrawn={() => setFirstFrameDrawn(true)} />
               </>
             )}
+            <PaperDuotone ink={INK} paper={PAPER} />
           </Canvas>
         </PaperWebGLBoundary>
       ) : (

@@ -155,7 +155,7 @@ export function Tree3DOverlay({
             background: panel.surface.toggle,
             backdropFilter: 'blur(24px)',
             border: `1px solid ${panel.border.accent}`,
-            color: 'primary.main',
+            color: panel.role.primary,
             fontWeight: 700,
             letterSpacing: '0.05em',
             '&:hover': {
@@ -239,11 +239,11 @@ export function Tree3DOverlay({
                 fullWidth
                 onClick={onAdminAddPersonClick}
                 sx={{
-                  color: 'secondary.main',
-                  borderColor: 'secondary.main',
+                  color: panel.role.secondary,
+                  borderColor: panel.role.secondary,
                   fontSize: '0.7rem',
                   fontWeight: 700,
-                  '&:hover': { borderColor: 'secondary.light', background: panel.tint.secondary }
+                  '&:hover': { borderColor: panel.role.secondaryLight, background: panel.tint.secondary }
                 }}
               >
                 + ADD PERSON
@@ -284,17 +284,17 @@ export function Tree3DOverlay({
               <FormControlLabel
                 control={<Switch checked={showNames} onChange={() => onShowNamesChange(!showNames)} color="primary" size="small" />}
                 label="LABELS"
-                sx={{ m: 0, color: 'text.primary', '& .MuiFormControlLabel-label': { fontSize: '0.7rem', fontWeight: 600, letterSpacing: '0.05em' } }}
+                sx={{ m: 0, color: panel.role.text, '& .MuiFormControlLabel-label': { fontSize: '0.7rem', fontWeight: 600, letterSpacing: '0.05em' } }}
               />
               <FormControlLabel
                 control={<Switch checked={showLinks} onChange={() => onShowLinksChange(!showLinks)} color="primary" size="small" />}
                 label="LINKS"
-                sx={{ m: 0, color: 'text.primary', '& .MuiFormControlLabel-label': { fontSize: '0.7rem', fontWeight: 600, letterSpacing: '0.05em' } }}
+                sx={{ m: 0, color: panel.role.text, '& .MuiFormControlLabel-label': { fontSize: '0.7rem', fontWeight: 600, letterSpacing: '0.05em' } }}
               />
               <FormControlLabel
                 control={<Switch checked={showArrows} onChange={() => onShowArrowsChange(!showArrows)} color="primary" size="small" />}
                 label="ARROWS"
-                sx={{ m: 0, color: 'text.primary', '& .MuiFormControlLabel-label': { fontSize: '0.7rem', fontWeight: 600, letterSpacing: '0.05em' } }}
+                sx={{ m: 0, color: panel.role.text, '& .MuiFormControlLabel-label': { fontSize: '0.7rem', fontWeight: 600, letterSpacing: '0.05em' } }}
               />
             </Box>
 
@@ -306,7 +306,7 @@ export function Tree3DOverlay({
                 borderRadius: '8px',
                 border: `1px solid ${panel.border.hairline}`
               }}>
-                <Typography variant="caption" sx={{ color: 'primary.main', fontWeight: 700, letterSpacing: '0.1em', mb: 1, display: 'block', fontSize: '0.6rem' }}>
+                <Typography variant="caption" sx={{ color: panel.role.primary, fontWeight: 700, letterSpacing: '0.1em', mb: 1, display: 'block', fontSize: '0.6rem' }}>
                   SEARCH ARCHIVE
                 </Typography>
                 <TreeSearchBar
@@ -380,7 +380,7 @@ export function Tree3DOverlay({
                               return n;
                             });
                           }}
-                          sx={{ p: 0.5, color: panel.ink.ghost, '&.Mui-checked': { color: 'primary.main' } }}
+                          sx={{ p: 0.5, color: panel.ink.ghost, '&.Mui-checked': { color: panel.role.primary } }}
                         />
                         <Typography sx={{ fontSize: '0.75rem', color: panel.ink.body }}>{cluster}</Typography>
                       </Box>

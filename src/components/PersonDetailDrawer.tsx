@@ -5,8 +5,7 @@ import {
   Button, 
   IconButton, 
   Drawer,
-  useTheme,
-  alpha
+  useTheme
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import { FamilyNode, FamilyLink } from '../types/graph';
@@ -57,8 +56,7 @@ export const PersonDetailDrawer: React.FC<PersonDetailDrawerProps> = ({
   onManageLinks,
   onDelete,
 }) => {
-  const theme = useTheme();
-  const { panel } = theme.palette;
+  const { panel } = useTheme().palette;
   const isSheet = useIsDrawerSheet();
 
   const { setFocusedPerson } = useCanvasMode();
@@ -176,7 +174,7 @@ export const PersonDetailDrawer: React.FC<PersonDetailDrawerProps> = ({
                 sx={{ 
                   borderColor: panel.role.secondary,
                   color: panel.role.secondary,
-                  '&:hover': { borderColor: 'secondary.light', background: alpha(theme.palette.secondary.main, 0.1) }
+                  '&:hover': { borderColor: panel.role.secondaryLight, background: panel.tint.secondaryHover }
                 }}
               >
                 + Add Relative
@@ -189,7 +187,7 @@ export const PersonDetailDrawer: React.FC<PersonDetailDrawerProps> = ({
                   sx={{ 
                     borderColor: panel.role.success,
                     color: panel.role.success,
-                    '&:hover': { borderColor: 'success.light', background: alpha(theme.palette.success.main, 0.1) }
+                    '&:hover': { borderColor: panel.role.successLight, background: panel.tint.successHover }
                   }}
                 >
                   Invite to Tree

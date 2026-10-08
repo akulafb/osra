@@ -27,6 +27,8 @@ export interface PanelTokens {
   tint: {
     accent: string;
     secondary: string;
+    secondaryHover: string;
+    successHover: string;
   };
   ink: {
     inherited: string;
@@ -73,7 +75,9 @@ export interface PanelTokens {
   role: {
     primary: string;
     secondary: string;
+    secondaryLight: string;
     success: string;
+    successLight: string;
     error: string;
     text: string;
     textSecondary: string;
@@ -116,6 +120,8 @@ export const cosmosPanel: PanelTokens = {
   tint: {
     accent: 'rgba(212, 175, 55, 0.1)',
     secondary: 'rgba(124, 58, 237, 0.1)',
+    secondaryHover: 'rgba(124, 58, 237, 0.1)',
+    successHover: 'rgba(16, 185, 129, 0.1)',
   },
   ink: {
     inherited: 'rgba(255, 255, 255, 0.87)',
@@ -162,7 +168,9 @@ export const cosmosPanel: PanelTokens = {
   role: {
     primary: '#D4AF37',
     secondary: '#7c3aed',
+    secondaryLight: 'rgb(150, 97, 240)',
     success: '#10b981',
+    successLight: 'rgb(63, 199, 154)',
     error: '#ef4444',
     text: '#ede9fe',
     textSecondary: '#a78bfa',
@@ -198,6 +206,8 @@ export function paperPanel(): PanelTokens {
     tint: {
       accent: ink(0.06),
       secondary: ink(0.04),
+      secondaryHover: ink(0.1),
+      successHover: ink(0.1),
     },
     ink: {
       inherited: ink(),
@@ -244,7 +254,9 @@ export function paperPanel(): PanelTokens {
     role: {
       primary: ink(),
       secondary: ink(),
+      secondaryLight: ink(0.75),
       success: ink(),
+      successLight: ink(0.75),
       error: accent(),
       text: ink(),
       textSecondary: ink(0.7),

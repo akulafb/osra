@@ -84,7 +84,7 @@ export function TreeSearchBar({
       <Typography 
         variant="caption" 
         sx={{ 
-          color: 'primary.main', 
+          color: panel.role.primary,
           minWidth: 45, 
           fontFamily: 'monospace',
           fontWeight: 600,
