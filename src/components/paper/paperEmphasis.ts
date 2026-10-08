@@ -11,7 +11,7 @@ export const PAPER_3D_INK: Record<Emphasis, number> = {
   relative: 1,
   dimmed: 0.5,
   ghost: 1,
-  hidden: 1,
+  hidden: 0,
 };
 
 /**
@@ -21,10 +21,12 @@ export const PAPER_3D_INK: Record<Emphasis, number> = {
 export interface PaperEmphasisState {
   emphasis: ReadonlyMap<string, Emphasis>;
   drift: ReadonlyMap<string, Point3>;
+  /** The Person under the mouse, selected or not; none for touch. */
+  pointedId: string | null;
 }
 
 export function emptyEmphasisState(): PaperEmphasisState {
-  return { emphasis: new Map(), drift: new Map() };
+  return { emphasis: new Map(), drift: new Map(), pointedId: null };
 }
 
 export function inkOf(state: PaperEmphasisState, id: string): number {

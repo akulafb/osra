@@ -118,8 +118,8 @@ Preconditions:
 ### Sub-features
 
 - `paper-3d-hover` (mouse only): the Person under the pointer gets a thin ink ring, the same width at any zoom, and a pointer cursor. Their direct relatives (parents, children, spouses and ex-spouses) keep full ink; everyone else, their labels and the lines between them fade to half ink. The hovered Person's own lines darken to full ink and carry ink dots flowing out from them.
-- `paper-3d-hover-lean`: the relatives lean toward the hovered Person by a small share of the distance (at most 6 world units, never into the 4-unit gap between discs) over about 0.3 s, and ease back when the hover ends. Their labels and lines follow. The layout itself never changes.
-- `paper-3d-hover-rules`: emphasis comes from `focusEmphasis`, as in Paper 2D: while a Person is selected the selection outranks the hover, so hovering shows only the pointer cursor. A camera drag (more than 6 px with a button down), the pointer over INSTRUMENTS or the drawer, or leaving the canvas hovers nobody. Touch has no hover: a phone tap opens the bottom sheet as before.
+- `paper-3d-hover-lean`: the relatives lean toward the hovered Person by a small share of the distance (at most 6 world units, never into the 4-unit gap between discs) with an easing of 0.12 s time constant (most of the way in about 0.35 s), and ease back when the hover ends. Their labels, lines and arrows follow, and arrows dim with their lines. The layout itself never changes.
+- `paper-3d-hover-rules`: emphasis comes from `focusEmphasis`, as in Paper 2D: while a Person is selected the selection outranks the hover, so hovering shows only the pointer cursor. Where discs overlap, a click selects the ringed Person (the nearest centre on screen), not the front-most disc. A camera drag (more than 6 px with a button down), the pointer over INSTRUMENTS or the drawer, or leaving the canvas hovers nobody. Touch has no hover: a phone tap opens the bottom sheet as before.
 
 ### Driving it with ui.sh
 

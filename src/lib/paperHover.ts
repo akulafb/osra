@@ -80,7 +80,8 @@ export function easeDrift(
   current: ReadonlyMap<string, Point3>,
   target: ReadonlyMap<string, Point3>,
   dtSeconds: number
-): Map<string, Point3> {
+): ReadonlyMap<string, Point3> {
+  if (arrived(current, target)) return current;
   const k = 1 - Math.exp(-dtSeconds / DRIFT_EASE_SECONDS);
   const next = new Map<string, Point3>();
   for (const id of new Set([...current.keys(), ...target.keys()])) {
@@ -98,4 +99,13 @@ export function easeDrift(
 export function linesOf<L extends PaperLine>(lines: readonly L[], personId: string | null): L[] {
   if (!personId) return [];
   return lines.filter((line) => line.sourceId === personId || line.targetId === personId);
+}
+
+function arrived(current: ReadonlyMap<string, Point3>, target: ReadonlyMap<string, Point3>): boolean {
+  if (current.size !== target.size) return false;
+  for (const [id, to] of target) {
+    const at = current.get(id);
+    if (!at || at.x !== to.x || at.y !== to.y || at.z !== to.z) return false;
+  }
+  return true;
 }

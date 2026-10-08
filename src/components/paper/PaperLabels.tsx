@@ -32,16 +32,16 @@ interface PaperLabelsProps {
 export function PaperLabels({ nodes, layout, ink, viewDistance, state }: PaperLabelsProps) {
   const texts = useRef(new Map<string, TroikaText>());
   const anchors = useRef(new Map<string, THREE.Group>());
-  const placedDrift = useRef<PaperEmphasisState['drift'] | null>(null);
+  const placed = useRef({ layout, drift: state.current.drift });
   const point = useRef(new THREE.Vector3());
 
   useFrame(({ camera }) => {
     const start = viewDistance.current;
     const end = start * LABEL_FADE_END;
     const { drift } = state.current;
-    if (drift !== placedDrift.current) {
+    if (drift !== placed.current.drift || layout !== placed.current.layout) {
       anchors.current.forEach((anchor, id) => placeOf(layout, drift, id, anchor.position));
-      placedDrift.current = drift;
+      placed.current = { layout, drift };
     }
     texts.current.forEach((text, id) => {
       if (!layout.has(id)) return;
@@ -63,9 +63,11 @@ export function PaperLabels({ nodes, layout, ink, viewDistance, state }: PaperLa
           <Billboard
             key={node.id}
             ref={(anchor: THREE.Group | null) => {
-              if (anchor) anchors.current.set(node.id, anchor);
-              else anchors.current.delete(node.id);
-              placedDrift.current = null;
+              if (!anchor) anchors.current.delete(node.id);
+              else if (anchors.current.get(node.id) !== anchor) {
+                anchors.current.set(node.id, anchor);
+                placeOf(layout, state.current.drift, node.id, anchor.position);
+              }
             }}
           >
             <Text

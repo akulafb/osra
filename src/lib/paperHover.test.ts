@@ -66,11 +66,23 @@ describe('paperDrift', () => {
   });
 
   it('moves each relative straight toward the hovered Person', () => {
-    const drift = paperDrift(layout, hover);
-    expect(drift.get('far')!.x).toBeLessThan(0);
-    expect(drift.get('far')!.y).toBeCloseTo(0);
-    expect(drift.get('mid')!.z).toBeGreaterThan(0);
-    expect(drift.get('near')!.y).toBeLessThan(0);
+    const slanted: PaperLayout = new Map([
+      ['hovered', { x: 10, y: 20, z: 30, radius: 4 }],
+      ['relative', { x: 34, y: 52, z: 30, radius: 4 }],
+    ]);
+    const lean = paperDrift(slanted, new Map<string, Emphasis>([['hovered', 'hovered'], ['relative', 'relative']])).get('relative')!;
+    expect(lean.x).toBeCloseTo(-3.6);
+    expect(lean.y).toBeCloseTo(-4.8);
+    expect(lean.z).toBeCloseTo(0);
+  });
+
+  it('moves a nearer relative by 15% of the distance, under the cap', () => {
+    const close: PaperLayout = new Map([
+      ['hovered', { x: 0, y: 0, z: 0, radius: 4 }],
+      ['relative', { x: 0, y: 20, z: 0, radius: 4 }],
+    ]);
+    const lean = paperDrift(close, new Map<string, Emphasis>([['hovered', 'hovered'], ['relative', 'relative']])).get('relative')!;
+    expect(lean.y).toBeCloseTo(-3);
   });
 
   it('moves a relative by a small share of the distance, and never more than 6 units', () => {
@@ -120,6 +132,11 @@ describe('easeDrift', () => {
     const current = new Map([['a', { x: 6, y: 0, z: 0 }]]);
     expect(easeDrift(current, new Map(), 1 / 60).get('a')!.x).toBeLessThan(6);
     expect(easeDrift(current, new Map(), 5).size).toBe(0);
+  });
+
+  it('hands back the same map once every Person has arrived, so nothing redraws', () => {
+    const arrived = easeDrift(new Map(), target, 5);
+    expect(easeDrift(arrived, target, 1 / 60)).toBe(arrived);
   });
 
   it('leaves its inputs as they were', () => {

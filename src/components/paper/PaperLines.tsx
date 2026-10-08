@@ -4,7 +4,7 @@ import { Line } from '@react-three/drei';
 import * as THREE from 'three';
 import type { FamilyLink } from '../../types/graph';
 import type { PaperLayout, PaperLine } from '../../lib/paperLayout';
-import { hoveredPerson } from '../../lib/paperHover';
+import { hoveredPerson, linesOf } from '../../lib/paperHover';
 import { fadeInk, inkOf, placeOf, type PaperEmphasisState } from './paperEmphasis';
 import { paperLineSegments } from './paperScene';
 
@@ -55,7 +55,7 @@ export function PaperLines({ lines, layout, ink, parentInk, paper, state, showAr
             />
           )
       )}
-      {showArrows && <PaperArrows lines={lines} layout={layout} color={parentInk} />}
+      {showArrows && <PaperArrows lines={lines} layout={layout} color={parentInk} paper={paper} state={state} />}
     </>
   );
 }
@@ -91,46 +91,42 @@ function PaperLineKind({
     () => ({ line: new THREE.Color(colour), ink: new THREE.Color(ink), paper: new THREE.Color(paper), out: new THREE.Color() }),
     [colour, ink, paper]
   );
-  const drawn = useRef<{ segments: LineSegments | null; emphasis?: PaperEmphasisState['emphasis']; drift?: PaperEmphasisState['drift'] }>({
-    segments: null,
-  });
+  const drawn = useRef<{ geometry?: object; colours?: object; emphasis?: PaperEmphasisState['emphasis']; drift?: PaperEmphasisState['drift'] }>({});
   const scratch = useMemo(() => new THREE.Vector3(), []);
-
-  useLayoutEffect(() => {
-    drawn.current = { segments: null };
-  }, [points, colours]);
 
   useFrame(() => {
     const segments = ref.current;
     if (!segments) return;
+    const { geometry } = segments;
     const { emphasis, drift } = state.current;
     const last = drawn.current;
-    const fresh = last.segments !== segments;
+    const fresh = last.geometry !== geometry;
 
     if (fresh || drift !== last.drift) {
-      const positions = new Float32Array(lines.length * 6);
+      const start = geometry.attributes.instanceStart as THREE.InterleavedBufferAttribute;
+      const positions = start.data.array as Float32Array;
       lines.forEach((line, i) => {
         placeOf(layout, drift, line.sourceId, scratch).toArray(positions, i * 6);
         placeOf(layout, drift, line.targetId, scratch).toArray(positions, i * 6 + 3);
       });
-      segments.geometry.setPositions(positions);
+      start.data.needsUpdate = true;
+      geometry.computeBoundingSphere();
       if (style.dashed) segments.computeLineDistances();
     }
 
-    if (fresh || emphasis !== last.emphasis) {
-      const hoveredId = hoveredPerson(emphasis);
+    if (fresh || colours !== last.colours || emphasis !== last.emphasis) {
+      const own = new Set(linesOf(lines, hoveredPerson(emphasis)));
       const rgb = new Float32Array(lines.length * 6);
       lines.forEach((line, i) => {
-        const own = hoveredId !== null && (line.sourceId === hoveredId || line.targetId === hoveredId);
         const kept = Math.min(inkOf(state.current, line.sourceId), inkOf(state.current, line.targetId));
-        fadeInk(own ? colours.ink : colours.line, colours.paper, kept, colours.out);
+        fadeInk(own.has(line) ? colours.ink : colours.line, colours.paper, kept, colours.out);
         colours.out.toArray(rgb, i * 6);
         colours.out.toArray(rgb, i * 6 + 3);
       });
-      segments.geometry.setColors(rgb);
+      geometry.setColors(rgb);
     }
 
-    drawn.current = { segments, emphasis, drift };
+    drawn.current = { geometry, colours, emphasis, drift };
   });
 
   return (
@@ -148,44 +144,78 @@ function PaperLineKind({
   );
 }
 
-/** A small cone on each parent line, just short of the child's disc, pointing at the child. */
-function PaperArrows({ lines, layout, color }: { lines: readonly PaperLine[]; layout: PaperLayout; color: string }) {
+/** A small cone on each parent line, just short of the child's disc, pointing at the child; it leans and fades with its line. */
+function PaperArrows({
+  lines,
+  layout,
+  color,
+  paper,
+  state,
+}: {
+  lines: readonly PaperLine[];
+  layout: PaperLayout;
+  color: string;
+  paper: string;
+  state: MutableRefObject<PaperEmphasisState>;
+}) {
   const meshRef = useRef<THREE.InstancedMesh>(null);
   const geometry = useMemo(() => new THREE.ConeGeometry(ARROW_RADIUS, ARROW_LENGTH, 12), []);
-  const material = useMemo(() => new THREE.MeshBasicMaterial({ color }), [color]);
+  const material = useMemo(() => new THREE.MeshBasicMaterial(), []);
   useLayoutEffect(() => () => geometry.dispose(), [geometry]);
   useLayoutEffect(() => () => material.dispose(), [material]);
 
   const arrows = useMemo(
-    () =>
-      lines.flatMap((line) => {
-        const parent = layout.get(line.sourceId);
-        const child = layout.get(line.targetId);
-        if (line.type !== 'parent' || !parent || !child) return [];
-        const to = new THREE.Vector3(child.x, child.y, child.z);
-        const direction = to.clone().sub(new THREE.Vector3(parent.x, parent.y, parent.z));
-        if (direction.lengthSq() === 0) return [];
-        direction.normalize();
-        return [{ tip: to.addScaledVector(direction, -(child.radius + 1)), direction }];
-      }),
+    () => lines.filter((line) => line.type === 'parent' && layout.has(line.sourceId) && layout.has(line.targetId)),
     [lines, layout]
   );
+  const colours = useMemo(() => ({ line: new THREE.Color(color), paper: new THREE.Color(paper), out: new THREE.Color() }), [color, paper]);
+  const scratch = useMemo(
+    () => ({
+      parent: new THREE.Vector3(),
+      child: new THREE.Vector3(),
+      direction: new THREE.Vector3(),
+      up: new THREE.Vector3(0, 1, 0),
+      quaternion: new THREE.Quaternion(),
+      matrix: new THREE.Matrix4(),
+      one: new THREE.Vector3(1, 1, 1),
+    }),
+    []
+  );
+  const drawn = useRef<{ mesh?: object; colours?: object; emphasis?: PaperEmphasisState['emphasis']; drift?: PaperEmphasisState['drift'] }>({});
 
-  useLayoutEffect(() => {
+  useFrame(() => {
     const mesh = meshRef.current;
     if (!mesh) return;
-    const up = new THREE.Vector3(0, 1, 0);
-    const matrix = new THREE.Matrix4();
-    const quaternion = new THREE.Quaternion();
-    const one = new THREE.Vector3(1, 1, 1);
-    arrows.forEach(({ tip, direction }, i) => {
-      quaternion.setFromUnitVectors(up, direction);
-      const centre = tip.clone().addScaledVector(direction, -ARROW_LENGTH / 2);
-      mesh.setMatrixAt(i, matrix.compose(centre, quaternion, one));
-    });
-    mesh.instanceMatrix.needsUpdate = true;
-    mesh.computeBoundingSphere();
-  }, [arrows]);
+    const { emphasis, drift } = state.current;
+    const last = drawn.current;
+    const fresh = last.mesh !== mesh;
+
+    if (fresh || drift !== last.drift) {
+      const { parent, child, direction, up, quaternion, matrix, one } = scratch;
+      arrows.forEach((line, i) => {
+        placeOf(layout, drift, line.sourceId, parent);
+        placeOf(layout, drift, line.targetId, child);
+        direction.subVectors(child, parent);
+        if (direction.lengthSq() === 0) direction.copy(up);
+        direction.normalize();
+        quaternion.setFromUnitVectors(up, direction);
+        child.addScaledVector(direction, -(layout.get(line.targetId)!.radius + 1 + ARROW_LENGTH / 2));
+        mesh.setMatrixAt(i, matrix.compose(child, quaternion, one));
+      });
+      mesh.instanceMatrix.needsUpdate = true;
+      mesh.computeBoundingSphere();
+    }
+
+    if (fresh || colours !== last.colours || emphasis !== last.emphasis) {
+      arrows.forEach((line, i) => {
+        const kept = Math.min(inkOf(state.current, line.sourceId), inkOf(state.current, line.targetId));
+        mesh.setColorAt(i, fadeInk(colours.line, colours.paper, kept, colours.out));
+      });
+      if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+    }
+
+    drawn.current = { mesh, colours, emphasis, drift };
+  });
 
   return <instancedMesh key={arrows.length} ref={meshRef} args={[geometry, material, arrows.length]} />;
 }

@@ -59,7 +59,7 @@ export function PaperDiscs({ ids, layout, ink, paper, state, onPersonClick }: Pa
     if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
   }, [ids, colours, state]);
 
-  const camera = useThree((state) => state.camera);
+  const camera = useThree((three) => three.camera);
   const placedFacing = useMemo(() => new THREE.Quaternion(), []);
   const drawn = useRef<Partial<PaperEmphasisState>>({});
   useLayoutEffect(() => {
@@ -88,7 +88,7 @@ export function PaperDiscs({ ids, layout, ink, paper, state, onPersonClick }: Pa
       onClick={(e) => {
         if (e.instanceId === undefined) return;
         e.stopPropagation();
-        onPersonClick(ids[e.instanceId], e);
+        onPersonClick(state.current.pointedId ?? ids[e.instanceId], e);
       }}
     />
   );
