@@ -4,7 +4,6 @@ import { useTheme } from '@mui/material/styles';
 import FamilyTree3D from './FamilyTree3D';
 import { FamilyTree2D } from './FamilyTree2D';
 import { useViewMode } from '../hooks/useViewMode';
-import { useBackgroundTheme } from '../hooks/useBackgroundTheme';
 import { useWorkingRecord } from '../contexts/WorkingRecordContext';
 import { linkWriteOutcome } from '../hooks/useWorkingRecord';
 import { useNewNodesSinceSignIn } from '../hooks/useNewNodesSinceSignIn';
@@ -59,7 +58,6 @@ function reportWriteFailure(error: unknown, fallback: string): void {
 export const FamilyTree: React.FC = () => {
   const { user, userProfile, isAdmin, session } = useAuth();
   const { mode, switchMode, isHydrated } = useViewMode();
-  const { theme: backgroundTheme, setTheme: setBackgroundTheme } = useBackgroundTheme();
   const { working, confirmedNodes, confirmedLinks, isLoading, error, reload, write } =
     useWorkingRecord();
   const {
@@ -472,7 +470,8 @@ export const FamilyTree: React.FC = () => {
 
   const searchHighlightedNodeId = searchMatches[searchIndex]?.id ?? null;
 
-  const { panel } = useTheme().palette;
+  const { palette } = useTheme();
+  const { panel } = palette;
 
   const seeWhosNewButtonSx = {
     fontWeight: 700,
@@ -544,7 +543,7 @@ export const FamilyTree: React.FC = () => {
               width: '40px',
               height: '40px',
               border: `4px solid ${panel.loader.track}`,
-              borderTop: `4px solid ${panel.loader.pageHead}`,
+              borderTop: `4px solid ${panel.loader.pageSpinner}`,
               borderRadius: '50%',
               animation: 'spin 1s linear infinite',
               margin: '16px auto',
@@ -566,7 +565,7 @@ export const FamilyTree: React.FC = () => {
         width: '100%',
         height: '100vh',
         background: panel.page,
-        color: panel.loader.error,
+        color: palette.error.main,
         textAlign: 'center',
         padding: '20px',
       }}>
@@ -608,6 +607,7 @@ export const FamilyTree: React.FC = () => {
       height: '100vh',
       overflow: 'hidden',
       background: panel.page,
+      color: panel.ink.inherited,
     }}>
       {mode === '2D' && showSeeWhosNewButton && newMembers.length > 0 && (
         <div
@@ -729,8 +729,6 @@ export const FamilyTree: React.FC = () => {
             graphData={working}
             interaction={interaction}
             selectedNode={selectedNode}
-            backgroundTheme={backgroundTheme}
-            onBackgroundThemeChange={setBackgroundTheme}
             collapsedNodes={collapsedNodes}
             onToggleCollapse={handleToggleCollapse}
             onSetCollapsedNodes={handleSetCollapsedNodes}
@@ -786,8 +784,6 @@ export const FamilyTree: React.FC = () => {
             interaction={interaction}
             layoutType="tree"
             activePreset={activePreset}
-            backgroundTheme={backgroundTheme}
-            onBackgroundThemeChange={setBackgroundTheme}
             isMobile={isMobile()}
             drawerInset={drawerInset}
             collapsedNodes={collapsedNodes}

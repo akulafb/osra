@@ -205,7 +205,7 @@ export const GhostNodeCard: React.FC<GhostNodeCardProps> = ({
           disabled={!name.trim() || isSubmitting || mustConfirm}
           style={{
             background: name.trim() && !mustConfirm ? color : hud.card.disabledFill,
-            color: name.trim() && !mustConfirm ? hud.card.onAccent : hud.card.inkQuiet,
+            color: name.trim() && !mustConfirm ? hud.card.onRelation : hud.card.inkQuiet,
             border: 'none',
             borderRadius: '6px',
             padding: '5px 8px',

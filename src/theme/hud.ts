@@ -1,11 +1,14 @@
+import { alpha } from '@mui/material/styles';
+import { PAPER_ACCENT, type PaperPair } from './paperPair';
+
 export interface HudTokens {
+  error: string;
   banner: {
     surface: string;
     border: string;
     glow: string;
     ink: string;
     highlight: string;
-    error: string;
   };
   card: {
     border: string;
@@ -16,10 +19,10 @@ export interface HudTokens {
     inkQuiet: string;
     highlight: string;
     onAccent: string;
+    onRelation: string;
     disabledFill: string;
-    error: string;
   };
-  panel: {
+  editor: {
     surface: string;
     caption: string;
     prompt: string;
@@ -31,6 +34,7 @@ export interface HudTokens {
     field: string;
     warning: string;
     option: string;
+    optionOffSurface: string;
     optionOffBorder: string;
     optionOffInk: string;
   };
@@ -74,13 +78,13 @@ declare module '@mui/material/styles' {
 }
 
 export const cosmosHud: HudTokens = {
+  error: '#f87171',
   banner: {
     surface: 'rgba(15, 23, 42, 0.95)',
     border: 'rgba(168, 85, 247, 0.8)',
     glow: 'rgba(168, 85, 247, 0.4)',
     ink: '#e2e8f0',
     highlight: '#c084fc',
-    error: '#f87171',
   },
   card: {
     border: 'rgba(255,255,255,0.15)',
@@ -91,10 +95,10 @@ export const cosmosHud: HudTokens = {
     inkQuiet: 'rgba(255,255,255,0.4)',
     highlight: '#c084fc',
     onAccent: '#0f172a',
+    onRelation: '#0f172a',
     disabledFill: 'rgba(255,255,255,0.1)',
-    error: '#f87171',
   },
-  panel: {
+  editor: {
     surface: 'rgba(15, 23, 42, 0.95)',
     caption: 'rgba(255,255,255,0.65)',
     prompt: 'rgba(255,255,255,0.75)',
@@ -106,6 +110,7 @@ export const cosmosHud: HudTokens = {
     field: 'rgba(0,0,0,0.35)',
     warning: '#fbbf24',
     option: 'rgba(192, 132, 252, 0.12)',
+    optionOffSurface: 'rgba(255,255,255,0.03)',
     optionOffBorder: 'rgba(255,255,255,0.08)',
     optionOffInk: 'rgba(255,255,255,0.35)',
   },
@@ -138,3 +143,72 @@ export const cosmosHud: HudTokens = {
     motherTint: 'rgba(244, 114, 182, 0.25)',
   },
 };
+
+export function paperHud({ paper, ink }: PaperPair): HudTokens {
+  return {
+    error: PAPER_ACCENT,
+    banner: {
+      surface: alpha(paper, 0.96),
+      border: ink,
+      glow: alpha(ink, 0.15),
+      ink,
+      highlight: ink,
+    },
+    card: {
+      border: alpha(ink, 0.2),
+      controlBorder: alpha(ink, 0.3),
+      field: alpha(ink, 0.05),
+      shadow: alpha(ink, 0.2),
+      inkSecondary: alpha(ink, 0.8),
+      inkQuiet: alpha(ink, 0.45),
+      highlight: ink,
+      onAccent: paper,
+      onRelation: '#0f172a',
+      disabledFill: alpha(ink, 0.1),
+    },
+    editor: {
+      surface: alpha(paper, 0.96),
+      caption: alpha(ink, 0.65),
+      prompt: alpha(ink, 0.75),
+      pill: alpha(paper, 0.92),
+      pillBorder: alpha(ink, 0.3),
+      pillInk: alpha(ink, 0.85),
+    },
+    targeting: {
+      field: alpha(ink, 0.06),
+      warning: PAPER_ACCENT,
+      option: alpha(ink, 0.08),
+      optionOffSurface: alpha(ink, 0.03),
+      optionOffBorder: alpha(ink, 0.08),
+      optionOffInk: alpha(ink, 0.35),
+    },
+    ghost: {
+      surface: alpha(paper, 0.97),
+      matchSurface: paper,
+      matchBorder: alpha(ink, 0.4),
+      matchActive: alpha(ink, 0.12),
+      matchAction: ink,
+      matchInk: ink,
+      matchMeta: alpha(ink, 0.6),
+      matchMore: alpha(ink, 0.45),
+    },
+    picker: {
+      surface: alpha(paper, 0.98),
+      border: ink,
+      glow: alpha(ink, 0.15),
+      choice: alpha(ink, 0.04),
+      confirm: ink,
+      confirmGlow: alpha(ink, 0.25),
+    },
+    kinship: {
+      parentSource: ink,
+      parentTarget: alpha(ink, 0.55),
+      marriage: ink,
+      divorce: alpha(ink, 0.5),
+      father: ink,
+      fatherTint: alpha(ink, 0.12),
+      mother: alpha(ink, 0.6),
+      motherTint: alpha(ink, 0.06),
+    },
+  };
+}

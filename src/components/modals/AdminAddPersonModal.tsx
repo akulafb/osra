@@ -103,7 +103,7 @@ export default function AdminAddPersonModal({
     <div style={overlayStyle(theme)}>
       <div style={contentStyle(theme)}>
         <h2 style={{ marginTop: 0, color: panel.ink.strong }}>Add person (standalone)</h2>
-        <p style={{ color: modal.flat.ink.faint, fontSize: '0.85rem' }}>
+        <p style={{ color: modal.adminTool.ink.faint, fontSize: '0.85rem' }}>
           Creates a new person with no relationships yet. You can add links afterward.
         </p>
         <form onSubmit={handleSubmit}>
@@ -155,7 +155,7 @@ export default function AdminAddPersonModal({
 
 const labelStyle = ({ palette }: Theme): React.CSSProperties => ({
   display: 'block',
-  color: palette.modal.flat.ink.muted,
+  color: palette.modal.adminTool.ink.muted,
   fontSize: '0.8rem',
   marginTop: 8,
 });
@@ -164,8 +164,8 @@ const inputStyle = ({ palette }: Theme): React.CSSProperties => ({
   width: '100%',
   padding: '8px 10px',
   borderRadius: 6,
-  border: `1px solid ${palette.modal.admin.field.border}`,
-  background: palette.modal.admin.field.surface,
+  border: `1px solid ${palette.modal.adminForm.field.border}`,
+  background: palette.modal.adminForm.field.surface,
   color: palette.panel.ink.strong,
   marginTop: 4,
 });
@@ -173,7 +173,7 @@ const inputStyle = ({ palette }: Theme): React.CSSProperties => ({
 const overlayStyle = ({ palette }: Theme): React.CSSProperties => ({
   position: 'fixed',
   inset: 0,
-  background: palette.modal.admin.scrim,
+  background: palette.modal.adminForm.scrim,
   zIndex: 2000,
   display: 'flex',
   alignItems: 'center',
@@ -182,7 +182,7 @@ const overlayStyle = ({ palette }: Theme): React.CSSProperties => ({
 });
 
 const contentStyle = ({ palette }: Theme): React.CSSProperties => ({
-  background: palette.modal.admin.surface,
+  background: palette.modal.adminForm.surface,
   borderRadius: 12,
   padding: 24,
   maxWidth: 420,

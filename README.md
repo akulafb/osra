@@ -217,7 +217,7 @@ Each solution unlocked the next challenge, building from a simple graph into a f
 - **Cinematic Intro Zoom**: Dramatic 30,000-unit "fly-in" from deep space upon app entry.
 - **Ambient Cosmic Music**: Immersive background audio synced with the cinematic entry (default ON).
 - **Celestial Body Mode**: Toggle links visibility to see family members as floating stars in deep space.
-- **Background Themes**: Deep space, wax white, smooth sepia, or baby blue.
+- **Canvas Mode**: Switch between Cosmos (dark starfield) and Paper (ink on paper, the default).
 - **2D View**: Tree, cluster and radial layouts with orthogonal elbow connectors, pan and zoom.
 - **Direct Manipulation**: Action Handles (Parent, Child, Spouse, Connect, Dissolve) on each Tree Node in 2D and in a docked panel in 3D; a Ghost Node previews a new Person before it is written. Desktop only; phones use the Person drawer.
 - **Person Matches**: While adding someone, existing Persons with the same name or a Spelling Match are offered so the tree does not get duplicates.

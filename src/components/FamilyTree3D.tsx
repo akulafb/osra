@@ -9,14 +9,12 @@ import Typography from '@mui/material/Typography';
 import Checkbox from '@mui/material/Checkbox';
 import Switch from '@mui/material/Switch';
 import FormControlLabel from '@mui/material/FormControlLabel';
-import Select from '@mui/material/Select';
-import MenuItem from '@mui/material/MenuItem';
 import { useTheme } from '@mui/material/styles';
 import { FamilyGraph, FamilyNode, RelativeDirection } from '../types/graph';
 import { useAuth } from '../contexts/AuthContext';
 import { createStarfield, type NebulaData } from '../utils/starfield';
 import { isMobile } from '../utils/device';
-import type { BackgroundTheme } from '../hooks/useBackgroundTheme';
+import { CanvasModeSwitch } from './CanvasModeSwitch';
 import { getTexturePath } from '../utils/imageFormat';
 import { getClusterColors } from '../utils/familyColors';
 import { getNodeId } from '../lib/familyGraph';
@@ -88,19 +86,6 @@ const CONNECT_NON_CANDIDATE_DIM = 0.2;
 /** Shared so that outside Connect Mode the candidacy identity never changes,
  *  and the scene is not asked to rebuild every node object for nothing. */
 const NO_CANDIDACY: Map<string, Candidacy> = new Map();
-
-const THEME_COLORS_3D: Record<Exclude<BackgroundTheme, 'deep-space'>, number> = {
-  'wax-white': 0xfffef8,
-  'smooth-sepia': 0xe8dcc8,
-  'baby-blue': 0xd4e8f7,
-};
-
-const THEME_LABELS: Record<BackgroundTheme, string> = {
-  'deep-space': 'Deep Space',
-  'wax-white': 'Wax White',
-  'smooth-sepia': 'Smooth Sepia',
-  'baby-blue': 'Baby Blue',
-};
 
 const getPlanetMaterial = (nodeId: string, isMobileDevice: boolean = false) => {
   let hash = 0;
@@ -225,8 +210,6 @@ interface FamilyTree3DProps {
   searchOpenRequested?: number;
   searchNavigateTrigger?: number;
   searchDisabled?: boolean;
-  backgroundTheme?: BackgroundTheme;
-  onBackgroundThemeChange?: (theme: BackgroundTheme) => void;
   /** 3D-only: which paternal family clusters are visible in the force graph */
   visibleClusters3D: Set<string>;
   onVisibleClusters3DChange: React.Dispatch<React.SetStateAction<Set<string>>>;
@@ -297,8 +280,6 @@ export const FamilyTree3DContent: React.FC<FamilyTree3DProps> = ({
   searchOpenRequested = 0,
   searchNavigateTrigger = 0,
   searchDisabled = false,
-  backgroundTheme = 'deep-space',
-  onBackgroundThemeChange,
   visibleClusters3D,
   onVisibleClusters3DChange,
   uniqueClusters,
@@ -1660,56 +1641,42 @@ export const FamilyTree3DContent: React.FC<FamilyTree3DProps> = ({
         envInitializedRef.current = true;
       }
 
-      if (backgroundTheme === 'deep-space') {
-        if (!starfieldRef.current) {
-          setIsStarfieldLoading(true);
-          const isMob = isMobile();
-          const starfieldResult = createStarfield(scene, {
-            isMobileDevice: isMob,
-            onBackgroundLoaded: () => setIsStarfieldLoading(false),
-          });
-          starfieldRef.current = starfieldResult.group;
-          nebulaeRef.current = starfieldResult.nebulae;
-        }
-      } else {
-        setIsStarfieldLoading(false);
-        if (starfieldRef.current) {
-          scene.remove(starfieldRef.current);
-          starfieldRef.current = null;
-          nebulaeRef.current = [];
-        }
-        scene.background = new THREE.Color(THEME_COLORS_3D[backgroundTheme]);
-        scene.environment = null;
+      if (!starfieldRef.current) {
+        setIsStarfieldLoading(true);
+        const isMob = isMobile();
+        const starfieldResult = createStarfield(scene, {
+          isMobileDevice: isMob,
+          onBackgroundLoaded: () => setIsStarfieldLoading(false),
+        });
+        starfieldRef.current = starfieldResult.group;
+        nebulaeRef.current = starfieldResult.nebulae;
       }
     };
 
     const interval = setInterval(initEnvironment, 500);
     return () => clearInterval(interval);
-  }, [backgroundTheme]);
+  }, []);
 
-  // Show loader immediately when user selects deep-space (before interval runs)
   useEffect(() => {
-    if (backgroundTheme === 'deep-space' && !starfieldRef.current) {
+    if (!starfieldRef.current) {
       setIsStarfieldLoading(true);
     }
-  }, [backgroundTheme]);
-
-  const containerBg = backgroundTheme === 'deep-space' ? '#0a0a0a' : backgroundTheme === 'wax-white' ? '#fffef8' : backgroundTheme === 'smooth-sepia' ? '#e8dcc8' : '#d4e8f7';
+  }, []);
 
   // Render
   return (
-    <div style={{ position: 'relative', width: '100%', height: '100%', background: containerBg }}>
+    <div style={{ position: 'relative', width: '100%', height: '100%', background: '#0a0a0a' }}>
       {isSimulationLoading && graphData && (
         <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: panel.loader.scrim, zIndex: 1000, color: panel.ink.strong, fontSize: '18px', pointerEvents: 'none' }}>
           <div style={{ textAlign: 'center' }}>
             <div>Loading <span style={{ fontFamily: 'cursive', fontWeight: 'bold' }}>Osra</span>...</div>
-            <div style={{ width: '40px', height: '40px', border: `4px solid ${panel.loader.track}`, borderTop: `4px solid ${panel.loader.head}`, borderRadius: '50%', animation: 'spin 1s linear infinite', margin: '10px auto' }} />
+            <div style={{ width: '40px', height: '40px', border: `4px solid ${panel.loader.track}`, borderTop: `4px solid ${panel.loader.spinner}`, borderRadius: '50%', animation: 'spin 1s linear infinite', margin: '10px auto' }} />
           </div>
         </div>
       )}
       {isStarfieldLoading && (
         <div style={{ position: 'absolute', bottom: '24px', left: '50%', transform: 'translateX(-50%)', zIndex: 1000, display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 20px', background: panel.loader.toast, borderRadius: '8px', color: panel.ink.strong, fontSize: '0.9rem', pointerEvents: 'none', boxShadow: `0 4px 12px ${panel.shadow.soft}` }}>
-          <div style={{ width: 20, height: 20, border: `2px solid ${panel.loader.track}`, borderTop: `2px solid ${panel.loader.head}`, borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+          <div style={{ width: 20, height: 20, border: `2px solid ${panel.loader.track}`, borderTop: `2px solid ${panel.loader.spinner}`, borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
           Loading background…
         </div>
       )}
@@ -1923,39 +1890,7 @@ export const FamilyTree3DContent: React.FC<FamilyTree3DProps> = ({
               RESET VIEWPORT
             </Button>
 
-            <Box>
-              <Typography variant="caption" sx={{ color: 'primary.main', fontWeight: 700, letterSpacing: '0.1em', mb: 1, display: 'block', fontSize: '0.6rem' }}>
-                CHRONICLE THEME
-              </Typography>
-              <Select
-                value={backgroundTheme}
-                onChange={(e) => onBackgroundThemeChange?.(e.target.value as BackgroundTheme)}
-                size="small"
-                fullWidth
-                sx={{
-                  fontSize: '0.75rem',
-                  backgroundColor: panel.surface.well,
-                  '& .MuiSelect-select': { py: 1, display: 'flex', alignItems: 'center', gap: 1 },
-                  '& fieldset': { borderColor: panel.border.subtle },
-                }}
-              >
-                {(['deep-space', 'wax-white', 'smooth-sepia', 'baby-blue'] as const).map((t) => (
-                  <MenuItem key={t} value={t} sx={{ fontSize: '0.75rem' }}>
-                    <Box
-                      sx={{
-                        width: 12,
-                        height: 12,
-                        borderRadius: '2px',
-                        mr: 1,
-                        backgroundColor: t === 'deep-space' ? '#050505' : t === 'wax-white' ? '#fffef8' : t === 'smooth-sepia' ? '#e8dcc8' : '#d4e8f7',
-                        border: '1px solid rgba(255,255,255,0.1)'
-                      }}
-                    />
-                    {THEME_LABELS[t]}
-                  </MenuItem>
-                ))}
-              </Select>
-            </Box>
+            <CanvasModeSwitch />
 
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
               <FormControlLabel

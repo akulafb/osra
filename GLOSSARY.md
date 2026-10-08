@@ -67,6 +67,25 @@ The everyday word for what one Person is to another, read from a Kinship Path: n
 _Avoid_: Relation label, Shortcut word, Relationship name
 
 
+### Canvas Modes
+
+**Canvas Mode**:
+The look a viewer chooses for the tree canvas and its panels: Cosmos or Paper. A per-viewer preference; it never changes the Tree Record.
+_Avoid_: Theme, Chronicle Theme, Background theme, Skin
+
+**Cosmos**:
+The Canvas Mode with a dark starfield, glossy family-coloured Tree Nodes and live physics.
+_Avoid_: Deep Space, Dark mode
+
+**Paper**:
+The default Canvas Mode: flat ink-on-paper Tree Nodes in a still layout, in grayscale or, when the viewer turns colour on, in Paper Pairs.
+_Avoid_: Atlas, Light mode, Ink mode
+
+**Paper Pair**:
+A hand-picked background colour and the ink colour drawn on it. Each family is assigned one; with colour on, the canvas takes the pair of the focused Person's family.
+_Avoid_: Palette, Section colour, Duotone
+
+
 ### Direct Interaction
 
 **Action Handle**:

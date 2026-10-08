@@ -380,7 +380,7 @@ export const Manipulation3DPanel: React.FC<Manipulation3DPanelProps> = ({
           zIndex: 1250,
           width: panelWidth,
           boxSizing: 'border-box',
-          background: hud.panel.surface,
+          background: hud.editor.surface,
           backdropFilter: 'blur(16px)',
           border: `1px solid ${hud.card.border}`,
           borderRadius: 12,
@@ -397,7 +397,7 @@ export const Manipulation3DPanel: React.FC<Manipulation3DPanelProps> = ({
           style={{
             fontSize: 11,
             fontWeight: 700,
-            color: hud.panel.caption,
+            color: hud.editor.caption,
             overflow: 'hidden',
             textOverflow: 'ellipsis',
             whiteSpace: 'nowrap',
@@ -414,7 +414,7 @@ export const Manipulation3DPanel: React.FC<Manipulation3DPanelProps> = ({
            * pixels at distance.
            */
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <div style={{ fontSize: 11, color: hud.panel.prompt, lineHeight: 1.4 }}>
+            <div style={{ fontSize: 11, color: hud.editor.prompt, lineHeight: 1.4 }}>
               Dissolve <strong>{selectedNode.firstName}</strong>? This cannot be undone.
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
@@ -427,7 +427,7 @@ export const Manipulation3DPanel: React.FC<Manipulation3DPanelProps> = ({
                   background: DISSOLVE_ACCENT,
                   border: `1.5px solid ${DISSOLVE_ACCENT}`,
                   borderRadius: 999,
-                  color: hud.card.onAccent,
+                  color: hud.card.onRelation,
                   cursor: 'pointer',
                   fontSize: 13,
                   fontWeight: 800,
@@ -442,10 +442,10 @@ export const Manipulation3DPanel: React.FC<Manipulation3DPanelProps> = ({
                 aria-label="Keep this person"
                 style={{
                   flex: 1,
-                  background: hud.panel.pill,
-                  border: `1.5px solid ${hud.panel.pillBorder}`,
+                  background: hud.editor.pill,
+                  border: `1.5px solid ${hud.editor.pillBorder}`,
                   borderRadius: 999,
-                  color: hud.panel.pillInk,
+                  color: hud.editor.pillInk,
                   cursor: 'pointer',
                   fontSize: 13,
                   fontWeight: 800,
@@ -466,7 +466,7 @@ export const Manipulation3DPanel: React.FC<Manipulation3DPanelProps> = ({
                 type="button"
                 onClick={() => setRelation(rel)}
                 style={{
-                  background: hud.panel.pill,
+                  background: hud.editor.pill,
                   border: `1.5px solid ${relationColor(rel)}`,
                   borderRadius: 999,
                   color: relationColor(rel),
@@ -484,7 +484,7 @@ export const Manipulation3DPanel: React.FC<Manipulation3DPanelProps> = ({
               type="button"
               onClick={startConnect}
               style={{
-                background: hud.panel.pill,
+                background: hud.editor.pill,
                 border: `1.5px solid ${CONNECT_ACCENT}`,
                 borderRadius: 999,
                 color: CONNECT_ACCENT,
@@ -502,7 +502,7 @@ export const Manipulation3DPanel: React.FC<Manipulation3DPanelProps> = ({
                 type="button"
                 onClick={startDissolve}
                 style={{
-                  background: hud.panel.pill,
+                  background: hud.editor.pill,
                   border: `1.5px solid ${DISSOLVE_ACCENT}`,
                   borderRadius: 999,
                   color: DISSOLVE_ACCENT,

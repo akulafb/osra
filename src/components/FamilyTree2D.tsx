@@ -7,8 +7,6 @@ import 'd3-transition'; // Import for transition support
 import Button from '@mui/material/Button';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
-import Select from '@mui/material/Select';
-import MenuItem from '@mui/material/MenuItem';
 import { useTheme } from '@mui/material/styles';
 import { FamilyGraph, FamilyNode, FamilyLink, Node2D, LayoutType } from '../types/graph';
 import { calculateLayout, calculateBounds } from '../lib/layoutEngine';
@@ -26,32 +24,14 @@ import { connectedPersonIds } from '../lib/personMatch';
 import { TreeSearchBar } from './TreeSearchBar';
 import { topRightControlsClear, type PersonDrawerInset } from '../hooks/usePersonDrawerInset';
 import { canEdit } from '../lib/permissions';
-import type { BackgroundTheme } from '../hooks/useBackgroundTheme';
+import { CanvasModeSwitch } from './CanvasModeSwitch';
+import { useCanvasMode, useCurrentPaperPair } from '../hooks/useCanvasMode';
+import { focusEmphasis } from '../lib/focusEmphasis';
 import { DirectManipulationController } from '../hooks/useDirectManipulation';
 import { candidacyFor } from './cards/connectCandidates';
 import { otherParentChoice } from '../lib/otherParent';
 
-function getBackgroundForTheme(theme: BackgroundTheme): string {
-  switch (theme) {
-    case 'deep-space':
-      return 'linear-gradient(180deg, #0a0a0a 0%, #1a1a2e 100%)';
-    case 'wax-white':
-      return '#fffef8';
-    case 'smooth-sepia':
-      return '#e8dcc8';
-    case 'baby-blue':
-      return '#d4e8f7';
-    default:
-      return 'linear-gradient(180deg, #0a0a0a 0%, #1a1a2e 100%)';
-  }
-}
-
-const THEME_LABELS: Record<BackgroundTheme, string> = {
-  'deep-space': 'Deep Space',
-  'wax-white': 'Wax White',
-  'smooth-sepia': 'Smooth Sepia',
-  'baby-blue': 'Baby Blue',
-};
+const COSMOS_BACKGROUND = 'linear-gradient(180deg, #0a0a0a 0%, #1a1a2e 100%)';
 
 interface FamilyTree2DProps {
   graphData: FamilyGraph;
@@ -87,8 +67,6 @@ interface FamilyTree2DProps {
   searchOpenRequested?: number;
   searchNavigateTrigger?: number;
   searchDisabled?: boolean;
-  backgroundTheme?: BackgroundTheme;
-  onBackgroundThemeChange?: (theme: BackgroundTheme) => void;
   /** Dashed preview edge while Add Relative connect-to-existing is focused */
   pendingLinkPreview?: { anchorId: string; existingId: string } | null;
   /** Admin: add standalone person (opens modal in parent) */
@@ -162,8 +140,6 @@ export const FamilyTree2D: React.FC<FamilyTree2DProps> = ({
   searchOpenRequested = 0,
   searchNavigateTrigger = 0,
   searchDisabled = false,
-  backgroundTheme = 'deep-space',
-  onBackgroundThemeChange,
   pendingLinkPreview = null,
   isAdmin = false,
   onAdminAddPersonClick,
@@ -175,8 +151,14 @@ export const FamilyTree2D: React.FC<FamilyTree2DProps> = ({
   onConfirmDissolve,
 }) => {
   const { panel, hud } = useTheme().palette;
-  const presetBackground = getBackgroundForTheme(backgroundTheme);
-  const emptyBackground = getBackgroundForTheme(backgroundTheme);
+  const { mode: canvasMode } = useCanvasMode();
+  const { pair } = useCurrentPaperPair();
+  const isPaper = canvasMode === 'paper';
+  const background = isPaper ? pair.paper : COSMOS_BACKGROUND;
+  const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
+  const handleHoverChange = useCallback((nodeId: string, hovering: boolean) => {
+    setHoveredNodeId((current) => (hovering ? nodeId : current === nodeId ? null : current));
+  }, []);
   const svgRef = useRef<SVGSVGElement>(null);
   const gRef = useRef<SVGGElement>(null);
   const zoomBehaviorRef = useRef<ZoomBehavior<SVGSVGElement, unknown> | null>(null);
@@ -242,6 +224,19 @@ export const FamilyTree2D: React.FC<FamilyTree2DProps> = ({
 
   // Calculate bounds and center the view
   const bounds = useMemo(() => calculateBounds(nodes), [nodes]);
+
+  const isConnecting =
+    interaction.state.phase === 'targeting-connect' || interaction.state.phase === 'choosing-kinship';
+  const emphasis = useMemo(() => {
+    if (!isPaper) return null;
+    return focusEmphasis({
+      personIds: nodes.map((n) => n.id),
+      links: graphData?.links ?? [],
+      hoveredId: hoveredNodeId,
+      focusedId: isConnecting ? null : interaction.selectedNodeId,
+      searchMatchIds: searchQuery.trim() ? new Set(searchMatches.map((m) => m.id)) : null,
+    });
+  }, [isPaper, nodes, graphData?.links, hoveredNodeId, isConnecting, interaction.selectedNodeId, searchQuery, searchMatches]);
   // Read inside the fit effect without making a layout change re-trigger it.
   const boundsRef = useRef(bounds);
   boundsRef.current = bounds;
@@ -578,7 +573,7 @@ export const FamilyTree2D: React.FC<FamilyTree2DProps> = ({
   }, [nodes, interaction.connectSourceId]);
 
   return (
-    <div style={{ position: 'relative', width: '100%', height: '100%', background: activePreset ? presetBackground : emptyBackground }}>
+    <div style={{ position: 'relative', width: '100%', height: '100%', background }}>
       {/* Connect Mode HUD Top Banner */}
       {interaction.state.phase === 'targeting-connect' && connectSourceNode && (
         <div
@@ -605,7 +600,7 @@ export const FamilyTree2D: React.FC<FamilyTree2DProps> = ({
           <span>
             🔗 Connect Mode: Select a relative to link with <strong style={{ color: hud.banner.highlight }}>{connectSourceNode.firstName}</strong>
             {interaction.rejectedTarget && (
-              <span style={{ marginLeft: 8, color: hud.banner.error, fontSize: 11 }}>
+              <span style={{ marginLeft: 8, color: hud.error, fontSize: 11 }}>
                 ({interaction.rejectedTarget.reason})
               </span>
             )}
@@ -641,7 +636,7 @@ export const FamilyTree2D: React.FC<FamilyTree2DProps> = ({
           fontSize: '1rem',
           textAlign: 'center',
           padding: '24px',
-          background: emptyBackground
+          background
         }}>
           <div style={{ maxWidth: '320px', color: panel.ink.strong }}>
             <div style={{ fontSize: '2.5rem', marginBottom: '16px' }}>🌳</div>
@@ -686,7 +681,13 @@ export const FamilyTree2D: React.FC<FamilyTree2DProps> = ({
             style={{ transition: isDragging ? 'none' : 'transform 0.1s ease-out' }}
           >
             {/* Render links first (behind nodes) */}
-            <OrthogonalLinks links={links} activePreset={activePreset} lifecycles={lifecycles} />
+            <OrthogonalLinks
+              links={links}
+              activePreset={activePreset}
+              lifecycles={lifecycles}
+              paperInk={isPaper ? pair.ink : undefined}
+              emphasis={emphasis}
+            />
 
             {pendingLinkPreview &&
               (() => {
@@ -704,7 +705,7 @@ export const FamilyTree2D: React.FC<FamilyTree2DProps> = ({
                     y1={y1}
                     x2={x2}
                     y2={y2}
-                    stroke="#22d3ee"
+                    stroke={isPaper ? pair.ink : '#22d3ee'}
                     strokeWidth={2.5}
                     strokeDasharray="6 4"
                     opacity={0.95}
@@ -734,6 +735,9 @@ export const FamilyTree2D: React.FC<FamilyTree2DProps> = ({
                 lifecycles={lifecycles}
                 isConfirmingDissolve={interaction.confirmingDissolveId === node.id}
                 onConfirmDissolve={onConfirmDissolve}
+                paperPair={isPaper ? pair : undefined}
+                emphasis={emphasis?.get(node.id)}
+                onHoverChange={isPaper ? handleHoverChange : undefined}
               />
             ))}
 
@@ -826,6 +830,7 @@ export const FamilyTree2D: React.FC<FamilyTree2DProps> = ({
                     interaction.selectNode(sourceId);
                   }}
                   onCancel={() => interaction.handleEscape()}
+                  previewStroke={isPaper ? pair.ink : undefined}
                 />
               );
             })()}
@@ -938,39 +943,7 @@ export const FamilyTree2D: React.FC<FamilyTree2DProps> = ({
               </Button>
             </Box>
 
-            <Box>
-              <Typography variant="caption" sx={{ color: 'primary.main', fontWeight: 700, letterSpacing: '0.1em', mb: 1, display: 'block', fontSize: '0.6rem' }}>
-                CHRONICLE THEME
-              </Typography>
-              <Select
-                value={backgroundTheme}
-                onChange={(e) => onBackgroundThemeChange?.(e.target.value as BackgroundTheme)}
-                size="small"
-                fullWidth
-                sx={{
-                  fontSize: '0.75rem',
-                  backgroundColor: panel.surface.well,
-                  '& .MuiSelect-select': { py: 1, display: 'flex', alignItems: 'center', gap: 1 },
-                  '& fieldset': { borderColor: panel.border.subtle },
-                }}
-              >
-                {(['deep-space', 'wax-white', 'smooth-sepia', 'baby-blue'] as const).map((t) => (
-                  <MenuItem key={t} value={t} sx={{ fontSize: '0.75rem' }}>
-                    <Box
-                      sx={{
-                        width: 12,
-                        height: 12,
-                        borderRadius: '2px',
-                        mr: 1,
-                        backgroundColor: t === 'deep-space' ? '#050505' : t === 'wax-white' ? '#fffef8' : t === 'smooth-sepia' ? '#e8dcc8' : '#d4e8f7',
-                        border: '1px solid rgba(255,255,255,0.1)'
-                      }}
-                    />
-                    {THEME_LABELS[t]}
-                  </MenuItem>
-                ))}
-              </Select>
-            </Box>
+            <CanvasModeSwitch />
 
             {onSearchQueryChange && onSearchPrev && onSearchNext && onSearchClose && (
               <Box sx={{ 

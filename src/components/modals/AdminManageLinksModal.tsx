@@ -208,7 +208,7 @@ export default function AdminManageLinksModal({
     <div ref={overlayRef} style={overlayStyle(theme)}>
       <div style={contentStyle(theme)}>
         <h2 style={{ marginTop: 0, color: panel.ink.strong }}>Links for this person</h2>
-        <p style={{ color: modal.flat.ink.faint, fontSize: '0.85rem' }}>
+        <p style={{ color: modal.adminTool.ink.faint, fontSize: '0.85rem' }}>
           Edit or delete relationships. Changes are checked so the tree stays consistent.
         </p>
 
@@ -224,14 +224,14 @@ export default function AdminManageLinksModal({
               key={link.id ?? `${link.source}-${link.target}-${link.type}`}
               style={{
                 padding: '10px 0',
-                borderBottom: `1px solid ${modal.flat.border}`,
+                borderBottom: `1px solid ${modal.adminTool.border}`,
                 display: 'flex',
                 flexWrap: 'wrap',
                 alignItems: 'center',
                 gap: 8,
               }}
             >
-              <span style={{ color: modal.flat.ink.soft, flex: '1 1 200px' }}>
+              <span style={{ color: modal.adminTool.ink.soft, flex: '1 1 200px' }}>
                 <strong>{link.type}</strong> → {otherLabel(link)}
                 {link.parentRole ? ` (${link.parentRole})` : ''}
               </span>
@@ -256,21 +256,21 @@ export default function AdminManageLinksModal({
           ))}
         </ul>
         {incident.length === 0 && (
-          <p style={{ color: modal.flat.ink.faint }}>No links touch this person.</p>
+          <p style={{ color: modal.adminTool.ink.faint }}>No links touch this person.</p>
         )}
 
         {editing && (
           <form
             onSubmit={handleSaveEdit}
             style={{
-              borderTop: `1px solid ${modal.admin.rule}`,
+              borderTop: `1px solid ${modal.adminForm.rule}`,
               paddingTop: 16,
               marginTop: 8,
             }}
           >
             <h3 style={{ color: panel.ink.strong, fontSize: '1rem' }}>Edit link</h3>
             <FormControl fullWidth margin="dense" size="small">
-              <InputLabel id="es" sx={{ color: modal.flat.ink.muted }}>
+              <InputLabel id="es" sx={{ color: modal.adminTool.ink.muted }}>
                 Source (parent for parent links)
               </InputLabel>
               <Select
@@ -289,7 +289,7 @@ export default function AdminManageLinksModal({
               </Select>
             </FormControl>
             <FormControl fullWidth margin="dense" size="small">
-              <InputLabel id="et" sx={{ color: modal.flat.ink.muted }}>
+              <InputLabel id="et" sx={{ color: modal.adminTool.ink.muted }}>
                 Target (child for parent links)
               </InputLabel>
               <Select
@@ -308,7 +308,7 @@ export default function AdminManageLinksModal({
               </Select>
             </FormControl>
             <FormControl fullWidth margin="dense" size="small">
-              <InputLabel id="ety" sx={{ color: modal.flat.ink.muted }}>
+              <InputLabel id="ety" sx={{ color: modal.adminTool.ink.muted }}>
                 Type
               </InputLabel>
               <Select
@@ -328,7 +328,7 @@ export default function AdminManageLinksModal({
             </FormControl>
             {editType === 'parent' && (
               <FormControl fullWidth margin="dense" size="small">
-                <InputLabel id="epr" sx={{ color: modal.flat.ink.muted }}>
+                <InputLabel id="epr" sx={{ color: modal.adminTool.ink.muted }}>
                   Parent role
                 </InputLabel>
                 <Select
@@ -378,7 +378,7 @@ export default function AdminManageLinksModal({
 const overlayStyle = ({ palette }: Theme): React.CSSProperties => ({
   position: 'fixed',
   inset: 0,
-  background: palette.modal.admin.scrim,
+  background: palette.modal.adminForm.scrim,
   zIndex: 2000,
   display: 'flex',
   alignItems: 'center',
@@ -390,7 +390,7 @@ const overlayStyle = ({ palette }: Theme): React.CSSProperties => ({
 const contentStyle = ({ palette }: Theme): React.CSSProperties => ({
   position: 'relative',
   zIndex: 0,
-  background: palette.modal.admin.surface,
+  background: palette.modal.adminForm.surface,
   borderRadius: 12,
   padding: 24,
   maxWidth: 520,

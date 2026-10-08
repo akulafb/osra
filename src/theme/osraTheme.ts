@@ -1,10 +1,11 @@
-import { createTheme } from '@mui/material/styles';
-import { cosmosChat } from './chat';
-import { cosmosHud } from './hud';
-import { cosmosModal } from './modal';
-import { cosmosPanel } from './panel';
+import { alpha, createTheme, type ThemeOptions } from '@mui/material/styles';
+import { cosmosChat, paperChat } from './chat';
+import { cosmosHud, paperHud } from './hud';
+import { cosmosModal, paperModal } from './modal';
+import { cosmosPanel, paperPanel } from './panel';
+import { PAPER_ACCENT, type PaperPair } from './paperPair';
 
-export const osraTheme = createTheme({
+const shared: Pick<ThemeOptions, 'typography' | 'components'> = {
   typography: {
     fontFamily: '"Inter", "Lora", Georgia, serif',
     h1: { fontFamily: '"Lora", serif' },
@@ -32,6 +33,10 @@ export const osraTheme = createTheme({
       },
     },
   },
+};
+
+export const osraTheme = createTheme({
+  ...shared,
   palette: {
     mode: 'dark',
     primary: {
@@ -65,3 +70,24 @@ export const osraTheme = createTheme({
     modal: cosmosModal,
   },
 });
+
+export function createPaperTheme(pair: PaperPair) {
+  const { paper, ink } = pair;
+  return createTheme({
+    ...shared,
+    palette: {
+      mode: 'light',
+      primary: { main: ink, contrastText: paper },
+      secondary: { main: ink, contrastText: paper },
+      success: { main: ink },
+      error: { main: PAPER_ACCENT },
+      warning: { main: ink },
+      background: { default: paper, paper },
+      text: { primary: ink, secondary: alpha(ink, 0.7) },
+      panel: paperPanel(pair),
+      hud: paperHud(pair),
+      chat: paperChat(pair),
+      modal: paperModal(pair),
+    },
+  });
+}

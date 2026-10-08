@@ -1,6 +1,7 @@
 import { lazy, Suspense } from 'react';
 import Button from '@mui/material/Button';
 import { FamilyTree } from '../components/FamilyTree';
+import { CanvasModeProvider } from '../contexts/CanvasModeProvider';
 import { useAuth } from '../contexts/AuthContext';
 import { WorkingRecordProvider } from '../contexts/WorkingRecordContext';
 
@@ -61,23 +62,25 @@ export default function HomePage() {
   }
 
   return (
-    <div style={{ position: 'relative', width: '100%', height: '100vh' }}>
-      <div style={{
-        position: 'absolute',
-        top: '20px',
-        left: '20px',
-        zIndex: 1000
-      }}>
-        <Button variant="contained" color="error" onClick={signOut}>
-          Sign Out
-        </Button>
+    <CanvasModeProvider>
+      <div style={{ position: 'relative', width: '100%', height: '100vh' }}>
+        <div style={{
+          position: 'absolute',
+          top: '20px',
+          left: '20px',
+          zIndex: 1000
+        }}>
+          <Button variant="contained" color="error" onClick={signOut}>
+            Sign Out
+          </Button>
+        </div>
+        {/* Scoped to the signed-in tree: the landing page has no reason to hold a
+            family graph, and this is the narrowest mount that still covers every
+            reader — FamilyChat included, since it renders inside FamilyTree. */}
+        <WorkingRecordProvider>
+          <FamilyTree />
+        </WorkingRecordProvider>
       </div>
-      {/* Scoped to the signed-in tree: the landing page has no reason to hold a
-          family graph, and this is the narrowest mount that still covers every
-          reader — FamilyChat included, since it renders inside FamilyTree. */}
-      <WorkingRecordProvider>
-        <FamilyTree />
-      </WorkingRecordProvider>
-    </div>
+    </CanvasModeProvider>
   );
 }

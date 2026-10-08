@@ -31,6 +31,7 @@ Each feature file starts with an H1 and one paragraph of user-visible behaviour,
 
 - [Landing page](./landing.md): the signed-out page, public metrics and the Google sign-in entry.
 - [Tree views](./tree-views.md): family picker, 2D/3D switch, 3D toggles and the INSTRUMENTS panel.
+- [Paper mode](./paper-mode.md): the COSMOS ⇄ PAPER switch, Paper 2D in ink on paper, and the Paper panels.
 - [Tree search](./tree-search.md): finding people by name, stepping through matches, keyboard entry.
 - [Person details](./person-details.md): selecting a person and the details drawer.
 - [Family chat](./family-chat.md): the 🤖 assistant, its answers and the daily message limit.
