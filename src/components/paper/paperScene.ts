@@ -59,6 +59,11 @@ export function isTap(down: ScreenPoint | null, up: ScreenPoint): boolean {
   return Math.hypot(up.x - down.x, up.y - down.y) <= TAP_SLOP_PX;
 }
 
+/** A tap on empty paper, which clears the selection; a tap on a Person or a camera drag does not. */
+export function isBackgroundTap(down: ScreenPoint | null, up: ScreenPoint, onPerson: boolean): boolean {
+  return !onPerson && isTap(down, up);
+}
+
 const LABEL_BASE_SIZE = 3;
 const LABEL_SIZE_PER_RADIUS = 0.3;
 const LABEL_MIN_RADIUS = 4;

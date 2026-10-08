@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { depthFade, isTap, paperFrame, paperLabelSize, paperLineSegments, TAP_SLOP_PX } from './paperScene';
+import { depthFade, isBackgroundTap, isTap, paperFrame, paperLabelSize, paperLineSegments, TAP_SLOP_PX } from './paperScene';
 import type { PaperLayout, PaperLine } from '../../lib/paperLayout';
 
 const layout: PaperLayout = new Map([
@@ -98,5 +98,24 @@ describe('paperLineSegments', () => {
   it('leaves out a line whose Person has no disc', () => {
     const segments = paperLineSegments([line('a', 'missing', 'parent')], layout);
     expect(segments.parent).toEqual([]);
+  });
+});
+
+describe('isBackgroundTap', () => {
+  const down = { x: 200, y: 200 };
+
+  it('clears the selection on a background tap that moves 3 to 6 px', () => {
+    for (const moved of [3, 4, 5, TAP_SLOP_PX]) {
+      expect(isBackgroundTap(down, { x: down.x + moved, y: down.y }, false)).toBe(true);
+    }
+  });
+
+  it('keeps the selection when the pointer moves more than 6 px, a camera drag', () => {
+    expect(isBackgroundTap(down, { x: down.x + TAP_SLOP_PX + 1, y: down.y }, false)).toBe(false);
+    expect(isBackgroundTap(down, { x: down.x + 20, y: down.y + 20 }, false)).toBe(false);
+  });
+
+  it('keeps the selection when the tap lands on a Person', () => {
+    expect(isBackgroundTap(down, { x: down.x + 4, y: down.y }, true)).toBe(false);
   });
 });

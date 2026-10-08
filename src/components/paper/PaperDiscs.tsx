@@ -48,12 +48,19 @@ export function PaperDiscs({ ids, layout, ink, onPersonClick }: PaperDiscsProps)
   );
 
   const camera = useThree((state) => state.camera);
+  const placedFacing = useMemo(() => new THREE.Quaternion(), []);
   useLayoutEffect(() => {
     place(camera.quaternion);
+    placedFacing.copy(camera.quaternion);
     meshRef.current?.computeBoundingSphere();
-  }, [place, camera]);
+  }, [place, camera, placedFacing]);
 
-  useFrame(() => place(camera.quaternion));
+  // Only a turning camera moves the discs; a still one leaves the instance buffer as it is.
+  useFrame(() => {
+    if (placedFacing.equals(camera.quaternion)) return;
+    place(camera.quaternion);
+    placedFacing.copy(camera.quaternion);
+  });
 
   return (
     <instancedMesh

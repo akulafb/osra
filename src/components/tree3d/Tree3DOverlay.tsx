@@ -58,11 +58,18 @@ export interface Tree3DSearch {
   onQueryChange: (q: string) => void;
   matches: FamilyNode[];
   currentIndex: number;
-  onPrev: () => void;
-  onNext: () => void;
+  /** Without these the previous and next match buttons are hidden; the count and highlight stay. */
+  onPrev?: () => void;
+  onNext?: () => void;
   onClose: () => void;
   disabled: boolean;
 }
+
+const noop = () => {};
+
+const HIDE_MATCH_STEPPING = {
+  '& [aria-label="Previous match"], & [aria-label="Next match"]': { display: 'none' },
+};
 
 export interface Tree3DOverlayProps {
   graphData: FamilyGraph;
@@ -73,8 +80,9 @@ export interface Tree3DOverlayProps {
   onModeChange?: (mode: '3D' | '2D') => void;
   isAdmin: boolean;
   onAdminAddPersonClick?: () => void;
-  isAmbienceOn: boolean;
-  onAmbienceChange: (on: boolean) => void;
+  /** Without these the AMBIANCE toggle is hidden. */
+  isAmbienceOn?: boolean;
+  onAmbienceChange?: (on: boolean) => void;
   showNames: boolean;
   onShowNamesChange: (on: boolean) => void;
   showLinks: boolean;
@@ -142,6 +150,21 @@ export function Tree3DOverlay({
     }
   }, [searchOpenRequested]);
 
+  const searchBar = search && (
+    <TreeSearchBar
+      query={search.query}
+      onQueryChange={search.onQueryChange}
+      matches={search.matches}
+      currentIndex={search.currentIndex}
+      onPrev={search.onPrev ?? noop}
+      onNext={search.onNext ?? noop}
+      onClose={search.onClose}
+      disabled={search.disabled}
+      embedded
+      focusTrigger={searchOpenRequested}
+    />
+  );
+
   return (
     <>
       {/* Settings Controls - Top Right */}
@@ -168,7 +191,7 @@ export function Tree3DOverlay({
         </Button>
 
         {/* Ambiance Toggle - Floating slightly below button */}
-        <Box sx={{
+        {onAmbienceChange && <Box sx={{
           background: panel.surface.pill,
           backdropFilter: 'blur(12px)',
           px: 1.5,
@@ -179,7 +202,7 @@ export function Tree3DOverlay({
           <FormControlLabel
             control={
               <Switch
-                checked={isAmbienceOn}
+                checked={!!isAmbienceOn}
                 onChange={() => onAmbienceChange(!isAmbienceOn)}
                 color="success"
                 size="small"
@@ -196,7 +219,7 @@ export function Tree3DOverlay({
               }
             }}
           />
-        </Box>
+        </Box>}
 
         <SettingsPanelSpring isOpen={showControls}>
           <div style={{
@@ -309,18 +332,7 @@ export function Tree3DOverlay({
                 <Typography variant="caption" sx={{ color: panel.role.primary, fontWeight: 700, letterSpacing: '0.1em', mb: 1, display: 'block', fontSize: '0.6rem' }}>
                   SEARCH ARCHIVE
                 </Typography>
-                <TreeSearchBar
-                  query={search.query}
-                  onQueryChange={search.onQueryChange}
-                  matches={search.matches}
-                  currentIndex={search.currentIndex}
-                  onPrev={search.onPrev}
-                  onNext={search.onNext}
-                  onClose={search.onClose}
-                  disabled={search.disabled}
-                  embedded
-                  focusTrigger={searchOpenRequested}
-                />
+                {search.onPrev && search.onNext ? searchBar : <Box sx={HIDE_MATCH_STEPPING}>{searchBar}</Box>}
               </Box>
             )}
 

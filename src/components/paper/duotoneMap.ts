@@ -2,7 +2,7 @@ import { hexToRgb } from '../../lib/colourBlend';
 
 export type LinearRgb = readonly [number, number, number];
 
-export interface Duotone {
+export interface LinearPair {
   ink: LinearRgb;
   paper: LinearRgb;
 }
@@ -22,7 +22,7 @@ export function luma([r, g, b]: LinearRgb): number {
 }
 
 /** Where a colour sits between the scene's ink and paper, painted at the same place between the pair's ink and paper. */
-export function duotone(colour: LinearRgb, scene: Duotone, pair: Duotone): LinearRgb {
+export function duotone(colour: LinearRgb, scene: LinearPair, pair: LinearPair): LinearRgb {
   const inkLuma = luma(scene.ink);
   const t = Math.min(1, Math.max(0, (luma(colour) - inkLuma) / (luma(scene.paper) - inkLuma)));
   const at = (i: number) => pair.ink[i] + (pair.paper[i] - pair.ink[i]) * t;

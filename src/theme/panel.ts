@@ -1,3 +1,4 @@
+import { lighten } from '@mui/material/styles';
 import { livePair } from './paperPair';
 
 export interface PanelTokens {
@@ -168,9 +169,9 @@ export const cosmosPanel: PanelTokens = {
   role: {
     primary: '#D4AF37',
     secondary: '#7c3aed',
-    secondaryLight: 'rgb(150, 97, 240)',
+    secondaryLight: lighten('#7c3aed', 0.2),
     success: '#10b981',
-    successLight: 'rgb(63, 199, 154)',
+    successLight: lighten('#10b981', 0.2),
     error: '#ef4444',
     text: '#ede9fe',
     textSecondary: '#a78bfa',

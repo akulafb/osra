@@ -2,35 +2,50 @@ import { useEffect, useState } from 'react';
 import { layoutPaperTree, type PaperLayout } from '../lib/paperLayout';
 import type { FamilyGraph } from '../types/graph';
 
+export type PaperLayoutState =
+  | { status: 'waiting' }
+  | { status: 'ready'; layout: PaperLayout }
+  | { status: 'failed' };
+
 /**
- * The Paper layout to use next: the one already made, else a new one once
- * Paper 3D needs it. Made once per load, so edits and mode switches never move
- * anyone (ADR 0014).
+ * Whether to make the Paper layout now: only once, when Paper 3D first needs
+ * it, so edits and mode switches never move anyone (ADR 0014).
  */
-export function resolvePaperLayout(
-  current: PaperLayout | null,
+export function needsPaperLayout(
+  state: PaperLayoutState,
   graph: FamilyGraph | null,
   needed: boolean
-): PaperLayout | null {
-  if (current || !needed || !graph) return current;
-  return layoutPaperTree(graph);
+): graph is FamilyGraph {
+  return state.status === 'waiting' && needed && !!graph;
+}
+
+export function makePaperLayout(
+  graph: FamilyGraph,
+  layOut: (graph: FamilyGraph) => PaperLayout = layoutPaperTree
+): PaperLayoutState {
+  try {
+    return { status: 'ready', layout: layOut(graph) };
+  } catch (error) {
+    console.error('[usePaperLayout] Paper layout failed:', error);
+    return { status: 'failed' };
+  }
 }
 
 /** Made after the loaded gate has painted. */
-export function usePaperLayout(graph: FamilyGraph | null, needed: boolean): PaperLayout | null {
-  const [layout, setLayout] = useState<PaperLayout | null>(null);
+export function usePaperLayout(graph: FamilyGraph | null, needed: boolean): PaperLayoutState {
+  const [state, setState] = useState<PaperLayoutState>({ status: 'waiting' });
 
   useEffect(() => {
-    if (layout || !needed || !graph) return;
+    if (!needsPaperLayout(state, graph, needed)) return;
     let timeout = 0;
     const frame = requestAnimationFrame(() => {
-      timeout = window.setTimeout(() => setLayout(resolvePaperLayout(null, graph, true)));
+      timeout = window.setTimeout(() => setState(makePaperLayout(graph)));
     });
     return () => {
       cancelAnimationFrame(frame);
       clearTimeout(timeout);
     };
-  }, [layout, graph, needed]);
+  }, [state, graph, needed]);
 
-  return layout;
+  return state;
 }

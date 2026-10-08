@@ -34,6 +34,11 @@ Paper does not restyle Cosmos. Its Persons sit still in a seeded layout (`src/li
   - `vite.config.ts` (the `vendor-three` chunk);
   - the bundled label font;
   - `features/paper-mode.md` and `features/tree-views.md`.
+- **LIN-93, passes 3 and 4 (duotone, live pair, review fixes).**
+  - `src/components/paper/*`: the duotone pass and its pure colour map;
+  - `src/theme/panel.ts`: the live pair tokens the panels below read;
+  - `TreeSearchBar.tsx` (the counter), `FamilyTree2D.tsx` (the empty state), `PersonDetailDrawer.tsx` (the hover states, and Connect Nodes offered only when a handler is passed) and `ConnectPickerCard.tsx` (the selected choice in the pair's accent);
+  - `Tree3DOverlay.tsx`: optional AMBIANCE and previous/next match props. Paper 3D passes neither, so it hides AMBIANCE (LIN-94 brings it back with the tap sound) and the match stepping (LIN-97), lists only Esc under NAV CONTROLS (LIN-96 adds WASD, Q/E and R) and offers no Connect Nodes (LIN-96).
 - **LIN-94.**
   - `src/components/paper/*`: hover, focus, fly-to, screen-space hit testing, ring, particles, ripple, wobble;
   - a new tap-sound module generated with Web Audio (product decision 8);

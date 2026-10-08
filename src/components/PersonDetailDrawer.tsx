@@ -36,7 +36,8 @@ interface PersonDetailDrawerProps {
   onEdit: () => void;
   onAdd: () => void;
   onInvite: () => void;
-  onConnect: () => void;
+  /** Without it Connect Nodes is not offered; Paper 3D has no connect picker yet (LIN-96). */
+  onConnect?: () => void;
   onManageLinks: () => void;
   onDelete: () => void;
 }
@@ -202,14 +203,16 @@ export const PersonDetailDrawer: React.FC<PersonDetailDrawerProps> = ({
                 Administrative Tools
               </Typography>
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-                <Button 
-                  variant="text" 
-                  fullWidth
-                  onClick={onConnect}
-                  sx={{ justifyContent: 'flex-start', color: panel.role.textSecondary }}
-                >
-                  Connect Nodes...
-                </Button>
+                {onConnect && (
+                  <Button 
+                    variant="text" 
+                    fullWidth
+                    onClick={onConnect}
+                    sx={{ justifyContent: 'flex-start', color: panel.role.textSecondary }}
+                  >
+                    Connect Nodes...
+                  </Button>
+                )}
                 <Button 
                   variant="text" 
                   fullWidth

@@ -1,8 +1,15 @@
+let hasWebGL: boolean | undefined;
+
+/** Probes once per page and gives the probe's context back, so mode switches never pile up WebGL contexts. */
 export function browserHasWebGL(): boolean {
+  if (hasWebGL !== undefined) return hasWebGL;
   try {
     const canvas = document.createElement('canvas');
-    return !!(canvas.getContext('webgl2') || canvas.getContext('webgl'));
+    const gl = canvas.getContext('webgl2') ?? canvas.getContext('webgl');
+    gl?.getExtension('WEBGL_lose_context')?.loseContext();
+    hasWebGL = !!gl;
   } catch {
-    return false;
+    hasWebGL = false;
   }
+  return hasWebGL;
 }

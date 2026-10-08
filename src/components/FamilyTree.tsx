@@ -667,7 +667,7 @@ export const FamilyTree: React.FC = () => {
         onEdit={() => setIsEditModalOpen(true)}
         onAdd={() => setIsAddModalOpen(true)}
         onInvite={() => setIsBulkInviteOpen(true)}
-        onConnect={() => selectedNode && interaction.startConnect(selectedNode.id)}
+        onConnect={isPaper3D ? undefined : () => selectedNode && interaction.startConnect(selectedNode.id)}
         onManageLinks={() => setAdminManageLinksOpen(true)}
         onDelete={handleAdminDeleteSelectedNode}
       />
@@ -759,8 +759,6 @@ export const FamilyTree: React.FC = () => {
             onSearchQueryChange={setSearchQuery}
             searchMatches={searchMatches}
             searchIndex={searchIndex}
-            onSearchPrev={handleSearchPrev}
-            onSearchNext={handleSearchNext}
             onSearchClose={handleSearchClose}
             searchOpenRequested={searchOpenRequested}
             searchDisabled={false}

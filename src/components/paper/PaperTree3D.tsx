@@ -4,11 +4,12 @@ import { CameraControls } from '@react-three/drei';
 import * as THREE from 'three';
 import { useTheme } from '@mui/material/styles';
 import type { FamilyGraph, FamilyNode } from '../../types/graph';
-import { paperLines, type PaperLayout } from '../../lib/paperLayout';
+import { paperLines } from '../../lib/paperLayout';
 import { filterGraphDataFor3D } from '../../lib/filterGraphData';
 import { GRAYSCALE_PAIR, LIVE_PAIR } from '../../theme/paperPair';
 import type { DirectManipulationController } from '../../hooks/useDirectManipulation';
 import type { PersonDrawerInset } from '../../hooks/usePersonDrawerInset';
+import type { PaperLayoutState } from '../../hooks/usePaperLayout';
 import { candidacyFor } from '../cards/connectCandidates';
 import { Tree3DOverlay, type Tree3DSceneCamera, type Tree3DSearch } from '../tree3d/Tree3DOverlay';
 import { useIsMobileDevice } from '../tree3d/useIsMobileDevice';
@@ -18,11 +19,11 @@ import { PaperLabels } from './PaperLabels';
 import { PaperDuotone } from './PaperDuotone';
 import { PaperWebGLBoundary, PaperWebGLFallback } from './PaperWebGLFallback';
 import { browserHasWebGL } from './browserHasWebGL';
-import { isTap, paperFrame, type ScreenPoint } from './paperScene';
+import { isBackgroundTap, isTap, paperFrame, type ScreenPoint } from './paperScene';
 
 export interface PaperTree3DProps {
   graphData: FamilyGraph;
-  layout: PaperLayout | null;
+  layout: PaperLayoutState;
   interaction: DirectManipulationController;
   collapsedNodes: Set<string>;
   onSetCollapsedNodes: (nodes: Set<string>) => void;
@@ -35,8 +36,6 @@ export interface PaperTree3DProps {
   onSearchQueryChange: (q: string) => void;
   searchMatches: FamilyNode[];
   searchIndex: number;
-  onSearchPrev: () => void;
-  onSearchNext: () => void;
   onSearchClose: () => void;
   searchOpenRequested: number;
   searchDisabled: boolean;
@@ -62,7 +61,7 @@ const MIN_FOCUS_DISTANCE = 60;
 /** Paper's own 3D scene (ADR 0014): the still layout as ink discs, lines and labels, drawn in grayscale and painted in the live Paper Pair. */
 export function PaperTree3D({
   graphData,
-  layout,
+  layout: layoutState,
   interaction,
   collapsedNodes,
   onSetCollapsedNodes,
@@ -75,8 +74,6 @@ export function PaperTree3D({
   onSearchQueryChange,
   searchMatches,
   searchIndex,
-  onSearchPrev,
-  onSearchNext,
   onSearchClose,
   searchOpenRequested,
   searchDisabled,
@@ -94,14 +91,15 @@ export function PaperTree3D({
   const [hasWebGL] = useState(browserHasWebGL);
   const [firstFrameDrawn, setFirstFrameDrawn] = useState(false);
   const [sceneFailed, setSceneFailed] = useState(false);
-  const [isAmbienceOn, setIsAmbienceOn] = useState(false);
   const [showNames, setShowNames] = useState(true);
   const [showLinks, setShowLinks] = useState(true);
   const [showArrows, setShowArrows] = useState(false);
 
   const controlsRef = useRef<CameraControls | null>(null);
   const pointerDown = useRef<ScreenPoint | null>(null);
+  const personClick = useRef<MouseEvent | null>(null);
   const viewDistance = useRef(0);
+  const layout = layoutState.status === 'ready' ? layoutState.layout : null;
 
   const shown = useMemo(() => {
     if (!layout) return { nodes: [], lines: [] };
@@ -155,6 +153,7 @@ export function PaperTree3D({
 
   const handlePersonClick = useCallback(
     (id: string, event: ThreeEvent<MouseEvent>) => {
+      personClick.current = event.nativeEvent;
       if (!isTap(pointerDown.current, { x: event.nativeEvent.clientX, y: event.nativeEvent.clientY })) return;
       const sourceId = interaction.connectSourceId;
       if (sourceId) {
@@ -166,14 +165,18 @@ export function PaperTree3D({
     [interaction, graphData]
   );
 
-  const handlePointerMissed = useCallback(
-    (event: MouseEvent) => {
-      if (event.type !== 'click') return;
-      if (!isTap(pointerDown.current, { x: event.clientX, y: event.clientY })) return;
+  // R3F reports a missed click only within 2 px, so the scene decides background taps itself, after R3F has handled the disc clicks.
+  const handleSceneClick = useCallback(
+    (event: React.MouseEvent) => {
+      if (!(event.target instanceof HTMLCanvasElement)) return;
+      const onPerson = personClick.current === event.nativeEvent;
+      if (!isBackgroundTap(pointerDown.current, { x: event.clientX, y: event.clientY }, onPerson)) return;
       interaction.handleBackgroundClick();
     },
     [interaction]
   );
+
+  const handleSceneFailed = useCallback(() => setSceneFailed(true), []);
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -195,22 +198,18 @@ export function PaperTree3D({
     onQueryChange: onSearchQueryChange,
     matches: searchMatches,
     currentIndex: searchIndex,
-    onPrev: onSearchPrev,
-    onNext: onSearchNext,
     onClose: onSearchClose,
     disabled: searchDisabled,
   };
 
   const navKeys = (
     <div style={{ lineHeight: '1.6' }}>
-      <div><span style={{ color: panel.ink.strong, fontWeight: 600 }}>WASD</span>: Move</div>
-      <div><span style={{ color: panel.ink.strong, fontWeight: 600 }}>Q / E</span>: Rotate L / R</div>
-      <div><span style={{ color: panel.ink.strong, fontWeight: 600 }}>R</span>: Reset view</div>
       <div><span style={{ color: panel.ink.strong, fontWeight: 600 }}>Esc</span>: Deselect</div>
     </div>
   );
 
-  const loaded = !hasWebGL || sceneFailed || (!!frame && firstFrameDrawn);
+  const failed = !hasWebGL || sceneFailed || layoutState.status === 'failed';
+  const loaded = failed || (!!frame && firstFrameDrawn);
   const fallback = <PaperWebGLFallback paper={LIVE_PAIR.paper} ink={LIVE_PAIR.ink} />;
 
   return (
@@ -219,6 +218,7 @@ export function PaperTree3D({
       onPointerDownCapture={(e) => {
         pointerDown.current = { x: e.clientX, y: e.clientY };
       }}
+      onClick={handleSceneClick}
     >
       {!loaded && (
         <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: panel.loader.scrim, zIndex: 1000, color: panel.ink.strong, fontSize: '18px', pointerEvents: 'none' }}>
@@ -229,17 +229,17 @@ export function PaperTree3D({
         </div>
       )}
 
-      {hasWebGL ? (
-        <PaperWebGLBoundary fallback={fallback} onError={() => setSceneFailed(true)}>
+      {!failed ? (
+        <PaperWebGLBoundary fallback={fallback} onError={handleSceneFailed}>
           <Canvas
             camera={{ fov: 50, near: 1, far: 100000, position: [0, 0, 400] }}
             dpr={[1, 2]}
-            gl={{ antialias: true }}
-            onPointerMissed={handlePointerMissed}
+            gl={{ antialias: false }}
           >
             <color attach="background" args={[PAPER]} />
             <fog attach="fog" args={[PAPER, 1, 100000]} />
             <CameraControls ref={controlsRef} makeDefault />
+            <ContextLossWatch onLost={handleSceneFailed} />
             {layout && frame && (
               <>
                 <PaperView viewDistance={viewDistance} />
@@ -268,8 +268,6 @@ export function PaperTree3D({
         onModeChange={onModeChange}
         isAdmin={isAdmin}
         onAdminAddPersonClick={onAdminAddPersonClick}
-        isAmbienceOn={isAmbienceOn}
-        onAmbienceChange={setIsAmbienceOn}
         showNames={showNames}
         onShowNamesChange={setShowNames}
         showLinks={showLinks}
@@ -321,10 +319,22 @@ function InitialFraming({ fit }: { fit: (smooth: boolean) => void }) {
 /** The loaded gate's second half: the first frame with the layout in it has been drawn. */
 function FirstFrame({ onDrawn }: { onDrawn: () => void }) {
   const done = useRef(false);
+  const pending = useRef(0);
   useFrame(() => {
     if (done.current) return;
     done.current = true;
-    requestAnimationFrame(onDrawn);
+    pending.current = requestAnimationFrame(onDrawn);
   });
+  useEffect(() => () => cancelAnimationFrame(pending.current), []);
+  return null;
+}
+
+/** A lost WebGL context leaves a blank canvas, so it fails the scene like a render error does. */
+function ContextLossWatch({ onLost }: { onLost: () => void }) {
+  const canvas = useThree((state) => state.gl.domElement);
+  useEffect(() => {
+    canvas.addEventListener('webglcontextlost', onLost);
+    return () => canvas.removeEventListener('webglcontextlost', onLost);
+  }, [canvas, onLost]);
   return null;
 }
