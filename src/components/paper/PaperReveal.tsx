@@ -6,12 +6,8 @@ import type { Point3 } from '../../lib/paperHover';
 import { paperFlySmoothTime } from '../../lib/paperFocus';
 import { paperRevealProgress, paperRevealShares, PAPER_REVEAL_SECONDS } from '../../lib/paperIntro';
 import type { PaperEmphasisState } from './paperEmphasis';
-import type { PaperFrame } from './paperScene';
+import { PAPER_REVEAL_FRAME_PRIORITY, type PaperFrame } from './paperScene';
 
-/** After the hover has set the drift, before anything draws from it. */
-const REVEAL_FRAME_PRIORITY = -0.5;
-
-/** Where the camera swings in from: turned aside, tipped up and further back than where it lands. */
 const SWING_AZIMUTH = 0.9;
 const SWING_POLAR = 0.35;
 const SWING_BACK = 1.6;
@@ -34,7 +30,7 @@ export function PaperReveal({ frame, layout, ids, state, onDone }: PaperRevealPr
   const shares = useMemo(() => paperRevealShares(layout, ids, frame.center), [layout, ids, frame.center]);
   const startedAt = useRef<number | null>(null);
   const done = useRef(false);
-  const landing = useRef<number | null>(null);
+  const landing = useRef<{ distance: number; azimuth: number; polar: number } | null>(null);
   const finish = useRef(onDone);
   finish.current = onDone;
 
@@ -42,11 +38,15 @@ export function PaperReveal({ frame, layout, ids, state, onDone }: PaperRevealPr
     if (!controls) return;
     const smoothTime = controls.smoothTime;
     // Kept across StrictMode's second run, which would otherwise land where the first one started.
-    const distance = (landing.current ??= controls.distance);
+    const { distance, azimuth, polar } = (landing.current ??= {
+      distance: controls.distance,
+      azimuth: controls.azimuthAngle,
+      polar: controls.polarAngle,
+    });
     controls.smoothTime = paperFlySmoothTime(PAPER_REVEAL_SECONDS);
-    void controls.rotate(-SWING_AZIMUTH, -SWING_POLAR, false);
+    void controls.rotateTo(azimuth - SWING_AZIMUTH, polar - SWING_POLAR, false);
     void controls.dollyTo(distance * SWING_BACK, false);
-    void controls.rotate(SWING_AZIMUTH, SWING_POLAR, true);
+    void controls.rotateTo(azimuth, polar, true);
     void controls.dollyTo(distance, true);
     return () => {
       controls.smoothTime = smoothTime;
@@ -79,7 +79,7 @@ export function PaperReveal({ frame, layout, ids, state, onDone }: PaperRevealPr
       });
     }
     state.current = { ...state.current, drift, reveal };
-  }, REVEAL_FRAME_PRIORITY);
+  }, PAPER_REVEAL_FRAME_PRIORITY);
 
   return null;
 }

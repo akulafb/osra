@@ -46,7 +46,6 @@ export interface PaperTree3DProps {
   isAddModalOpen?: boolean;
   isEditModalOpen?: boolean;
   isBulkInviteOpen?: boolean;
-  /** Any modal is open over the scene. */
   isModalOpen?: boolean;
   searchQuery: string;
   onSearchQueryChange: (q: string) => void;
@@ -74,10 +73,6 @@ const FOG_FAR = 2.6;
 const FLY_SMOOTH_TIME = paperFlySmoothTime(PAPER_FLY_SECONDS);
 const CROSSFADE_MS = 500;
 
-/**
- * How the scene arrives. The page's opening Paper scene keeps the loader up
- * until it is drawn, then reveals; any later one cross-fades from paper.
- */
 type PaperArrival = 'loader' | 'revealing' | 'crossfade' | 'settled';
 
 /** Paper's own 3D scene (ADR 0014): the still layout as ink discs, lines and labels, drawn in grayscale and painted in the live Paper Pair. */
@@ -243,7 +238,6 @@ export function PaperTree3D({
   const failed = !hasWebGL || sceneFailed || layoutState.status === 'failed';
   const loaded = failed || (!!frame && firstFrameDrawn);
   const fallback = <PaperWebGLFallback paper={LIVE_PAIR.paper} ink={LIVE_PAIR.ink} />;
-  if (failed && arrival === 'revealing') setArrival('settled');
 
   return (
     <div
@@ -260,7 +254,7 @@ export function PaperTree3D({
       {(arrival === 'loader' || arrival === 'revealing') && (
         <PaperLoader stage={loaded ? 'done' : frame ? 'scene' : 'layout'} leaving={loaded} onLeave={handleLoaderLeave} />
       )}
-      {arrival === 'crossfade' && (
+      {arrival === 'crossfade' && !failed && (
         <div
           onTransitionEnd={handleArrived}
           style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: LIVE_PAIR.paper, zIndex: 1000, color: panel.ink.strong, fontSize: '18px', pointerEvents: 'none', opacity: loaded ? 0 : 1, transition: `opacity ${CROSSFADE_MS}ms ease-out` }}
@@ -295,7 +289,7 @@ export function PaperTree3D({
             {layout && frame && (
               <>
                 <PaperView viewDistance={viewDistance} />
-                <PaperCameraRig frame={frame} state={emphasisState} paused={isModalOpen} />
+                <PaperCameraRig frame={frame} state={emphasisState} modalOpen={isModalOpen} />
                 <InitialFraming fit={fitFrame} />
                 <PaperFocus
                   selectedId={interaction.selectedNodeId}

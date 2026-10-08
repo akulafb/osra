@@ -43,7 +43,6 @@ export function inkOf(state: PaperEmphasisState, id: string): number {
   return PAPER_3D_INK[state.emphasis.get(id) ?? 'normal'];
 }
 
-/** How far a Person has grown in: whole outside the intro reveal. */
 export function revealOf(state: PaperEmphasisState, id: string): number {
   return state.reveal?.get(id) ?? 1;
 }

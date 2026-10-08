@@ -14,12 +14,11 @@ const MAX_FRAME_SECONDS = 0.1;
 interface PaperCameraRigProps {
   frame: PaperFrame;
   state: MutableRefObject<PaperEmphasisState>;
-  /** A modal covers the scene: the view holds still behind it. */
-  paused: boolean;
+  modalOpen: boolean;
 }
 
 /** Keeps the camera within its zoom limits and box, and turns the view slowly once it sits idle with nobody focused, outside the intro and behind no modal. */
-export function PaperCameraRig({ frame, state, paused }: PaperCameraRigProps) {
+export function PaperCameraRig({ frame, state, modalOpen }: PaperCameraRigProps) {
   const controls = useThree((three) => three.controls) as CameraControls | null;
   const camera = useThree((three) => three.camera);
   const size = useThree((three) => three.size);
@@ -45,10 +44,10 @@ export function PaperCameraRig({ frame, state, paused }: PaperCameraRigProps) {
   }, []);
 
   useFrame((_, delta) => {
-    if (!controls || paused || state.current.reveal) return;
+    if (!controls || modalOpen || state.current.reveal) return;
     const idleSeconds = (performance.now() - lastInput.current) / 1000;
     if (!paperIdleRotates(idleSeconds, state.current.focus !== null)) return;
-    controls.azimuthAngle += paperIdleRotateSpeed(size.width) * Math.min(delta, MAX_FRAME_SECONDS);
+    void controls.rotate(paperIdleRotateSpeed(size.width) * Math.min(delta, MAX_FRAME_SECONDS), 0, true);
   });
 
   return null;

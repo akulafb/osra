@@ -14,9 +14,8 @@ import {
   type ScreenDisc,
 } from '../../lib/paperHover';
 import { placeOf, type PaperEmphasisState, type PaperFocus } from './paperEmphasis';
-import type { ScreenPoint } from './paperScene';
+import { PAPER_HOVER_FRAME_PRIORITY, type ScreenPoint } from './paperScene';
 
-const HOVER_FRAME_PRIORITY = -1;
 const LONGEST_FRAME_SECONDS = 0.1;
 
 interface PaperHoverProps {
@@ -80,7 +79,7 @@ export function PaperHover({ state, pointer, layout, ids, links, selectedId }: P
     const drift = focus ? withWobble(lean.current, paperWobble(layout, emphasis, clock.elapsedTime - focus.since)) : lean.current;
     wrote.current = drift;
     if (drift !== state.current.drift) state.current = { ...state.current, drift };
-  }, HOVER_FRAME_PRIORITY);
+  }, PAPER_HOVER_FRAME_PRIORITY);
 
   return null;
 }

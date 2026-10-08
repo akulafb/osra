@@ -23,6 +23,9 @@ export const TAP_SLOP_PX = 6;
 /** Lines draw before the discs and write no depth, so every disc covers the lines that cross it. */
 export const PAPER_LINE_RENDER_ORDER = -2;
 
+export const PAPER_HOVER_FRAME_PRIORITY = -1;
+export const PAPER_REVEAL_FRAME_PRIORITY = PAPER_HOVER_FRAME_PRIORITY + 0.5;
+
 const EMPTY_FRAME_RADIUS = 50;
 
 export function paperFrame(layout: PaperLayout, ids: Iterable<string>): PaperFrame {

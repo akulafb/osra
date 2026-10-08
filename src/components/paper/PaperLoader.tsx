@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef } from 'react';
 import { GRAYSCALE_PAIR } from '../../theme/paperPair';
-import { paperTitleStartedAt } from './paperIntroSession';
+import { paperTitleStartedAt, swapPaperLoaderShare } from './paperIntroSession';
 
 export type PaperLoaderStage = 'record' | 'layout' | 'scene' | 'done';
 
@@ -19,13 +19,10 @@ const WORD_STAGGER_MS = 120;
 const FALL_MS = 500;
 const BAR_MS = 600;
 const BAR_WIDTH_PX = 208;
-/** Above every control on the page, the chat button included, until it fades. */
+/** One above FamilyChat's button, the highest control on the page. */
 const LOADER_Z_INDEX = 10001;
 
 const { paper, ink } = GRAYSCALE_PAIR;
-
-/** The bar's share is kept across the loading screen and the scene, so it carries on rather than starting over. */
-let shownShare = 0;
 
 interface PaperLoaderProps {
   stage: PaperLoaderStage;
@@ -63,8 +60,7 @@ export function PaperLoader({ stage, leaving = false, onLeave }: PaperLoaderProp
 
   const share = STAGE_SHARE[stage];
   useLayoutEffect(() => {
-    const from = shownShare;
-    shownShare = share;
+    const from = swapPaperLoaderShare(share);
     const fill = bar.current?.animate([{ transform: `scaleX(${from})` }, { transform: `scaleX(${share})` }], {
       duration: BAR_MS,
       easing: EASE_OUT,

@@ -14,7 +14,6 @@ const LABEL_FADE_END = 1.8;
 const LABEL_GAP = 1.5;
 const OUTLINE_PER_WEIGHT = 0.07;
 const HIDDEN_BELOW = 0.02;
-/** Labels come in late in the reveal, once their Person is nearly in place. */
 const LABEL_REVEAL_POWER = 3;
 
 interface TroikaText extends THREE.Mesh {

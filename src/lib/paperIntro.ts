@@ -1,10 +1,8 @@
 import type { PaperLayout } from './paperLayout';
 import type { Point3 } from './paperHover';
 
-/** How long the Persons take to reveal outward from the centre, the farthest finishing last. */
 export const PAPER_REVEAL_SECONDS = 1.8;
 
-/** How long one Person takes to grow from the centre to their place. */
 const PERSON_REVEAL_SECONDS = 0.9;
 
 /** Each Person's share of the way out from `center`: 0 at the centre, 1 for the farthest. */

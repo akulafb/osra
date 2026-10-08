@@ -5,18 +5,24 @@
  */
 let titleStartedAt: number | null = null;
 let played = false;
+let loaderShare = 0;
 
-/** When the title began rising, starting it now if nothing has. */
 export function paperTitleStartedAt(now: number): number {
   titleStartedAt ??= now;
   return titleStartedAt;
 }
 
-/** Whether a Paper scene mounting now carries the page's opening intro. */
 export function paperIntroPending(): boolean {
   return titleStartedAt !== null && !played;
 }
 
 export function markPaperIntroPlayed(): void {
   played = true;
+}
+
+/** Swaps in the loader bar's new share and returns the one it showed, so a remounted loader carries on. */
+export function swapPaperLoaderShare(share: number): number {
+  const shown = loaderShare;
+  loaderShare = share;
+  return shown;
 }

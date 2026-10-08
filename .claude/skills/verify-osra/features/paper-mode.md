@@ -1,6 +1,6 @@
 # Paper mode
 
-Paper is the default Canvas Mode: everyone lands on it unless they switched to Cosmos in this browser. In 2D it draws flat ink cards and ink lines on grayscale paper. Hovering a Person rings them and dims everyone but their direct relatives. Selecting a Person ghosts everyone but their relatives. A search dims the non-matches. FIND ME and the current search match get accent rings. INSTRUMENTS, the drawer, the chat, the cards, the banners and the modals take the same paper and ink. In 3D, Paper draws its own scene of ink discs, lines and labels in a still layout (see [Paper 3D scene](#paper-3d-scene-lin-93)); the camera glides, turns slowly when idle and zooms toward the cursor (see [Paper 3D camera and effects](#paper-3d-camera-and-effects-lin-95-pass-95a)).
+Paper is the default Canvas Mode: everyone lands on it unless they switched to Cosmos in this browser. In 2D it draws flat ink cards and ink lines on grayscale paper. Hovering a Person rings them and dims everyone but their direct relatives. Selecting a Person ghosts everyone but their relatives. A search dims the non-matches. FIND ME and the current search match get accent rings. INSTRUMENTS, the drawer, the chat, the cards, the banners and the modals take the same paper and ink. In 3D, Paper draws its own scene of ink discs, lines and labels in a still layout (see [Paper 3D scene](#paper-3d-scene-lin-93)); the camera glides, turns slowly when idle and zooms toward the cursor (see [Paper 3D camera and effects](#paper-3d-camera-and-effects-lin-95-pass-95a)). The page's first Paper 3D load opens with a titled loader and a reveal, and a one-time controls hint (see [intro](#paper-3d-intro-and-hint-lin-95-pass-95b)).
 
 ## Sub-features
 
@@ -74,7 +74,7 @@ Preconditions:
 
 ### Driving it with ui.sh
 
-- Record the view-mode and canvas-mode keys. In Paper, open INSTRUMENTS and click `3D`. Wait until `document.body.innerText.includes('Loading Osra')` is false.
+- Record the view-mode and canvas-mode keys. In Paper, open INSTRUMENTS and click `3D`. Wait until `document.body.innerText.includes('Loading Osra')` is false. After a reload into Paper 3D the loader is the titled one instead (see [intro](#paper-3d-intro-and-hint-lin-95-pass-95b)): wait until `document.querySelector('[role=status][aria-label=Loading]')` is gone.
 - **Overview.** `capture.sh` once the loader is gone. The grain and the idle turn mean no two captures match. Expect ink discs, Arabic and Latin labels, and the three line styles.
 - **Click.** Nodes have no accessibility handles: pick an isolated disc from the screenshot (PNG pixels ÷ 2 at the 879 px tab) and run `$S/ui.sh "$RUN_DIR" tap <x> <y>`. The drawer heading is the Person's name (`.MuiDrawer-paper h4`). Below 1024 px wide (the Orca tab) it is the phone bottom sheet.
 - **Escape.** Probe first with `window.addEventListener('keydown', …)`, then `$S/ui.sh "$RUN_DIR" key Escape`; `.MuiDrawer-paper h4` disappears.
@@ -186,3 +186,28 @@ Preconditions:
 - Under a 1280 px override the Orca pane still paints only its own width (about 935 px). The rest of the screenshot repeats the left edge, so judge the effects inside the left 935 px.
 - Drag momentum and the feel of the idle turn need a visible tab at full frame rate. An unfocused Orca tab runs a few frames a second, so report motion feel unverified (STANDING 14).
 - Never run an eval that awaits `requestAnimationFrame` in a throttled tab: it can hang Orca's connection. Start a counter in one eval and read it in a later one.
+
+## Paper 3D intro and hint (LIN-95 pass 95b)
+
+### Sub-features
+
+- `paper-3d-loader`: a page that opens on Paper 3D shows grey paper (`236 236 234`, even with colour on) with "OSRA" over "FAMILY TREE" in a heavy sans, each word rising 0.8 s `cubic-bezier(.16,1,.3,1)` 0.12 s after the one before, over a thin ink bar that fills as the record, the layout and the first frame arrive. It covers every control, the chat button included (z-index 10001), and is `role=status` `aria-label=Loading`. The loading screen and the scene share one loader, so the words and the bar carry on rather than start over when the scene mounts.
+- `paper-3d-reveal`: once the scene is drawn and the title has risen, the words fall 0.5 s and the loader fades into the scene. The Persons grow outward from the tree's centre, nearest first, with their lines; labels come in last. Meanwhile the camera swings in from turned aside, tipped up and 1.6× further back to the overview. Both end within 1.8 s; the idle turn waits for the reveal.
+- `paper-3d-crossfade`: any other arrival (COSMOS → PAPER, 2D → 3D, a page that opened elsewhere) has no title and no reveal: a paper cover with the old "Loading Osra..." spinner fades out over 0.5 s once the scene is drawn.
+- `paper-3d-hint`: after the arrival settles, a pill at the bottom centre reads "Drag to rotate · Pinch to zoom" when `matchMedia('(pointer: coarse)')` matches, "Drag to rotate · Scroll to zoom" otherwise. It fades in, holds and fades out over about 4 s and writes `family-tree-paper-hint-seen` as it appears; while that key exists it never shows again. Storage that cannot be read counts as seen.
+- `paper-3d-idle-modal`: the idle turn holds while any modal is open (Add Relative, Edit Registry, Bulk Invite, New Members, Manage Links, Add Person).
+
+### Driving it with ui.sh
+
+- Record `family-tree-paper-hint-seen` with the other keys and restore it (remove it when it was `null`).
+- **Loader and reveal.** Set the view-mode key to 3D, `orca reload`, then take screenshots back to back (each takes about 1.3 s). To see the reveal frame by frame, slow the scene clock right after the reload with `orca eval` (`performance.now = () => t0 + (real() - t0) / 8`); the loader's and the hint's Web Animations keep real time. Say so in the report.
+- **Hint.** Remove the key, reload, and sample `document.body.innerText.includes('Drag to rotate')` every 200 ms from an `orca eval` interval: true for about 4 s, and the key reads `1` from its first sample. Reload again: never true.
+- **Cross-fade.** Open INSTRUMENTS, click `COSMOS`, then `PAPER`, while an interval samples `[role=status][aria-label=Loading]` (never present) and the opacity of the div whose inline `transition` names `opacity` (1 down to 0).
+- **Phone.** `orca reload`, then at once `orca exec --command "set viewport 390 844 2"` (a reload clears it) and take screenshots: the title wraps the same, the hint sits beside the chat button.
+- **Proof.** Capture `paper-intro load-*`, `slow-*`, `hint-*`, `reload-noh-*`, `switch-paper2-*` and `phone-*`.
+
+### Gotchas
+
+- A throttled tab (Orca not in front) runs about 1 frame a second, so the reveal and swing need screenshots to pump frames or the slowed clock above; report the feel as unverified unless the tab is visible.
+- A tab can stall at 0 frames: close it and open a fresh one with `open-tab.sh` (delete `state/page` first).
+- Viewport emulation has no touch, so the live hint reads "Scroll to zoom" even at phone size; the pinch copy is covered by `src/lib/paperIntro.test.ts`.
