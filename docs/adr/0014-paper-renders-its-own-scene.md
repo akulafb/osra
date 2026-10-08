@@ -26,7 +26,7 @@ Paper does not restyle Cosmos. Its Persons sit still in a seeded layout (`src/li
 `src/components/paper/` holds the Paper scene, one component per concern: discs, lines, labels, duotone, camera rig, effects.
 
 - **LIN-93, pass 1 (landed).** `src/lib/paperLayout.ts` (`layoutPaperTree`, `placeNewcomer`, `paperLines`, `kinshipLinkCounts`, `paperDiscRadius`) with its tests, `src/lib/seededRandom.ts`, this ADR, and the `@react-three/postprocessing` v2 dependency.
-- **LIN-93, pass 2.** First, as its own commit, the extraction: the new `src/components/tree3d/Tree3DOverlay.tsx` and `FamilyTree3D.tsx`. Then the scene:
+- **LIN-93, pass 2.** First, as its own commit, the extraction: the new `src/components/tree3d/Tree3DOverlay.tsx`, the new `src/components/tree3d/useIsMobileDevice.ts` (the resize-tracked `isMobile()` both scenes use) and `FamilyTree3D.tsx`. Then the scene:
   - `FamilyTree.tsx` (choose the scene by Canvas Mode);
   - `src/hooks/usePaperLayout.ts`, which computes the layout once and keeps it across mode switches;
   - `src/components/paper/PaperTree3D.tsx`, `PaperDiscs.tsx`, `PaperLines.tsx`, `PaperLabels.tsx` and `PaperDuotone.tsx`, plus the WebGL fallback;

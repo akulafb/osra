@@ -1,6 +1,6 @@
 # Paper mode
 
-Paper is the default Canvas Mode: everyone lands on it unless they switched to Cosmos in this browser. In 2D it draws flat ink cards and ink lines on grayscale paper. Hovering a Person rings them and dims everyone but their direct relatives. Selecting a Person ghosts everyone but their relatives. A search dims the non-matches. FIND ME and the current search match get accent rings. INSTRUMENTS, the drawer, the chat, the cards, the banners and the modals take the same paper and ink. Until the Paper 3D scene lands, 3D in Paper shows the Cosmos scene under Paper panels.
+Paper is the default Canvas Mode: everyone lands on it unless they switched to Cosmos in this browser. In 2D it draws flat ink cards and ink lines on grayscale paper. Hovering a Person rings them and dims everyone but their direct relatives. Selecting a Person ghosts everyone but their relatives. A search dims the non-matches. FIND ME and the current search match get accent rings. INSTRUMENTS, the drawer, the chat, the cards, the banners and the modals take the same paper and ink. In 3D, Paper draws its own still scene of ink discs, lines and labels (see [Paper 3D scene](#paper-3d-scene-lin-93)).
 
 ## Sub-features
 
@@ -36,7 +36,6 @@ Preconditions:
 ## Gotchas
 
 - Paper is the default, so a run that leaves no `family-tree-canvas-mode` key leaves the owner on Paper. That is the intended start state, not a leak.
-- 3D in Paper still shows the starfield scene; only its panels are Paper (temporary until the Paper 3D scene lands).
 - `hidden` (search non-match) is dimmed in 2D rather than removed, because 2D keeps its layout.
 - The Action Handle pills around a selected 2D card are drawn in ink in Paper. Their Cosmos colours are untouched.
 
@@ -62,3 +61,29 @@ Preconditions:
 - Right after `orca reload` the family picker can ignore Orca clicks. Use a DOM click (`orca eval`) for setup steps.
 - Motion needs a visible tab; a throttled tab stalls the fade.
 - 2D card fills trail the variables by up to 200 ms (NodeCard's own `all 0.2s` transition) and MUI buttons by up to about 170 ms (MUI's transition). Both read the same source.
+
+## Paper 3D scene (LIN-93)
+
+### Sub-features
+
+- `paper-3d` draws every shown Person as a flat ink disc that faces the camera, larger with more Kinship Links, on grayscale paper. The layout is still: nothing drifts. Labels are uppercase monospace (bundled Kawkab Mono, Arabic too), bigger and bolder on larger discs, and fade with distance. Parent lines are thin and grey, marriages thick ink, divorces dashed ink. No planet textures, starfield or family bubbles; INSTRUMENTS has no TEXTURE or FAMILY PRESETS.
+- `paper-3d-click` selects the clicked Person: the drawer opens (desktop side drawer, phone bottom sheet). A pointer that moves more than 6 px is a camera drag, not a click. Clicking empty paper or pressing Escape clears the selection.
+- `paper-3d-stable` keeps the layout for the whole page load: switching to Cosmos or 2D and back shows the same positions.
+- `paper-3d-no-webgl` shows "THE 3D TREE NEEDS WEBGL" in place of the canvas when WebGL is missing; INSTRUMENTS still works.
+
+### Driving it with ui.sh
+
+- Record the view-mode and canvas-mode keys. In Paper, open INSTRUMENTS and click `3D`. Wait until `document.body.innerText.includes('Loading Osra')` is false.
+- **Overview.** `capture.sh` after two identical consecutive captures. Expect ink discs, Arabic and Latin labels, and the three line styles.
+- **Click.** Nodes have no accessibility handles: pick an isolated disc from the screenshot (PNG pixels ÷ 2 at the 879 px tab) and run `$S/ui.sh "$RUN_DIR" tap <x> <y>`. The drawer heading is the Person's name (`.MuiDrawer-paper h4`). Below 1024 px wide (the Orca tab) it is the phone bottom sheet.
+- **Escape.** Probe first with `window.addEventListener('keydown', …)`, then `$S/ui.sh "$RUN_DIR" key Escape`; `.MuiDrawer-paper h4` disappears.
+- **Stable layout.** Capture, switch CANVAS MODE to `COSMOS` and back to `PAPER`, close INSTRUMENTS and capture again: the scene pixels match.
+- **No WebGL.** Go to 2D, then `orca eval` `HTMLCanvasElement.prototype.getContext` to return `null` for `webgl*` (keep the original on `window`), then click `3D`. The `role=alert` fallback shows. Restore `getContext` afterwards.
+- **Proof.** Capture `paper-3d overview`, `paper-3d click`, `paper-3d escape`, `paper-3d switch-before`, `paper-3d switch-cosmos`, `paper-3d switch-after` and `paper-3d no-webgl`.
+
+### Gotchas
+
+- An occluded Orca tab runs no `requestAnimationFrame`, so the layout never starts and "Loading Osra" stays. Each `orca screenshot` forces a frame: take a few to pump it, or bring Orca forward.
+- The Orca tab is 879 px wide, under the 1024 px `isMobile()` cutoff, so the desktop side drawer and NAV CONTROLS can't be reached. `orca set device` offers only phones taller than the pane, and their screenshots repeat the top ~540 px: prove the phone sheet with `.MuiDrawer-paper` `getBoundingClientRect()` instead. Device emulation clears on reload.
+- `orca keypress Meta+f` does not reach the page; dispatch `new KeyboardEvent('keydown', { key: 'f', metaKey: true })` on `window` and say so.
+- Paper 3D stays grayscale with Paper colour on until the duotone pass lands; the panels follow the pair.

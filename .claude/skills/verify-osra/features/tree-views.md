@@ -1,6 +1,6 @@
 # Tree views
 
-A signed-in user explores the family tree in 2D (one family at a time, as a hierarchy) or 3D (all families as a force-directed starfield). The INSTRUMENTS panel holds the view controls; the family picker chooses which family 2D shows.
+A signed-in user explores the family tree in 2D (one family at a time, as a hierarchy) or 3D (all families: a force-directed starfield in Cosmos, a still ink scene in Paper). The INSTRUMENTS panel holds the view controls; the family picker chooses which family 2D shows.
 
 ## Sub-features
 
@@ -24,7 +24,7 @@ Preconditions:
 
 - **Pick a family (2D).** Run `$S/ui.sh "$RUN_DIR" click button "SELECT FAMILY ▾"`, then `$S/ui.sh "$RUN_DIR" pick button "Badran"`. The picker button reads "Badran ▾", the list item reads "Badran✓", and `ui.sh tree` lists node groups whose text is a given name then a family name (e.g. "<Given>" / "Badran").
 - **Open instruments.** Run `$S/ui.sh "$RUN_DIR" click button "INSTRUMENTS ▾"`. The button reads "INSTRUMENTS ▴"; the panel shows FIND ME, + ADD PERSON, 3D, 2D, CANVAS MODE (COSMOS / PAPER, plus the `Paper colour` palette toggle beside it, Paper only, 2D and 3D, phones too), SEARCH ARCHIVE, COLLAPSE ALL.
-- **Switch to 3D.** Run `$S/ui.sh "$RUN_DIR" click button "3D"`, wait about 6 s for the fly-in. `ui.sh tree` shows switches "AMBIANCE", "LABELS", "LINKS", "ARROWS" and family checkboxes; `localStorage.getItem('family-tree-view-mode')` is `{"mode":"3D","layout":"tree"}`. The screenshot shows planets and links on a starfield (in Paper too, until the Paper 3D scene lands; only the panels change).
+- **Switch to 3D.** Run `$S/ui.sh "$RUN_DIR" click button "3D"`, wait about 6 s for the fly-in. `ui.sh tree` shows switches "AMBIANCE", "LABELS", "LINKS", "ARROWS" and family checkboxes; `localStorage.getItem('family-tree-view-mode')` is `{"mode":"3D","layout":"tree"}`. In Cosmos the screenshot shows planets and links on a starfield; in Paper it shows ink discs on grey paper (see [Paper mode](./paper-mode.md#paper-3d-scene-lin-93)).
 - **3D toggle.** Run `$S/ui.sh "$RUN_DIR" click switch "LINKS"`. The switch reads `checked=false` and the screenshot shows nodes without link lines. Click it again to restore.
 - **Back to 2D.** Open INSTRUMENTS and run `$S/ui.sh "$RUN_DIR" click button "2D"`. The mode key reads `"2D"` and the empty state "Select a family above to explore, or try the 3D view." returns until a family is picked.
 - **Proof.** `capture.sh` after each step: `views 2d-family`, `views 3d`, `views 3d-links-off`, `views 2d-back`.
