@@ -16,7 +16,11 @@ const DISC_SEGMENTS = 40;
 export function PaperDiscs({ ids, layout, ink, onPersonClick }: PaperDiscsProps) {
   const meshRef = useRef<THREE.InstancedMesh>(null);
   const geometry = useMemo(() => new THREE.CircleGeometry(1, DISC_SEGMENTS), []);
-  const material = useMemo(() => new THREE.MeshBasicMaterial({ color: ink }), [ink]);
+  // Lines end at disc centres, at the disc's own depth; the offset keeps the disc on top there.
+  const material = useMemo(
+    () => new THREE.MeshBasicMaterial({ color: ink, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -4 }),
+    [ink]
+  );
 
   useLayoutEffect(() => () => geometry.dispose(), [geometry]);
   useLayoutEffect(() => () => material.dispose(), [material]);
