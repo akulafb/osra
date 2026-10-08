@@ -1,6 +1,7 @@
 /**
- * The chat test questions (LIN-74): 20 questions on the made-up test tree in
- * `kinshipFixtureTree.ts`, each with one answer that can be checked exactly.
+ * The chat test questions (LIN-74, LIN-81): 31 questions on the made-up chat
+ * test tree (`CHAT_TEST_TREE` in `kinshipFixtureTree.ts`), each with one
+ * answer that can be checked exactly.
  *
  * `scripts/chat-questions/run.ts` asks each one through the family chat with
  * the real services and checks the reply with `checkChatTestReply`. It is not
@@ -9,10 +10,10 @@
  *
  * The signed-in Person is Maya Khoury: "I", "me" and "my" mean her.
  */
-import { FIXTURE_IDS } from './kinshipFixtureTree';
+import { CHAT_TEST_IDS } from './kinshipFixtureTree';
 
 /** The Person the test account has claimed. */
-export const CHAT_TEST_SPEAKER = { personId: FIXTURE_IDS.maya, displayName: 'Maya Khoury' } as const;
+export const CHAT_TEST_SPEAKER = { personId: CHAT_TEST_IDS.maya, displayName: 'Maya Khoury' } as const;
 
 export type ChatTestGroup =
   | 'relatives'
@@ -79,8 +80,8 @@ export const CHAT_TEST_QUESTIONS: readonly ChatTestQuestion[] = [
     id: 'my-nieces-nephews',
     group: 'relatives',
     question: 'Who are my nieces and nephews?',
-    // Hani's son; Hani is the only sibling.
-    expect: { names: ['Sami Khoury'], allow: ['Hani Khoury'] },
+    // Hani's son, and his daughter with Joumana; Hani is the only sibling.
+    expect: { names: ['Lara Khoury', 'Sami Khoury'], allow: ['Hani Khoury', 'Joumana Saab'] },
   },
   {
     id: 'my-paternal-grandparents',
@@ -137,10 +138,10 @@ export const CHAT_TEST_QUESTIONS: readonly ChatTestQuestion[] = [
     id: 'tree-size',
     group: 'count',
     question: 'How many people are in the family tree?',
-    expect: { number: 41 },
+    expect: { number: 43 },
   },
 
-  // How two Persons are related.
+  // How two Persons are related: the Kinship Term, never the Persons on the path between them.
   {
     id: 'cousin',
     group: 'how_related',
@@ -148,20 +149,19 @@ export const CHAT_TEST_QUESTIONS: readonly ChatTestQuestion[] = [
     expect: {
       relations: [/first cousin/i],
       forbid: [/second cousin/i, /once removed/i],
-      allow: ['Huda Mansour', 'Samir Mansour', 'Adel Mansour', 'Widad Sabbagh'],
     },
   },
   {
     id: 'in-law',
     group: 'how_related',
     question: 'How is Faris Khoury related to Dina Aziz?',
-    expect: { relations: [/father[\s-]in[\s-]law|parent[\s-]in[\s-]law/i], allow: ['Nabil Khoury'] },
+    expect: { relations: [/father[\s-]in[\s-]law/i] },
   },
   {
     id: 'step',
     group: 'how_related',
     question: 'How is Karim Qasim related to Jad Saleh?',
-    expect: { relations: [/step[\s-]?(father|parent)/i], allow: ['Layla Haddad', 'Tarek Saleh'] },
+    expect: { relations: [/step[\s-]?father/i] },
   },
   {
     id: 'once-removed',
@@ -170,8 +170,59 @@ export const CHAT_TEST_QUESTIONS: readonly ChatTestQuestion[] = [
     expect: {
       relations: [/first cousin,? once removed/i],
       forbid: [/second cousin/i],
-      allow: ['Sara Khoury', 'Faris Khoury', 'Mariam Haddad', 'Nabil Khoury', 'Hani Khoury', 'Omar Haddad'],
     },
+  },
+
+  {
+    id: 'niece-both-parents',
+    group: 'how_related',
+    question: 'How is Lara Khoury related to me?',
+    // Hani's daughter with Joumana, linked to both: a niece, not a sister-in-law's daughter.
+    expect: { relations: [/\bniece\b/i], forbid: [/nephew/i, /in[\s-]law/i, /\bstep/i] },
+  },
+  {
+    id: 'great-grandparent',
+    group: 'how_related',
+    question: 'How is Idris Haddad related to me?',
+    expect: { relations: [/great[\s-]grandfather/i], forbid: [/great[\s-]great/i, /grandparent/i] },
+  },
+  {
+    id: 'great-aunt',
+    group: 'how_related',
+    question: 'How is Amal Mansour related to Rima Haddad?',
+    expect: { relations: [/great[\s-]aunt/i], forbid: [/great[\s-]uncle/i, /great[\s-]great/i] },
+  },
+  {
+    id: 'third-cousin',
+    group: 'how_related',
+    question: 'How is Lina Saleh related to Sami Khoury?',
+    expect: { relations: [/third cousin/i], forbid: [/removed/i, /second cousin/i] },
+  },
+  {
+    id: 'step-grandchild',
+    group: 'how_related',
+    question: 'How is Lina Saleh related to Karim Qasim?',
+    expect: { relations: [/step[\s-]?granddaughter/i], forbid: [/grandson/i, /grandchild/i] },
+  },
+  {
+    id: 'son-in-law',
+    group: 'how_related',
+    question: 'How is Karim Qasim related to Huda Mansour?',
+    expect: { relations: [/son[\s-]in[\s-]law/i], forbid: [/\bstep/i] },
+  },
+  {
+    id: 'two-terms',
+    group: 'how_related',
+    question: 'How is Karim Qasim related to me?',
+    // No one word: Layla Haddad, Maya's father's first cousin, is his wife.
+    expect: { relations: [/first cousin,? once removed/i, /husband/i], allow: ['Layla Haddad'], joinedTerms: 2 },
+  },
+  {
+    id: 'no-gender',
+    group: 'how_related',
+    question: 'How is Ziad Mansour related to Samir Mansour?',
+    // Ziad's gender is not recorded: the neutral word.
+    expect: { relations: [/\bchild\b/i], forbid: [/\bson\b/i, /\bdaughter\b/i] },
   },
 
   // Two married cousins: the blood relation first, then the marriage.
@@ -182,7 +233,6 @@ export const CHAT_TEST_QUESTIONS: readonly ChatTestQuestion[] = [
     expect: {
       relations: [/first cousin/i, /married|husband|wife|spouse/i],
       forbid: [/second cousin/i],
-      allow: ['Yusuf Haddad', 'Mariam Haddad', 'Idris Haddad', 'Salma Darwish', 'Huda Mansour', 'Faris Khoury'],
     },
   },
 
@@ -208,14 +258,36 @@ export const CHAT_TEST_QUESTIONS: readonly ChatTestQuestion[] = [
     id: 'amto',
     group: 'arabic',
     question: 'Who is my amto?',
-    // The father's sister. Walid Aziz, the mother's brother, is a wrong name.
-    expect: { names: ['Sara Khoury'], allow: ['Nabil Khoury'] },
+    // The father's sister, called by the same word. Walid Aziz, the mother's brother, is a wrong name.
+    expect: { names: ['Sara Khoury'], relations: [/\bamto\b/i], allow: ['Nabil Khoury'] },
   },
   {
     id: 'jiddo-mama-side',
     group: 'arabic',
     question: "Who is my jiddo on my mama's side?",
-    // The mother's father. Faris Khoury, the father's father, is a wrong name.
-    expect: { names: ['Bashir Aziz'], allow: ['Dina Aziz'] },
+    // The mother's father, called by the same word. Faris Khoury, the father's father, is a wrong name.
+    expect: { names: ['Bashir Aziz'], relations: [/\bjiddo\b/i], allow: ['Dina Aziz'] },
+  },
+  {
+    id: 'is-he-my-khalo',
+    group: 'arabic',
+    question: 'Is Walid Aziz my khalo?',
+    // The mother's brother: the reply says "khalo" back.
+    expect: { relations: [/\bkhalo\b/i] },
+  },
+
+  // Open questions: counts from the family overview, never a list of its Persons.
+  {
+    id: 'about-the-family',
+    group: 'open',
+    question: 'Tell me about the family',
+    // The founders with the most descendants are the only Persons the overview names.
+    expect: { number: 43, allow: ['Idris Haddad', 'Salma Darwish', 'Adel Mansour'] },
+  },
+  {
+    id: 'haddad-family',
+    group: 'open',
+    question: 'Explain the Haddad family',
+    expect: { number: 8, allow: ['Idris Haddad'] },
   },
 ];
