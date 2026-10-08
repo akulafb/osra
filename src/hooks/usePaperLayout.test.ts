@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { makePaperLayout, needsPaperLayout, type PaperLayoutState } from './usePaperLayout';
 import type { FamilyGraph } from '../types/graph';
 
@@ -57,6 +57,7 @@ describe('makePaperLayout', () => {
   });
 
   it('reports a failure instead of throwing when the layout throws', () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
     const state = makePaperLayout(graph, () => {
       throw new Error('no room');
     });

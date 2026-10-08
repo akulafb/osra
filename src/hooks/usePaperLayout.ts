@@ -15,7 +15,7 @@ export function needsPaperLayout(
   state: PaperLayoutState,
   graph: FamilyGraph | null,
   needed: boolean
-): graph is FamilyGraph {
+): boolean {
   return state.status === 'waiting' && needed && !!graph;
 }
 
@@ -36,7 +36,7 @@ export function usePaperLayout(graph: FamilyGraph | null, needed: boolean): Pape
   const [state, setState] = useState<PaperLayoutState>({ status: 'waiting' });
 
   useEffect(() => {
-    if (!needsPaperLayout(state, graph, needed)) return;
+    if (!graph || !needsPaperLayout(state, graph, needed)) return;
     let timeout = 0;
     const frame = requestAnimationFrame(() => {
       timeout = window.setTimeout(() => setState(makePaperLayout(graph)));

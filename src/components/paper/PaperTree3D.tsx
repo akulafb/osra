@@ -10,7 +10,6 @@ import { GRAYSCALE_PAIR, LIVE_PAIR } from '../../theme/paperPair';
 import type { DirectManipulationController } from '../../hooks/useDirectManipulation';
 import type { PersonDrawerInset } from '../../hooks/usePersonDrawerInset';
 import type { PaperLayoutState } from '../../hooks/usePaperLayout';
-import { candidacyFor } from '../cards/connectCandidates';
 import { Tree3DOverlay, type Tree3DSceneCamera, type Tree3DSearch } from '../tree3d/Tree3DOverlay';
 import { useIsMobileDevice } from '../tree3d/useIsMobileDevice';
 import { PaperDiscs } from './PaperDiscs';
@@ -155,15 +154,16 @@ export function PaperTree3D({
     (id: string, event: ThreeEvent<MouseEvent>) => {
       personClick.current = event.nativeEvent;
       if (!isTap(pointerDown.current, { x: event.nativeEvent.clientX, y: event.nativeEvent.clientY })) return;
-      const sourceId = interaction.connectSourceId;
-      if (sourceId) {
-        interaction.pickConnectTarget(id, candidacyFor(graphData, sourceId, id));
-        return;
-      }
       interaction.selectNode(id);
     },
-    [interaction, graphData]
+    [interaction]
   );
+
+  // Paper 3D has no connect picker until LIN-96, so a connect started in another view steps back out on arrival.
+  const { connectSourceId, handleEscape } = interaction;
+  useEffect(() => {
+    if (connectSourceId) handleEscape();
+  }, [connectSourceId, handleEscape]);
 
   // R3F reports a missed click only within 2 px, so the scene decides background taps itself, after R3F has handled the disc clicks.
   const handleSceneClick = useCallback(

@@ -81,7 +81,7 @@ Preconditions:
 - **Stable layout.** Capture, switch CANVAS MODE to `COSMOS` and back to `PAPER`, close INSTRUMENTS and capture again: the scene pixels match.
 - **Background tap.** With a Person selected, press on empty paper, move 4 px and release (`orca mouse move --x <x> --y <y>`, `orca mouse down`, `orca mouse move --x <x+4> --y <y>`, `orca mouse up`, each with `--page`): the drawer closes. The same with a 20 px move is a camera drag and keeps it.
 - **Unwired controls.** In Paper 3D with INSTRUMENTS open: `AMBIANCE` is absent from `document.body.innerText`; type a name in SEARCH ARCHIVE: the count shows and `[aria-label="Next match"]` is `display: none`; NAV CONTROLS' text is only `Esc: Deselect`; select a Person as admin: the drawer has no `Connect Nodes...`. Cosmos 3D shows all four.
-- **No WebGL.** Go to 2D, then `orca eval` `HTMLCanvasElement.prototype.getContext` to return `null` for `webgl*` (keep the original on `window`), then click `3D`. The `role=alert` fallback shows. Restore `getContext` afterwards.
+- **No WebGL.** The WebGL check runs once per page, so reload first, go to 2D, then `orca eval` `HTMLCanvasElement.prototype.getContext` to return `null` for `webgl*` (keep the original on `window`), then click `3D`. The `role=alert` fallback shows. Restore `getContext` afterwards.
 - **Proof.** Capture `paper-3d overview`, `paper-3d click`, `paper-3d escape`, `paper-3d click-phone` (the bottom sheet at the tab's phone width, a plain screenshot), `paper-3d switch-before`, `paper-3d switch-cosmos`, `paper-3d switch-after` and `paper-3d no-webgl`.
 
 ### Gotchas

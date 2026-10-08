@@ -53,7 +53,7 @@ export function PaperDiscs({ ids, layout, ink, onPersonClick }: PaperDiscsProps)
     place(camera.quaternion);
     placedFacing.copy(camera.quaternion);
     meshRef.current?.computeBoundingSphere();
-  }, [place, camera, placedFacing]);
+  }, [place, camera, placedFacing, material]);
 
   // Only a turning camera moves the discs; a still one leaves the instance buffer as it is.
   useFrame(() => {
