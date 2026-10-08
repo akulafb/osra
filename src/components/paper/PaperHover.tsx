@@ -33,8 +33,8 @@ interface PaperHoverProps {
 /**
  * Finds the Person under the mouse, at most once a frame, and turns it into
  * the scene's emphasis (focusEmphasis: a selected Person outranks the hover;
- * in Connect Mode, paperConnectEmphasis), the lean of the hovered Person's relatives and the wobble of the focused
- * Person's relatives.
+ * in Connect Mode, paperConnectEmphasis), the lean of the hovered Person's
+ * relatives and the wobble of the focused Person's relatives.
  */
 export function PaperHover({ state, pointer, layout, ids, links, selectedId, connect }: PaperHoverProps) {
   const inputs = useMemo(() => ({ layout, ids, links, selectedId, connect }), [layout, ids, links, selectedId, connect]);
