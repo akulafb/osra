@@ -3,6 +3,8 @@ import Button from '@mui/material/Button';
 import { useTheme } from '@mui/material/styles';
 import FamilyTree3D from './FamilyTree3D';
 import { PaperTree3D } from './paper/PaperTree3D';
+import { PaperLoader } from './paper/PaperLoader';
+import { GRAYSCALE_PAIR } from '../theme/paperPair';
 import { FamilyTree2D } from './FamilyTree2D';
 import { useViewMode } from '../hooks/useViewMode';
 import { useCanvasMode } from '../hooks/useCanvasMode';
@@ -539,6 +541,18 @@ export const FamilyTree: React.FC = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
+  if (canvasMode === 'paper' && !isHydrated) {
+    return <div style={{ width: '100%', height: '100vh', background: GRAYSCALE_PAIR.paper }} />;
+  }
+
+  if (isPaper3D && isLoading) {
+    return (
+      <div style={{ position: 'relative', width: '100%', height: '100vh' }}>
+        <PaperLoader stage="record" />
+      </div>
+    );
+  }
+
   if (!isHydrated || isLoading) {
     return (
       <div
@@ -755,6 +769,7 @@ export const FamilyTree: React.FC = () => {
             isAddModalOpen={isAddModalOpen}
             isEditModalOpen={isEditModalOpen}
             isBulkInviteOpen={isBulkInviteOpen}
+            isModalOpen={isAddModalOpen || isEditModalOpen || isBulkInviteOpen || newMembersModalOpen || adminManageLinksOpen || adminAddPersonOpen}
             searchQuery={searchQuery}
             onSearchQueryChange={setSearchQuery}
             searchMatches={searchMatches}

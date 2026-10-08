@@ -4,7 +4,7 @@ import { Billboard, Text } from '@react-three/drei';
 import * as THREE from 'three';
 import type { FamilyNode } from '../../types/graph';
 import type { PaperLayout } from '../../lib/paperLayout';
-import { inkOf, placeOf, type PaperEmphasisState } from './paperEmphasis';
+import { inkOf, placeOf, revealOf, type PaperEmphasisState } from './paperEmphasis';
 import { depthFade, paperLabelSize } from './paperScene';
 
 const PAPER_LABEL_FONT_URL = '/fonts/kawkab-mono/KawkabMono-Regular.woff';
@@ -14,6 +14,8 @@ const LABEL_FADE_END = 1.8;
 const LABEL_GAP = 1.5;
 const OUTLINE_PER_WEIGHT = 0.07;
 const HIDDEN_BELOW = 0.02;
+/** Labels come in late in the reveal, once their Person is nearly in place. */
+const LABEL_REVEAL_POWER = 3;
 
 interface TroikaText extends THREE.Mesh {
   fillOpacity: number;
@@ -46,7 +48,8 @@ export function PaperLabels({ nodes, layout, ink, viewDistance, state }: PaperLa
     texts.current.forEach((text, id) => {
       if (!layout.has(id)) return;
       placeOf(layout, drift, id, point.current);
-      const fade = depthFade(camera.position.distanceTo(point.current), start, end) * inkOf(state.current, id);
+      const fade =
+        depthFade(camera.position.distanceTo(point.current), start, end) * inkOf(state.current, id) * revealOf(state.current, id) ** LABEL_REVEAL_POWER;
       text.visible = fade > HIDDEN_BELOW;
       text.fillOpacity = fade;
       text.outlineOpacity = fade;

@@ -22,6 +22,10 @@ import { PaperHoverRing } from './PaperHoverRing';
 import { PaperParticles } from './PaperParticles';
 import { PaperRipple } from './PaperRipple';
 import { PaperFocus } from './PaperFocus';
+import { PaperReveal } from './PaperReveal';
+import { PaperLoader } from './PaperLoader';
+import { PaperHint } from './PaperHint';
+import { markPaperIntroPlayed, paperIntroPending } from './paperIntroSession';
 import { wakePaperTap } from './paperTap';
 import { paperFlySmoothTime, PAPER_FLY_SECONDS } from '../../lib/paperFocus';
 import { PAPER_DRAG_SMOOTH_SECONDS } from '../../lib/paperCamera';
@@ -42,6 +46,8 @@ export interface PaperTree3DProps {
   isAddModalOpen?: boolean;
   isEditModalOpen?: boolean;
   isBulkInviteOpen?: boolean;
+  /** Any modal is open over the scene. */
+  isModalOpen?: boolean;
   searchQuery: string;
   onSearchQueryChange: (q: string) => void;
   searchMatches: FamilyNode[];
@@ -66,6 +72,13 @@ const PARENT_INK = `#${new THREE.Color(INK).lerp(new THREE.Color(PAPER), 0.45).g
 const FOG_NEAR = 0.9;
 const FOG_FAR = 2.6;
 const FLY_SMOOTH_TIME = paperFlySmoothTime(PAPER_FLY_SECONDS);
+const CROSSFADE_MS = 500;
+
+/**
+ * How the scene arrives. The page's opening Paper scene keeps the loader up
+ * until it is drawn, then reveals; any later one cross-fades from paper.
+ */
+type PaperArrival = 'loader' | 'revealing' | 'crossfade' | 'settled';
 
 /** Paper's own 3D scene (ADR 0014): the still layout as ink discs, lines and labels, drawn in grayscale and painted in the live Paper Pair. */
 export function PaperTree3D({
@@ -79,6 +92,7 @@ export function PaperTree3D({
   isAddModalOpen,
   isEditModalOpen,
   isBulkInviteOpen,
+  isModalOpen = false,
   searchQuery,
   onSearchQueryChange,
   searchMatches,
@@ -103,6 +117,7 @@ export function PaperTree3D({
   const [showNames, setShowNames] = useState(true);
   const [showLinks, setShowLinks] = useState(true);
   const [showArrows, setShowArrows] = useState(false);
+  const [arrival, setArrival] = useState<PaperArrival>(() => (paperIntroPending() ? 'loader' : 'crossfade'));
 
   const controlsRef = useRef<CameraControls | null>(null);
   const pointerDown = useRef<ScreenPoint | null>(null);
@@ -178,6 +193,11 @@ export function PaperTree3D({
   );
 
   const handleSceneFailed = useCallback(() => setSceneFailed(true), []);
+  const handleLoaderLeave = useCallback(() => {
+    markPaperIntroPlayed();
+    setArrival('revealing');
+  }, []);
+  const handleArrived = useCallback(() => setArrival('settled'), []);
 
   const handlePointerMove = useCallback((event: React.PointerEvent) => {
     const { nativeEvent } = event;
@@ -223,6 +243,7 @@ export function PaperTree3D({
   const failed = !hasWebGL || sceneFailed || layoutState.status === 'failed';
   const loaded = failed || (!!frame && firstFrameDrawn);
   const fallback = <PaperWebGLFallback paper={LIVE_PAIR.paper} ink={LIVE_PAIR.ink} />;
+  if (failed && arrival === 'revealing') setArrival('settled');
 
   return (
     <div
@@ -236,14 +257,23 @@ export function PaperTree3D({
       onPointerMove={handlePointerMove}
       onPointerLeave={handlePointerLeave}
     >
-      {!loaded && (
-        <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: panel.loader.scrim, zIndex: 1000, color: panel.ink.strong, fontSize: '18px', pointerEvents: 'none' }}>
-          <div style={{ textAlign: 'center' }}>
-            <div>Loading <span style={{ fontFamily: 'cursive', fontWeight: 'bold' }}>Osra</span>...</div>
-            <div style={{ width: '40px', height: '40px', border: `4px solid ${panel.loader.track}`, borderTop: `4px solid ${panel.loader.spinner}`, borderRadius: '50%', animation: 'spin 1s linear infinite', margin: '10px auto' }} />
-          </div>
+      {(arrival === 'loader' || arrival === 'revealing') && (
+        <PaperLoader stage={loaded ? 'done' : frame ? 'scene' : 'layout'} leaving={loaded} onLeave={handleLoaderLeave} />
+      )}
+      {arrival === 'crossfade' && (
+        <div
+          onTransitionEnd={handleArrived}
+          style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: LIVE_PAIR.paper, zIndex: 1000, color: panel.ink.strong, fontSize: '18px', pointerEvents: 'none', opacity: loaded ? 0 : 1, transition: `opacity ${CROSSFADE_MS}ms ease-out` }}
+        >
+          {!loaded && (
+            <div style={{ textAlign: 'center' }}>
+              <div>Loading <span style={{ fontFamily: 'cursive', fontWeight: 'bold' }}>Osra</span>...</div>
+              <div style={{ width: '40px', height: '40px', border: `4px solid ${panel.loader.track}`, borderTop: `4px solid ${panel.loader.spinner}`, borderRadius: '50%', animation: 'spin 1s linear infinite', margin: '10px auto' }} />
+            </div>
+          )}
         </div>
       )}
+      {arrival === 'settled' && !failed && <PaperHint />}
 
       {!failed ? (
         <PaperWebGLBoundary fallback={fallback} onError={handleSceneFailed}>
@@ -265,7 +295,7 @@ export function PaperTree3D({
             {layout && frame && (
               <>
                 <PaperView viewDistance={viewDistance} />
-                <PaperCameraRig frame={frame} state={emphasisState} />
+                <PaperCameraRig frame={frame} state={emphasisState} paused={isModalOpen} />
                 <InitialFraming fit={fitFrame} />
                 <PaperFocus
                   selectedId={interaction.selectedNodeId}
@@ -284,6 +314,9 @@ export function PaperTree3D({
                   links={graphData.links}
                   selectedId={interaction.selectedNodeId}
                 />
+                {arrival === 'revealing' && (
+                  <PaperReveal frame={frame} layout={layout} ids={shownIds} state={emphasisState} onDone={handleArrived} />
+                )}
                 <PaperDiscs ids={shownIds} layout={layout} ink={INK} paper={PAPER} state={emphasisState} onPersonClick={handlePersonClick} />
                 <PaperHoverRing state={emphasisState} layout={layout} ink={INK} />
                 {showLinks && (

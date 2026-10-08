@@ -11,8 +11,15 @@ const INPUT_EVENTS = ['pointerdown', 'pointermove', 'wheel', 'keydown'] as const
 /** A frame after a stalled tab turns the view no further than this. */
 const MAX_FRAME_SECONDS = 0.1;
 
-/** Keeps the camera within its zoom limits and box, and turns the view slowly once it sits idle with nobody focused. */
-export function PaperCameraRig({ frame, state }: { frame: PaperFrame; state: MutableRefObject<PaperEmphasisState> }) {
+interface PaperCameraRigProps {
+  frame: PaperFrame;
+  state: MutableRefObject<PaperEmphasisState>;
+  /** A modal covers the scene: the view holds still behind it. */
+  paused: boolean;
+}
+
+/** Keeps the camera within its zoom limits and box, and turns the view slowly once it sits idle with nobody focused, outside the intro and behind no modal. */
+export function PaperCameraRig({ frame, state, paused }: PaperCameraRigProps) {
   const controls = useThree((three) => three.controls) as CameraControls | null;
   const camera = useThree((three) => three.camera);
   const size = useThree((three) => three.size);
@@ -38,7 +45,7 @@ export function PaperCameraRig({ frame, state }: { frame: PaperFrame; state: Mut
   }, []);
 
   useFrame((_, delta) => {
-    if (!controls) return;
+    if (!controls || paused || state.current.reveal) return;
     const idleSeconds = (performance.now() - lastInput.current) / 1000;
     if (!paperIdleRotates(idleSeconds, state.current.focus !== null)) return;
     controls.azimuthAngle += paperIdleRotateSpeed(size.width) * Math.min(delta, MAX_FRAME_SECONDS);

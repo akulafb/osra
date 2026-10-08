@@ -2,7 +2,7 @@ import { useCallback, useLayoutEffect, useMemo, useRef, type MutableRefObject } 
 import { useFrame, useThree, type ThreeEvent } from '@react-three/fiber';
 import * as THREE from 'three';
 import type { PaperLayout } from '../../lib/paperLayout';
-import { fadeInk, inkOf, placeOf, type PaperEmphasisState } from './paperEmphasis';
+import { fadeInk, inkOf, placeOf, revealOf, type PaperEmphasisState } from './paperEmphasis';
 
 interface PaperDiscsProps {
   ids: readonly string[];
@@ -44,7 +44,7 @@ export function PaperDiscs({ ids, layout, ink, paper, state, onPersonClick }: Pa
       const { drift } = state.current;
       discs.forEach((disc, i) => {
         placeOf(layout, drift, ids[i], position);
-        scale.setScalar(disc.radius);
+        scale.setScalar(disc.radius * revealOf(state.current, ids[i]));
         mesh.setMatrixAt(i, matrix.compose(position, quaternion, scale));
       });
       mesh.instanceMatrix.needsUpdate = true;
