@@ -472,6 +472,16 @@ describe('askFamilyChat: Jev routes common questions to code', () => {
     }
   });
 
+  it('answers "Is <Person> my <word>?" in code with TypeSafe off or failing: the route still names the speaker', async () => {
+    const model = scriptedModel();
+    const jev = scriptedRoute(routeReply(null));
+
+    const outcome = await askRouted('Is Samir my khalo?', model.send, jev.route);
+
+    expect(model.send).not.toHaveBeenCalled();
+    expect(outcome).toMatchObject({ ok: true, answer: '**Samir Mansour** is your khalo.', answeredBy: 'code' });
+  });
+
   it('shows the daily limit line when the route is refused for it, with no model call', async () => {
     const model = scriptedModel();
     const jev = scriptedRoute({ ok: false, cause: 'daily_limit', usage: { ...usage, messagesUsed: 10 } });

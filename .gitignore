@@ -29,7 +29,6 @@ dist-ssr
 *.sln
 *.sw?
 .vercel
-AGENTS.md
 
 # Supabase CLI temp (contains project ref, pooler URL)
 supabase/.temp/
