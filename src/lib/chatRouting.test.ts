@@ -271,6 +271,90 @@ describe('routeMessage: code answers the common kinds, with no model call', () =
   });
 });
 
+describe('routeMessage: "Is <Person> my <word>?" is answered yes or no in code', () => {
+  /** How Jev reads "Is Samir my khalo?": the speaker's aunts and uncles, though a Person is named. */
+  const khaloReading = reading({ relation: 'aunts_uncles', side: 'maternal', gender: 'male' });
+
+  it('yes, in the word the user wrote, when the Kinship Term is what an Arabic word means', () => {
+    expect(route('Is Samir my khalo?', khaloReading)).toEqual({ by: 'code', answer: '**Samir Mansour** is your khalo.' });
+    expect(route('is Idris my jiddo', reading({ relation: 'grandparents', gender: 'male' }))).toEqual({
+      by: 'code',
+      answer: '**Idris Haddad** is your jiddo.',
+    });
+  });
+
+  it('no, and nothing more, when the term is another one: the father\'s sister is not a khalto', () => {
+    expect(route('Is Mariam my khalto?', reading({ relation: 'aunts_uncles', side: 'maternal', gender: 'female' }))).toEqual({
+      by: 'code',
+      answer: 'No.',
+    });
+    expect(route('Is Samir my ammo?', reading({ relation: 'aunts_uncles', side: 'paternal', gender: 'male' }))).toEqual({
+      by: 'code',
+      answer: 'No.',
+    });
+    expect(route('Is Idris my uncle?', reading({ relation: 'aunts_uncles', gender: 'male' }))).toEqual({ by: 'code', answer: 'No.' });
+  });
+
+  it('an English word that names no side or gender fits the term on either side, and either gender', () => {
+    expect(route('Is Mariam my aunt?', reading({ relation: 'aunts_uncles', gender: 'female' }))).toEqual({
+      by: 'code',
+      answer: '**Mariam Haddad** is your aunt.',
+    });
+    expect(route('Is Adel Mansour my grandparent?', reading({ relation: 'grandparents' }))).toEqual({
+      by: 'code',
+      answer: '**Adel Mansour** is your grandparent.',
+    });
+    // A cousin of any degree is a cousin; a "first cousin" is only that.
+    expect(route('Is Tala my cousin?', reading({ relation: 'cousins' }))).toEqual({ by: 'code', answer: '**Tala Mansour** is your cousin.' });
+    expect(route('Is Tala my first cousin?', reading({ relation: 'cousins' }))).toEqual({
+      by: 'code',
+      answer: '**Tala Mansour** is your first cousin.',
+    });
+  });
+
+  it('yes when any Kinship Path fits: Nabil is a first cousin and a brother-in-law', () => {
+    expect(route('Is Nabil my cousin?', reading({ relation: 'cousins' }))).toEqual({ by: 'code', answer: '**Nabil Khoury** is your cousin.' });
+    expect(route('Is Nabil my brother-in-law?', reading({ relation: 'in_laws', gender: 'male' }))).toEqual({
+      by: 'code',
+      answer: '**Nabil Khoury** is your brother-in-law.',
+    });
+  });
+
+  it('not related: the same answer as "how am I related to"', () => {
+    expect(route('Is Hana my cousin?', reading({ relation: 'cousins' }))).toEqual({
+      by: 'code',
+      answer: 'You and **Hana Rahhal** are not related in the family tree.',
+    });
+  });
+
+  it('the Kinship Term itself, not yes or no, when the tree does not record the gender the word needs', () => {
+    expect(route('Is Amal my khalto?', reading({ relation: 'aunts_uncles', side: 'maternal', gender: 'female' }))).toEqual({
+      by: 'code',
+      answer: "**Amal Mansour** is your aunt or uncle, on your mother's side.",
+    });
+  });
+
+  it('is read from the words, so it is answered even with no reading from Jev', () => {
+    expect(route('Is Samir my khalo?', null)).toEqual({ by: 'code', answer: '**Samir Mansour** is your khalo.' });
+  });
+
+  it('goes to the model for a word the code does not know', () => {
+    expect(route('Is Samir my favourite khalo?', khaloReading)).toEqual({ by: 'model', why: 'names_do_not_fit' });
+    expect(route('Is Samir my godfather?', null)).toEqual({ by: 'model', why: 'no_reading' });
+  });
+
+  it('is routed by Jev\'s reading when more than a name comes between "is" and "my"', () => {
+    expect(route("Is Samir's son my cousin?", reading({ relation: 'cousins' }))).toEqual({ by: 'model', why: 'names_do_not_fit' });
+  });
+
+  it('goes to the model when the Person is not found once, or there is no speaker', () => {
+    expect(route('Is Layla my aunt?', khaloReading)).toEqual({ by: 'model', why: 'person_ambiguous' });
+    expect(route('Is Samir Haddad my khalo?', khaloReading)).toEqual({ by: 'model', why: 'person_not_found' });
+    expect(route('Is Samir my khalo?', khaloReading, null)).toEqual({ by: 'model', why: 'speaker_unknown' });
+    expect(route('Is Omar my cousin?', reading({ relation: 'cousins' })).by).toBe('model');
+  });
+});
+
 describe('routeMessage: everything else goes to the model with tools', () => {
   it('a message Jev marks other', () => {
     expect(route('hello!', reading({ relation: 'other', subject: 'nobody' }))).toEqual({ by: 'model', why: 'other' });
@@ -330,8 +414,8 @@ describe('routeMessage: everything else goes to the model with tools', () => {
     expect(route('who are my cousins', reading({ relation: 'cousins' }), null)).toEqual({ by: 'model', why: 'speaker_unknown' });
   });
 
-  it('a question about "me" that also names someone ("is Nabil my cousin?")', () => {
-    expect(route('is Nabil my cousin?', reading({ relation: 'cousins' })).by).toBe('model');
+  it('a question about "me" that also names someone, not as "Is <Person> my <word>?"', () => {
+    expect(route('does Nabil count as my cousin?', reading({ relation: 'cousins' })).by).toBe('model');
   });
 
   it('subject nobody with a relative kind', () => {
