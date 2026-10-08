@@ -44,6 +44,16 @@ export function hoveredPerson(emphasis: ReadonlyMap<string, Emphasis>): string |
   return null;
 }
 
+/** The Person the emphasis is about: the focused one, or else the hovered one. */
+export function emphasisSubject(emphasis: ReadonlyMap<string, Emphasis>): string | null {
+  let hovered: string | null = null;
+  for (const [id, state] of emphasis) {
+    if (state === 'focused') return id;
+    if (state === 'hovered') hovered = id;
+  }
+  return hovered;
+}
+
 /**
  * How far each relative of the hovered Person leans toward them: a small share
  * of the distance between them, capped, and never into the gap discs keep. A

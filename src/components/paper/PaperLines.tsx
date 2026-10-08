@@ -4,7 +4,7 @@ import { Line } from '@react-three/drei';
 import * as THREE from 'three';
 import type { FamilyLink } from '../../types/graph';
 import type { PaperLayout, PaperLine } from '../../lib/paperLayout';
-import { hoveredPerson, linesOf } from '../../lib/paperHover';
+import { emphasisSubject, linesOf } from '../../lib/paperHover';
 import { fadeInk, inkOf, placeOf, type PaperEmphasisState } from './paperEmphasis';
 import { paperLineSegments } from './paperScene';
 
@@ -64,7 +64,7 @@ type LineSegments = ElementRef<typeof Line>;
 
 /**
  * One draw call for every line of one kind. A line fades with the fainter of
- * its two Persons, and the hovered Person's own lines darken to full ink.
+ * its two Persons, and the hovered or focused Person's own lines darken to full ink.
  */
 function PaperLineKind({
   lines,
@@ -115,7 +115,7 @@ function PaperLineKind({
     }
 
     if (fresh || colours !== last.colours || emphasis !== last.emphasis) {
-      const own = new Set(linesOf(lines, hoveredPerson(emphasis)));
+      const own = new Set(linesOf(lines, emphasisSubject(emphasis)));
       const rgb = new Float32Array(lines.length * 6);
       lines.forEach((line, i) => {
         const kept = Math.min(inkOf(state.current, line.sourceId), inkOf(state.current, line.targetId));

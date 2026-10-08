@@ -10,7 +10,7 @@ export const PAPER_3D_INK: Record<Emphasis, number> = {
   focused: 1,
   relative: 1,
   dimmed: 0.5,
-  ghost: 1,
+  ghost: 0.2,
   hidden: 0,
 };
 
@@ -20,13 +20,21 @@ export const PAPER_3D_INK: Record<Emphasis, number> = {
  */
 export interface PaperEmphasisState {
   emphasis: ReadonlyMap<string, Emphasis>;
+  /** Render offsets on top of the layout: the hover lean and the focus wobble. */
   drift: ReadonlyMap<string, Point3>;
   /** The Person under the mouse, selected or not; none for touch. */
   pointedId: string | null;
+  /** The focused Person, and the scene clock's time when the focus began. */
+  focus: PaperFocus | null;
+}
+
+export interface PaperFocus {
+  id: string;
+  since: number;
 }
 
 export function emptyEmphasisState(): PaperEmphasisState {
-  return { emphasis: new Map(), drift: new Map(), pointedId: null };
+  return { emphasis: new Map(), drift: new Map(), pointedId: null, focus: null };
 }
 
 export function inkOf(state: PaperEmphasisState, id: string): number {

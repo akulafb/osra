@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { Emphasis } from './focusEmphasis';
 import type { FamilyLink } from '../types/graph';
 import type { PaperLayout, PaperLine } from './paperLayout';
-import { easeDrift, linesOf, nearestDiscAt, paperDrift, paperScreenRadius } from './paperHover';
+import { easeDrift, emphasisSubject, linesOf, nearestDiscAt, paperDrift, paperScreenRadius } from './paperHover';
 
 describe('nearestDiscAt', () => {
   const discs = [
@@ -163,5 +163,28 @@ describe('linesOf', () => {
 
   it('picks none for nobody', () => {
     expect(linesOf(lines, null)).toEqual([]);
+  });
+});
+
+describe('emphasisSubject', () => {
+  it('is the focused Person while one is focused', () => {
+    const emphasis = new Map<string, Emphasis>([
+      ['a', 'relative'],
+      ['b', 'focused'],
+      ['c', 'ghost'],
+    ]);
+    expect(emphasisSubject(emphasis)).toBe('b');
+  });
+
+  it('is the hovered Person while nobody is focused', () => {
+    const emphasis = new Map<string, Emphasis>([
+      ['a', 'dimmed'],
+      ['b', 'hovered'],
+    ]);
+    expect(emphasisSubject(emphasis)).toBe('b');
+  });
+
+  it('is nobody when nobody is hovered or focused', () => {
+    expect(emphasisSubject(new Map<string, Emphasis>([['a', 'normal']]))).toBeNull();
   });
 });
