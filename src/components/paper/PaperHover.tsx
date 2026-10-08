@@ -18,7 +18,6 @@ import {
 import { placeOf, type PaperEmphasisState } from './paperEmphasis';
 import type { ScreenPoint } from './paperScene';
 
-/** Before the camera-controls update and every other part of the scene (both run later in the frame). */
 const HOVER_FRAME_PRIORITY = -1;
 const LONGEST_FRAME_SECONDS = 0.1;
 

@@ -32,7 +32,6 @@ describe('nearestDiscAt', () => {
 
 describe('paperScreenRadius', () => {
   it('is the world radius over the half-height the view covers at that depth, in pixels', () => {
-    // A 90 degree view covers 100 units above and below the axis at depth 100, drawn in 400 px.
     expect(paperScreenRadius(10, 100, 90, 800)).toBeCloseTo(40);
   });
 
@@ -81,7 +80,6 @@ describe('paperDrift', () => {
   });
 
   it('stops a close relative short of the gap discs keep between them', () => {
-    // 14 apart, radii 4 and 4, gap 4: 2 units of room.
     expect(length(paperDrift(layout, hover).get('near')!)).toBeCloseTo(2);
   });
 

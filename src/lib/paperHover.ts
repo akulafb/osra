@@ -47,7 +47,7 @@ export function hoveredPerson(emphasis: ReadonlyMap<string, Emphasis>): string |
 /**
  * How far each relative of the hovered Person leans toward them: a small share
  * of the distance between them, capped, and never into the gap discs keep. A
- * render offset on top of the layout, which it leaves as it is.
+ * render offset on top of the layout.
  */
 export function paperDrift(layout: PaperLayout, emphasis: ReadonlyMap<string, Emphasis>): Map<string, Point3> {
   const drift = new Map<string, Point3>();

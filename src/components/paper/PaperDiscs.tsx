@@ -70,7 +70,6 @@ export function PaperDiscs({ ids, layout, ink, paper, state, onPersonClick }: Pa
     meshRef.current?.computeBoundingSphere();
   }, [place, paint, camera, placedFacing, state]);
 
-  // Only a turning camera or a lean moves the discs, and only a new emphasis repaints them.
   useFrame(() => {
     const { emphasis, drift } = state.current;
     if (!placedFacing.equals(camera.quaternion) || drift !== drawn.current.drift) {

@@ -15,10 +15,8 @@ export const PAPER_3D_INK: Record<Emphasis, number> = {
 };
 
 /**
- * What the scene draws from on each frame. The hover writes it before the
- * other parts of the scene read it, so a hover shows in the frame it is found.
- * Both maps are replaced, never changed in place: a part redraws when one is a
- * new map.
+ * What the scene draws from on each frame. Both maps are replaced, never
+ * changed in place: a part redraws when one is a new map.
  */
 export interface PaperEmphasisState {
   emphasis: ReadonlyMap<string, Emphasis>;

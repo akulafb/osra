@@ -182,7 +182,6 @@ export function PaperTree3D({
 
   const handleSceneFailed = useCallback(() => setSceneFailed(true), []);
 
-  // Only a mouse hovers. The scene finds the Person under it once a frame; a camera drag hovers nobody.
   const handlePointerMove = useCallback((event: React.PointerEvent) => {
     const { nativeEvent } = event;
     const overCanvas = nativeEvent.target instanceof HTMLCanvasElement;
