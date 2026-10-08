@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
-import { useTheme } from '@mui/material/styles';
+import { alpha, useTheme } from '@mui/material/styles';
+import { useCanvasMode } from '../../hooks/useCanvasMode';
 import { FamilyGraph } from '../../types/graph';
 import {
   buildConnectOptions,
@@ -50,6 +51,7 @@ export const ConnectPickerCard: React.FC<ConnectPickerCardProps> = ({
   onCancel,
 }) => {
   const { panel, hud } = useTheme().palette;
+  const { mode: canvasMode } = useCanvasMode();
   const [selectedRel, setSelectedRel] = useState<ConnectSelection>('marriage');
   const [parentRole, setParentRole] = useState<ParentRole>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -98,7 +100,7 @@ export const ConnectPickerCard: React.FC<ConnectPickerCardProps> = ({
     padding: '6px 8px',
     borderRadius: '6px',
     border: selectedRel === selection ? `1.5px solid ${accent}` : `1px solid ${panel.border.subtle}`,
-    background: selectedRel === selection ? `color-mix(in srgb, ${accent} 20%, transparent)` : hud.picker.choice,
+    background: selectedRel === selection ? (canvasMode === 'paper' ? `color-mix(in srgb, ${accent} 20%, transparent)` : alpha(accent, 0.2)) : hud.picker.choice,
     color: enabled ? panel.ink.strong : panel.ink.ghost,
     cursor: enabled ? 'pointer' : 'not-allowed',
     fontSize: '11px',
