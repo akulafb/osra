@@ -21,10 +21,15 @@ interface PaperFocusProps {
   flyTo: MutableRefObject<((id: string) => void) | null>;
 }
 
-/** On each focus the camera flies to the Person and a tap plays; clearing the focus flies back to the overview. */
+/**
+ * On each focus the camera flies to the Person and a tap plays; clearing the
+ * focus flies back to the overview. A resize or a turned phone reframes the
+ * same way.
+ */
 export function PaperFocus({ selectedId, layout, ids, links, drawerInset, onOverview, flyTo }: PaperFocusProps) {
   const controls = useThree((three) => three.controls) as CameraControls | null;
   const canvas = useThree((three) => three.gl.domElement);
+  const size = useThree((three) => three.size);
 
   const fly = useCallback(
     (id: string, smooth: boolean) => {
@@ -68,6 +73,17 @@ export function PaperFocus({ selectedId, layout, ids, links, drawerInset, onOver
       onOverview();
     }
   }, [controls, selectedId, fly, onOverview]);
+
+  const reframe = useRef(() => {});
+  reframe.current = () => {
+    if (selectedId) fly(selectedId, true);
+    else onOverview();
+  };
+  const sized = useRef(false);
+  useEffect(() => {
+    if (sized.current) reframe.current();
+    sized.current = true;
+  }, [size.width, size.height, drawerInset.rightPx, drawerInset.bottomVh]);
 
   return null;
 }

@@ -15,7 +15,8 @@ import { useIsMobileDevice } from '../tree3d/useIsMobileDevice';
 import { PaperDiscs } from './PaperDiscs';
 import { PaperLines } from './PaperLines';
 import { PaperLabels } from './PaperLabels';
-import { PaperDuotone } from './PaperDuotone';
+import { PaperEffects } from './PaperEffects';
+import { PaperCameraRig } from './PaperCameraRig';
 import { PaperHover } from './PaperHover';
 import { PaperHoverRing } from './PaperHoverRing';
 import { PaperParticles } from './PaperParticles';
@@ -23,6 +24,8 @@ import { PaperRipple } from './PaperRipple';
 import { PaperFocus } from './PaperFocus';
 import { wakePaperTap } from './paperTap';
 import { paperFlySmoothTime, PAPER_FLY_SECONDS } from '../../lib/paperFocus';
+import { PAPER_DRAG_SMOOTH_SECONDS } from '../../lib/paperCamera';
+import { paperEffects } from '../../lib/paperEffects';
 import { emptyEmphasisState, type PaperEmphasisState } from './paperEmphasis';
 import { PaperWebGLBoundary, PaperWebGLFallback } from './PaperWebGLFallback';
 import { browserHasWebGL } from './browserHasWebGL';
@@ -251,11 +254,18 @@ export function PaperTree3D({
           >
             <color attach="background" args={[PAPER]} />
             <fog attach="fog" args={[PAPER, 1, 100000]} />
-            <CameraControls ref={controlsRef} makeDefault smoothTime={FLY_SMOOTH_TIME} />
+            <CameraControls
+              ref={controlsRef}
+              makeDefault
+              smoothTime={FLY_SMOOTH_TIME}
+              draggingSmoothTime={PAPER_DRAG_SMOOTH_SECONDS}
+              dollyToCursor
+            />
             <ContextLossWatch onLost={handleSceneFailed} />
             {layout && frame && (
               <>
                 <PaperView viewDistance={viewDistance} />
+                <PaperCameraRig frame={frame} state={emphasisState} />
                 <InitialFraming fit={fitFrame} />
                 <PaperFocus
                   selectedId={interaction.selectedNodeId}
@@ -297,7 +307,7 @@ export function PaperTree3D({
                 <FirstFrame onDrawn={() => setFirstFrameDrawn(true)} />
               </>
             )}
-            <PaperDuotone ink={INK} paper={PAPER} />
+            <PaperEffects ink={INK} paper={PAPER} settings={paperEffects(isMobileDevice)} />
           </Canvas>
         </PaperWebGLBoundary>
       ) : (
