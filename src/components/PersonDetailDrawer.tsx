@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { 
   Box, 
   Typography, 
@@ -11,6 +11,7 @@ import {
 import CloseIcon from '@mui/icons-material/Close';
 import { FamilyNode, FamilyLink } from '../types/graph';
 import { canManageInvites } from '../lib/permissions';
+import { useCanvasMode } from '../hooks/useCanvasMode';
 import type { Database } from '../types/database';
 import { SHEET_MAX_HEIGHT_VH, SIDE_DRAWER_WIDTH_PX, useIsDrawerSheet } from '../hooks/usePersonDrawerInset';
 
@@ -60,6 +61,13 @@ export const PersonDetailDrawer: React.FC<PersonDetailDrawerProps> = ({
   const { panel } = theme.palette;
   const isSheet = useIsDrawerSheet();
 
+  const { setFocusedPerson } = useCanvasMode();
+  const hasPerson = !!selectedNode;
+  const familyCluster = selectedNode?.familyCluster;
+  useEffect(() => {
+    setFocusedPerson(hasPerson ? { familyCluster } : null);
+  }, [hasPerson, familyCluster, setFocusedPerson]);
+
   if (!selectedNode) return null;
 
   const showInvite = canManageInvites(
@@ -92,7 +100,7 @@ export const PersonDetailDrawer: React.FC<PersonDetailDrawerProps> = ({
                 borderLeft: `1px solid ${panel.border.accent}`,
                 boxShadow: `-10px 0 40px ${panel.shadow.floating}`,
               }),
-          color: 'text.primary',
+          color: panel.role.text,
           display: 'flex',
           flexDirection: 'column',
           overflow: 'hidden',
@@ -116,7 +124,7 @@ export const PersonDetailDrawer: React.FC<PersonDetailDrawerProps> = ({
             <Typography 
               variant="overline" 
               sx={{ 
-                color: 'primary.main',
+                color: panel.role.primary,
                 letterSpacing: '0.1em',
                 fontWeight: 600
               }}
@@ -166,8 +174,8 @@ export const PersonDetailDrawer: React.FC<PersonDetailDrawerProps> = ({
                 fullWidth
                 onClick={onAdd}
                 sx={{ 
-                  borderColor: 'secondary.main',
-                  color: 'secondary.main',
+                  borderColor: panel.role.secondary,
+                  color: panel.role.secondary,
                   '&:hover': { borderColor: 'secondary.light', background: alpha(theme.palette.secondary.main, 0.1) }
                 }}
               >
@@ -179,8 +187,8 @@ export const PersonDetailDrawer: React.FC<PersonDetailDrawerProps> = ({
                   fullWidth
                   onClick={onInvite}
                   sx={{ 
-                    borderColor: 'success.main',
-                    color: 'success.main',
+                    borderColor: panel.role.success,
+                    color: panel.role.success,
                     '&:hover': { borderColor: 'success.light', background: alpha(theme.palette.success.main, 0.1) }
                   }}
                 >
@@ -200,7 +208,7 @@ export const PersonDetailDrawer: React.FC<PersonDetailDrawerProps> = ({
                   variant="text" 
                   fullWidth
                   onClick={onConnect}
-                  sx={{ justifyContent: 'flex-start', color: 'text.secondary' }}
+                  sx={{ justifyContent: 'flex-start', color: panel.role.textSecondary }}
                 >
                   Connect Nodes...
                 </Button>
@@ -208,7 +216,7 @@ export const PersonDetailDrawer: React.FC<PersonDetailDrawerProps> = ({
                   variant="text" 
                   fullWidth
                   onClick={onManageLinks}
-                  sx={{ justifyContent: 'flex-start', color: 'text.secondary' }}
+                  sx={{ justifyContent: 'flex-start', color: panel.role.textSecondary }}
                 >
                   Manage Links
                 </Button>
@@ -216,7 +224,7 @@ export const PersonDetailDrawer: React.FC<PersonDetailDrawerProps> = ({
                   variant="text" 
                   fullWidth
                   onClick={onDelete}
-                  sx={{ justifyContent: 'flex-start', color: 'error.main' }}
+                  sx={{ justifyContent: 'flex-start', color: panel.role.error }}
                 >
                   Delete Entry
                 </Button>

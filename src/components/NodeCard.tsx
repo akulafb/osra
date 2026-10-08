@@ -4,7 +4,7 @@ import { getClusterColors } from '../utils/familyColors';
 import { LifecycleController, useLifecycleProgress } from '../hooks/useLifecycles';
 import { cardDissolveAt, cardSpawnAt } from '../utils/canvasFx';
 import type { Emphasis } from '../lib/focusEmphasis';
-import { PAPER_ACCENT, type PaperPair } from '../theme/paperPair';
+import type { PaperPair } from '../theme/paperPair';
 import { PAPER_2D_OPACITY } from '../utils/paper2D';
 
 export interface NodeCardProps {
@@ -69,6 +69,7 @@ function PaperHighlights({
   width,
   height,
   ink,
+  accent,
   isHovered,
   isSelected,
   isFindMe,
@@ -77,6 +78,7 @@ function PaperHighlights({
   width: number;
   height: number;
   ink: string;
+  accent: string;
   isHovered: boolean;
   isSelected: boolean;
   isFindMe: boolean;
@@ -98,8 +100,8 @@ function PaperHighlights({
   );
   return (
     <>
-      {isSearchMatch && ring(11, PAPER_ACCENT, 2.5, '6 4')}
-      {isFindMe && !isSearchMatch && ring(11, PAPER_ACCENT, 3)}
+      {isSearchMatch && ring(11, accent, 2.5, '6 4')}
+      {isFindMe && !isSearchMatch && ring(11, accent, 3)}
       {isSelected && ring(5, ink, 1.5)}
       {isHovered && !isSelected && ring(5, ink, 1)}
     </>
@@ -160,7 +162,7 @@ const NodeCardComponent: React.FC<NodeCardProps> = ({
 
   const inkOr = (cosmos: string) => (paperPair ? paperPair.ink : cosmos);
   const paperOr = (cosmos: string) => (paperPair ? paperPair.paper : cosmos);
-  const accentOr = (cosmos: string) => (paperPair ? PAPER_ACCENT : cosmos);
+  const accentOr = (cosmos: string) => (paperPair ? paperPair.accent : cosmos);
 
   const showActionHandles = canEdit && (isHovered || isSelected || isConfirmingDissolve);
 
@@ -219,6 +221,7 @@ const NodeCardComponent: React.FC<NodeCardProps> = ({
           width={node.width}
           height={node.height}
           ink={paperPair.ink}
+          accent={paperPair.accent}
           isHovered={emphasis === 'hovered'}
           isSelected={isSelected}
           isFindMe={isHighlighted}
