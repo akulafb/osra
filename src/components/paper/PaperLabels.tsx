@@ -4,6 +4,7 @@ import { Billboard, Text } from '@react-three/drei';
 import * as THREE from 'three';
 import type { FamilyNode } from '../../types/graph';
 import type { PaperLayout } from '../../lib/paperLayout';
+import { inkOf, placeOf, type PaperEmphasisState } from './paperEmphasis';
 import { depthFade, paperLabelSize } from './paperScene';
 
 const PAPER_LABEL_FONT_URL = '/fonts/kawkab-mono/KawkabMono-Regular.woff';
@@ -24,20 +25,28 @@ interface PaperLabelsProps {
   layout: PaperLayout;
   ink: string;
   viewDistance: MutableRefObject<number>;
+  state: MutableRefObject<PaperEmphasisState>;
 }
 
-/** Uppercase monospace names above each disc, bigger and bolder for larger discs, fading with distance from the camera. */
-export function PaperLabels({ nodes, layout, ink, viewDistance }: PaperLabelsProps) {
+/** Uppercase monospace names above each disc, bigger and bolder for larger discs, fading with distance from the camera and with the emphasis. */
+export function PaperLabels({ nodes, layout, ink, viewDistance, state }: PaperLabelsProps) {
   const texts = useRef(new Map<string, TroikaText>());
+  const anchors = useRef(new Map<string, THREE.Group>());
+  const placedDrift = useRef<PaperEmphasisState['drift'] | null>(null);
   const point = useRef(new THREE.Vector3());
 
   useFrame(({ camera }) => {
     const start = viewDistance.current;
     const end = start * LABEL_FADE_END;
+    const { drift } = state.current;
+    if (drift !== placedDrift.current) {
+      anchors.current.forEach((anchor, id) => placeOf(layout, drift, id, anchor.position));
+      placedDrift.current = drift;
+    }
     texts.current.forEach((text, id) => {
-      const disc = layout.get(id);
-      if (!disc) return;
-      const fade = depthFade(camera.position.distanceTo(point.current.set(disc.x, disc.y, disc.z)), start, end);
+      if (!layout.has(id)) return;
+      placeOf(layout, drift, id, point.current);
+      const fade = depthFade(camera.position.distanceTo(point.current), start, end) * inkOf(state.current, id);
       text.visible = fade > HIDDEN_BELOW;
       text.fillOpacity = fade;
       text.outlineOpacity = fade;
@@ -51,7 +60,14 @@ export function PaperLabels({ nodes, layout, ink, viewDistance }: PaperLabelsPro
         if (!disc) return null;
         const { fontSize, weight } = paperLabelSize(disc.radius);
         return (
-          <Billboard key={node.id} position={[disc.x, disc.y, disc.z]}>
+          <Billboard
+            key={node.id}
+            ref={(anchor: THREE.Group | null) => {
+              if (anchor) anchors.current.set(node.id, anchor);
+              else anchors.current.delete(node.id);
+              placedDrift.current = null;
+            }}
+          >
             <Text
               ref={(text: TroikaText | null) => {
                 if (text) texts.current.set(node.id, text);

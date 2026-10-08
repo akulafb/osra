@@ -1,26 +1,30 @@
-import { useCallback, useLayoutEffect, useMemo, useRef } from 'react';
+import { useCallback, useLayoutEffect, useMemo, useRef, type MutableRefObject } from 'react';
 import { useFrame, useThree, type ThreeEvent } from '@react-three/fiber';
 import * as THREE from 'three';
 import type { PaperLayout } from '../../lib/paperLayout';
+import { fadeInk, inkOf, placeOf, type PaperEmphasisState } from './paperEmphasis';
 
 interface PaperDiscsProps {
   ids: readonly string[];
   layout: PaperLayout;
   ink: string;
+  paper: string;
+  state: MutableRefObject<PaperEmphasisState>;
   onPersonClick: (id: string, event: ThreeEvent<MouseEvent>) => void;
 }
 
 const DISC_SEGMENTS = 40;
 
-/** Every shown Person as one flat ink disc, all in a single instanced draw that turns to face the camera each frame. */
-export function PaperDiscs({ ids, layout, ink, onPersonClick }: PaperDiscsProps) {
+/** Every shown Person as one flat ink disc, all in a single instanced draw that turns to face the camera each frame and fades with the emphasis. */
+export function PaperDiscs({ ids, layout, ink, paper, state, onPersonClick }: PaperDiscsProps) {
   const meshRef = useRef<THREE.InstancedMesh>(null);
   const geometry = useMemo(() => new THREE.CircleGeometry(1, DISC_SEGMENTS), []);
   // Lines end at disc centres, at the disc's own depth; the offset keeps the disc on top there.
   const material = useMemo(
-    () => new THREE.MeshBasicMaterial({ color: ink, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -4 }),
-    [ink]
+    () => new THREE.MeshBasicMaterial({ polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -4 }),
+    []
   );
+  const colours = useMemo(() => ({ ink: new THREE.Color(ink), paper: new THREE.Color(paper), disc: new THREE.Color() }), [ink, paper]);
 
   useLayoutEffect(() => () => geometry.dispose(), [geometry]);
   useLayoutEffect(() => () => material.dispose(), [material]);
@@ -37,29 +41,44 @@ export function PaperDiscs({ ids, layout, ink, onPersonClick }: PaperDiscsProps)
       const mesh = meshRef.current;
       if (!mesh) return;
       const { matrix, position, scale } = scratch;
+      const { drift } = state.current;
       discs.forEach((disc, i) => {
-        position.set(disc.x, disc.y, disc.z);
+        placeOf(layout, drift, ids[i], position);
         scale.setScalar(disc.radius);
         mesh.setMatrixAt(i, matrix.compose(position, quaternion, scale));
       });
       mesh.instanceMatrix.needsUpdate = true;
     },
-    [discs, scratch]
+    [discs, ids, layout, scratch, state]
   );
+
+  const paint = useCallback(() => {
+    const mesh = meshRef.current;
+    if (!mesh) return;
+    ids.forEach((id, i) => mesh.setColorAt(i, fadeInk(colours.ink, colours.paper, inkOf(state.current, id), colours.disc)));
+    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+  }, [ids, colours, state]);
 
   const camera = useThree((state) => state.camera);
   const placedFacing = useMemo(() => new THREE.Quaternion(), []);
+  const drawn = useRef<Partial<PaperEmphasisState>>({});
   useLayoutEffect(() => {
     place(camera.quaternion);
     placedFacing.copy(camera.quaternion);
+    paint();
+    drawn.current = state.current;
     meshRef.current?.computeBoundingSphere();
-  }, [place, camera, placedFacing, material]);
+  }, [place, paint, camera, placedFacing, state]);
 
-  // Only a turning camera moves the discs; a still one leaves the instance buffer as it is.
+  // Only a turning camera or a lean moves the discs, and only a new emphasis repaints them.
   useFrame(() => {
-    if (placedFacing.equals(camera.quaternion)) return;
-    place(camera.quaternion);
-    placedFacing.copy(camera.quaternion);
+    const { emphasis, drift } = state.current;
+    if (!placedFacing.equals(camera.quaternion) || drift !== drawn.current.drift) {
+      place(camera.quaternion);
+      placedFacing.copy(camera.quaternion);
+    }
+    if (emphasis !== drawn.current.emphasis) paint();
+    drawn.current = state.current;
   });
 
   return (

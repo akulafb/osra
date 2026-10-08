@@ -16,6 +16,8 @@ import { PaperDiscs } from './PaperDiscs';
 import { PaperLines } from './PaperLines';
 import { PaperLabels } from './PaperLabels';
 import { PaperDuotone } from './PaperDuotone';
+import { PaperHover, PaperHoverRing, PaperParticles } from './PaperHover';
+import { emptyEmphasisState, type PaperEmphasisState } from './paperEmphasis';
 import { PaperWebGLBoundary, PaperWebGLFallback } from './PaperWebGLFallback';
 import { browserHasWebGL } from './browserHasWebGL';
 import { isBackgroundTap, isTap, paperFrame, type ScreenPoint } from './paperScene';
@@ -96,6 +98,8 @@ export function PaperTree3D({
 
   const controlsRef = useRef<CameraControls | null>(null);
   const pointerDown = useRef<ScreenPoint | null>(null);
+  const hoverPointer = useRef<ScreenPoint | null>(null);
+  const emphasisState = useRef<PaperEmphasisState>(emptyEmphasisState());
   const personClick = useRef<MouseEvent | null>(null);
   const viewDistance = useRef(0);
   const layout = layoutState.status === 'ready' ? layoutState.layout : null;
@@ -178,6 +182,18 @@ export function PaperTree3D({
 
   const handleSceneFailed = useCallback(() => setSceneFailed(true), []);
 
+  // Only a mouse hovers. The scene finds the Person under it once a frame; a camera drag hovers nobody.
+  const handlePointerMove = useCallback((event: React.PointerEvent) => {
+    const { nativeEvent } = event;
+    const overCanvas = nativeEvent.target instanceof HTMLCanvasElement;
+    const dragging = nativeEvent.buttons !== 0 && !isTap(pointerDown.current, { x: event.clientX, y: event.clientY });
+    hoverPointer.current =
+      event.pointerType === 'mouse' && overCanvas && !dragging ? { x: nativeEvent.offsetX, y: nativeEvent.offsetY } : null;
+  }, []);
+  const handlePointerLeave = useCallback(() => {
+    hoverPointer.current = null;
+  }, []);
+
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return;
@@ -219,6 +235,8 @@ export function PaperTree3D({
         pointerDown.current = { x: e.clientX, y: e.clientY };
       }}
       onClick={handleSceneClick}
+      onPointerMove={handlePointerMove}
+      onPointerLeave={handlePointerLeave}
     >
       {!loaded && (
         <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: panel.loader.scrim, zIndex: 1000, color: panel.ink.strong, fontSize: '18px', pointerEvents: 'none' }}>
@@ -244,11 +262,33 @@ export function PaperTree3D({
               <>
                 <PaperView viewDistance={viewDistance} />
                 <InitialFraming fit={fitFrame} />
-                <PaperDiscs ids={shownIds} layout={layout} ink={INK} onPersonClick={handlePersonClick} />
+                <PaperHover
+                  state={emphasisState}
+                  pointer={hoverPointer}
+                  layout={layout}
+                  ids={shownIds}
+                  links={graphData.links}
+                  selectedId={interaction.selectedNodeId}
+                />
+                <PaperDiscs ids={shownIds} layout={layout} ink={INK} paper={PAPER} state={emphasisState} onPersonClick={handlePersonClick} />
+                <PaperHoverRing state={emphasisState} layout={layout} ink={INK} />
                 {showLinks && (
-                  <PaperLines lines={shown.lines} layout={layout} ink={INK} parentInk={PARENT_INK} showArrows={showArrows} />
+                  <>
+                    <PaperLines
+                      lines={shown.lines}
+                      layout={layout}
+                      ink={INK}
+                      parentInk={PARENT_INK}
+                      paper={PAPER}
+                      state={emphasisState}
+                      showArrows={showArrows}
+                    />
+                    <PaperParticles state={emphasisState} layout={layout} lines={shown.lines} ink={INK} />
+                  </>
                 )}
-                {showNames && <PaperLabels nodes={shown.nodes} layout={layout} ink={INK} viewDistance={viewDistance} />}
+                {showNames && (
+                  <PaperLabels nodes={shown.nodes} layout={layout} ink={INK} viewDistance={viewDistance} state={emphasisState} />
+                )}
                 <FirstFrame onDrawn={() => setFirstFrameDrawn(true)} />
               </>
             )}
