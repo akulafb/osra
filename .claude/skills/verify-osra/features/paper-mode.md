@@ -66,7 +66,7 @@ Preconditions:
 
 ### Sub-features
 
-- `paper-3d` draws every shown Person as a flat ink disc that faces the camera, larger with more Kinship Links, on grayscale paper. The layout is still: nothing drifts. Labels are uppercase monospace (bundled Kawkab Mono, Arabic too), bigger and bolder on larger discs, and fade with distance. Parent lines are thin and grey, marriages thick ink, divorces dashed ink. No planet textures, starfield or family bubbles; INSTRUMENTS has no TEXTURE or FAMILY PRESETS.
+- `paper-3d` draws every shown Person as a flat ink disc that faces the camera, larger with more Kinship Links, on grayscale paper. The layout is still: nothing drifts on its own (a hover leans relatives in on top of it, see [Paper 3D hover](#paper-3d-hover-lin-94-pass-94a)). Labels are uppercase monospace (bundled Kawkab Mono, Arabic too), bigger and bolder on larger discs, and fade with distance. Parent lines are thin and grey, marriages thick ink, divorces dashed ink. No planet textures, starfield or family bubbles; INSTRUMENTS has no TEXTURE or FAMILY PRESETS.
 - `paper-3d-click` selects the clicked Person: the drawer opens (desktop side drawer, phone bottom sheet). A pointer that moves more than 6 px is a camera drag, not a click. Clicking empty paper (up to 6 px of movement) or pressing Escape clears the selection.
 - `paper-3d-stable` keeps the layout for the whole page load: switching to Cosmos or 2D and back shows the same positions.
 - `paper-3d-no-webgl` shows "THE 3D TREE NEEDS WEBGL" in place of the canvas when WebGL is missing, the renderer throws, the layout throws or the WebGL context is lost; INSTRUMENTS still works. The WebGL check runs once per page and gives its context back, so switching Paper and Cosmos never logs "Too many active WebGL contexts".
@@ -112,3 +112,24 @@ Preconditions:
 - An occluded Orca window runs about 1-3 rAF a second, so a 0.4 s fade shows up as 2 or 3 frames. To see the steps, slow the page clock for the recording (wrap `performance.now` and the rAF timestamp at 1/20 speed with `orca eval`), and say so in the report.
 - In the phone sheet, the drawer's buttons sit high: a tap meant to focus the page can land on `+ Add Relative` and open its modal. Tap the heading text (`.MuiDrawer-paper h4`) instead, and Cancel any modal that opens.
 
+
+## Paper 3D hover (LIN-94 pass 94a)
+
+### Sub-features
+
+- `paper-3d-hover` (mouse only): the Person under the pointer gets a thin ink ring, the same width at any zoom, and a pointer cursor. Their direct relatives (parents, children, spouses and ex-spouses) keep full ink; everyone else, their labels and the lines between them fade to half ink. The hovered Person's own lines darken to full ink and carry ink dots flowing out from them.
+- `paper-3d-hover-lean`: the relatives lean toward the hovered Person by a small share of the distance (at most 6 world units, never into the 4-unit gap between discs) over about 0.3 s, and ease back when the hover ends. Their labels and lines follow. The layout itself never changes.
+- `paper-3d-hover-rules`: emphasis comes from `focusEmphasis`, as in Paper 2D: while a Person is selected the selection outranks the hover, so hovering shows only the pointer cursor. A camera drag (more than 6 px with a button down), the pointer over INSTRUMENTS or the drawer, or leaving the canvas hovers nobody. Touch has no hover: a phone tap opens the bottom sheet as before.
+
+### Driving it with ui.sh
+
+- Paper 3D, loaded, the tab visible, nobody selected. Pick a disc with several relatives from a screenshot (PNG pixels ÷ 2 at the 879 px tab).
+- **Hover.** `orca mouse move --x <x> --y <y> --page "$(cat $RUN_DIR/state/page)"`, wait a second, capture. Then move to empty paper and capture again: the overview is back.
+- **Lean and dots.** Both move: take two captures about 0.2 s apart over the same hovered disc. The dots sit at different places along the lines; the relatives' discs are a few pixels nearer the hovered one than in the overview capture.
+- **Selection outranks hover.** `ui.sh tap` a disc (the drawer opens), then hover another disc: no ring and no dimming.
+- **Proof.** Capture `paper-3d-hover overview`, `hover`, `hover-off`, `hover-selected`.
+
+### Gotchas
+
+- `orca mouse move` sends a mouse pointer, so it hovers; `ui.sh tap` also leaves the pointer where it tapped, so a disc you just tapped stays hovered until the pointer moves.
+- The dots and the lean need rAF: in an occluded tab they freeze, and a screenshot pumps only one frame.
