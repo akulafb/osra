@@ -1,15 +1,32 @@
 import type { Emphasis } from './focusEmphasis';
-import type { PaperLayout } from './paperLayout';
+import type { PaperDisc, PaperLayout } from './paperLayout';
 import type { Point3 } from './paperHover';
 
 export const PAPER_FLY_SECONDS = 1;
 
-const FOCUS_DISTANCE_PER_RADIUS = 10;
-const MIN_FOCUS_DISTANCE = 60;
+const MIN_REACH_PER_RADIUS = 5;
+const MAX_REACH = 150;
+
+/**
+ * How far around the focused Person the camera keeps in view: out to their
+ * farthest relative's disc, with a floor for a Person with no relatives and a
+ * cap so one distant relative does not pull the camera back to the overview.
+ */
+export function paperFocusReach(layout: PaperLayout, focused: PaperDisc, emphasis: ReadonlyMap<string, Emphasis>): number {
+  let reach = focused.radius * MIN_REACH_PER_RADIUS;
+  for (const [id, state] of emphasis) {
+    const relative = layout.get(id);
+    if (state !== 'relative' || !relative) continue;
+    const distance = Math.hypot(relative.x - focused.x, relative.y - focused.y, relative.z - focused.z) + relative.radius;
+    reach = Math.max(reach, Math.min(MAX_REACH, distance));
+  }
+  return reach;
+}
 
 export interface PaperFlyInput {
   person: Point3;
-  radius: number;
+  /** How far around the Person must stay in view, in world units. */
+  reach: number;
   /** Where the camera is now and what it looks at. */
   from: { position: Point3; target: Point3 };
   viewport: { width: number; height: number };
@@ -20,17 +37,17 @@ export interface PaperFlyInput {
 
 /**
  * Where the camera flies to frame a focused Person: from the side it already
- * looks from, close enough to read them, with the Person in the middle of the
- * space the drawer leaves free. A portrait phone stands further back, so the
- * relatives still fit the narrow space above the bottom sheet.
+ * looks from, with the Person in the middle of the space the drawer leaves
+ * free and their reach filling it. A portrait phone stands further back, so
+ * the reach still fits the narrow space above the bottom sheet.
  */
-export function paperFlyTo({ person, radius, from, viewport, inset, fovDegrees }: PaperFlyInput): { position: Point3; target: Point3 } {
+export function paperFlyTo({ person, reach, from, viewport, inset, fovDegrees }: PaperFlyInput): { position: Point3; target: Point3 } {
   const back = normalize(sub(from.position, from.target)) ?? { x: 0, y: 0, z: 1 };
   const freeWidth = Math.max(1, viewport.width - inset.rightPx);
   const freeHeight = Math.max(1, viewport.height - inset.bottomPx);
-  const distance =
-    Math.max(MIN_FOCUS_DISTANCE, radius * FOCUS_DISTANCE_PER_RADIUS) * (viewport.height / Math.min(freeWidth, freeHeight));
-  const worldPerPx = (2 * distance * Math.tan((fovDegrees * Math.PI) / 360)) / viewport.height;
+  const tanHalfFov = Math.tan((fovDegrees * Math.PI) / 360);
+  const distance = (reach * viewport.height) / (Math.min(freeWidth, freeHeight) * tanHalfFov);
+  const worldPerPx = (2 * distance * tanHalfFov) / viewport.height;
 
   const forward = scale(back, -1);
   const right = normalize(cross(forward, { x: 0, y: 1, z: 0 })) ?? { x: 1, y: 0, z: 0 };
@@ -47,12 +64,18 @@ export function paperFlySmoothTime(seconds: number): number {
   return flight / 3;
 }
 
+export const PAPER_RIPPLE_DELAY_SECONDS = 0.4;
 export const PAPER_RIPPLE_SECONDS = 0.9;
 
-/** How far the focus ripple has run, eased from 0 to 1; null before it starts and once it is over. */
+/**
+ * How far the focus ripple has run, `seconds` after the focus began, eased
+ * from 0 to 1. It starts once the camera is nearly there; null before it
+ * starts and once it is over.
+ */
 export function paperRippleProgress(seconds: number): number | null {
-  if (!Number.isFinite(seconds) || seconds < 0 || seconds >= PAPER_RIPPLE_SECONDS) return null;
-  return 1 - (1 - seconds / PAPER_RIPPLE_SECONDS) ** 3;
+  const running = seconds - PAPER_RIPPLE_DELAY_SECONDS;
+  if (!Number.isFinite(running) || running < 0 || running >= PAPER_RIPPLE_SECONDS) return null;
+  return 1 - (1 - running / PAPER_RIPPLE_SECONDS) ** 3;
 }
 
 const PULSE_LENGTH = 0.3;

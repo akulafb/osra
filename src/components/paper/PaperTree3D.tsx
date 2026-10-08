@@ -259,6 +259,8 @@ export function PaperTree3D({
                 <PaperFocus
                   selectedId={interaction.selectedNodeId}
                   layout={layout}
+                  ids={shownIds}
+                  links={graphData.links}
                   drawerInset={openDrawerInset}
                   onOverview={flyToOverview}
                   flyTo={flyTo}

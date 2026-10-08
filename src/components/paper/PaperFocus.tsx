@@ -2,14 +2,18 @@ import { useCallback, useEffect, useRef, type MutableRefObject } from 'react';
 import { useThree } from '@react-three/fiber';
 import type { CameraControls } from '@react-three/drei';
 import * as THREE from 'three';
+import type { FamilyLink } from '../../types/graph';
+import { focusEmphasis } from '../../lib/focusEmphasis';
 import type { PaperLayout } from '../../lib/paperLayout';
-import { paperFlyTo } from '../../lib/paperFocus';
+import { paperFlyTo, paperFocusReach } from '../../lib/paperFocus';
 import type { PersonDrawerInset } from '../../hooks/usePersonDrawerInset';
 import { playPaperTap } from './paperTap';
 
 interface PaperFocusProps {
   selectedId: string | null;
   layout: PaperLayout;
+  ids: readonly string[];
+  links: readonly FamilyLink[];
   /** What the person drawer covers once it is open. */
   drawerInset: PersonDrawerInset;
   onOverview: () => void;
@@ -18,7 +22,7 @@ interface PaperFocusProps {
 }
 
 /** On each focus the camera flies to the Person and a tap plays; clearing the focus flies back to the overview. */
-export function PaperFocus({ selectedId, layout, drawerInset, onOverview, flyTo }: PaperFocusProps) {
+export function PaperFocus({ selectedId, layout, ids, links, drawerInset, onOverview, flyTo }: PaperFocusProps) {
   const controls = useThree((three) => three.controls) as CameraControls | null;
   const canvas = useThree((three) => three.gl.domElement);
 
@@ -26,12 +30,13 @@ export function PaperFocus({ selectedId, layout, drawerInset, onOverview, flyTo 
     (id: string, smooth: boolean) => {
       const disc = layout.get(id);
       if (!controls || !disc || !(controls.camera instanceof THREE.PerspectiveCamera)) return;
+      const emphasis = focusEmphasis({ personIds: ids, links, hoveredId: null, focusedId: id, searchMatchIds: null });
       const rect = canvas.getBoundingClientRect();
       const sheetTop = window.innerHeight * (1 - drawerInset.bottomVh / 100);
       const drawerLeft = window.innerWidth - drawerInset.rightPx;
       const { position, target } = paperFlyTo({
         person: disc,
-        radius: disc.radius,
+        reach: paperFocusReach(layout, disc, emphasis),
         from: { position: controls.camera.position, target: controls.getTarget(new THREE.Vector3()) },
         viewport: { width: rect.width, height: rect.height },
         inset: { rightPx: Math.max(0, rect.right - drawerLeft), bottomPx: Math.max(0, rect.bottom - sheetTop) },
@@ -39,7 +44,7 @@ export function PaperFocus({ selectedId, layout, drawerInset, onOverview, flyTo 
       });
       void controls.setLookAt(position.x, position.y, position.z, target.x, target.y, target.z, smooth);
     },
-    [controls, canvas, layout, drawerInset]
+    [controls, canvas, layout, ids, links, drawerInset]
   );
 
   useEffect(() => {

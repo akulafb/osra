@@ -8,7 +8,7 @@ import { paperRippleProgress, paperRipplePulse } from '../../lib/paperFocus';
 import { placeOf, type PaperEmphasisState } from './paperEmphasis';
 
 const MAX_RIPPLE_LINES = 64;
-const RIPPLE_WIDTH_PX = 3.5;
+const RIPPLE_WIDTH_PX = 6;
 
 /** A pulse of ink that runs out along each of the focused Person's lines when the focus begins, like a plucked string. */
 export function PaperRipple({

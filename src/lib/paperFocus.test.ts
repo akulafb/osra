@@ -5,9 +5,11 @@ import type { PaperLayout } from './paperLayout';
 import {
   paperFlySmoothTime,
   paperFlyTo,
+  paperFocusReach,
   paperRippleProgress,
   paperRipplePulse,
   paperWobble,
+  PAPER_RIPPLE_DELAY_SECONDS,
   PAPER_RIPPLE_SECONDS,
   type PaperFlyInput,
 } from './paperFocus';
@@ -27,7 +29,7 @@ const person = { x: 40, y: -10, z: 25 };
 const camera = { position: { x: 0, y: 0, z: 400 }, target: { x: 0, y: 0, z: 0 } };
 
 function flyInput(width: number, height: number, inset: { rightPx: number; bottomPx: number }): PaperFlyInput {
-  return { person, radius: 5, from: camera, viewport: { width, height }, inset, fovDegrees: FOV };
+  return { person, reach: 60, from: camera, viewport: { width, height }, inset, fovDegrees: FOV };
 }
 
 describe('paperFlyTo', () => {
@@ -62,6 +64,20 @@ describe('paperFlyTo', () => {
     expect(distance(portrait)).toBeGreaterThan(2 * distance(landscape));
   });
 
+  it('keeps the whole reach in the free space', () => {
+    const sheet = 0.45 * 844;
+    const fly = paperFlyTo(flyInput(390, 844, { rightPx: 0, bottomPx: sheet }));
+    const right = new THREE.Vector3().crossVectors(
+      new THREE.Vector3(fly.target.x - fly.position.x, fly.target.y - fly.position.y, fly.target.z - fly.position.z),
+      new THREE.Vector3(0, 1, 0)
+    ).setLength(60);
+    for (const side of [1, -1]) {
+      const edge = onScreen(fly, { x: person.x + side * right.x, y: person.y + side * right.y, z: person.z + side * right.z }, 390, 844);
+      expect(edge.x).toBeGreaterThanOrEqual(-0.001);
+      expect(edge.x).toBeLessThanOrEqual(390.001);
+    }
+  });
+
   it('keeps the direction the camera was looking from', () => {
     const from = { position: { x: 300, y: 0, z: 0 }, target: { x: 0, y: 0, z: 0 } };
     const fly = paperFlyTo({ ...flyInput(1440, 900, { rightPx: 0, bottomPx: 0 }), from });
@@ -84,6 +100,34 @@ describe('paperFlyTo', () => {
   });
 });
 
+describe('paperFocusReach', () => {
+  const layout: PaperLayout = new Map([
+    ['focus', { x: 0, y: 0, z: 0, radius: 8 }],
+    ['mum', { x: 30, y: 40, z: 0, radius: 6 }],
+    ['son', { x: 0, y: -20, z: 0, radius: 4 }],
+    ['far', { x: 900, y: 0, z: 0, radius: 5 }],
+    ['stranger', { x: 400, y: 400, z: 0, radius: 5 }],
+  ]);
+  const focused = (relatives: string[]) =>
+    new Map<string, Emphasis>([['focus', 'focused'], ['stranger', 'ghost'], ...relatives.map((id) => [id, 'relative'] as [string, Emphasis])]);
+
+  it('reaches the farthest relative, disc and all', () => {
+    expect(paperFocusReach(layout, layout.get('focus')!, focused(['mum', 'son']))).toBe(56);
+  });
+
+  it('frames a Person with no relatives on their own disc, with room around it', () => {
+    expect(paperFocusReach(layout, layout.get('focus')!, focused([]))).toBe(40);
+  });
+
+  it('does not pull back to the far end of the tree for one distant relative', () => {
+    expect(paperFocusReach(layout, layout.get('focus')!, focused(['son', 'far']))).toBe(150);
+  });
+
+  it('ignores everyone but the relatives', () => {
+    expect(paperFocusReach(layout, layout.get('focus')!, focused(['son']))).toBe(40);
+  });
+});
+
 describe('paperFlySmoothTime', () => {
   it('turns a flight time into a smoothing time that lands in about that long', () => {
     const smoothTime = paperFlySmoothTime(1);
@@ -99,9 +143,14 @@ describe('paperFlySmoothTime', () => {
 });
 
 describe('paperRippleProgress', () => {
+  it('waits until the camera is nearly there', () => {
+    expect(paperRippleProgress(0)).toBeNull();
+    expect(paperRippleProgress(PAPER_RIPPLE_DELAY_SECONDS / 2)).toBeNull();
+    expect(paperRippleProgress(PAPER_RIPPLE_DELAY_SECONDS)).toBe(0);
+  });
+
   it('runs from 0 to 1 over the ripple, always moving forward', () => {
-    expect(paperRippleProgress(0)).toBe(0);
-    const samples = [0.1, 0.3, 0.5, 0.7].map((share) => paperRippleProgress(share * PAPER_RIPPLE_SECONDS)!);
+    const samples = [0.1, 0.3, 0.5, 0.7].map((share) => paperRippleProgress(PAPER_RIPPLE_DELAY_SECONDS + share * PAPER_RIPPLE_SECONDS)!);
     samples.reduce((previous, progress) => {
       expect(progress).toBeGreaterThan(previous);
       expect(progress).toBeLessThan(1);
@@ -109,8 +158,8 @@ describe('paperRippleProgress', () => {
     }, 0);
   });
 
-  it.each([-0.1, PAPER_RIPPLE_SECONDS, PAPER_RIPPLE_SECONDS + 5, NaN, Infinity])('is over (null) at %s s', (seconds) => {
-    expect(paperRippleProgress(seconds)).toBeNull();
+  it.each([-0.1, PAPER_RIPPLE_SECONDS, PAPER_RIPPLE_SECONDS + 5, NaN, Infinity])('is over (null) %s s after it began', (seconds) => {
+    expect(paperRippleProgress(PAPER_RIPPLE_DELAY_SECONDS + seconds)).toBeNull();
   });
 });
 
