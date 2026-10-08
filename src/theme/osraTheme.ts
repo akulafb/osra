@@ -1,4 +1,8 @@
 import { createTheme } from '@mui/material/styles';
+import { cosmosChat } from './chat';
+import { cosmosHud } from './hud';
+import { cosmosModal } from './modal';
+import { cosmosPanel } from './panel';
 
 export const osraTheme = createTheme({
   typography: {
@@ -55,5 +59,9 @@ export const osraTheme = createTheme({
       primary: '#ede9fe',
       secondary: '#a78bfa',
     },
+    panel: cosmosPanel,
+    hud: cosmosHud,
+    chat: cosmosChat,
+    modal: cosmosModal,
   },
 });

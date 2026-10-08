@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useTheme } from '@mui/material/styles';
 import { FamilyNode, RelativeDirection } from '../../types/graph';
 import { readMatchResolution, SPELLING_MATCH_LABEL } from '../../lib/personMatch';
 import { usePersonMatch } from '../../hooks/usePersonMatch';
@@ -59,6 +60,7 @@ export const GhostNodeCard: React.FC<GhostNodeCardProps> = ({
   onCancel,
   onNameChange,
 }) => {
+  const { panel, hud } = useTheme().palette;
   const [name, setName] = useState('');
   const choice = relation === 'child' && otherParentChoice ? otherParentChoice : NO_OTHER_PARENT;
   const [otherParentId, setOtherParentId] = useOtherParentPick(choice);
@@ -121,14 +123,14 @@ export const GhostNodeCard: React.FC<GhostNodeCardProps> = ({
     <div
       style={{
         width: `${GHOST_CARD_WIDTH}px`,
-        background: 'rgba(15, 23, 42, 0.96)',
+        background: hud.ghost.surface,
         backdropFilter: 'blur(16px)',
         border: `1.5px dashed ${color}`,
         borderRadius: '10px',
-        boxShadow: `0 0 20px ${color}33, 0 8px 30px rgba(0,0,0,0.6)`,
+        boxShadow: `0 0 20px ${color}33, 0 8px 30px ${panel.shadow.raised}`,
         padding: '8px 10px',
         boxSizing: 'border-box',
-        color: '#fff',
+        color: panel.ink.strong,
         display: 'flex',
         flexDirection: 'column',
         gap: '6px',
@@ -156,7 +158,7 @@ export const GhostNodeCard: React.FC<GhostNodeCardProps> = ({
           style={{
             background: 'transparent',
             border: 'none',
-            color: 'rgba(255,255,255,0.6)',
+            color: panel.ink.muted,
             cursor: 'pointer',
             fontSize: '12px',
             padding: '0 2px',
@@ -188,11 +190,11 @@ export const GhostNodeCard: React.FC<GhostNodeCardProps> = ({
           style={{
             flex: 1,
             minWidth: 0,
-            background: 'rgba(30, 41, 59, 0.9)',
-            border: '1px solid rgba(255,255,255,0.2)',
+            background: hud.card.field,
+            border: `1px solid ${hud.card.controlBorder}`,
             borderRadius: '6px',
             padding: '5px 8px',
-            color: '#fff',
+            color: panel.ink.strong,
             fontSize: '12px',
             fontWeight: 600,
             outline: 'none',
@@ -202,8 +204,8 @@ export const GhostNodeCard: React.FC<GhostNodeCardProps> = ({
           type="submit"
           disabled={!name.trim() || isSubmitting || mustConfirm}
           style={{
-            background: name.trim() && !mustConfirm ? color : 'rgba(255,255,255,0.1)',
-            color: name.trim() && !mustConfirm ? '#0f172a' : 'rgba(255,255,255,0.4)',
+            background: name.trim() && !mustConfirm ? color : hud.card.disabledFill,
+            color: name.trim() && !mustConfirm ? hud.card.onAccent : hud.card.inkQuiet,
             border: 'none',
             borderRadius: '6px',
             padding: '5px 8px',
@@ -231,14 +233,14 @@ export const GhostNodeCard: React.FC<GhostNodeCardProps> = ({
         <div
           style={{
             marginTop: '4px',
-            background: 'rgba(10, 15, 30, 0.98)',
-            border: '1px solid rgba(168, 85, 247, 0.5)',
+            background: hud.ghost.matchSurface,
+            border: `1px solid ${hud.ghost.matchBorder}`,
             borderRadius: '6px',
             padding: '4px',
             display: 'flex',
             flexDirection: 'column',
             gap: '3px',
-            boxShadow: '0 4px 15px rgba(0,0,0,0.5)',
+            boxShadow: `0 4px 15px ${panel.shadow.floating}`,
           }}
         >
           <div
@@ -250,7 +252,7 @@ export const GhostNodeCard: React.FC<GhostNodeCardProps> = ({
               padding: '2px 4px',
             }}
           >
-            <span style={{ fontSize: '9px', color: '#c084fc', fontWeight: 600 }}>
+            <span style={{ fontSize: '9px', color: hud.card.highlight, fontWeight: 600 }}>
               Existing relative matches:
             </span>
             {unresolved && (
@@ -260,11 +262,11 @@ export const GhostNodeCard: React.FC<GhostNodeCardProps> = ({
                 disabled={confirmedDifferentPerson}
                 style={{
                   background: confirmedDifferentPerson
-                    ? 'rgba(168, 85, 247, 0.25)'
+                    ? hud.ghost.matchActive
                     : 'transparent',
-                  border: '1px solid rgba(168, 85, 247, 0.5)',
+                  border: `1px solid ${hud.ghost.matchBorder}`,
                   borderRadius: '4px',
-                  color: '#e9d5ff',
+                  color: hud.ghost.matchAction,
                   fontSize: '9px',
                   fontWeight: 600,
                   padding: '1px 5px',
@@ -288,11 +290,11 @@ export const GhostNodeCard: React.FC<GhostNodeCardProps> = ({
                 alignItems: 'center',
                 justifyContent: 'space-between',
                 gap: '4px',
-                background: 'rgba(255, 255, 255, 0.05)',
-                border: '1px solid rgba(255,255,255,0.1)',
+                background: panel.surface.control,
+                border: `1px solid ${panel.border.subtle}`,
                 borderRadius: '4px',
                 padding: '3px 6px',
-                color: isAlreadyConnected ? '#94a3b8' : '#e2e8f0',
+                color: isAlreadyConnected ? hud.ghost.matchMeta : hud.ghost.matchInk,
                 fontSize: '10px',
                 cursor: isAlreadyConnected ? 'default' : 'pointer',
                 textAlign: 'left',
@@ -300,22 +302,22 @@ export const GhostNodeCard: React.FC<GhostNodeCardProps> = ({
               }}
               onMouseEnter={(e) => {
                 if (isAlreadyConnected) return;
-                e.currentTarget.style.background = 'rgba(168, 85, 247, 0.25)';
+                e.currentTarget.style.background = hud.ghost.matchActive;
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
+                e.currentTarget.style.background = panel.surface.control;
               }}
             >
               <span style={{ fontWeight: 600 }}>
                 {person.firstName}
                 {isSpellingVariant && (
-                  <span style={{ fontWeight: 400, color: '#94a3b8' }}> · {SPELLING_MATCH_LABEL}</span>
+                  <span style={{ fontWeight: 400, color: hud.ghost.matchMeta }}> · {SPELLING_MATCH_LABEL}</span>
                 )}
                 {!isVisible && (
-                  <span style={{ fontWeight: 400, color: '#94a3b8' }}> · hidden by filter</span>
+                  <span style={{ fontWeight: 400, color: hud.ghost.matchMeta }}> · hidden by filter</span>
                 )}
               </span>
-              <span style={{ fontSize: '9px', color: '#94a3b8', whiteSpace: 'nowrap' }}>
+              <span style={{ fontSize: '9px', color: hud.ghost.matchMeta, whiteSpace: 'nowrap' }}>
                 {isAlreadyConnected
                   ? 'already connected'
                   : `🔗 Link (${person.familyCluster ?? 'General'})`}
@@ -323,7 +325,7 @@ export const GhostNodeCard: React.FC<GhostNodeCardProps> = ({
             </button>
           ))}
           {hiddenMatchCount > 0 && (
-            <div style={{ fontSize: '9px', color: '#64748b', padding: '0 4px 2px' }}>
+            <div style={{ fontSize: '9px', color: hud.ghost.matchMore, padding: '0 4px 2px' }}>
               +{hiddenMatchCount} more not shown
             </div>
           )}

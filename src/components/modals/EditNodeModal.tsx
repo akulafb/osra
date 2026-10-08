@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import Button from '@mui/material/Button';
+import { useTheme, type Theme } from '@mui/material/styles';
 import { useAuth } from '../../contexts/AuthContext';
 import { FamilyNode, PersonGender } from '../../types/graph';
 import { formatNodeDisplayName } from '../../utils/nodeDisplayName';
@@ -30,6 +31,8 @@ export default function EditNodeModal({
 }: EditNodeModalProps) {
   const { user, isAdmin, session } = useAuth();
   const { write } = useWorkingRecord();
+  const theme = useTheme();
+  const { modal, panel, primary } = theme.palette;
   const [name, setName] = useState('');
   const [familyCluster, setFamilyCluster] = useState('');
   const [maternalFamilyCluster, setMaternalFamilyCluster] = useState('');
@@ -157,13 +160,13 @@ export default function EditNodeModal({
   if (!isOpen) return null;
 
   return (
-    <div style={modalOverlayStyle}>
-      <div style={modalContentStyle}>
+    <div style={modalOverlayStyle(theme)}>
+      <div style={modalContentStyle(theme)}>
         <h2 style={{ 
           marginTop: 0, 
           fontFamily: '"Lora", serif', 
           fontSize: '1.5rem',
-          color: 'white',
+          color: panel.ink.strong,
           marginBottom: '24px'
         }}>
           Edit {formatNodeDisplayName(targetNode)}
@@ -171,28 +174,28 @@ export default function EditNodeModal({
 
         <form onSubmit={handleSubmit}>
           <div style={fieldStyle}>
-            <label style={labelStyle}>FIRST NAME</label>
+            <label style={labelStyle(theme)}>FIRST NAME</label>
             <input
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value.slice(0, MAX_NAME_LENGTH))}
               placeholder="Given name"
-              style={inputStyle}
+              style={inputStyle(theme)}
               maxLength={MAX_NAME_LENGTH}
               required
               disabled={isSubmitting}
             />
-            <p style={{ margin: '8px 0 0 0', fontSize: '0.7rem', color: 'rgba(255,255,255,0.4)', fontStyle: 'italic' }}>
+            <p style={{ margin: '8px 0 0 0', fontSize: '0.7rem', color: modal.ink.hint, fontStyle: 'italic' }}>
               Paternal / maternal family clusters are set below (admin) or inherited from the tree.
             </p>
           </div>
 
           <div style={fieldStyle}>
-            <label style={labelStyle}>GENDER</label>
+            <label style={labelStyle(theme)}>GENDER</label>
             <select
               value={gender ?? ''}
               onChange={(e) => setGender(e.target.value ? (e.target.value as PersonGender) : null)}
-              style={inputStyle}
+              style={inputStyle(theme)}
               disabled={isSubmitting}
             >
               <option value="">Not recorded</option>
@@ -205,7 +208,7 @@ export default function EditNodeModal({
           {isAdmin && (
             <>
               <div style={fieldStyle}>
-                <label style={labelStyle}>
+                <label style={labelStyle(theme)}>
                   PATERNAL FAMILY CLUSTER (ADMIN ONLY)
                 </label>
                 <input
@@ -213,16 +216,16 @@ export default function EditNodeModal({
                   value={familyCluster}
                   onChange={(e) => setFamilyCluster(e.target.value.slice(0, MAX_CLUSTER_LENGTH))}
                   placeholder="e.g. Badran, Kutob, etc."
-                  style={inputStyle}
+                  style={inputStyle(theme)}
                   maxLength={MAX_CLUSTER_LENGTH}
                   disabled={isSubmitting}
                 />
-                <p style={{ margin: '8px 0 0 0', fontSize: '0.7rem', color: 'rgba(255,255,255,0.4)', fontStyle: 'italic' }}>
+                <p style={{ margin: '8px 0 0 0', fontSize: '0.7rem', color: modal.ink.hint, fontStyle: 'italic' }}>
                   Primary family name (3D positioning, display)
                 </p>
               </div>
               <div style={fieldStyle}>
-                <label style={labelStyle}>
+                <label style={labelStyle(theme)}>
                   MATERNAL FAMILY CLUSTER (ADMIN ONLY)
                 </label>
                 <input
@@ -230,11 +233,11 @@ export default function EditNodeModal({
                   value={maternalFamilyCluster}
                   onChange={(e) => setMaternalFamilyCluster(e.target.value.slice(0, MAX_CLUSTER_LENGTH))}
                   placeholder="e.g. mother's family name"
-                  style={inputStyle}
+                  style={inputStyle(theme)}
                   maxLength={MAX_CLUSTER_LENGTH}
                   disabled={isSubmitting}
                 />
-                <p style={{ margin: '8px 0 0 0', fontSize: '0.7rem', color: 'rgba(255,255,255,0.4)', fontStyle: 'italic' }}>
+                <p style={{ margin: '8px 0 0 0', fontSize: '0.7rem', color: modal.ink.hint, fontStyle: 'italic' }}>
                   For children to appear on mother&apos;s family tree in 2D
                 </p>
               </div>
@@ -243,30 +246,30 @@ export default function EditNodeModal({
 
           {/* Show current cluster for non-admins */}
           {!isAdmin && targetNode.familyCluster && (
-            <div style={infoBoxStyle}>
+            <div style={infoBoxStyle(theme)}>
               <strong style={{ fontSize: '0.65rem', letterSpacing: '0.05em', display: 'block', marginBottom: '4px' }}>FAMILY CLUSTER</strong>
-              <span style={{ fontSize: '0.9rem', color: 'white' }}>{targetNode.familyCluster}</span>
+              <span style={{ fontSize: '0.9rem', color: panel.ink.strong }}>{targetNode.familyCluster}</span>
             </div>
           )}
 
           {matches.length > 0 && (
-            <div style={warningStyle}>
+            <div style={warningStyle(theme)}>
               <strong style={{ fontSize: '0.75rem', letterSpacing: '0.05em' }}>MATCHES DETECTED IN ARCHIVE</strong>
-              <ul style={{ margin: '12px 0', paddingLeft: '20px', color: 'rgba(255,255,255,0.8)' }}>
+              <ul style={{ margin: '12px 0', paddingLeft: '20px', color: modal.ink.secondary }}>
                 {matches.map(({ person, isSpellingVariant, isVisible }) => (
                   <li key={person.id} style={{ fontSize: '0.85rem' }}>
                     {formatNodeDisplayName(person)}
                     {isSpellingVariant && (
-                      <span style={{ color: 'rgba(255,255,255,0.5)' }}> · {SPELLING_MATCH_LABEL}</span>
+                      <span style={{ color: panel.ink.faint }}> · {SPELLING_MATCH_LABEL}</span>
                     )}
                     {!isVisible && (
-                      <span style={{ color: 'rgba(255,255,255,0.5)' }}> · hidden by filter</span>
+                      <span style={{ color: panel.ink.faint }}> · hidden by filter</span>
                     )}
                   </li>
                 ))}
               </ul>
               {hiddenMatchCount > 0 && (
-                <p style={{ fontSize: '0.75rem', margin: '0 0 8px 0', color: 'rgba(255,255,255,0.5)' }}>
+                <p style={{ fontSize: '0.75rem', margin: '0 0 8px 0', color: panel.ink.faint }}>
                   +{hiddenMatchCount} more match{hiddenMatchCount === 1 ? '' : 'es'} not shown.
                 </p>
               )}
@@ -276,30 +279,30 @@ export default function EditNodeModal({
                     type="checkbox"
                     checked={confirmedDifferentPerson}
                     onChange={(e) => setConfirmedDifferentPerson(e.target.checked)}
-                    style={{ accentColor: '#D4AF37' }}
+                    style={{ accentColor: primary.main }}
                     disabled={isSubmitting}
                   />
-                  <span style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.8)' }}>
+                  <span style={{ fontSize: '0.8rem', color: modal.ink.secondary }}>
                     This is a different person from the one above
                   </span>
                 </label>
               ) : (
-                <p style={{ fontSize: '0.75rem', margin: 0, fontStyle: 'italic', color: 'rgba(255,255,255,0.6)' }}>
+                <p style={{ fontSize: '0.75rem', margin: 0, fontStyle: 'italic', color: panel.ink.muted }}>
                   Check none of these is the person you are renaming into.
                 </p>
               )}
             </div>
           )}
 
-          {successMessage && <div style={successStyle}>{successMessage}</div>}
-          {error && <div style={errorStyle}>{error}</div>}
+          {successMessage && <div style={successStyle(theme)}>{successMessage}</div>}
+          {error && <div style={errorStyle(theme)}>{error}</div>}
 
-          <div style={actionsStyle}>
+          <div style={actionsStyle(theme)}>
             <Button 
               variant="text" 
               onClick={onClose} 
               disabled={isSubmitting}
-              sx={{ color: 'rgba(255,255,255,0.5)', fontWeight: 600 }}
+              sx={{ color: panel.ink.faint, fontWeight: 600 }}
             >
               Cancel
             </Button>
@@ -308,7 +311,7 @@ export default function EditNodeModal({
               variant="contained"
               disabled={isSubmitting || !name.trim() || mustConfirm}
               sx={{ 
-                background: 'linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)',
+                background: modal.submit,
                 fontWeight: 700,
                 letterSpacing: '0.05em',
                 px: 3
@@ -324,103 +327,103 @@ export default function EditNodeModal({
 }
 
 // Styles
-const modalOverlayStyle: React.CSSProperties = {
+const modalOverlayStyle = ({ palette }: Theme): React.CSSProperties => ({
   position: 'fixed',
   top: 0,
   left: 0,
   right: 0,
   bottom: 0,
-  backgroundColor: 'rgba(0, 0, 0, 0.8)',
+  backgroundColor: palette.modal.scrim,
   display: 'flex',
   justifyContent: 'center',
   alignItems: 'center',
   zIndex: 2000,
   backdropFilter: 'blur(8px)',
-};
+});
 
-const modalContentStyle: React.CSSProperties = {
-  backgroundColor: 'rgba(5, 5, 5, 0.85)',
+const modalContentStyle = ({ palette }: Theme): React.CSSProperties => ({
+  backgroundColor: palette.modal.surface,
   backdropFilter: 'blur(24px)',
-  color: 'white',
+  color: palette.panel.ink.strong,
   padding: '40px',
   borderRadius: '12px',
   width: '100%',
   maxWidth: '480px',
-  boxShadow: '0 20px 60px rgba(0,0,0,0.6)',
-  border: '1px solid rgba(212, 175, 55, 0.2)',
-};
+  boxShadow: `0 20px 60px ${palette.panel.shadow.raised}`,
+  border: `1px solid ${palette.panel.border.accent}`,
+});
 
 const fieldStyle: React.CSSProperties = {
   marginBottom: '24px',
 };
 
-const labelStyle: React.CSSProperties = {
+const labelStyle = ({ palette }: Theme): React.CSSProperties => ({
   display: 'block',
   marginBottom: '10px',
   fontSize: '0.65rem',
   fontWeight: 700,
   letterSpacing: '0.1em',
-  color: '#D4AF37',
-};
+  color: palette.primary.main,
+});
 
-const inputStyle: React.CSSProperties = {
+const inputStyle = ({ palette }: Theme): React.CSSProperties => ({
   width: '100%',
   padding: '14px',
   borderRadius: '4px',
-  border: '1px solid rgba(255,255,255,0.1)',
-  backgroundColor: 'rgba(255,255,255,0.03)',
-  color: 'white',
+  border: `1px solid ${palette.modal.field.border}`,
+  backgroundColor: palette.modal.field.surface,
+  color: palette.panel.ink.strong,
   fontSize: '0.95rem',
   boxSizing: 'border-box',
   fontFamily: '"Inter", sans-serif',
-};
+});
 
-const infoBoxStyle: React.CSSProperties = {
-  backgroundColor: 'rgba(212, 175, 55, 0.05)',
-  border: '1px solid rgba(212, 175, 55, 0.2)',
-  color: '#D4AF37',
+const infoBoxStyle = ({ palette }: Theme): React.CSSProperties => ({
+  backgroundColor: palette.modal.notice.surface,
+  border: `1px solid ${palette.panel.border.accent}`,
+  color: palette.primary.main,
   padding: '16px',
   borderRadius: '4px',
   marginBottom: '24px',
-};
+});
 
-const warningStyle: React.CSSProperties = {
-  backgroundColor: 'rgba(212, 175, 55, 0.05)',
-  border: '1px solid rgba(212, 175, 55, 0.3)',
-  color: '#D4AF37',
+const warningStyle = ({ palette }: Theme): React.CSSProperties => ({
+  backgroundColor: palette.modal.notice.surface,
+  border: `1px solid ${palette.modal.notice.border}`,
+  color: palette.primary.main,
   padding: '20px',
   borderRadius: '8px',
   marginBottom: '24px',
-};
+});
 
-const successStyle: React.CSSProperties = {
-  backgroundColor: 'rgba(16, 185, 129, 0.1)',
-  border: '1px solid rgba(16, 185, 129, 0.3)',
-  color: '#10b981',
+const successStyle = ({ palette }: Theme): React.CSSProperties => ({
+  backgroundColor: palette.modal.status.successSurface,
+  border: `1px solid ${palette.modal.status.successBorder}`,
+  color: palette.success.main,
   padding: '16px',
   borderRadius: '4px',
   marginBottom: '24px',
   fontSize: '0.9rem',
   textAlign: 'center',
   fontWeight: 600,
-};
+});
 
-const errorStyle: React.CSSProperties = {
-  backgroundColor: 'rgba(239, 68, 68, 0.1)',
-  border: '1px solid rgba(239, 68, 68, 0.3)',
-  color: '#ef4444',
+const errorStyle = ({ palette }: Theme): React.CSSProperties => ({
+  backgroundColor: palette.modal.status.errorSurface,
+  border: `1px solid ${palette.modal.status.errorBorder}`,
+  color: palette.error.main,
   padding: '16px',
   borderRadius: '4px',
   marginBottom: '24px',
   fontSize: '0.85rem',
-};
+});
 
-const actionsStyle: React.CSSProperties = {
+const actionsStyle = ({ palette }: Theme): React.CSSProperties => ({
   display: 'flex',
   justifyContent: 'flex-end',
   gap: '16px',
   marginTop: '40px',
   paddingTop: '20px',
-  borderTop: '1px solid rgba(255,255,255,0.05)',
-};
+  borderTop: `1px solid ${palette.panel.border.hairline}`,
+});
 

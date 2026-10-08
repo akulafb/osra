@@ -57,6 +57,7 @@ export const PersonDetailDrawer: React.FC<PersonDetailDrawerProps> = ({
   onDelete,
 }) => {
   const theme = useTheme();
+  const { panel } = theme.palette;
   const isSheet = useIsDrawerSheet();
 
   if (!selectedNode) return null;
@@ -77,19 +78,19 @@ export const PersonDetailDrawer: React.FC<PersonDetailDrawerProps> = ({
       sx={{
         '& .MuiDrawer-paper': {
           width: isSheet ? '100%' : SIDE_DRAWER_WIDTH_PX,
-          background: 'rgba(5, 5, 5, 0.75)',
+          background: panel.surface.drawer,
           backdropFilter: 'blur(24px)',
           ...(isSheet
             ? {
                 maxHeight: `${SHEET_MAX_HEIGHT_VH}vh`,
-                borderTop: '1px solid rgba(212, 175, 55, 0.2)',
+                borderTop: `1px solid ${panel.border.accent}`,
                 borderTopLeftRadius: 16,
                 borderTopRightRadius: 16,
-                boxShadow: '0 -10px 40px rgba(0,0,0,0.5)',
+                boxShadow: `0 -10px 40px ${panel.shadow.floating}`,
               }
             : {
-                borderLeft: '1px solid rgba(212, 175, 55, 0.2)',
-                boxShadow: '-10px 0 40px rgba(0,0,0,0.5)',
+                borderLeft: `1px solid ${panel.border.accent}`,
+                boxShadow: `-10px 0 40px ${panel.shadow.floating}`,
               }),
           color: 'text.primary',
           display: 'flex',
@@ -105,7 +106,7 @@ export const PersonDetailDrawer: React.FC<PersonDetailDrawerProps> = ({
             variant="h4" 
             sx={{ 
               fontFamily: '"Lora", serif', 
-              color: 'white',
+              color: panel.ink.strong,
               mb: 0.5
             }}
           >
@@ -124,7 +125,7 @@ export const PersonDetailDrawer: React.FC<PersonDetailDrawerProps> = ({
             </Typography>
           )}
         </Box>
-        <IconButton aria-label="Close details" onClick={onClose} sx={{ color: 'rgba(255,255,255,0.5)', '&:hover': { color: 'white' } }}>
+        <IconButton aria-label="Close details" onClick={onClose} sx={{ color: panel.ink.faint, '&:hover': { color: panel.ink.strong } }}>
           <CloseIcon />
         </IconButton>
       </Box>
@@ -135,7 +136,7 @@ export const PersonDetailDrawer: React.FC<PersonDetailDrawerProps> = ({
           variant="caption" 
           sx={{ 
             fontFamily: 'monospace', 
-            color: 'rgba(255,255,255,0.3)',
+            color: panel.ink.ghost,
             display: 'block',
             mb: isSheet ? 2 : 4
           }}
@@ -152,10 +153,10 @@ export const PersonDetailDrawer: React.FC<PersonDetailDrawerProps> = ({
                 fullWidth
                 onClick={onEdit}
                 sx={{ 
-                  background: 'linear-gradient(135deg, #D4AF37 0%, #B8860B 100%)',
-                  color: 'black',
+                  background: panel.fill.accent,
+                  color: panel.ink.onAccent,
                   fontWeight: 700,
-                  '&:hover': { background: 'linear-gradient(135deg, #F0E68C 0%, #D4AF37 100%)' }
+                  '&:hover': { background: panel.fill.accentHover }
                 }}
               >
                 Edit Registry
@@ -190,8 +191,8 @@ export const PersonDetailDrawer: React.FC<PersonDetailDrawerProps> = ({
           )}
 
           {isAdmin && (
-            <Box sx={{ mt: 2, pt: 2, borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-              <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.3)', mb: 1, display: 'block', textTransform: 'uppercase' }}>
+            <Box sx={{ mt: 2, pt: 2, borderTop: `1px solid ${panel.border.hairline}` }}>
+              <Typography variant="caption" sx={{ color: panel.ink.ghost, mb: 1, display: 'block', textTransform: 'uppercase' }}>
                 Administrative Tools
               </Typography>
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>

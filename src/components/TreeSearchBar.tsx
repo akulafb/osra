@@ -3,6 +3,7 @@ import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import IconButton from '@mui/material/IconButton';
 import Box from '@mui/material/Box';
+import { useTheme } from '@mui/material/styles';
 import type { FamilyNode } from '../types/graph';
 
 interface TreeSearchBarProps {
@@ -35,6 +36,7 @@ export function TreeSearchBar({
   focusTrigger = 0,
 }: TreeSearchBarProps) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const { panel } = useTheme().palette;
 
   useEffect(() => {
     if (focusTrigger > 0 && inputRef.current) {
@@ -67,13 +69,13 @@ export function TreeSearchBar({
   const textFieldSx = {
     width: '100%',
     '& .MuiOutlinedInput-root': {
-      backgroundColor: 'rgba(0,0,0,0.3)',
-      color: '#fff',
+      backgroundColor: panel.surface.inset,
+      color: panel.ink.strong,
       fontFamily: '"Inter", sans-serif',
       letterSpacing: '0.02em',
-      '& fieldset': { borderColor: 'rgba(212, 175, 55, 0.1)' },
-      '&:hover fieldset': { borderColor: 'rgba(212, 175, 55, 0.3)' },
-      '&.Mui-focused fieldset': { borderColor: 'rgba(212, 175, 55, 0.5)' },
+      '& fieldset': { borderColor: panel.border.field },
+      '&:hover fieldset': { borderColor: panel.border.fieldHover },
+      '&.Mui-focused fieldset': { borderColor: panel.border.fieldFocus },
     },
   };
 
@@ -87,7 +89,7 @@ export function TreeSearchBar({
           fontFamily: 'monospace',
           fontWeight: 600,
           textAlign: 'center',
-          background: 'rgba(212, 175, 55, 0.1)',
+          background: panel.tint.accent,
           px: 1,
           py: 0.5,
           borderRadius: '4px'
@@ -102,10 +104,10 @@ export function TreeSearchBar({
           disabled={!canNavigate}
           aria-label="Previous match"
           sx={{ 
-            color: 'white',
-            background: 'rgba(255,255,255,0.05)',
-            '&:hover': { background: 'rgba(255,255,255,0.1)' },
-            '&.Mui-disabled': { color: 'rgba(255,255,255,0.2)' }
+            color: panel.ink.strong,
+            background: panel.surface.control,
+            '&:hover': { background: panel.surface.controlHover },
+            '&.Mui-disabled': { color: panel.ink.disabled }
           }}
         >
           ‹
@@ -116,10 +118,10 @@ export function TreeSearchBar({
           disabled={!canNavigate}
           aria-label="Next match"
           sx={{ 
-            color: 'white',
-            background: 'rgba(255,255,255,0.05)',
-            '&:hover': { background: 'rgba(255,255,255,0.1)' },
-            '&.Mui-disabled': { color: 'rgba(255,255,255,0.2)' }
+            color: panel.ink.strong,
+            background: panel.surface.control,
+            '&:hover': { background: panel.surface.controlHover },
+            '&.Mui-disabled': { color: panel.ink.disabled }
           }}
         >
           ›
@@ -162,11 +164,11 @@ export function TreeSearchBar({
     display: 'flex',
     alignItems: 'center',
     gap: 1,
-    backgroundColor: 'rgba(5, 5, 5, 0.7)',
+    backgroundColor: panel.surface.toggle,
     backdropFilter: 'blur(24px)',
-    border: '1px solid rgba(212, 175, 55, 0.2)',
+    border: `1px solid ${panel.border.accent}`,
     borderRadius: '8px',
-    boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
+    boxShadow: `0 8px 32px ${panel.shadow.soft}`,
   };
 
   return (

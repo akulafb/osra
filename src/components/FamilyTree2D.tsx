@@ -9,6 +9,7 @@ import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import Select from '@mui/material/Select';
 import MenuItem from '@mui/material/MenuItem';
+import { useTheme } from '@mui/material/styles';
 import { FamilyGraph, FamilyNode, FamilyLink, Node2D, LayoutType } from '../types/graph';
 import { calculateLayout, calculateBounds } from '../lib/layoutEngine';
 import NodeCard from './NodeCard';
@@ -173,6 +174,7 @@ export const FamilyTree2D: React.FC<FamilyTree2DProps> = ({
   canDissolveNode,
   onConfirmDissolve,
 }) => {
+  const { panel, hud } = useTheme().palette;
   const presetBackground = getBackgroundForTheme(backgroundTheme);
   const emptyBackground = getBackgroundForTheme(backgroundTheme);
   const svgRef = useRef<SVGSVGElement>(null);
@@ -586,24 +588,24 @@ export const FamilyTree2D: React.FC<FamilyTree2DProps> = ({
             left: '50%',
             transform: 'translateX(-50%)',
             zIndex: 1450,
-            background: 'rgba(15, 23, 42, 0.95)',
+            background: hud.banner.surface,
             backdropFilter: 'blur(16px)',
-            border: '1.5px solid rgba(168, 85, 247, 0.8)',
+            border: `1.5px solid ${hud.banner.border}`,
             borderRadius: '24px',
             padding: '8px 18px',
-            color: '#e2e8f0',
+            color: hud.banner.ink,
             fontSize: '13px',
             fontWeight: 600,
             display: 'flex',
             alignItems: 'center',
             gap: '12px',
-            boxShadow: '0 0 20px rgba(168, 85, 247, 0.4)',
+            boxShadow: `0 0 20px ${hud.banner.glow}`,
           }}
         >
           <span>
-            🔗 Connect Mode: Select a relative to link with <strong style={{ color: '#c084fc' }}>{connectSourceNode.firstName}</strong>
+            🔗 Connect Mode: Select a relative to link with <strong style={{ color: hud.banner.highlight }}>{connectSourceNode.firstName}</strong>
             {interaction.rejectedTarget && (
-              <span style={{ marginLeft: 8, color: '#f87171', fontSize: 11 }}>
+              <span style={{ marginLeft: 8, color: hud.banner.error, fontSize: 11 }}>
                 ({interaction.rejectedTarget.reason})
               </span>
             )}
@@ -614,11 +616,11 @@ export const FamilyTree2D: React.FC<FamilyTree2DProps> = ({
               interaction.handleEscape();
             }}
             style={{
-              background: 'rgba(255,255,255,0.1)',
+              background: panel.surface.controlHover,
               border: 'none',
               borderRadius: '12px',
               padding: '3px 10px',
-              color: '#fff',
+              color: panel.ink.strong,
               fontSize: '11px',
               cursor: 'pointer',
             }}
@@ -641,21 +643,21 @@ export const FamilyTree2D: React.FC<FamilyTree2DProps> = ({
           padding: '24px',
           background: emptyBackground
         }}>
-          <div style={{ maxWidth: '320px', color: 'white' }}>
+          <div style={{ maxWidth: '320px', color: panel.ink.strong }}>
             <div style={{ fontSize: '2.5rem', marginBottom: '16px' }}>🌳</div>
             {isMobile ? (
               <>
-                <div style={{ marginBottom: '12px', lineHeight: 1.5, color: 'rgba(255,255,255,0.9)' }}>
+                <div style={{ marginBottom: '12px', lineHeight: 1.5, color: panel.ink.soft }}>
                   Select a family above to explore, or try the <strong>3D view</strong>.
                 </div>
                 {isMobileViewport && (
-                  <div style={{ fontSize: '0.9rem', color: 'rgba(255,255,255,0.6)', lineHeight: 1.5 }}>
+                  <div style={{ fontSize: '0.9rem', color: panel.ink.muted, lineHeight: 1.5 }}>
                     Visit on desktop for the full immersive experience.
                   </div>
                 )}
               </>
             ) : (
-              <div style={{ color: 'rgba(255,255,255,0.9)' }}>Select a family above to view in 2D</div>
+              <div style={{ color: panel.ink.soft }}>Select a family above to view in 2D</div>
             )}
           </div>
         </div>
@@ -831,8 +833,8 @@ export const FamilyTree2D: React.FC<FamilyTree2DProps> = ({
 
           {/* Zoom controls overlay */}
           <g style={{ pointerEvents: 'none' }}>
-            <rect x="10" y="10" width="120" height="40" rx="8" fill="rgba(255,255,255,0.85)" />
-            <text x="20" y="35" fill="#334155" fontSize={12}>
+            <rect x="10" y="10" width="120" height="40" rx="8" fill={panel.zoomBadge.surface} />
+            <text x="20" y="35" fill={panel.zoomBadge.ink} fontSize={12}>
               Zoom: {(transform.k * 100).toFixed(0)}%
             </text>
           </g>
@@ -855,15 +857,15 @@ export const FamilyTree2D: React.FC<FamilyTree2DProps> = ({
           onClick={() => setShowControls(!showControls)}
           sx={{ 
             minWidth: '140px',
-            background: 'rgba(5, 5, 5, 0.7)',
+            background: panel.surface.toggle,
             backdropFilter: 'blur(24px)',
-            border: '1px solid rgba(212, 175, 55, 0.2)',
+            border: `1px solid ${panel.border.accent}`,
             color: 'primary.main',
             fontWeight: 700,
             letterSpacing: '0.05em',
             '&:hover': {
-              background: 'rgba(5, 5, 5, 0.85)',
-              borderColor: 'rgba(212, 175, 55, 0.4)',
+              background: panel.surface.toggleHover,
+              borderColor: panel.border.accentHover,
             }
           }}
         >
@@ -876,12 +878,12 @@ export const FamilyTree2D: React.FC<FamilyTree2DProps> = ({
             flexDirection: 'column',
             gap: '12px',
             width: '220px',
-            backgroundColor: 'rgba(5, 5, 5, 0.8)',
+            backgroundColor: panel.surface.panel,
             backdropFilter: 'blur(24px)',
             padding: '20px',
             borderRadius: '12px',
-            border: '1px solid rgba(212, 175, 55, 0.2)',
-            boxShadow: '0 20px 50px rgba(0,0,0,0.6)'
+            border: `1px solid ${panel.border.accent}`,
+            boxShadow: `0 20px 50px ${panel.shadow.raised}`
           }}>
             {userNodeId && (
               <Button 
@@ -890,7 +892,7 @@ export const FamilyTree2D: React.FC<FamilyTree2DProps> = ({
                 size="small" 
                 onClick={handleFindMe}
                 sx={{ 
-                  background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                  background: panel.fill.findMe,
                   fontWeight: 700,
                   letterSpacing: '0.05em'
                 }}
@@ -910,7 +912,7 @@ export const FamilyTree2D: React.FC<FamilyTree2DProps> = ({
                   borderColor: 'secondary.main',
                   fontSize: '0.7rem',
                   fontWeight: 700,
-                  '&:hover': { borderColor: 'secondary.light', background: 'rgba(124, 58, 237, 0.1)' }
+                  '&:hover': { borderColor: 'secondary.light', background: panel.tint.secondary }
                 }}
               >
                 + ADD PERSON
@@ -947,9 +949,9 @@ export const FamilyTree2D: React.FC<FamilyTree2DProps> = ({
                 fullWidth
                 sx={{
                   fontSize: '0.75rem',
-                  backgroundColor: 'rgba(255,255,255,0.03)',
+                  backgroundColor: panel.surface.well,
                   '& .MuiSelect-select': { py: 1, display: 'flex', alignItems: 'center', gap: 1 },
-                  '& fieldset': { borderColor: 'rgba(255,255,255,0.1)' },
+                  '& fieldset': { borderColor: panel.border.subtle },
                 }}
               >
                 {(['deep-space', 'wax-white', 'smooth-sepia', 'baby-blue'] as const).map((t) => (
@@ -974,9 +976,9 @@ export const FamilyTree2D: React.FC<FamilyTree2DProps> = ({
               <Box sx={{ 
                 mt: 1, 
                 p: 1.5, 
-                backgroundColor: 'rgba(0, 0, 0, 0.3)', 
+                backgroundColor: panel.surface.inset, 
                 borderRadius: '8px', 
-                border: '1px solid rgba(255,255,255,0.05)' 
+                border: `1px solid ${panel.border.hairline}` 
               }}>
                 <Typography variant="caption" sx={{ color: 'primary.main', fontWeight: 700, letterSpacing: '0.1em', mb: 1, display: 'block', fontSize: '0.6rem' }}>
                   SEARCH ARCHIVE
@@ -1015,7 +1017,7 @@ export const FamilyTree2D: React.FC<FamilyTree2DProps> = ({
                   onSetCollapsedNodes?.(parents);
                 }
               }}
-              sx={{ mt: 1, fontSize: '0.65rem', fontWeight: 700, borderColor: 'rgba(255,255,255,0.1)' }}
+              sx={{ mt: 1, fontSize: '0.65rem', fontWeight: 700, borderColor: panel.border.subtle }}
             >
               {collapsedNodes.size > 0 ? 'EXPAND ALL' : 'COLLAPSE ALL'}
             </Button>
@@ -1031,10 +1033,10 @@ export const FamilyTree2D: React.FC<FamilyTree2DProps> = ({
               sx={{ 
                 width: '100%', 
                 justifyContent: 'space-between',
-                background: 'rgba(5, 5, 5, 0.7)',
+                background: panel.surface.toggle,
                 backdropFilter: 'blur(24px)',
-                border: '1px solid rgba(212, 175, 55, 0.2)',
-                color: 'white',
+                border: `1px solid ${panel.border.accent}`,
+                color: panel.ink.strong,
                 fontSize: '0.7rem',
                 fontWeight: 600,
                 letterSpacing: '0.05em'
@@ -1049,11 +1051,11 @@ export const FamilyTree2D: React.FC<FamilyTree2DProps> = ({
             <ExpandableSpring isOpen={isPresetMenuOpen}>
               <Box sx={{
                 mt: 1,
-                backgroundColor: 'rgba(5, 5, 5, 0.9)',
+                backgroundColor: panel.surface.menu,
                 backdropFilter: 'blur(24px)',
                 borderRadius: '12px',
-                border: '1px solid rgba(212, 175, 55, 0.2)',
-                boxShadow: '0 10px 40px rgba(0,0,0,0.5)',
+                border: `1px solid ${panel.border.accent}`,
+                boxShadow: `0 10px 40px ${panel.shadow.floating}`,
                 width: '100%',
                 overflow: 'hidden',
               }}>
@@ -1072,9 +1074,9 @@ export const FamilyTree2D: React.FC<FamilyTree2DProps> = ({
                         fontSize: '0.7rem',
                         py: 1.5,
                         px: 2,
-                        color: activePreset === cluster ? 'primary.main' : 'rgba(255,255,255,0.7)',
-                        backgroundColor: activePreset === cluster ? 'rgba(212, 175, 55, 0.1)' : 'transparent',
-                        '&:hover': { background: 'rgba(255,255,255,0.05)' }
+                        color: activePreset === cluster ? 'primary.main' : panel.ink.body,
+                        backgroundColor: activePreset === cluster ? panel.tint.accent : 'transparent',
+                        '&:hover': { background: panel.surface.control }
                       }}
                     >
                       {cluster}

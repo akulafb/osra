@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTheme } from '@mui/material/styles';
 import { FamilyNode } from '../../types/graph';
 import type { OtherParentChoice } from '../../lib/otherParent';
 
@@ -16,20 +17,21 @@ export interface OtherParentPickerProps {
 }
 
 export const OtherParentPicker: React.FC<OtherParentPickerProps> = ({ choice, people, value, onChange }) => {
+  const { panel, hud } = useTheme().palette;
   const nameOf = (id: string) => people.find((p) => p.id === id)?.firstName ?? 'Unknown';
 
   if (choice.kind === 'none') return null;
 
   if (choice.kind === 'one') {
     return (
-      <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.7)' }}>
-        Other parent: <span style={{ color: '#fff', fontWeight: 600 }}>{nameOf(choice.personId)}</span>
+      <div style={{ fontSize: '10px', color: panel.ink.body }}>
+        Other parent: <span style={{ color: panel.ink.strong, fontWeight: 600 }}>{nameOf(choice.personId)}</span>
       </div>
     );
   }
 
   return (
-    <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '10px', color: 'rgba(255,255,255,0.7)' }}>
+    <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '10px', color: panel.ink.body }}>
       Other parent:
       <select
         value={value ?? ''}
@@ -37,11 +39,11 @@ export const OtherParentPicker: React.FC<OtherParentPickerProps> = ({ choice, pe
         style={{
           flex: 1,
           minWidth: 0,
-          background: 'rgba(30, 41, 59, 0.9)',
-          border: '1px solid rgba(255,255,255,0.2)',
+          background: hud.card.field,
+          border: `1px solid ${hud.card.controlBorder}`,
           borderRadius: '4px',
           padding: '2px 4px',
-          color: '#fff',
+          color: panel.ink.strong,
           fontSize: '10px',
         }}
       >

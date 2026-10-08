@@ -11,6 +11,7 @@ import Switch from '@mui/material/Switch';
 import FormControlLabel from '@mui/material/FormControlLabel';
 import Select from '@mui/material/Select';
 import MenuItem from '@mui/material/MenuItem';
+import { useTheme } from '@mui/material/styles';
 import { FamilyGraph, FamilyNode, RelativeDirection } from '../types/graph';
 import { useAuth } from '../contexts/AuthContext';
 import { createStarfield, type NebulaData } from '../utils/starfield';
@@ -317,6 +318,7 @@ export const FamilyTree3DContent: React.FC<FamilyTree3DProps> = ({
 }) => {
   const ForceGraph3DAny = ForceGraph3D as unknown as React.ComponentType<any>;
   const { userProfile } = useAuth();
+  const { panel } = useTheme().palette;
 
   // Which subject is in which lifecycle right now. Ids rather than subjects,
   // because the scene addresses its meshes by node id.
@@ -1698,16 +1700,16 @@ export const FamilyTree3DContent: React.FC<FamilyTree3DProps> = ({
   return (
     <div style={{ position: 'relative', width: '100%', height: '100%', background: containerBg }}>
       {isSimulationLoading && graphData && (
-        <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0, 0, 0, 0.7)', zIndex: 1000, color: '#fff', fontSize: '18px', pointerEvents: 'none' }}>
+        <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: panel.loader.scrim, zIndex: 1000, color: panel.ink.strong, fontSize: '18px', pointerEvents: 'none' }}>
           <div style={{ textAlign: 'center' }}>
             <div>Loading <span style={{ fontFamily: 'cursive', fontWeight: 'bold' }}>Osra</span>...</div>
-            <div style={{ width: '40px', height: '40px', border: '4px solid rgba(255,255,255,0.3)', borderTop: '4px solid #fff', borderRadius: '50%', animation: 'spin 1s linear infinite', margin: '10px auto' }} />
+            <div style={{ width: '40px', height: '40px', border: `4px solid ${panel.loader.track}`, borderTop: `4px solid ${panel.loader.head}`, borderRadius: '50%', animation: 'spin 1s linear infinite', margin: '10px auto' }} />
           </div>
         </div>
       )}
       {isStarfieldLoading && (
-        <div style={{ position: 'absolute', bottom: '24px', left: '50%', transform: 'translateX(-50%)', zIndex: 1000, display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 20px', background: 'rgba(0,0,0,0.6)', borderRadius: '8px', color: '#fff', fontSize: '0.9rem', pointerEvents: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.4)' }}>
-          <div style={{ width: 20, height: 20, border: '2px solid rgba(255,255,255,0.3)', borderTop: '2px solid #fff', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+        <div style={{ position: 'absolute', bottom: '24px', left: '50%', transform: 'translateX(-50%)', zIndex: 1000, display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 20px', background: panel.loader.toast, borderRadius: '8px', color: panel.ink.strong, fontSize: '0.9rem', pointerEvents: 'none', boxShadow: `0 4px 12px ${panel.shadow.soft}` }}>
+          <div style={{ width: 20, height: 20, border: `2px solid ${panel.loader.track}`, borderTop: `2px solid ${panel.loader.head}`, borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
           Loading background…
         </div>
       )}
@@ -1795,15 +1797,15 @@ export const FamilyTree3DContent: React.FC<FamilyTree3DProps> = ({
           onClick={() => setShowControls(!showControls)}
           sx={{ 
             minWidth: '140px',
-            background: 'rgba(5, 5, 5, 0.7)',
+            background: panel.surface.toggle,
             backdropFilter: 'blur(24px)',
-            border: '1px solid rgba(212, 175, 55, 0.2)',
+            border: `1px solid ${panel.border.accent}`,
             color: 'primary.main',
             fontWeight: 700,
             letterSpacing: '0.05em',
             '&:hover': {
-              background: 'rgba(5, 5, 5, 0.85)',
-              borderColor: 'rgba(212, 175, 55, 0.4)',
+              background: panel.surface.toggleHover,
+              borderColor: panel.border.accentHover,
             }
           }}
         >
@@ -1812,12 +1814,12 @@ export const FamilyTree3DContent: React.FC<FamilyTree3DProps> = ({
 
         {/* Ambiance Toggle - Floating slightly below button */}
         <Box sx={{ 
-          background: 'rgba(5, 5, 5, 0.5)', 
+          background: panel.surface.pill, 
           backdropFilter: 'blur(12px)', 
           px: 1.5, 
           py: 0.5, 
           borderRadius: '20px',
-          border: '1px solid rgba(255,255,255,0.05)'
+          border: `1px solid ${panel.border.hairline}`
         }}>
           <FormControlLabel
             control={
@@ -1831,7 +1833,7 @@ export const FamilyTree3DContent: React.FC<FamilyTree3DProps> = ({
             label="AMBIANCE"
             sx={{ 
               m: 0,
-              color: 'rgba(255,255,255,0.6)', 
+              color: panel.ink.muted, 
               '& .MuiFormControlLabel-label': { 
                 fontSize: '0.65rem', 
                 fontWeight: 700, 
@@ -1847,12 +1849,12 @@ export const FamilyTree3DContent: React.FC<FamilyTree3DProps> = ({
             flexDirection: 'column', 
             gap: '12px', 
             width: '220px', 
-            backgroundColor: 'rgba(5, 5, 5, 0.8)', 
+            backgroundColor: panel.surface.panel, 
             backdropFilter: 'blur(24px)',
             padding: '20px', 
             borderRadius: '12px', 
-            border: '1px solid rgba(212, 175, 55, 0.2)',
-            boxShadow: '0 20px 50px rgba(0,0,0,0.6)'
+            border: `1px solid ${panel.border.accent}`,
+            boxShadow: `0 20px 50px ${panel.shadow.raised}`
           }}>
             {userProfile?.node_id && (
               <Button
@@ -1866,7 +1868,7 @@ export const FamilyTree3DContent: React.FC<FamilyTree3DProps> = ({
                   focusNodeById(userProfile.node_id!);
                 }}
                 sx={{ 
-                  background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                  background: panel.fill.findMe,
                   fontWeight: 700,
                   letterSpacing: '0.05em'
                 }}
@@ -1886,7 +1888,7 @@ export const FamilyTree3DContent: React.FC<FamilyTree3DProps> = ({
                   borderColor: 'secondary.main',
                   fontSize: '0.7rem',
                   fontWeight: 700,
-                  '&:hover': { borderColor: 'secondary.light', background: 'rgba(124, 58, 237, 0.1)' }
+                  '&:hover': { borderColor: 'secondary.light', background: panel.tint.secondary }
                 }}
               >
                 + ADD PERSON
@@ -1916,7 +1918,7 @@ export const FamilyTree3DContent: React.FC<FamilyTree3DProps> = ({
               variant="text" 
               size="small" 
               onClick={resetView}
-              sx={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.7rem', fontWeight: 600 }}
+              sx={{ color: panel.ink.faint, fontSize: '0.7rem', fontWeight: 600 }}
             >
               RESET VIEWPORT
             </Button>
@@ -1932,9 +1934,9 @@ export const FamilyTree3DContent: React.FC<FamilyTree3DProps> = ({
                 fullWidth
                 sx={{
                   fontSize: '0.75rem',
-                  backgroundColor: 'rgba(255,255,255,0.03)',
+                  backgroundColor: panel.surface.well,
                   '& .MuiSelect-select': { py: 1, display: 'flex', alignItems: 'center', gap: 1 },
-                  '& fieldset': { borderColor: 'rgba(255,255,255,0.1)' },
+                  '& fieldset': { borderColor: panel.border.subtle },
                 }}
               >
                 {(['deep-space', 'wax-white', 'smooth-sepia', 'baby-blue'] as const).map((t) => (
@@ -1977,9 +1979,9 @@ export const FamilyTree3DContent: React.FC<FamilyTree3DProps> = ({
               <Box sx={{ 
                 mt: 1, 
                 p: 1.5, 
-                backgroundColor: 'rgba(0, 0, 0, 0.3)', 
+                backgroundColor: panel.surface.inset, 
                 borderRadius: '8px', 
-                border: '1px solid rgba(255,255,255,0.05)' 
+                border: `1px solid ${panel.border.hairline}` 
               }}>
                 <Typography variant="caption" sx={{ color: 'primary.main', fontWeight: 700, letterSpacing: '0.1em', mb: 1, display: 'block', fontSize: '0.6rem' }}>
                   SEARCH ARCHIVE
@@ -2018,7 +2020,7 @@ export const FamilyTree3DContent: React.FC<FamilyTree3DProps> = ({
                   effectiveSetCollapsedNodes(parents);
                 }
               }}
-              sx={{ mt: 1, fontSize: '0.65rem', fontWeight: 700, borderColor: 'rgba(255,255,255,0.1)' }}
+              sx={{ mt: 1, fontSize: '0.65rem', fontWeight: 700, borderColor: panel.border.subtle }}
             >
               {effectiveCollapsedNodes.size > 0 ? 'EXPAND ALL' : 'COLLAPSE ALL'}
             </Button>
@@ -2029,12 +2031,12 @@ export const FamilyTree3DContent: React.FC<FamilyTree3DProps> = ({
                 size="small"
                 fullWidth
                 onClick={() => setIsTextureMenuOpen(!isTextureMenuOpen)}
-                sx={{ justifyContent: 'space-between', color: 'rgba(255,255,255,0.6)', fontSize: '0.7rem' }}
+                sx={{ justifyContent: 'space-between', color: panel.ink.muted, fontSize: '0.7rem' }}
               >
                 TEXTURE: {nodeTexture.toUpperCase()} {isTextureMenuOpen ? '▴' : '▾'}
               </Button>
               <TextureMenuSpring isOpen={isTextureMenuOpen}>
-                <Box sx={{ mt: 0.5, backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: '4px', overflow: 'hidden' }}>
+                <Box sx={{ mt: 0.5, backgroundColor: panel.surface.well, borderRadius: '4px', overflow: 'hidden' }}>
                   <Button fullWidth size="small" sx={{ justifyContent: 'flex-start', fontSize: '0.7rem', py: 1 }} onClick={() => { setNodeTexture('spheres'); setIsTextureMenuOpen(false); }}>Spheres</Button>
                   <Button fullWidth size="small" sx={{ justifyContent: 'flex-start', fontSize: '0.7rem', py: 1 }} onClick={() => { setNodeTexture('planets'); setIsTextureMenuOpen(false); }}>Planets</Button>
                   <Button fullWidth size="small" sx={{ justifyContent: 'flex-start', fontSize: '0.7rem', py: 1 }} onClick={() => { setNodeTexture('none'); setIsTextureMenuOpen(false); }}>None</Button>
@@ -2053,7 +2055,7 @@ export const FamilyTree3DContent: React.FC<FamilyTree3DProps> = ({
                 FAMILY PRESETS {isPresetsOpen ? '▴' : '▾'}
               </Button>
               <TextureMenuSpring isOpen={isPresetsOpen}>
-                <Box sx={{ mt: 0.5, backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: '4px', overflow: 'hidden', maxHeight: '200px', overflowY: 'auto' }}>
+                <Box sx={{ mt: 0.5, backgroundColor: panel.surface.well, borderRadius: '4px', overflow: 'hidden', maxHeight: '200px', overflowY: 'auto' }}>
                   <Button fullWidth size="small" sx={{ justifyContent: 'flex-start', fontSize: '0.7rem' }} onClick={() => applyPreset(null)}>Global View</Button>
                   {uniqueClusters.map((cluster) => (
                     <Button key={cluster} fullWidth size="small" sx={{ justifyContent: 'flex-start', fontSize: '0.7rem', color: activePreset === cluster ? 'primary.main' : 'inherit' }} onClick={() => applyPreset(cluster)}>{cluster}</Button>
@@ -2068,13 +2070,13 @@ export const FamilyTree3DContent: React.FC<FamilyTree3DProps> = ({
                 size="small"
                 fullWidth
                 onClick={() => setIsVisibilityOpen(!isVisibilityOpen)}
-                sx={{ justifyContent: 'space-between', color: 'rgba(255,255,255,0.6)', fontSize: '0.7rem' }}
+                sx={{ justifyContent: 'space-between', color: panel.ink.muted, fontSize: '0.7rem' }}
               >
                 VISIBILITY {isVisibilityOpen ? '▴' : '▾'}
               </Button>
               <TextureMenuSpring isOpen={isVisibilityOpen} maxHeightOpen={300}>
-                <Box sx={{ mt: 0.5, backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: '4px', overflow: 'hidden' }}>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', p: 1, borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                <Box sx={{ mt: 0.5, backgroundColor: panel.surface.well, borderRadius: '4px', overflow: 'hidden' }}>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', p: 1, borderBottom: `1px solid ${panel.border.hairline}` }}>
                     <Button size="small" sx={{ fontSize: '0.6rem', minWidth: 0 }} onClick={() => onVisibleClusters3DChange(new Set(uniqueClusters))}>ALL</Button>
                     <Button size="small" sx={{ fontSize: '0.6rem', minWidth: 0 }} onClick={() => onVisibleClusters3DChange(new Set())}>NONE</Button>
                   </Box>
@@ -2092,9 +2094,9 @@ export const FamilyTree3DContent: React.FC<FamilyTree3DProps> = ({
                               return n;
                             });
                           }}
-                          sx={{ p: 0.5, color: 'rgba(255,255,255,0.3)', '&.Mui-checked': { color: 'primary.main' } }}
+                          sx={{ p: 0.5, color: panel.ink.ghost, '&.Mui-checked': { color: 'primary.main' } }}
                         />
-                        <Typography sx={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.7)' }}>{cluster}</Typography>
+                        <Typography sx={{ fontSize: '0.75rem', color: panel.ink.body }}>{cluster}</Typography>
                       </Box>
                     ))}
                   </Box>
@@ -2125,13 +2127,13 @@ export const FamilyTree3DContent: React.FC<FamilyTree3DProps> = ({
               variant="outlined"
               onClick={() => setShowNavControls(!showNavControls)}
               sx={{
-                backgroundColor: 'rgba(30, 30, 40, 0.95)',
-                borderColor: 'rgba(255,255,255,0.1)',
-                color: '#e5e7eb',
+                backgroundColor: panel.nav.surface,
+                borderColor: panel.border.subtle,
+                color: panel.nav.ink,
                 fontSize: '0.75rem',
                 fontWeight: 700,
                 letterSpacing: '1px',
-                '&:hover': { borderColor: 'rgba(255,255,255,0.2)', backgroundColor: 'rgba(30, 30, 40, 0.95)' },
+                '&:hover': { borderColor: panel.border.subtleHover, backgroundColor: panel.nav.surface },
               }}
             >
               NAV CONTROLS 👁️ {showNavControls ? '▴' : '▾'}
@@ -2139,22 +2141,22 @@ export const FamilyTree3DContent: React.FC<FamilyTree3DProps> = ({
             <SettingsPanelSpring isOpen={showNavControls}>
               <div style={{
                 marginTop: '8px',
-                backgroundColor: 'rgba(30, 30, 40, 0.95)',
+                backgroundColor: panel.nav.surface,
                 padding: '8px 12px',
                 borderRadius: '8px',
-                color: '#e5e7eb',
+                color: panel.nav.ink,
                 fontSize: '0.7rem',
-                border: '1px solid rgba(255,255,255,0.1)',
-                boxShadow: '0 10px 40px rgba(0,0,0,0.5)',
+                border: `1px solid ${panel.border.subtle}`,
+                boxShadow: `0 10px 40px ${panel.shadow.floating}`,
                 minWidth: '180px',
               }}>
                 <div style={{ lineHeight: '1.6' }}>
-                  <div><span style={{ color: isSteeringActive ? '#10b981' : '#fbbf24', fontWeight: 600 }}>R</span>: Mouse Steering <span style={{ color: isSteeringActive ? '#10b981' : '#fbbf24' }}>({isSteeringActive ? 'ACTIVE' : 'LOCKED'})</span></div>
-                  <div><span style={{ color: '#fff', fontWeight: 600 }}>WASD</span>: Move (Hold <span style={{ color: '#fff', fontWeight: 600 }}>Shift</span> for Boost)</div>
-                  <div><span style={{ color: '#fff', fontWeight: 600 }}>Q / E</span>: Roll View L / R</div>
-                  <div><span style={{ color: '#fff', fontWeight: 600 }}>Tab</span>: Cycle Names</div>
-                  <div><span style={{ color: '#fff', fontWeight: 600 }}>Enter</span>: Focus selection</div>
-                  <div><span style={{ color: '#fff', fontWeight: 600 }}>Esc</span>: Deselect</div>
+                  <div><span style={{ color: isSteeringActive ? panel.nav.keyOn : panel.nav.keyOff, fontWeight: 600 }}>R</span>: Mouse Steering <span style={{ color: isSteeringActive ? panel.nav.keyOn : panel.nav.keyOff }}>({isSteeringActive ? 'ACTIVE' : 'LOCKED'})</span></div>
+                  <div><span style={{ color: panel.ink.strong, fontWeight: 600 }}>WASD</span>: Move (Hold <span style={{ color: panel.ink.strong, fontWeight: 600 }}>Shift</span> for Boost)</div>
+                  <div><span style={{ color: panel.ink.strong, fontWeight: 600 }}>Q / E</span>: Roll View L / R</div>
+                  <div><span style={{ color: panel.ink.strong, fontWeight: 600 }}>Tab</span>: Cycle Names</div>
+                  <div><span style={{ color: panel.ink.strong, fontWeight: 600 }}>Enter</span>: Focus selection</div>
+                  <div><span style={{ color: panel.ink.strong, fontWeight: 600 }}>Esc</span>: Deselect</div>
                 </div>
               </div>
             </SettingsPanelSpring>

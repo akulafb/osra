@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTheme } from '@mui/material/styles';
 import { FamilyNode } from '../types/graph';
 import { TargetOption } from './cards/connectCandidates';
 import { CONNECT_ACCENT } from './cards/relationStyle';
@@ -45,6 +46,7 @@ export const ConnectTargetingBody: React.FC<ConnectTargetingBodyProps> = ({
   onPickTarget,
   onExit,
 }) => {
+  const { panel, hud } = useTheme().palette;
   const truncated = Math.max(0, optionTotal - options.length);
 
   return (
@@ -52,14 +54,14 @@ export const ConnectTargetingBody: React.FC<ConnectTargetingBodyProps> = ({
       <div style={{ fontSize: 11, fontWeight: 700, color: CONNECT_ACCENT }}>
         🔗 Connect {sourceNode.firstName} to…
       </div>
-      <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.65)', lineHeight: 1.4 }}>
+      <div style={{ fontSize: 10, color: hud.panel.caption, lineHeight: 1.4 }}>
         {candidateCount === 0
           ? 'No one in view can be linked to this person yet.'
           : 'Click a glowing planet, or pick from the list.'}
         {unreachableCount > 0 && (
           <>
             {' '}
-            <span style={{ color: '#fbbf24' }}>
+            <span style={{ color: hud.targeting.warning }}>
               {unreachableCount} of {candidateCount} are out of view — search for them by name.
             </span>
           </>
@@ -79,10 +81,10 @@ export const ConnectTargetingBody: React.FC<ConnectTargetingBodyProps> = ({
         dir="auto"
         aria-label="Search for a person to connect"
         style={{
-          background: 'rgba(0,0,0,0.35)',
-          border: '1px solid rgba(255,255,255,0.15)',
+          background: hud.targeting.field,
+          border: `1px solid ${hud.card.border}`,
           borderRadius: 6,
-          color: '#fff',
+          color: panel.ink.strong,
           fontSize: 11,
           outline: 'none',
           padding: '6px 8px',
@@ -103,12 +105,12 @@ export const ConnectTargetingBody: React.FC<ConnectTargetingBodyProps> = ({
             title={candidacy.ok ? undefined : candidacy.reason}
             style={{
               alignItems: 'center',
-              background: candidacy.ok ? 'rgba(192, 132, 252, 0.12)' : 'rgba(255,255,255,0.03)',
+              background: candidacy.ok ? hud.targeting.option : panel.surface.well,
               border: candidacy.ok
                 ? `1px solid ${CONNECT_ACCENT}66`
-                : '1px solid rgba(255,255,255,0.08)',
+                : `1px solid ${hud.targeting.optionOffBorder}`,
               borderRadius: 6,
-              color: candidacy.ok ? '#fff' : 'rgba(255,255,255,0.35)',
+              color: candidacy.ok ? panel.ink.strong : hud.targeting.optionOffInk,
               cursor: candidacy.ok ? 'pointer' : 'not-allowed',
               display: 'flex',
               fontSize: 11,
@@ -121,12 +123,12 @@ export const ConnectTargetingBody: React.FC<ConnectTargetingBodyProps> = ({
             <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {node.firstName}
               {node.familyCluster && (
-                <span style={{ color: 'rgba(255,255,255,0.4)' }}> · {node.familyCluster}</span>
+                <span style={{ color: hud.card.inkQuiet }}> · {node.familyCluster}</span>
               )}
             </span>
             {candidacy.ok && visibility !== 'onscreen' && (
               <span
-                style={{ color: '#fbbf24', flexShrink: 0 }}
+                style={{ color: hud.targeting.warning, flexShrink: 0 }}
                 title={visibility === 'behind' ? 'Behind the camera' : 'Off-screen'}
               >
                 ↗
@@ -135,7 +137,7 @@ export const ConnectTargetingBody: React.FC<ConnectTargetingBodyProps> = ({
           </button>
         ))}
         {options.length === 0 && (
-          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>
+          <div style={{ fontSize: 10, color: hud.card.inkQuiet }}>
             {query.trim() ? 'No one matches that search.' : 'Nothing to link to here.'}
           </div>
         )}
@@ -143,13 +145,13 @@ export const ConnectTargetingBody: React.FC<ConnectTargetingBodyProps> = ({
 
       {/* Saying how many were left out, rather than claiming the list is all of them. */}
       {truncated > 0 && (
-        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>
+        <div style={{ fontSize: 10, color: hud.card.inkQuiet }}>
           {truncated} more — narrow it with a search.
         </div>
       )}
 
       {rejected && (
-        <div style={{ fontSize: 10, color: '#f87171', lineHeight: 1.4 }}>
+        <div style={{ fontSize: 10, color: hud.card.error, lineHeight: 1.4 }}>
           {rejected.node.firstName}: {rejected.reason}
         </div>
       )}
@@ -159,9 +161,9 @@ export const ConnectTargetingBody: React.FC<ConnectTargetingBodyProps> = ({
         onClick={onExit}
         style={{
           background: 'transparent',
-          border: '1px solid rgba(255,255,255,0.2)',
+          border: `1px solid ${hud.card.controlBorder}`,
           borderRadius: 6,
-          color: 'rgba(255,255,255,0.8)',
+          color: hud.card.inkSecondary,
           cursor: 'pointer',
           fontSize: 11,
           padding: '5px 8px',
