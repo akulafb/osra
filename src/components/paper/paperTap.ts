@@ -1,4 +1,3 @@
-/** The audio nodes a tap needs, so a tap can be played on any context. */
 export type TapAudio = Pick<BaseAudioContext, 'currentTime' | 'destination' | 'createOscillator' | 'createGain'>;
 
 const TAP_PEAK_GAIN = 0.05;
@@ -29,20 +28,19 @@ let context: AudioContext | null = null;
 
 /**
  * Makes the tap's audio context on first use and wakes it. Called inside a
- * click, it is what lets later taps play on browsers that only start audio
- * from a gesture.
+ * click or key press, it is what lets later taps play on browsers that only
+ * start audio from a gesture.
  */
 export function wakePaperTap(): AudioContext | null {
   try {
     if (!context && typeof AudioContext !== 'undefined') context = new AudioContext();
-    if (context?.state === 'suspended') void context.resume();
+    if (context && context.state !== 'running') void context.resume();
   } catch {
     context = null;
   }
   return context;
 }
 
-/** The tap that plays on each focus in Paper 3D. */
 export function playPaperTap(): void {
   const audio = wakePaperTap();
   if (audio) playTapOn(audio);

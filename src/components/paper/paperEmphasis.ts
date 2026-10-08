@@ -41,10 +41,7 @@ export function inkOf(state: PaperEmphasisState, id: string): number {
   return PAPER_3D_INK[state.emphasis.get(id) ?? 'normal'];
 }
 
-/**
- * The ink each end of a line keeps: its own Person's. A faint Person's line
- * darkens toward a kept relative, so it never crosses their disc as a light wedge.
- */
+/** The ink each end of a line keeps: its own Person's. */
 export function lineEndInks(state: PaperEmphasisState, line: PaperLine): [number, number] {
   return [inkOf(state, line.sourceId), inkOf(state, line.targetId)];
 }

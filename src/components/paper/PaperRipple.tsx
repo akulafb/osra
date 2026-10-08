@@ -6,6 +6,7 @@ import type { PaperLayout, PaperLine } from '../../lib/paperLayout';
 import { linesOf } from '../../lib/paperHover';
 import { paperRippleProgress, paperRipplePulse } from '../../lib/paperFocus';
 import { placeOf, type PaperEmphasisState } from './paperEmphasis';
+import { PAPER_LINE_RENDER_ORDER } from './paperScene';
 
 const MAX_RIPPLE_LINES = 64;
 const RIPPLE_WIDTH_PX = 6;
@@ -59,5 +60,5 @@ export function PaperRipple({
     geometry.computeBoundingSphere();
   });
 
-  return <Line ref={ref} points={points} segments fog color={ink} lineWidth={RIPPLE_WIDTH_PX} visible={false} />;
+  return <Line ref={ref} points={points} segments fog renderOrder={PAPER_LINE_RENDER_ORDER + 1} depthWrite={false} color={ink} lineWidth={RIPPLE_WIDTH_PX} visible={false} />;
 }

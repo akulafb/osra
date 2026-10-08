@@ -42,6 +42,7 @@ export interface PaperFlyInput {
  * the reach still fits the narrow space above the bottom sheet.
  */
 export function paperFlyTo({ person, reach, from, viewport, inset, fovDegrees }: PaperFlyInput): { position: Point3; target: Point3 } {
+  if (!(viewport.width > 0 && viewport.height > 0)) return from;
   const back = normalize(sub(from.position, from.target)) ?? { x: 0, y: 0, z: 1 };
   const freeWidth = Math.max(1, viewport.width - inset.rightPx);
   const freeHeight = Math.max(1, viewport.height - inset.bottomPx);

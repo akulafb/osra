@@ -6,7 +6,7 @@ import type { FamilyLink } from '../../types/graph';
 import type { PaperLayout, PaperLine } from '../../lib/paperLayout';
 import { emphasisSubject, linesOf } from '../../lib/paperHover';
 import { fadeInk, inkOf, lineEndInks, placeOf, type PaperEmphasisState } from './paperEmphasis';
-import { paperLineSegments } from './paperScene';
+import { PAPER_LINE_RENDER_ORDER, paperLineSegments } from './paperScene';
 
 interface PaperLinesProps {
   lines: readonly PaperLine[];
@@ -62,10 +62,7 @@ export function PaperLines({ lines, layout, ink, parentInk, paper, state, showAr
 
 type LineSegments = ElementRef<typeof Line>;
 
-/**
- * One draw call for every line of one kind. Each end of a line fades with its
- * own Person, and the hovered or focused Person's own lines darken to full ink.
- */
+/** One draw call for every line of one kind; the hovered or focused Person's own lines darken to full ink. */
 function PaperLineKind({
   lines,
   layout,
@@ -111,7 +108,7 @@ function PaperLineKind({
       });
       start.data.needsUpdate = true;
       geometry.computeBoundingSphere();
-      if (style.dashed) segments.computeLineDistances();
+      if (style.dashed && fresh) segments.computeLineDistances();
     }
 
     if (fresh || colours !== last.colours || emphasis !== last.emphasis) {
@@ -136,6 +133,8 @@ function PaperLineKind({
       vertexColors={vertexColors}
       segments
       fog
+      renderOrder={PAPER_LINE_RENDER_ORDER}
+      depthWrite={false}
       lineWidth={style.width}
       dashed={style.dashed}
       dashSize={3}

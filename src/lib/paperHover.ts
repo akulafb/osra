@@ -105,7 +105,6 @@ export function easeDrift(
   return next;
 }
 
-/** The lines that end at this Person. */
 export function linesOf<L extends PaperLine>(lines: readonly L[], personId: string | null): L[] {
   if (!personId) return [];
   return lines.filter((line) => line.sourceId === personId || line.targetId === personId);

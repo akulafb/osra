@@ -29,7 +29,7 @@ export function PaperFocus({ selectedId, layout, ids, links, drawerInset, onOver
   const fly = useCallback(
     (id: string, smooth: boolean) => {
       const disc = layout.get(id);
-      if (!controls || !disc || !(controls.camera instanceof THREE.PerspectiveCamera)) return;
+      if (!controls || !disc || !(controls.camera instanceof THREE.PerspectiveCamera)) return false;
       const emphasis = focusEmphasis({ personIds: ids, links, hoveredId: null, focusedId: id, searchMatchIds: null });
       const rect = canvas.getBoundingClientRect();
       const sheetTop = window.innerHeight * (1 - drawerInset.bottomVh / 100);
@@ -37,18 +37,19 @@ export function PaperFocus({ selectedId, layout, ids, links, drawerInset, onOver
       const { position, target } = paperFlyTo({
         person: disc,
         reach: paperFocusReach(layout, disc, emphasis),
-        from: { position: controls.camera.position, target: controls.getTarget(new THREE.Vector3()) },
+        from: { position: controls.getPosition(new THREE.Vector3(), true), target: controls.getTarget(new THREE.Vector3(), true) },
         viewport: { width: rect.width, height: rect.height },
         inset: { rightPx: Math.max(0, rect.right - drawerLeft), bottomPx: Math.max(0, rect.bottom - sheetTop) },
         fovDegrees: controls.camera.fov,
       });
       void controls.setLookAt(position.x, position.y, position.z, target.x, target.y, target.z, smooth);
+      return true;
     },
     [controls, canvas, layout, ids, links, drawerInset]
   );
 
   useEffect(() => {
-    flyTo.current = (id) => fly(id, true);
+    flyTo.current = (id) => void fly(id, true);
     return () => {
       flyTo.current = null;
     };
@@ -62,8 +63,7 @@ export function PaperFocus({ selectedId, layout, ids, links, drawerInset, onOver
     if (selectedId === previous) return;
     const arriving = previous === undefined;
     if (selectedId) {
-      fly(selectedId, !arriving);
-      if (!arriving) playPaperTap();
+      if (fly(selectedId, !arriving) && !arriving) playPaperTap();
     } else if (previous) {
       onOverview();
     }

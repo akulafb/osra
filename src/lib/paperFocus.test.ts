@@ -56,6 +56,11 @@ describe('paperFlyTo', () => {
     expect(at.y).toBeCloseTo(450, 3);
   });
 
+  it('stays where it is while the canvas has no size yet, rather than flying onto its own target', () => {
+    expect(paperFlyTo(flyInput(1440, 0, { rightPx: 0, bottomPx: 0 }))).toEqual(camera);
+    expect(paperFlyTo(flyInput(0, 900, { rightPx: 0, bottomPx: 0 }))).toEqual(camera);
+  });
+
   it('stands further back on a portrait phone, so the relatives fit the narrow space', () => {
     const distance = (fly: ReturnType<typeof paperFlyTo>) =>
       new THREE.Vector3(fly.position.x, fly.position.y, fly.position.z).distanceTo(new THREE.Vector3(fly.target.x, fly.target.y, fly.target.z));

@@ -49,7 +49,7 @@ export function PaperParticles({
     (dots.material as THREE.PointsMaterial).size = PARTICLE_SIZE_PX * gl.getPixelRatio();
 
     const position = geometry.getAttribute('position') as THREE.BufferAttribute;
-    const time = clock.getElapsedTime();
+    const time = clock.elapsedTime;
     let n = 0;
     for (const line of own) {
       const otherId = line.sourceId === subjectId ? line.targetId : line.sourceId;

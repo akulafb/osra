@@ -117,7 +117,7 @@ Preconditions:
 
 ### Sub-features
 
-- `paper-3d-hover` (mouse only): the Person under the pointer gets a thin ink ring, the same width at any zoom, and a pointer cursor. Their direct relatives (parents, children, spouses and ex-spouses) keep full ink; everyone else and their labels fade to half ink. Each end of a line fades with its own Person, so a line from a faded Person darkens as it nears a relative's disc and never crosses it as a light wedge. The hovered Person's own lines darken to full ink and carry ink dots flowing out from them.
+- `paper-3d-hover` (mouse only): the Person under the pointer gets a thin ink ring, the same width at any zoom, and a pointer cursor. Their direct relatives (parents, children, spouses and ex-spouses) keep full ink; everyone else and their labels fade to half ink. Each end of a line fades with its own Person, and lines draw beneath every disc, so no line crosses a disc as a light wedge. The hovered Person's own lines darken to full ink and carry ink dots flowing out from them.
 - `paper-3d-hover-lean`: the relatives lean toward the hovered Person by a small share of the distance (at most 6 world units, never into the 4-unit gap between discs) with an easing of 0.12 s time constant (most of the way in about 0.35 s), and ease back when the hover ends. Their labels, lines and arrows follow, and arrows dim with their lines. The layout itself never changes.
 - `paper-3d-hover-rules`: emphasis comes from `focusEmphasis`, as in Paper 2D: while a Person is selected the selection outranks the hover, so hovering shows only the pointer cursor. Where discs overlap, a click selects the ringed Person (the nearest centre on screen), not the front-most disc. A camera drag (more than 6 px with a button down), the pointer over INSTRUMENTS or the drawer, or leaving the canvas hovers nobody. Touch has no hover: a phone tap opens the bottom sheet as before.
 
@@ -143,7 +143,7 @@ Preconditions:
 - `paper-3d-focus-ripple`: 0.4 s after the focus, as the camera nears, a 6 px ink pulse runs out along the focused Person's lines (at most 64) over 0.9 s, once.
 - `paper-3d-focus-wobble`: the relatives wobble gently around their places (at most 1.5 units, easing in over 0.6 s) while the focus lasts; the layout never changes.
 - `paper-3d-focus-colour`: with colour on, the panels fade from the default pair to the focused Person's family pair.
-- `paper-3d-focus-tap`: each new focus plays a short Web Audio tap (880 Hz falling, 0.11 s, quiet). It always plays: AMBIANCE is Cosmos-only (product decision 10). Nothing plays when the page loads with a Person already selected.
+- `paper-3d-focus-tap`: each new focus plays a short Web Audio tap (880 Hz falling, 0.11 s, quiet). Any click or key press inside Paper wakes the audio first, so browsers that need a gesture still play it. It always plays: AMBIANCE is Cosmos-only (product decision 10). Nothing plays when the page loads with a Person already selected.
 - `paper-3d-focus-clear`: Escape or a tap on empty paper clears the selection, closes the drawer and flies back to the overview.
 
 ### Driving it with ui.sh

@@ -229,6 +229,7 @@ export function PaperTree3D({
       }}
       onClick={handleSceneClick}
       onClickCapture={wakePaperTap}
+      onKeyDownCapture={wakePaperTap}
       onPointerMove={handlePointerMove}
       onPointerLeave={handlePointerLeave}
     >
