@@ -3,7 +3,7 @@ import { useTheme } from '@mui/material/styles';
 import { FamilyNode, RelativeDirection } from '../../types/graph';
 import { readMatchResolution, SPELLING_MATCH_LABEL } from '../../lib/personMatch';
 import { usePersonMatch } from '../../hooks/usePersonMatch';
-import { relationColor, relationLabel } from './relationStyle';
+import { relationLabel } from './relationStyle';
 import { OtherParentPicker } from './OtherParentPicker';
 import { NO_OTHER_PARENT, type OtherParentChoice } from '../../lib/otherParent';
 import { useOtherParentPick } from '../../hooks/useOtherParentPick';
@@ -117,7 +117,7 @@ export const GhostNodeCard: React.FC<GhostNodeCardProps> = ({
     }
   };
 
-  const color = relationColor(relation);
+  const { line: color, glow } = hud.relation[relation];
 
   return (
     <div
@@ -127,7 +127,7 @@ export const GhostNodeCard: React.FC<GhostNodeCardProps> = ({
         backdropFilter: 'blur(16px)',
         border: `1.5px dashed ${color}`,
         borderRadius: '10px',
-        boxShadow: `0 0 20px ${color}33, 0 8px 30px ${panel.shadow.raised}`,
+        boxShadow: `0 0 20px ${glow}, 0 8px 30px ${panel.shadow.raised}`,
         padding: '8px 10px',
         boxSizing: 'border-box',
         color: panel.ink.strong,

@@ -5,19 +5,35 @@ import {
   resolveCanvasMode,
   type CanvasMode,
   type CanvasModePreference,
+  type PaperColour,
 } from '../lib/canvasMode';
-import { GRAYSCALE_PAIR, type PaperPair } from '../theme/paperPair';
+import { GRAYSCALE_PAIR, PAPER_PAIRS, type PaperPair } from '../theme/paperPair';
+
+export interface FocusedPerson {
+  familyCluster?: string;
+}
 
 export interface CanvasModeController extends CanvasModePreference {
   setMode: (mode: CanvasMode) => void;
+  setPaperColour: (paperColour: PaperColour) => void;
+  /** Tells Paper whose family's pair to show; null clears focus and draws a new overview pair. */
+  setFocusedPerson: (person: FocusedPerson | null) => void;
 }
 
 export interface CurrentPaperPair {
+  /** The pair on screen right now; during a fade it changes every frame. */
   pair: PaperPair;
+  /** The pair the current fade is heading to. */
+  target: PaperPair;
 }
 
 export const CanvasModeContext = createContext<CanvasModeController | null>(null);
-export const CurrentPaperPairContext = createContext<CurrentPaperPair>({ pair: GRAYSCALE_PAIR });
+export const CurrentPaperPairContext = createContext<CurrentPaperPair>({
+  pair: GRAYSCALE_PAIR,
+  target: GRAYSCALE_PAIR,
+});
+
+const LAST_OVERVIEW_PAIR_KEY = 'family-tree-paper-overview-pair';
 
 export function readStoredCanvasMode(): CanvasModePreference {
   try {
@@ -36,6 +52,31 @@ export function writeStoredCanvasMode(mode: CanvasMode): void {
     localStorage.setItem(CANVAS_MODE_STORAGE_KEY, mode);
   } catch (e) {
     console.warn('[useCanvasMode] Failed to save preference:', e);
+  }
+}
+
+export function writeStoredPaperColour(paperColour: PaperColour): void {
+  try {
+    localStorage.setItem(PAPER_COLOUR_STORAGE_KEY, paperColour);
+  } catch (e) {
+    console.warn('[useCanvasMode] Failed to save colour setting:', e);
+  }
+}
+
+export function readLastOverviewPair(): PaperPair | null {
+  try {
+    const stored = sessionStorage.getItem(LAST_OVERVIEW_PAIR_KEY);
+    return stored === null ? null : (PAPER_PAIRS[Number(stored)] ?? null);
+  } catch {
+    return null;
+  }
+}
+
+export function writeLastOverviewPair(pair: PaperPair): void {
+  try {
+    sessionStorage.setItem(LAST_OVERVIEW_PAIR_KEY, String(PAPER_PAIRS.indexOf(pair)));
+  } catch {
+    // A tab without sessionStorage just risks repeating the last overview pair.
   }
 }
 

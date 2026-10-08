@@ -1,5 +1,4 @@
-import { alpha } from '@mui/material/styles';
-import { PAPER_ACCENT, type PaperPair } from './paperPair';
+import { livePair } from './paperPair';
 
 export interface ModalTokens {
   scrim: string;
@@ -128,62 +127,63 @@ export const cosmosModal: ModalTokens = {
   },
 };
 
-export function paperModal({ paper, ink }: PaperPair): ModalTokens {
+export function paperModal(): ModalTokens {
+  const { paper, ink, accent } = livePair;
   return {
-    scrim: alpha(ink, 0.35),
-    surface: alpha(paper, 0.97),
-    previewShadow: alpha(ink, 0.25),
-    submit: ink,
-    optionSurface: alpha(ink, 0.04),
+    scrim: ink(0.35),
+    surface: paper(0.97),
+    previewShadow: ink(0.25),
+    submit: ink(),
+    optionSurface: ink(0.04),
     field: {
-      surface: alpha(ink, 0.03),
-      border: alpha(ink, 0.15),
+      surface: ink(0.03),
+      border: ink(0.15),
     },
     ink: {
-      hint: alpha(ink, 0.45),
-      meta: alpha(ink, 0.6),
-      secondary: alpha(ink, 0.8),
+      hint: ink(0.45),
+      meta: ink(0.6),
+      secondary: ink(0.8),
     },
     notice: {
-      surface: alpha(ink, 0.04),
-      border: alpha(ink, 0.3),
+      surface: ink(0.04),
+      border: ink(0.3),
     },
     status: {
-      successSurface: alpha(ink, 0.06),
-      successBorder: alpha(ink, 0.3),
-      errorSurface: alpha(PAPER_ACCENT, 0.08),
-      errorBorder: alpha(PAPER_ACCENT, 0.4),
+      successSurface: ink(0.06),
+      successBorder: ink(0.3),
+      errorSurface: accent(0.08),
+      errorBorder: accent(0.4),
     },
     adminTool: {
-      scrim: alpha(ink, 0.4),
-      surface: paper,
-      raised: alpha(ink, 0.04),
-      well: alpha(ink, 0.06),
-      shadow: alpha(ink, 0.25),
-      border: alpha(ink, 0.15),
-      errorSurface: alpha(PAPER_ACCENT, 0.1),
+      scrim: ink(0.4),
+      surface: paper(),
+      raised: ink(0.04),
+      well: ink(0.06),
+      shadow: ink(0.25),
+      border: ink(0.15),
+      errorSurface: accent(0.1),
       ink: {
-        soft: alpha(ink, 0.9),
-        muted: alpha(ink, 0.7),
-        faint: alpha(ink, 0.55),
-        ghost: alpha(ink, 0.4),
+        soft: ink(0.9),
+        muted: ink(0.7),
+        faint: ink(0.55),
+        ghost: ink(0.4),
       },
       badge: {
-        existing: alpha(ink, 0.08),
-        generated: alpha(ink, 0.08),
+        existing: ink(0.08),
+        generated: ink(0.08),
       },
       tag: {
-        surface: alpha(ink, 0.08),
-        ink,
+        surface: ink(0.08),
+        ink: ink(),
       },
     },
     adminForm: {
-      scrim: alpha(ink, 0.35),
-      surface: paper,
-      rule: alpha(ink, 0.2),
+      scrim: ink(0.35),
+      surface: paper(),
+      rule: ink(0.2),
       field: {
-        surface: alpha(ink, 0.03),
-        border: alpha(ink, 0.25),
+        surface: ink(0.03),
+        border: ink(0.25),
       },
     },
   };

@@ -1,5 +1,4 @@
-import { alpha } from '@mui/material/styles';
-import { PAPER_ACCENT, type PaperPair } from './paperPair';
+import { livePair } from './paperPair';
 
 export interface PanelTokens {
   page: string;
@@ -70,6 +69,15 @@ export interface PanelTokens {
   attention: {
     glow: string;
     glowPeak: string;
+  };
+  /** The theme's role colours, as tokens, so Paper panels fade them with the pair. */
+  role: {
+    primary: string;
+    secondary: string;
+    success: string;
+    error: string;
+    text: string;
+    textSecondary: string;
   };
 }
 
@@ -152,78 +160,95 @@ export const cosmosPanel: PanelTokens = {
     glow: 'rgba(168, 85, 247, 0.65)',
     glowPeak: 'rgba(236, 72, 153, 0.9)',
   },
+  role: {
+    primary: '#D4AF37',
+    secondary: '#7c3aed',
+    success: '#10b981',
+    error: '#ef4444',
+    text: '#ede9fe',
+    textSecondary: '#a78bfa',
+  },
 };
 
-export function paperPanel({ paper, ink }: PaperPair): PanelTokens {
+export function paperPanel(): PanelTokens {
+  const { paper, ink, accent } = livePair;
   return {
-    page: paper,
+    page: paper(),
     surface: {
-      panel: alpha(paper, 0.92),
-      drawer: alpha(paper, 0.94),
-      menu: alpha(paper, 0.97),
-      toggle: alpha(paper, 0.85),
-      toggleHover: alpha(paper, 0.95),
-      pill: alpha(paper, 0.7),
-      inset: alpha(ink, 0.04),
-      well: alpha(ink, 0.03),
-      control: alpha(ink, 0.05),
-      controlHover: alpha(ink, 0.1),
+      panel: paper(0.92),
+      drawer: paper(0.94),
+      menu: paper(0.97),
+      toggle: paper(0.85),
+      toggleHover: paper(0.95),
+      pill: paper(0.7),
+      inset: ink(0.04),
+      well: ink(0.03),
+      control: ink(0.05),
+      controlHover: ink(0.1),
     },
     border: {
-      accent: alpha(ink, 0.25),
-      accentHover: alpha(ink, 0.5),
-      hairline: alpha(ink, 0.08),
-      subtle: alpha(ink, 0.15),
-      subtleHover: alpha(ink, 0.3),
-      field: alpha(ink, 0.15),
-      fieldHover: alpha(ink, 0.35),
-      fieldFocus: alpha(ink, 0.6),
+      accent: ink(0.25),
+      accentHover: ink(0.5),
+      hairline: ink(0.08),
+      subtle: ink(0.15),
+      subtleHover: ink(0.3),
+      field: ink(0.15),
+      fieldHover: ink(0.35),
+      fieldFocus: ink(0.6),
     },
     tint: {
-      accent: alpha(ink, 0.06),
-      secondary: alpha(ink, 0.04),
+      accent: ink(0.06),
+      secondary: ink(0.04),
     },
     ink: {
-      inherited: ink,
-      strong: ink,
-      soft: alpha(ink, 0.9),
-      body: alpha(ink, 0.75),
-      muted: alpha(ink, 0.65),
-      faint: alpha(ink, 0.55),
-      ghost: alpha(ink, 0.4),
-      disabled: alpha(ink, 0.3),
-      onAccent: paper,
+      inherited: ink(),
+      strong: ink(),
+      soft: ink(0.9),
+      body: ink(0.75),
+      muted: ink(0.65),
+      faint: ink(0.55),
+      ghost: ink(0.4),
+      disabled: ink(0.3),
+      onAccent: paper(),
     },
     shadow: {
-      raised: alpha(ink, 0.18),
-      floating: alpha(ink, 0.14),
-      soft: alpha(ink, 0.1),
+      raised: ink(0.18),
+      floating: ink(0.14),
+      soft: ink(0.1),
     },
     fill: {
-      findMe: ink,
-      accent: ink,
-      accentHover: alpha(ink, 0.85),
+      findMe: ink(),
+      accent: ink(),
+      accentHover: ink(0.85),
     },
     nav: {
-      surface: alpha(paper, 0.95),
-      ink,
-      keyOn: ink,
-      keyOff: alpha(ink, 0.5),
+      surface: paper(0.95),
+      ink: ink(),
+      keyOn: ink(),
+      keyOff: ink(0.5),
     },
     loader: {
-      scrim: alpha(paper, 0.8),
-      toast: alpha(paper, 0.92),
-      track: alpha(ink, 0.2),
-      spinner: ink,
-      pageSpinner: ink,
+      scrim: paper(0.8),
+      toast: paper(0.92),
+      track: ink(0.2),
+      spinner: ink(),
+      pageSpinner: ink(),
     },
     zoomBadge: {
-      surface: alpha(paper, 0.9),
-      ink,
+      surface: paper(0.9),
+      ink: ink(),
     },
     attention: {
-      glow: alpha(PAPER_ACCENT, 0.45),
-      glowPeak: alpha(PAPER_ACCENT, 0.75),
+      glow: accent(0.45),
+      glowPeak: accent(0.75),
+    },
+    role: {
+      primary: ink(),
+      secondary: ink(),
+      success: ink(),
+      error: accent(),
+      text: ink(),
+      textSecondary: ink(0.7),
     },
   };
 }

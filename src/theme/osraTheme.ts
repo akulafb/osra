@@ -3,7 +3,8 @@ import { cosmosChat, paperChat } from './chat';
 import { cosmosHud, paperHud } from './hud';
 import { cosmosModal, paperModal } from './modal';
 import { cosmosPanel, paperPanel } from './panel';
-import { PAPER_ACCENT, type PaperPair } from './paperPair';
+import { contrastRatio } from '../lib/colourBlend';
+import type { PaperPair } from './paperPair';
 
 const shared: Pick<ThemeOptions, 'typography' | 'components'> = {
   typography: {
@@ -40,18 +41,18 @@ export const osraTheme = createTheme({
   palette: {
     mode: 'dark',
     primary: {
-      main: '#D4AF37', // Champagne Gold
+      main: cosmosPanel.role.primary, // Champagne Gold
       dark: '#B8860B',
       light: '#F0E68C',
     },
     secondary: {
-      main: '#7c3aed', // Royal Purple
+      main: cosmosPanel.role.secondary, // Royal Purple
     },
     success: {
-      main: '#10b981',
+      main: cosmosPanel.role.success,
     },
     error: {
-      main: '#ef4444',
+      main: cosmosPanel.role.error,
     },
     warning: {
       main: '#f59e0b',
@@ -61,8 +62,8 @@ export const osraTheme = createTheme({
       paper: '#0a0a0a',
     },
     text: {
-      primary: '#ede9fe',
-      secondary: '#a78bfa',
+      primary: cosmosPanel.role.text,
+      secondary: cosmosPanel.role.textSecondary,
     },
     panel: cosmosPanel,
     hud: cosmosHud,
@@ -72,22 +73,22 @@ export const osraTheme = createTheme({
 });
 
 export function createPaperTheme(pair: PaperPair) {
-  const { paper, ink } = pair;
+  const { paper, ink, accent } = pair;
   return createTheme({
     ...shared,
     palette: {
-      mode: 'light',
+      mode: contrastRatio(paper, '#ffffff') > contrastRatio(paper, '#000000') ? 'dark' : 'light',
       primary: { main: ink, contrastText: paper },
       secondary: { main: ink, contrastText: paper },
       success: { main: ink },
-      error: { main: PAPER_ACCENT },
+      error: { main: accent },
       warning: { main: ink },
       background: { default: paper, paper },
       text: { primary: ink, secondary: alpha(ink, 0.7) },
-      panel: paperPanel(pair),
-      hud: paperHud(pair),
-      chat: paperChat(pair),
-      modal: paperModal(pair),
+      panel: paperPanel(),
+      hud: paperHud(),
+      chat: paperChat(),
+      modal: paperModal(),
     },
   });
 }
