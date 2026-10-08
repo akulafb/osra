@@ -11,19 +11,9 @@ import {
 import { calculateLayout, keepDrawnParentLinks } from './layoutEngine';
 import { filterGraphData } from './filterGraphData';
 import { getNodeId } from './familyGraph';
-import { KINSHIP_FIXTURE_TREE } from './fixtures/kinshipFixtureTree';
+import { FIXTURE_IDS, KINSHIP_FIXTURE_TREE } from './fixtures/kinshipFixtureTree';
 import type { FamilyGraph, FamilyLink, FamilyNode } from '../types/graph';
 
-/**
- * The layout engine tests' Tree Record across three families, with each child
- * linked to both parents (ADR 0012):
- *
- *   Badran: Fahd + Ebtisam Kutob          -> Ali, Celine  (maternal Kutob)
- *           Omar + Aya Badran (cousins)  -> Yusuf        (maternal Badran)
- *           Hala, divorced Hisham Shaban  -> Seif, Zeina  (paternal Shaban, maternal Badran)
- *   Kutob:  Kamal + Widad Sabbagh         -> Ebtisam, Nader
- *   Shaban: Hisham
- */
 function person(id: string, familyCluster: string, maternalFamilyCluster?: string): FamilyNode {
   return { id, firstName: id, familyCluster, ...(maternalFamilyCluster && { maternalFamilyCluster }) };
 }
@@ -76,7 +66,6 @@ const LINKS: FamilyLink[] = [
 
 const TREE: FamilyGraph = { nodes: NODES, links: LINKS };
 
-/** A made-up tree of many generations, to exercise a layout bigger than the fixtures. */
 function bigTree(generations: number): FamilyGraph {
   const nodes: FamilyNode[] = [person('root-f', 'Big'), person('root-m', 'Wed')];
   const links: FamilyLink[] = [{ source: 'root-f', target: 'root-m', type: 'marriage' }];
@@ -112,8 +101,8 @@ function overlappingPairs(layout: PaperLayout): string[] {
   const pairs: string[] = [];
   for (let i = 0; i < ids.length; i++) {
     for (let j = i + 1; j < ids.length; j++) {
-      const clearance = layout.get(ids[i])!.radius + layout.get(ids[j])!.radius;
-      if (distance(layout, ids[i], ids[j]) < clearance) pairs.push(`${ids[i]}~${ids[j]}`);
+      const clearance = layout.get(ids[i])!.radius + layout.get(ids[j])!.radius + PAPER_DISC_GAP;
+      if (distance(layout, ids[i], ids[j]) < clearance - 1e-9) pairs.push(`${ids[i]}~${ids[j]}`);
     }
   }
   return pairs;
@@ -126,7 +115,7 @@ const asLines = (graph: FamilyGraph) =>
     .sort();
 
 describe('layoutPaperTree: the same tree gives the same positions', () => {
-  it('places every Person in the Tree Record', () => {
+  it('places every Person it is given', () => {
     const layout = layoutPaperTree(KINSHIP_FIXTURE_TREE);
     expect([...layout.keys()].sort()).toEqual(KINSHIP_FIXTURE_TREE.nodes.map(n => n.id).sort());
     for (const disc of layout.values()) {
@@ -138,7 +127,7 @@ describe('layoutPaperTree: the same tree gives the same positions', () => {
     expect(layoutPaperTree(KINSHIP_FIXTURE_TREE)).toEqual(layoutPaperTree(KINSHIP_FIXTURE_TREE));
   });
 
-  it('does not depend on the order the Tree Record lists Persons and Kinship Links in', () => {
+  it('does not depend on the order Persons and Kinship Links arrive in', () => {
     const shuffled: FamilyGraph = {
       nodes: [...KINSHIP_FIXTURE_TREE.nodes].reverse(),
       links: [...KINSHIP_FIXTURE_TREE.links].reverse(),
@@ -187,10 +176,8 @@ describe('layoutPaperTree: no two Persons overlap', () => {
 
 describe('disc size grows with the Kinship Link count', () => {
   it('counts every stored Kinship Link, both parent links included', () => {
-    const counts = kinshipLinkCounts(TREE.nodes, TREE.links);
-    // Ebtisam: two parents, a husband, two children.
+    const counts = kinshipLinkCounts(NODES.map(n => n.id), TREE.links);
     expect(counts.get('ebtisam')).toBe(5);
-    // A mother and a father of the same children count the same, whichever is drawn.
     expect(counts.get('omar')).toBe(counts.get('aya'));
     expect(counts.get('nader')).toBe(2);
   });
@@ -206,7 +193,7 @@ describe('disc size grows with the Kinship Link count', () => {
 
 describe('placeNewcomer: a newcomer lands near relatives and nobody else moves', () => {
   const layout = layoutPaperTree(KINSHIP_FIXTURE_TREE);
-  const anchor = KINSHIP_FIXTURE_TREE.nodes[5].id;
+  const anchor = FIXTURE_IDS.huda;
   const newcomer = person('newcomer', 'Haddad');
   const linksWithNewcomer: FamilyLink[] = [...KINSHIP_FIXTURE_TREE.links, father(anchor, 'newcomer')];
   const placed = placeNewcomer(layout, newcomer.id, linksWithNewcomer);
@@ -232,8 +219,29 @@ describe('placeNewcomer: a newcomer lands near relatives and nobody else moves',
     expect(toRelative).toBeLessThan(clearance * 4);
   });
 
-  it('places the same newcomer in the same spot every time', () => {
+  it('places the same newcomer in the same spot every time, whatever order the links arrive in', () => {
     expect(placeNewcomer(layout, newcomer.id, linksWithNewcomer).get('newcomer')).toEqual(placed.get('newcomer'));
+    const relatives: FamilyLink[] = [
+      ...KINSHIP_FIXTURE_TREE.links,
+      father(FIXTURE_IDS.khalil, 'baby'),
+      mother(FIXTURE_IDS.adel, 'baby'),
+      { source: 'baby', target: FIXTURE_IDS.sara, type: 'marriage' },
+      father('baby', FIXTURE_IDS.rima),
+    ];
+    for (let shift = 1; shift < 4; shift++) {
+      const rotated = [...relatives.slice(-shift), ...relatives.slice(0, -shift)].reverse();
+      expect(placeNewcomer(layout, 'baby', rotated).get('baby')).toEqual(placeNewcomer(layout, 'baby', relatives).get('baby'));
+    }
+  });
+
+  it('places a child of two parents far apart beside one of them, clear of every disc', () => {
+    const links = [...KINSHIP_FIXTURE_TREE.links, father(FIXTURE_IDS.khalil, 'baby'), mother(FIXTURE_IDS.adel, 'baby')];
+    const withBaby = placeNewcomer(layout, 'baby', links);
+    const nearest = Math.min(distance(withBaby, 'baby', FIXTURE_IDS.khalil), distance(withBaby, 'baby', FIXTURE_IDS.adel));
+    const clearance = withBaby.get('baby')!.radius + Math.max(layout.get(FIXTURE_IDS.khalil)!.radius, layout.get(FIXTURE_IDS.adel)!.radius) + PAPER_DISC_GAP;
+    expect(nearest).toBeLessThan(clearance * 4);
+    expect(overlappingPairs(withBaby)).toEqual([]);
+    for (const [id, disc] of layout) expect(withBaby.get(id)).toEqual(disc);
   });
 
   it('places a newcomer with no relatives clear of the tree', () => {
@@ -248,7 +256,6 @@ describe('placeNewcomer: a newcomer lands near relatives and nobody else moves',
 });
 
 describe('paperLines: the drawn-parent rule matches 2D and Cosmos (ADR 0012)', () => {
-  /** The parent lines 2D draws for one family preset, as "parent>child". */
   function drawn2D(preset: string): string[] {
     const filtered = filterGraphData(TREE, new Set(), preset);
     const { links } = calculateLayout(filtered.nodes, filtered.links, 'tree', preset);

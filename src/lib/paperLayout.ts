@@ -46,10 +46,10 @@ export function paperDiscRadius(kinshipLinkCount: number): number {
 /**
  * Each Person's number of stored Kinship Links: parent links to both parents
  * (ADR 0012), children, marriages and divorces. Links to anyone outside
- * `nodes` do not count.
+ * `personIds` do not count.
  */
-export function kinshipLinkCounts(nodes: readonly FamilyNode[], links: readonly FamilyLink[]): Map<string, number> {
-  const counts = new Map(nodes.map((n) => [n.id, 0]));
+export function kinshipLinkCounts(personIds: readonly string[], links: readonly FamilyLink[]): Map<string, number> {
+  const counts = new Map(personIds.map((id) => [id, 0]));
   for (const link of links) {
     const { sourceId, targetId } = getLinkEndpoints(link);
     if (sourceId === targetId || !counts.has(sourceId) || !counts.has(targetId)) continue;
@@ -81,6 +81,24 @@ interface Point {
   z: number;
 }
 
+function squaredDistance(p: Point, q: Point): number {
+  const dx = p.x - q.x;
+  const dy = p.y - q.y;
+  const dz = p.z - q.z;
+  return dx * dx + dy * dy + dz * dz;
+}
+
+function centroid(points: readonly Point[]): Point {
+  const sum = { x: 0, y: 0, z: 0 };
+  for (const p of points) {
+    sum.x += p.x;
+    sum.y += p.y;
+    sum.z += p.z;
+  }
+  const count = points.length || 1;
+  return { x: sum.x / count, y: sum.y / count, z: sum.z / count };
+}
+
 function randomUnit(random: () => number): Point {
   for (;;) {
     const x = random() * 2 - 1;
@@ -102,17 +120,30 @@ function cellKey(ix: number, iy: number, iz: number): number {
   return ((ix + GRID_OFFSET) * GRID_SPAN + (iy + GRID_OFFSET)) * GRID_SPAN + (iz + GRID_OFFSET);
 }
 
-/** Buckets the points into cubes of `size`, so near neighbours are found without testing every pair. */
+const HALF_NEIGHBOURHOOD: readonly (readonly [number, number, number])[] = [-1, 0, 1]
+  .flatMap((dx) => [-1, 0, 1].flatMap((dy) => [-1, 0, 1].map((dz) => [dx, dy, dz] as const)))
+  .filter(([dx, dy, dz]) => dx > 0 || (dx === 0 && (dy > 0 || (dy === 0 && dz >= 0))));
+
+interface Cell {
+  ix: number;
+  iy: number;
+  iz: number;
+  members: number[];
+}
+
 class Grid {
-  private cells = new Map<number, number[]>();
+  private cells = new Map<number, Cell>();
 
   constructor(private size: number) {}
 
   add(index: number, p: Point): void {
-    const key = cellKey(cellOf(p.x, this.size), cellOf(p.y, this.size), cellOf(p.z, this.size));
-    const bucket = this.cells.get(key);
-    if (bucket) bucket.push(index);
-    else this.cells.set(key, [index]);
+    const ix = cellOf(p.x, this.size);
+    const iy = cellOf(p.y, this.size);
+    const iz = cellOf(p.z, this.size);
+    const key = cellKey(ix, iy, iz);
+    const cell = this.cells.get(key);
+    if (cell) cell.members.push(index);
+    else this.cells.set(key, { ix, iy, iz, members: [index] });
   }
 
   forNear(p: Point, visit: (index: number) => void): void {
@@ -122,30 +153,32 @@ class Grid {
     for (let dx = -1; dx <= 1; dx++) {
       for (let dy = -1; dy <= 1; dy++) {
         for (let dz = -1; dz <= 1; dz++) {
-          const bucket = this.cells.get(cellKey(ix + dx, iy + dy, iz + dz));
-          if (bucket) for (const index of bucket) visit(index);
+          const cell = this.cells.get(cellKey(ix + dx, iy + dy, iz + dz));
+          if (cell) for (const index of cell.members) visit(index);
+        }
+      }
+    }
+  }
+
+  forEachNearPair(visit: (i: number, j: number) => void): void {
+    for (const cell of this.cells.values()) {
+      const { members } = cell;
+      for (const [dx, dy, dz] of HALF_NEIGHBOURHOOD) {
+        const other = this.cells.get(cellKey(cell.ix + dx, cell.iy + dy, cell.iz + dz));
+        if (!other) continue;
+        const same = other === cell;
+        for (let a = 0; a < members.length; a++) {
+          for (let b = same ? a + 1 : 0; b < other.members.length; b++) visit(members[a], other.members[b]);
         }
       }
     }
   }
 }
 
-/** The cells next to a cell that come after it, itself included, so each pair of cells is visited once. */
-const FORWARD_CELLS: readonly (readonly [number, number, number])[] = [-1, 0, 1]
-  .flatMap((dx) => [-1, 0, 1].flatMap((dy) => [-1, 0, 1].map((dz) => [dx, dy, dz] as const)))
-  .filter(([dx, dy, dz]) => dx > 0 || (dx === 0 && (dy > 0 || (dy === 0 && dz >= 0))));
-
-/** Pushes every pair of Persons closer than the repulsion range apart, and harder when their discs touch. */
 function repel(points: readonly Point[], velocity: Point[], radii: readonly number[], alpha: number): void {
-  const cells = new Map<number, number[]>();
-  points.forEach((p, i) => {
-    const key = cellKey(cellOf(p.x, REPULSION_RANGE), cellOf(p.y, REPULSION_RANGE), cellOf(p.z, REPULSION_RANGE));
-    const bucket = cells.get(key);
-    if (bucket) bucket.push(i);
-    else cells.set(key, [i]);
-  });
-
-  const pushApart = (i: number, j: number) => {
+  const grid = new Grid(REPULSION_RANGE);
+  points.forEach((p, i) => grid.add(i, p));
+  grid.forEachNearPair((i, j) => {
     const p = points[i];
     const q = points[j];
     let dx = q.x - p.x;
@@ -161,29 +194,14 @@ function repel(points: readonly Point[], velocity: Point[], radii: readonly numb
     }
     const distance = Math.sqrt(squared);
     const clearance = radii[i] + radii[j] + PAPER_DISC_GAP;
-    const push = (REPULSION * alpha) / squared + (distance < clearance ? ((clearance - distance) / distance) * COLLISION * 0.5 : 0);
+    const push = (REPULSION * alpha) / Math.max(squared, 1) + (distance < clearance ? ((clearance - distance) / distance) * COLLISION * 0.5 : 0);
     velocity[i].x -= dx * push;
     velocity[i].y -= dy * push;
     velocity[i].z -= dz * push;
     velocity[j].x += dx * push;
     velocity[j].y += dy * push;
     velocity[j].z += dz * push;
-  };
-
-  for (const [key, bucket] of cells) {
-    const p = points[bucket[0]];
-    const ix = cellOf(p.x, REPULSION_RANGE);
-    const iy = cellOf(p.y, REPULSION_RANGE);
-    const iz = cellOf(p.z, REPULSION_RANGE);
-    for (const [dx, dy, dz] of FORWARD_CELLS) {
-      const otherKey = cellKey(ix + dx, iy + dy, iz + dz);
-      const other = otherKey === key ? bucket : cells.get(otherKey);
-      if (!other) continue;
-      for (let a = 0; a < bucket.length; a++) {
-        for (let b = otherKey === key ? a + 1 : 0; b < other.length; b++) pushApart(bucket[a], other[b]);
-      }
-    }
-  }
+  });
 }
 
 interface Spring {
@@ -192,7 +210,6 @@ interface Spring {
   length: number;
 }
 
-/** Springs between linked Persons, one per pair, in an order that does not depend on the input order. */
 function springsBetween(index: Map<string, number>, links: readonly FamilyLink[]): Spring[] {
   const byPair = new Map<string, Spring>();
   for (const link of links) {
@@ -209,7 +226,6 @@ function springsBetween(index: Map<string, number>, links: readonly FamilyLink[]
   return [...byPair.values()].sort((s, t) => s.a - t.a || s.b - t.b);
 }
 
-/** Each Person starts one link length from the relative it was reached from, so families start together. */
 function startingPoints(ids: readonly string[], springs: readonly Spring[]): Point[] {
   const neighbours = ids.map(() => [] as Spring[]);
   for (const spring of springs) {
@@ -239,8 +255,7 @@ function startingPoints(ids: readonly string[], springs: readonly Spring[]): Poi
   return points as Point[];
 }
 
-/** Moves each disc that touches one already settled outward from the centre until it is clear. */
-function separate(ids: readonly string[], points: Point[], radii: readonly number[]): void {
+function pushOverlapsOutward(ids: readonly string[], points: Point[], radii: readonly number[]): void {
   const order = ids
     .map((_, i) => i)
     .sort((i, j) => {
@@ -256,9 +271,8 @@ function separate(ids: readonly string[], points: Point[], radii: readonly numbe
     for (;;) {
       let clear = true;
       grid.forNear(p, (j) => {
-        const q = points[j];
         const clearance = radii[i] + radii[j] + PAPER_DISC_GAP;
-        if ((p.x - q.x) ** 2 + (p.y - q.y) ** 2 + (p.z - q.z) ** 2 < clearance * clearance) clear = false;
+        if (squaredDistance(p, points[j]) < clearance * clearance) clear = false;
       });
       if (clear) break;
       p.x += outward.x * PAPER_DISC_GAP;
@@ -270,11 +284,10 @@ function separate(ids: readonly string[], points: Point[], radii: readonly numbe
 }
 
 /**
- * Positions every Person in the Tree Record in a still, organic 3D cloud.
+ * Positions every Person in the Working Record in a still, organic 3D cloud.
  *
- * The same Tree Record always gives the same layout, whatever order its
- * Persons and Kinship Links arrive in and whatever positions a simulation left
- * on them. It runs a fixed number of steps to completion, never live physics.
+ * The same Persons and Kinship Links always give the same layout, whatever
+ * order they arrive in and whatever positions a simulation left on them. It runs a fixed number of steps to completion, never live physics.
  * Relatives are pulled together, and no two discs overlap. Lay out the whole
  * Working Record: collapsing or hiding Persons only stops drawing them.
  */
@@ -282,7 +295,7 @@ export function layoutPaperTree(graph: { nodes: readonly FamilyNode[]; links: re
   const ids = [...new Set(graph.nodes.map((n) => n.id))].sort();
   const index = new Map(ids.map((id, i) => [id, i]));
   const springs = springsBetween(index, graph.links);
-  const counts = kinshipLinkCounts(ids.map((id) => ({ id, firstName: id })), graph.links);
+  const counts = kinshipLinkCounts(ids, graph.links);
   const radii = ids.map((id) => paperDiscRadius(counts.get(id)!));
   const degree = ids.map(() => 0);
   for (const spring of springs) {
@@ -326,78 +339,75 @@ export function layoutPaperTree(graph: { nodes: readonly FamilyNode[]; links: re
     });
   }
 
-  const centre = points.reduce((sum, p) => ({ x: sum.x + p.x, y: sum.y + p.y, z: sum.z + p.z }), { x: 0, y: 0, z: 0 });
-  const count = points.length || 1;
+  const centre = centroid(points);
   for (const p of points) {
-    p.x -= centre.x / count;
-    p.y -= centre.y / count;
-    p.z -= centre.z / count;
+    p.x -= centre.x;
+    p.y -= centre.y;
+    p.z -= centre.z;
   }
-  separate(ids, points, radii);
+  pushOverlapsOutward(ids, points, radii);
 
   return new Map(ids.map((id, i) => [id, { x: points[i].x, y: points[i].y, z: points[i].z, radius: radii[i] }]));
 }
 
 /**
  * Adds a newcomer beside their relatives without moving anyone: every disc
- * already placed keeps its position and size, and the newcomer takes the
- * nearest clear spot around their relatives (around the edge of the cloud when
- * they have none). The same newcomer always lands in the same spot. The full
- * layout is recomputed only on the next load. Returns `layout` itself when the
- * newcomer is already placed.
+ * already placed keeps its position and size. The newcomer takes the nearest
+ * clear shell around the placed relative closest to all their placed
+ * relatives, at the spot in it nearest the others (at the edge of the cloud
+ * when none are placed). The same newcomer and relatives always give the same
+ * spot. Returns
+ * `layout` itself when the newcomer is already placed.
  */
 export function placeNewcomer(layout: PaperLayout, newcomerId: string, links: readonly FamilyLink[]): PaperLayout {
   if (layout.has(newcomerId)) return layout;
 
-  const relatives = new Set<string>();
+  const relativeIds = new Set<string>();
   let linkCount = 0;
   for (const link of links) {
     const { sourceId, targetId } = getLinkEndpoints(link);
     const otherId = sourceId === newcomerId ? targetId : targetId === newcomerId ? sourceId : null;
     if (otherId === null || otherId === newcomerId || !layout.has(otherId)) continue;
-    relatives.add(otherId);
+    relativeIds.add(otherId);
     linkCount++;
   }
   const radius = paperDiscRadius(linkCount);
   const discs = [...layout.values()];
+  const relatives = [...relativeIds].sort().map((id) => layout.get(id)!);
 
   let anchor: Point;
-  let reach: number;
-  if (relatives.size > 0) {
-    const around = [...relatives].map((id) => layout.get(id)!);
-    anchor = {
-      x: around.reduce((sum, d) => sum + d.x, 0) / around.length,
-      y: around.reduce((sum, d) => sum + d.y, 0) / around.length,
-      z: around.reduce((sum, d) => sum + d.z, 0) / around.length,
-    };
-    reach = radius + PAPER_DISC_GAP + Math.min(...around.map((d) => d.radius));
+  let startDistance: number;
+  let toward: Point;
+  if (relatives.length > 0) {
+    toward = centroid(relatives);
+    const beside = relatives.reduce((best, d) => (squaredDistance(d, toward) < squaredDistance(best, toward) ? d : best));
+    anchor = beside;
+    startDistance = radius + PAPER_DISC_GAP + beside.radius;
   } else {
-    const count = discs.length || 1;
-    anchor = {
-      x: discs.reduce((sum, d) => sum + d.x, 0) / count,
-      y: discs.reduce((sum, d) => sum + d.y, 0) / count,
-      z: discs.reduce((sum, d) => sum + d.z, 0) / count,
-    };
-    const extent = discs.reduce((most, d) => Math.max(most, Math.sqrt((d.x - anchor.x) ** 2 + (d.y - anchor.y) ** 2 + (d.z - anchor.z) ** 2) + d.radius), 0);
-    reach = extent + radius + PAPER_DISC_GAP;
+    anchor = centroid(discs);
+    toward = anchor;
+    const extent = discs.reduce((most, d) => Math.max(most, Math.sqrt(squaredDistance(d, anchor)) + d.radius), 0);
+    startDistance = extent + radius + PAPER_DISC_GAP;
   }
 
   const random = seededRandom(hashString(newcomerId, SEED));
   const isClear = (p: Point) =>
     discs.every((d) => {
       const clearance = d.radius + radius + PAPER_DISC_GAP;
-      return (p.x - d.x) ** 2 + (p.y - d.y) ** 2 + (p.z - d.z) ** 2 >= clearance * clearance;
+      return squaredDistance(p, d) >= clearance * clearance;
     });
 
-  for (let distance = reach; ; distance += PAPER_DISC_GAP) {
+  for (let distance = startDistance; ; distance += PAPER_DISC_GAP) {
+    let best: Point | null = null;
     for (let attempt = 0; attempt < 32; attempt++) {
       const direction = randomUnit(random);
       const spot = { x: anchor.x + direction.x * distance, y: anchor.y + direction.y * distance, z: anchor.z + direction.z * distance };
-      if (isClear(spot)) {
-        const placed = new Map(layout);
-        placed.set(newcomerId, { ...spot, radius });
-        return placed;
-      }
+      if (isClear(spot) && (!best || squaredDistance(spot, toward) < squaredDistance(best, toward))) best = spot;
+    }
+    if (best) {
+      const placed = new Map(layout);
+      placed.set(newcomerId, { ...best, radius });
+      return placed;
     }
   }
 }

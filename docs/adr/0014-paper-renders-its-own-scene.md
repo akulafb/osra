@@ -6,14 +6,15 @@ Paper does not restyle Cosmos. Its Persons sit still in a seeded layout (`src/li
 
 ## Considered Options
 
-- **Swap only the force-graph element inside `FamilyTree3D`**, gating the Cosmos-only hooks off in Paper. Rejected: about 900 lines of that 2,100-line file assume the force graph, so Cosmos would gain some 30 `isPaper` branches. Several would fail quietly. The "Loading Osra" overlay clears only on the force graph's `onEngineStop`, so it would never clear. The starfield toast would stick. Cosmic FX has no off switch. Any adapter that fills `fgRef` for Paper would get the starfield, fog and cluster bubbles injected into Paper's scene. Every later Paper ticket would edit the Cosmos file.
+- **Swap only the force-graph element inside `FamilyTree3D`**, gating the Cosmos-only hooks off in Paper. Rejected: by our estimate about 900 lines of that 2,136-line file assume the force graph (`fgRef` alone appears 35 times), so Cosmos would gain roughly 30 `isPaper` branches. Several would fail quietly. The "Loading Osra" overlay clears only on the force graph's `onEngineStop`, so it would never clear. The starfield toast would stick. Cosmic FX has no enable flag and idles only while `fgRef` is empty. Any adapter that fills `fgRef` for Paper would wake it and get the starfield, fog and cluster bubbles injected into Paper's scene. Every later Paper ticket would edit the Cosmos file.
 - **Duplicate the overlays into the Paper scene**: no change to Cosmos, but two copies of INSTRUMENTS drift apart, and Paper's panel colours, search and controls would be built twice.
 
 ## Consequences
 
 - **Cosmos.** `FamilyTree3D.tsx` changes once, in LIN-93: its overlay JSX is replaced by the shared overlay, with Cosmos-only controls (TEXTURE, FAMILY PRESETS) passed in a slot that Paper leaves empty. Product decision 5 hides those two controls in Paper. The extraction is proven unchanged with a computed-style fingerprint of the Cosmos page before and after. No later Paper ticket edits `FamilyTree3D.tsx`.
+- **Not in the shared overlay.** `Manipulation3DPanel` stays mounted by each scene, because it needs that scene's handle and live positions. The keyboard stays in each scene too: Cosmos's handler is bound to its flight loop and `handleNodeClick`, and Paper's keys drive its own camera (product decision 6).
 - **The shared overlay is controlled.** It owns only panel UI state (open, menus). Each scene keeps its own AMBIANCE flag, its LABELS / LINKS / ARROWS toggles, and its camera. The overlay reaches the camera through a two-call scene interface, focus a Person and reset the view, for FIND ME and RESET VIEWPORT. Search Prev/Next stays in each scene.
-- **Positions.** Paper reads positions only from its layout map and never writes `x/y/z` or `fx/fy/fz` onto `FamilyNode` objects. Those objects are shared with Cosmos, and d3 mutates them (ADR 0006). The layout covers the whole Working Record: collapse and VISIBILITY only stop drawing a Person. A Person added during the session is placed with `placeNewcomer`, and nobody else moves. The full layout is recomputed only on the next load.
+- **Positions.** Paper reads positions only from its layout map and never writes `x/y/z` or `fx/fy/fz` onto `FamilyNode` objects. Those objects are shared with Cosmos, and d3 mutates them (ADR 0006). Where shared code reads `x/y/z` from a node array (`Manipulation3DPanel`, `useGhostPreview`, `useTargetVisibility`), Paper passes new `{ id, x, y, z }` objects built from the layout. The layout covers the whole Working Record: collapse and VISIBILITY only stop drawing a Person. A Person added during the session is placed with `placeNewcomer`, and nobody else moves; their relatives keep their disc size until the next load, when the full layout is recomputed. `usePaperLayout` is called from `FamilyTree.tsx`, which stays mounted, so the layout survives a switch to Cosmos or 2D and back.
 - **Lines.** Paper draws with `paperLines`, the drawn-parent rule Cosmos uses, over the Persons shown (ADR 0012).
 - **Disc size** grows with the Person's stored Kinship Link count, both parent links included. Counting only drawn lines would make a mother smaller than the father of the same children whenever the father's line is the one drawn.
 - **Switching modes** unmounts the other scene. Coming back to Cosmos replays its warm-up and intro, as it already does after a trip to 2D.
@@ -24,10 +25,12 @@ Paper does not restyle Cosmos. Its Persons sit still in a seeded layout (`src/li
 
 `src/components/paper/` holds the Paper scene, one component per concern: discs, lines, labels, duotone, camera rig, effects.
 
-- **LIN-93.** First, as its own commit, the extraction: the new `src/components/tree3d/Tree3DOverlay.tsx` and `FamilyTree3D.tsx`. Then the scene:
+- **LIN-93, pass 1 (landed).** `src/lib/paperLayout.ts` (`layoutPaperTree`, `placeNewcomer`, `paperLines`, `kinshipLinkCounts`, `paperDiscRadius`) with its tests, `src/lib/seededRandom.ts`, this ADR, and the `@react-three/postprocessing` v2 dependency.
+- **LIN-93, pass 2.** First, as its own commit, the extraction: the new `src/components/tree3d/Tree3DOverlay.tsx` and `FamilyTree3D.tsx`. Then the scene:
   - `FamilyTree.tsx` (choose the scene by Canvas Mode);
   - `src/hooks/usePaperLayout.ts`, which computes the layout once and keeps it across mode switches;
   - `src/components/paper/PaperTree3D.tsx`, `PaperDiscs.tsx`, `PaperLines.tsx`, `PaperLabels.tsx` and `PaperDuotone.tsx`, plus the WebGL fallback;
+  - Escape in Paper 3D, through `interaction.handleEscape()` as in Cosmos;
   - `vite.config.ts` (the `vendor-three` chunk);
   - the bundled label font;
   - `features/paper-mode.md` and `features/tree-views.md`.
@@ -42,15 +45,17 @@ Paper does not restyle Cosmos. Its Persons sit still in a seeded layout (`src/li
   - a new hint component and its storage key;
   - `features/paper-mode.md`.
 - **LIN-96.**
-  - `src/components/paper/*`: an adapter that satisfies `ForceGraphHandle` from R3F state for `Manipulation3DPanel`, Ghost Previews and target visibility; Spawn and Dissolve in ink; the WASD / Q/E / R keyboard (product decision 6); double-click collapse;
-  - `src/hooks/usePaperLayout.ts` (`placeNewcomer` for new Persons);
+  - `src/components/paper/*`: an adapter that satisfies `ForceGraphHandle` from R3F state for `Manipulation3DPanel`, Ghost Previews and target visibility; Spawn and Dissolve in ink; the WASD / Q/E / R keyboard (product decision 6) and Tab / Enter; double-click collapse;
+  - `src/hooks/usePaperLayout.ts` (call `placeNewcomer` for new Persons);
   - `features/paper-mode.md` and `features/add-relative.md`.
 
   `Manipulation3DPanel.tsx`, `useGhostPreview.ts` and `useTargetVisibility.ts` are reused unchanged.
 - **LIN-97.**
   - a new pure `src/lib/paperSearchCluster.ts` with tests: the one-off settle of the matches;
   - `src/components/paper/*`: hiding the non-matches, the cluster's lines, framing;
-  - `TreeSearchBar.tsx`: an optional count label that Cosmos does not pass;
+  - `TreeSearchBar.tsx`: an optional count label that Paper 2D and Paper 3D pass and Cosmos does not;
+  - `FamilyTree2D.tsx` only for passing that label, since Paper 2D's search emphasis already comes from `focusEmphasis` (ticket 2);
+  - Escape order in Paper (product decision 9): the selected Person first, then the search;
   - `features/paper-mode.md` and `features/tree-search.md`.
 
   Ctrl/Cmd+F already works through the shared overlay.
