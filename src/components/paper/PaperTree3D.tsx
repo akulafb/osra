@@ -21,7 +21,6 @@ import { isTap, paperFrame, type ScreenPoint } from './paperScene';
 
 export interface PaperTree3DProps {
   graphData: FamilyGraph;
-  /** From `usePaperLayout`; `null` until it is made. */
   layout: PaperLayout | null;
   interaction: DirectManipulationController;
   collapsedNodes: Set<string>;
@@ -59,11 +58,7 @@ const FOG_FAR = 2.6;
 const FOCUS_DISTANCE_PER_RADIUS = 10;
 const MIN_FOCUS_DISTANCE = 60;
 
-/**
- * Paper's own 3D scene (ADR 0014): the still layout as ink discs, lines and
- * labels on grayscale paper, under the overlay it shares with Cosmos. Colour
- * comes later, as a duotone pass over this scene.
- */
+/** Paper's own 3D scene (ADR 0014): the still layout as ink discs, lines and labels on grayscale paper. */
 export function PaperTree3D({
   graphData,
   layout,
@@ -97,6 +92,7 @@ export function PaperTree3D({
   const isMobileDevice = useIsMobileDevice();
   const [hasWebGL] = useState(browserHasWebGL);
   const [firstFrameDrawn, setFirstFrameDrawn] = useState(false);
+  const [sceneFailed, setSceneFailed] = useState(false);
   const [isAmbienceOn, setIsAmbienceOn] = useState(false);
   const [showNames, setShowNames] = useState(true);
   const [showLinks, setShowLinks] = useState(true);
@@ -213,7 +209,7 @@ export function PaperTree3D({
     </div>
   );
 
-  const loaded = !hasWebGL || (!!frame && firstFrameDrawn);
+  const loaded = !hasWebGL || sceneFailed || (!!frame && firstFrameDrawn);
   const fallback = <PaperWebGLFallback paper={PAPER} ink={INK} />;
 
   return (
@@ -233,7 +229,7 @@ export function PaperTree3D({
       )}
 
       {hasWebGL ? (
-        <PaperWebGLBoundary fallback={fallback}>
+        <PaperWebGLBoundary fallback={fallback} onError={() => setSceneFailed(true)}>
           <Canvas
             camera={{ fov: 50, near: 1, far: 100000, position: [0, 0, 400] }}
             dpr={[1, 2]}

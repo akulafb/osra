@@ -31,7 +31,7 @@ export function PaperWebGLFallback({ paper, ink }: { paper: string; ink: string 
 
 /** Shows the fallback if the renderer fails after the WebGL check passed, such as a context the GPU refuses. */
 export class PaperWebGLBoundary extends React.Component<
-  { fallback: React.ReactNode; children: React.ReactNode },
+  { fallback: React.ReactNode; onError: () => void; children: React.ReactNode },
   { failed: boolean }
 > {
   state = { failed: false };
@@ -42,6 +42,7 @@ export class PaperWebGLBoundary extends React.Component<
 
   componentDidCatch(error: unknown) {
     console.error('[PaperTree3D] WebGL scene failed:', error);
+    this.props.onError();
   }
 
   render() {

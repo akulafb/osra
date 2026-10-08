@@ -15,23 +15,19 @@ interface PaperLinesProps {
 const ARROW_LENGTH = 5;
 const ARROW_RADIUS = 1.6;
 
-/**
- * The three kinds of Kinship Link in ink, one draw each: parent lines thin and
- * lighter, marriages thick, divorces dashed.
- */
 export function PaperLines({ lines, layout, ink, parentInk, showArrows }: PaperLinesProps) {
   const segments = useMemo(() => paperLineSegments(lines, layout), [lines, layout]);
 
   return (
     <>
       {segments.parent.length > 0 && (
-        <Line points={segments.parent} segments color={parentInk} lineWidth={1} />
+        <Line points={segments.parent} segments fog color={parentInk} lineWidth={1} />
       )}
       {segments.marriage.length > 0 && (
-        <Line points={segments.marriage} segments color={ink} lineWidth={2.75} />
+        <Line points={segments.marriage} segments fog color={ink} lineWidth={2.75} />
       )}
       {segments.divorce.length > 0 && (
-        <Line points={segments.divorce} segments color={ink} lineWidth={1.5} dashed dashSize={3} gapSize={2.5} />
+        <Line points={segments.divorce} segments fog color={ink} lineWidth={1.5} dashed dashSize={3} gapSize={2.5} />
       )}
       {showArrows && <PaperArrows lines={lines} layout={layout} color={parentInk} />}
     </>

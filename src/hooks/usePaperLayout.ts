@@ -16,11 +16,7 @@ export function resolvePaperLayout(
   return layoutPaperTree(graph);
 }
 
-/**
- * Called from `FamilyTree`, which stays mounted, so the layout outlives a
- * switch to Cosmos or 2D. It is made in an effect, after the loaded gate has
- * painted.
- */
+/** Made after the loaded gate has painted. */
 export function usePaperLayout(graph: FamilyGraph | null, needed: boolean): PaperLayout | null {
   const [layout, setLayout] = useState<PaperLayout | null>(null);
 

@@ -18,7 +18,6 @@ export interface PaperFrame {
   radius: number;
 }
 
-/** A pointer that moves further than this between press and release is dragging the camera, not clicking. */
 export const TAP_SLOP_PX = 6;
 
 const EMPTY_FRAME_RADIUS = 50;
