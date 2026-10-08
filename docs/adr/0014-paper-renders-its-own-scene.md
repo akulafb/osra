@@ -55,11 +55,11 @@ Paper does not restyle Cosmos. Its Persons sit still in a seeded layout (`src/li
   - a new hint component and its storage key;
   - `features/paper-mode.md`.
 - **LIN-96.**
-  - `src/components/paper/*`: an adapter that satisfies `ForceGraphHandle` from R3F state for `Manipulation3DPanel`, Ghost Previews and target visibility; Spawn and Dissolve in ink; the WASD / Q/E / R keyboard (product decision 6) and Tab / Enter; double-click collapse;
-  - `src/hooks/usePaperLayout.ts` (call `placeNewcomer` for new Persons);
+  - `src/components/paper/*`: an adapter that satisfies `ForceGraphHandle` from R3F state for `Manipulation3DPanel`, Ghost Previews and target visibility; Connect Mode's candidacy, pick and confirm, with candidates in ink and the rest ghosted; Spawn and Dissolve in ink; the WASD / Q/E / R keyboard (product decision 6) and Tab / Enter; double-click collapse;
+  - `src/hooks/usePaperLayout.ts`: `followWorkingRecord` places each Person it has not seen with `placeNewcomer`, once, and drops a newcomer who leaves the Working Record (an aborted Spawn);
+  - `FamilyTree.tsx`: the Paper 3D branch gets the same editing props as Cosmos, and the drawer offers Connect Nodes in every view. The writes stay in its existing handlers (ADR 0004);
+  - `Manipulation3DPanel.tsx`, `ConnectPickerCard.tsx` and `useGhostPreview.ts`: Paper colours through the live pair tokens, only when Canvas Mode is Paper, and an optional ghost look the Paper scene passes. Cosmos keeps its literal colours and passes no look. `useTargetVisibility.ts` is reused unchanged;
   - `features/paper-mode.md` and `features/add-relative.md`.
-
-  `Manipulation3DPanel.tsx`, `useGhostPreview.ts` and `useTargetVisibility.ts` are reused unchanged.
 - **LIN-97.**
   - a new pure `src/lib/paperSearchCluster.ts` with tests: the one-off settle of the matches;
   - `src/components/paper/*`: hiding the non-matches, the cluster's lines, framing;

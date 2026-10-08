@@ -70,7 +70,7 @@ Preconditions:
 - `paper-3d-click` selects the clicked Person: the drawer opens (desktop side drawer, phone bottom sheet). A pointer that moves more than 6 px is a camera drag, not a click. Clicking empty paper (up to 6 px of movement) or pressing Escape clears the selection.
 - `paper-3d-stable` keeps the layout for the whole page load: switching to Cosmos or 2D and back shows the same positions.
 - `paper-3d-no-webgl` shows "THE 3D TREE NEEDS WEBGL" in place of the canvas when WebGL is missing, the renderer throws, the layout throws or the WebGL context is lost; INSTRUMENTS still works. The WebGL check runs once per page and gives its context back, so switching Paper and Cosmos never logs "Too many active WebGL contexts".
-- `paper-3d-unwired` hides what Paper 3D does not do yet: no AMBIANCE toggle (Cosmos-only: the Paper focus tap always plays, product decision 10), no previous/next match buttons (the count and highlight stay; LIN-97), only `Esc` under NAV CONTROLS (LIN-96) and no `Connect Nodes...` in the drawer (LIN-96). Cosmos 3D and Paper 2D keep all of them.
+- `paper-3d-unwired` hides what Paper 3D does not do yet: no AMBIANCE toggle (Cosmos-only: the Paper focus tap always plays, product decision 10), no previous/next match buttons (the count and highlight stay; LIN-97), and only `Esc` under NAV CONTROLS (LIN-96). Cosmos 3D and Paper 2D keep all of them. The drawer's `Connect Nodes...` is back in Paper 3D (see [Paper 3D editing](#paper-3d-editing-lin-96-pass-96a)).
 
 ### Driving it with ui.sh
 
@@ -80,7 +80,7 @@ Preconditions:
 - **Escape.** Probe first with `window.addEventListener('keydown', …)`, then `$S/ui.sh "$RUN_DIR" key Escape`; `.MuiDrawer-paper h4` disappears.
 - **Stable layout.** Capture, switch CANVAS MODE to `COSMOS` and back to `PAPER`, close INSTRUMENTS and capture again: the same Persons sit in the same places relative to each other (the idle turn and the grain change the pixels).
 - **Background tap.** With a Person selected, press on empty paper, move 4 px and release (`orca mouse move --x <x> --y <y>`, `orca mouse down`, `orca mouse move --x <x+4> --y <y>`, `orca mouse up`, each with `--page`): the drawer closes. The same with a 20 px move is a camera drag and keeps it.
-- **Unwired controls.** In Paper 3D with INSTRUMENTS open: `AMBIANCE` is absent from `document.body.innerText`; type a name in SEARCH ARCHIVE: the count shows and `[aria-label="Next match"]` is `display: none`; NAV CONTROLS' text is only `Esc: Deselect`; select a Person as admin: the drawer has no `Connect Nodes...`. Cosmos 3D shows all four.
+- **Unwired controls.** In Paper 3D with INSTRUMENTS open: `AMBIANCE` is absent from `document.body.innerText`; type a name in SEARCH ARCHIVE: the count shows and `[aria-label="Next match"]` is `display: none`; NAV CONTROLS' text is only `Esc: Deselect`. Cosmos 3D shows all three.
 - **No WebGL.** The WebGL check runs once per page, so reload first, go to 2D, then `orca eval` `HTMLCanvasElement.prototype.getContext` to return `null` for `webgl*` (keep the original on `window`), then click `3D`. The `role=alert` fallback shows. Restore `getContext` afterwards.
 - **Proof.** Capture `paper-3d overview`, `paper-3d click`, `paper-3d escape`, `paper-3d click-phone` (the bottom sheet at the tab's phone width, a plain screenshot), `paper-3d switch-before`, `paper-3d switch-cosmos`, `paper-3d switch-after` and `paper-3d no-webgl`.
 
@@ -211,3 +211,27 @@ Preconditions:
 - A throttled tab (Orca not in front) runs about 1 frame a second, so the reveal and swing need screenshots to pump frames or the slowed clock above; report the feel as unverified unless the tab is visible.
 - A tab can stall at 0 frames: close it and open a fresh one with `open-tab.sh` (delete `state/page` first).
 - Viewport emulation has no touch, so the live hint reads "Scroll to zoom" even at phone size; the pinch copy is covered by `src/lib/paperIntro.test.ts`.
+
+## Paper 3D editing (LIN-96 pass 96a)
+
+### Sub-features
+
+- `paper-3d-add-person`: INSTRUMENTS → `+ ADD PERSON` opens the same form as Cosmos, in paper and ink. A Person added during the session (from any path) gets a disc beside their relatives, or at the edge of the cloud with none, and nobody else moves; the full layout is recomputed on the next load. A newcomer who leaves the Working Record again (an aborted Spawn) is dropped.
+- `paper-3d-handles` (desktop, 1025 px and wider): selecting a Person docks the Action Handles panel at the left, as in Cosmos: `+ Parent`, `+ Child`, `+ Spouse` in ink, `🔗 Connect` and `✕ Dissolve` in the pair's accent, with a dashed leader line and a ring on the disc. Phones keep the drawer path: no handles (ADR 0002, LIN-62 amendment).
+- `paper-3d-ghost`: a handle opens the Ghost Node card and the Ghost Preview in ink: a wireframe disc shell, a dashed tether to the Person and an ink label. ✕ or Escape closes it.
+- `paper-3d-connect`: the drawer's `Connect Nodes...` (desktop and phone) or the panel's `🔗 Connect` enters Connect Mode: the drawer hides, the panel shows "Connect <name> to…", the candidates keep full ink, the Person and their relatives are ghosted at 0.2 ink. Clicking a candidate disc opens the kinship picker; `Establish Link` writes through the same handler as Cosmos. `Cancel (Esc)` or Escape leaves it. On a phone the panel docks at the bottom with only the ring on the disc.
+- The panel, the Ghost Node card and the Connect picker read the live pair's tokens only in Paper; Cosmos keeps its colours.
+
+### Driving it with ui.sh
+
+- Desktop size needs the override `orca exec --page <id> --command "set viewport 1280 812 2"` after each reload; the Orca pane is about 935 px, so the right part of the PNG repeats.
+- **Handles and ghost.** Paper 3D, INSTRUMENTS → `FIND ME`: the panel shows. `ui.sh click button "+ Child"`, fill the card's name with `Zz Lin96 Preview` and close it with ✕. Never press Enter or Add: that writes.
+- **Connect.** With a Person selected, `ui.sh click button "Connect Nodes..."` (on a phone the sheet hides it below the fold: `orca scrollintoview` its ref first). `ui.sh tree` shows "Connect <name> to…" and `Cancel (Esc)`. Tap a candidate disc: the picker opens; `Cancel` returns to targeting, Escape leaves.
+- **Phone.** `set viewport 820 812 2`: `FIND ME` selects with no handles; `Connect Nodes...` from the sheet opens the bottom-docked panel.
+- The writes (Enter in the Ghost Node card, `+ ADD PERSON` submit, `Establish Link`) are **Owner** steps; see [add relative](./add-relative.md).
+- **Proof.** Capture `paper-add-person`, `paper-handles`, `paper-ghost`, `paper-connect`, `paper-connect-escaped`, `paper-connect-pick`, `phone-selected` and `phone-connect`.
+
+### Gotchas
+
+- The targeting copy still says "Click a glowing planet" in Paper, and the dashed preview edge for Add Relative's connect-to-existing is not drawn yet (LIN-96 pass 96c). Spawn and Dissolve play without their ink animation until pass 96b.
+- Fingerprinting Cosmos for no change: open VISIBILITY and wait about 6 s before capturing; at 3 s its body can still be animating and differ by one element.
