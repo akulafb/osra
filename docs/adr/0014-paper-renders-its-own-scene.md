@@ -1,0 +1,57 @@
+# 0014 Paper renders its own 3D scene beside Cosmos
+
+Paper 3D is its own React Three Fiber scene, `PaperTree3D`, mounted as a sibling of the Cosmos view (`FamilyTree3D`): in 3D, `FamilyTree.tsx` renders one or the other by Canvas Mode. The overlay chrome both modes share (INSTRUMENTS, AMBIANCE, NAV CONTROLS, the "See who's new" slot, and the search-open reaction to Ctrl/Cmd+F) moves out of `FamilyTree3D.tsx` once, as a move-only change, into a shared overlay component that both scenes render. Cosmos keeps its force graph, physics, starfield, intro, cluster bubbles, Cosmic FX, flight loop and keyboard exactly as they are.
+
+Paper does not restyle Cosmos. Its Persons sit still in a seeded layout (`src/lib/paperLayout.ts`) computed once per load, where Cosmos runs live d3 physics. Its colour comes from a duotone pass over a grayscale scene, where Cosmos draws per-node textures, fog and a starfield. Its camera is drei's CameraControls, with momentum and idle rotation, where Cosmos drives the force graph's own controls with hand-written lerps. Making the force graph do all of that would mean switching off most of what it is for, and Cosmos would carry Paper's branches.
+
+## Considered Options
+
+- **Swap only the force-graph element inside `FamilyTree3D`**, gating the Cosmos-only hooks off in Paper. Rejected: about 900 lines of that 2,100-line file assume the force graph, so Cosmos would gain some 30 `isPaper` branches. Several would fail quietly. The "Loading Osra" overlay clears only on the force graph's `onEngineStop`, so it would never clear. The starfield toast would stick. Cosmic FX has no off switch. Any adapter that fills `fgRef` for Paper would get the starfield, fog and cluster bubbles injected into Paper's scene. Every later Paper ticket would edit the Cosmos file.
+- **Duplicate the overlays into the Paper scene**: no change to Cosmos, but two copies of INSTRUMENTS drift apart, and Paper's panel colours, search and controls would be built twice.
+
+## Consequences
+
+- **Cosmos.** `FamilyTree3D.tsx` changes once, in LIN-93: its overlay JSX is replaced by the shared overlay, with Cosmos-only controls (TEXTURE, FAMILY PRESETS) passed in a slot that Paper leaves empty. Product decision 5 hides those two controls in Paper. The extraction is proven unchanged with a computed-style fingerprint of the Cosmos page before and after. No later Paper ticket edits `FamilyTree3D.tsx`.
+- **The shared overlay is controlled.** It owns only panel UI state (open, menus). Each scene keeps its own AMBIANCE flag, its LABELS / LINKS / ARROWS toggles, and its camera. The overlay reaches the camera through a two-call scene interface, focus a Person and reset the view, for FIND ME and RESET VIEWPORT. Search Prev/Next stays in each scene.
+- **Positions.** Paper reads positions only from its layout map and never writes `x/y/z` or `fx/fy/fz` onto `FamilyNode` objects. Those objects are shared with Cosmos, and d3 mutates them (ADR 0006). The layout covers the whole Working Record: collapse and VISIBILITY only stop drawing a Person. A Person added during the session is placed with `placeNewcomer`, and nobody else moves. The full layout is recomputed only on the next load.
+- **Lines.** Paper draws with `paperLines`, the drawn-parent rule Cosmos uses, over the Persons shown (ADR 0012).
+- **Disc size** grows with the Person's stored Kinship Link count, both parent links included. Counting only drawn lines would make a mother smaller than the father of the same children whenever the father's line is the one drawn.
+- **Switching modes** unmounts the other scene. Coming back to Cosmos replays its warm-up and intro, as it already does after a trip to 2D.
+- **Loading.** Paper has its own loaded gate, set when the layout is done and the first frame is drawn. Every camera duration is finite (ADR 0011).
+- **The LIN-91 stopgap goes.** Under it, Paper in 3D showed the Cosmos scene in Paper panels.
+
+## Write set for LIN-93 to LIN-97
+
+`src/components/paper/` holds the Paper scene, one component per concern: discs, lines, labels, duotone, camera rig, effects.
+
+- **LIN-93.** First, as its own commit, the extraction: the new `src/components/tree3d/Tree3DOverlay.tsx` and `FamilyTree3D.tsx`. Then the scene:
+  - `FamilyTree.tsx` (choose the scene by Canvas Mode);
+  - `src/hooks/usePaperLayout.ts`, which computes the layout once and keeps it across mode switches;
+  - `src/components/paper/PaperTree3D.tsx`, `PaperDiscs.tsx`, `PaperLines.tsx`, `PaperLabels.tsx` and `PaperDuotone.tsx`, plus the WebGL fallback;
+  - `vite.config.ts` (the `vendor-three` chunk);
+  - the bundled label font;
+  - `features/paper-mode.md` and `features/tree-views.md`.
+- **LIN-94.**
+  - `src/components/paper/*`: hover, focus, fly-to, screen-space hit testing, ring, particles, ripple, wobble;
+  - a new tap-sound module generated with Web Audio (product decision 8);
+  - `features/paper-mode.md`.
+
+  It uses `focusEmphasis` and does not change it.
+- **LIN-95.**
+  - `src/components/paper/*`: camera rig momentum, idle rotation, zoom bounds, intro loader and reveal, depth of field and grain, resize;
+  - a new hint component and its storage key;
+  - `features/paper-mode.md`.
+- **LIN-96.**
+  - `src/components/paper/*`: an adapter that satisfies `ForceGraphHandle` from R3F state for `Manipulation3DPanel`, Ghost Previews and target visibility; Spawn and Dissolve in ink; the WASD / Q/E / R keyboard (product decision 6); double-click collapse;
+  - `src/hooks/usePaperLayout.ts` (`placeNewcomer` for new Persons);
+  - `features/paper-mode.md` and `features/add-relative.md`.
+
+  `Manipulation3DPanel.tsx`, `useGhostPreview.ts` and `useTargetVisibility.ts` are reused unchanged.
+- **LIN-97.**
+  - a new pure `src/lib/paperSearchCluster.ts` with tests: the one-off settle of the matches;
+  - `src/components/paper/*`: hiding the non-matches, the cluster's lines, framing;
+  - `TreeSearchBar.tsx`: an optional count label that Cosmos does not pass;
+  - `features/paper-mode.md` and `features/tree-search.md`.
+
+  Ctrl/Cmd+F already works through the shared overlay.
+- If LIN-94 to LIN-97 need anything new from the shared overlay, it is an optional prop, and Cosmos does not pass it.
