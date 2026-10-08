@@ -48,7 +48,7 @@ export const OrthogonalLinks: React.FC<OrthogonalLinksProps> = ({
         const isMarriage = link.type === 'marriage';
         const isDivorce = link.type === 'divorce';
 
-        // Marriage links are gold, divorce links are gray, parent links use family color or blue
+        // Marriage links are gold in Cosmos (ink in Paper), divorce links are gray, parent links use family color or blue
         const baseColor = paperInk
           ?? (isMarriage
             ? '#f59e0b'

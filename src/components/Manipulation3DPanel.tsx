@@ -427,7 +427,7 @@ export const Manipulation3DPanel: React.FC<Manipulation3DPanelProps> = ({
                   background: DISSOLVE_ACCENT,
                   border: `1.5px solid ${DISSOLVE_ACCENT}`,
                   borderRadius: 999,
-                  color: hud.card.onAccent,
+                  color: hud.card.onRelation,
                   cursor: 'pointer',
                   fontSize: 13,
                   fontWeight: 800,

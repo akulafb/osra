@@ -19,6 +19,7 @@ export interface HudTokens {
     inkQuiet: string;
     highlight: string;
     onAccent: string;
+    onRelation: string;
     disabledFill: string;
   };
   editor: {
@@ -94,6 +95,7 @@ export const cosmosHud: HudTokens = {
     inkQuiet: 'rgba(255,255,255,0.4)',
     highlight: '#c084fc',
     onAccent: '#0f172a',
+    onRelation: '#0f172a',
     disabledFill: 'rgba(255,255,255,0.1)',
   },
   editor: {
@@ -161,6 +163,7 @@ export function paperHud({ paper, ink }: PaperPair): HudTokens {
       inkQuiet: alpha(ink, 0.45),
       highlight: ink,
       onAccent: paper,
+      onRelation: '#0f172a',
       disabledFill: alpha(ink, 0.1),
     },
     editor: {
