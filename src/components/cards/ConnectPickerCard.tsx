@@ -277,7 +277,7 @@ export const ConnectPickerCard: React.FC<ConnectPickerCardProps> = ({
             borderRadius: '6px',
             border: 'none',
             background: hud.picker.confirm,
-            color: panel.ink.strong,
+            color: canvasMode === 'paper' ? hud.card.onAccent : panel.ink.strong,
             fontSize: '11px',
             fontWeight: 700,
             cursor: isSubmitting ? 'default' : 'pointer',
