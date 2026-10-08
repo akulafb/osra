@@ -15,7 +15,6 @@ export function pairForFamily(familyCluster: string): PaperPair {
   return PAPER_PAIRS[Math.abs(hashFamily(familyCluster)) % PAPER_PAIRS.length];
 }
 
-/** A random pair for the overview, never the one shown last. */
 export function drawOverviewPair(previous: PaperPair | null, random: () => number = Math.random): PaperPair {
   const choices = PAPER_PAIRS.filter((pair) => pair !== previous);
   return choices[Math.min(choices.length - 1, Math.floor(random() * choices.length))];

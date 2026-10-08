@@ -47,7 +47,6 @@ function oklabToRgb([L, a, b]: Oklab): Rgb {
   ];
 }
 
-/** Blends two #rrggbb colours through OKLab, so the midpoint looks halfway to the eye. */
 export function mixOklab(from: string, to: string, t: number): string {
   if (t <= 0) return from;
   if (t >= 1) return to;
@@ -61,7 +60,6 @@ function relativeLuminance(rgb: Rgb): number {
   return 0.2126 * r + 0.7152 * g + 0.0722 * b;
 }
 
-/** WCAG 2 contrast ratio, from 1 (same colour) to 21 (black on white). */
 export function contrastRatio(a: string, b: string): number {
   const la = relativeLuminance(hexToRgb(a));
   const lb = relativeLuminance(hexToRgb(b));

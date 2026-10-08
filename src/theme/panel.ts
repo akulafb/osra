@@ -70,7 +70,6 @@ export interface PanelTokens {
     glow: string;
     glowPeak: string;
   };
-  /** The theme's role colours, as tokens, so Paper panels fade them with the pair. */
   role: {
     primary: string;
     secondary: string;

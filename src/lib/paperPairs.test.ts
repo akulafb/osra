@@ -17,6 +17,12 @@ describe('pairForFamily', () => {
     }
   });
 
+  it('keeps each family on its pair', () => {
+    expect(pairForFamily('Badran')).toBe(PAPER_PAIRS[1]);
+    expect(pairForFamily('Zabalawi')).toBe(PAPER_PAIRS[4]);
+    expect(pairForFamily('Hajjaj')).toBe(PAPER_PAIRS[6]);
+  });
+
   it('spreads families across more than one pair', () => {
     const families = ['Badran', 'Kutob', 'Hajjaj', 'Zabalawi', 'Malhis', 'Shawa', 'Dajani', 'Masri'];
     expect(new Set(families.map(pairForFamily)).size).toBeGreaterThan(1);

@@ -46,9 +46,9 @@ export function CanvasModeProvider({ children }: { children: ReactNode }) {
   useEffect(() => writeLastOverviewPair(overview), [overview]);
 
   const target = useMemo(() => {
-    if (preference.paperColour === 'grayscale') return GRAYSCALE_PAIR;
+    if (preference.mode !== 'paper' || preference.paperColour === 'grayscale') return GRAYSCALE_PAIR;
     return focused?.familyCluster ? pairForFamily(focused.familyCluster) : overview;
-  }, [preference.paperColour, focused, overview]);
+  }, [preference.mode, preference.paperColour, focused, overview]);
 
   const [live, setLive] = useState(target);
   const liveRef = useRef(target);

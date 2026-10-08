@@ -49,10 +49,10 @@ Preconditions:
 
 ### Driving it with ui.sh
 
-- Record `localStorage.getItem('family-tree-paper-colour')` with the other keys, and restore it before cleanup (remove it when it was `null`).
+- Record `localStorage.getItem('family-tree-paper-colour')` with the other keys, and restore it before cleanup (remove it when it was `null`). The tab also keeps the last overview pair's index in sessionStorage `family-tree-paper-overview-pair`; it dies with the tab.
 - **Colour.** Open INSTRUMENTS and run `$S/ui.sh "$RUN_DIR" click button "Paper colour"`. The paper turns into a colour pair, the button reads `aria-pressed=true` and the key reads `colour`. `orca reload` keeps colour on with a different overview pair. Click again for grayscale (paper `236 236 234`).
 - **Fade.** Before selecting a Person, start an rAF recorder with `orca eval`: each frame push `getComputedStyle(document.documentElement).getPropertyValue('--paper-pair-paper')` into `window.__pairLog`, stopping after 1 s. Then `$S/ui.sh "$RUN_DIR" person <Given> <Family>` and read `window.__pairLog`: the values step from the old pair to the family pair over about 0.4 s.
-- **Ghost line.** With a Person selected, click a `+ Child` handle and read `getComputedStyle(document.querySelector('.ghost-node-layer line')).stroke`: it equals the live ink in Paper and the neon relation colour in Cosmos. Close with Escape; submit nothing.
+- **Ghost line.** With a Person selected, click a `+ Child` handle and read `getComputedStyle(document.querySelector('.ghost-node-layer line')).stroke`: in Paper it is the live ink at the relation's alpha (parent 1, spouse 0.85, child 0.7, sibling 0.6), in Cosmos the neon relation colour. Close with Escape; submit nothing.
 - **Proof.** Capture `paper colour-off`, `paper colour-on`, `paper colour-reload` and `paper focus-fade`.
 
 ### Gotchas
@@ -61,4 +61,4 @@ Preconditions:
 - The open chat panel covers the lower-left cards.
 - Right after `orca reload` the family picker can ignore Orca clicks. Use a DOM click (`orca eval`) for setup steps.
 - Motion needs a visible tab; a throttled tab stalls the fade.
-- 2D card fills trail the variables by about 150 ms (NodeCard's own fill transition) and MUI buttons by up to about 170 ms (MUI's transition). Both read the same source.
+- 2D card fills trail the variables by up to 200 ms (NodeCard's own `all 0.2s` transition) and MUI buttons by up to about 170 ms (MUI's transition). Both read the same source.

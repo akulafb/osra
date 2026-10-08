@@ -16,14 +16,11 @@ export interface FocusedPerson {
 export interface CanvasModeController extends CanvasModePreference {
   setMode: (mode: CanvasMode) => void;
   setPaperColour: (paperColour: PaperColour) => void;
-  /** Tells Paper whose family's pair to show; null clears focus and draws a new overview pair. */
   setFocusedPerson: (person: FocusedPerson | null) => void;
 }
 
 export interface CurrentPaperPair {
-  /** The pair on screen right now; during a fade it changes every frame. */
   pair: PaperPair;
-  /** The pair the current fade is heading to. */
   target: PaperPair;
 }
 
@@ -75,8 +72,8 @@ export function readLastOverviewPair(): PaperPair | null {
 export function writeLastOverviewPair(pair: PaperPair): void {
   try {
     sessionStorage.setItem(LAST_OVERVIEW_PAIR_KEY, String(PAPER_PAIRS.indexOf(pair)));
-  } catch {
-    // A tab without sessionStorage just risks repeating the last overview pair.
+  } catch (e) {
+    console.warn('[useCanvasMode] Failed to save overview pair:', e);
   }
 }
 

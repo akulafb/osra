@@ -8,12 +8,6 @@ export interface PaperPair {
 
 export const GRAYSCALE_PAIR: PaperPair = { paper: '#ececea', ink: '#1c1c1c', accent: '#c8361d' };
 
-/**
- * The Paper Pairs, sampled from the aicodingdictionary.com reference frames; the
- * owner tunes them during approval. Families are hashed onto this order, so
- * changing a value keeps every family's pair, but adding or removing one
- * reshuffles them.
- */
 export const PAPER_PAIRS: readonly PaperPair[] = [
   { paper: '#2e675a', ink: '#eceeed', accent: '#eceeed' },
   { paper: '#320b9f', ink: '#e4bf96', accent: '#e4bf96' },
@@ -32,7 +26,6 @@ export const PAIR_CSS_VARS: Record<PairColour, string> = {
   accent: '--paper-pair-accent',
 };
 
-/** The live pair's colour as CSS, so anything styled with it fades with the scene. */
 export function pairVar(colour: PairColour, opacity = 1): string {
   const channels = `var(${PAIR_CSS_VARS[colour]}, ${hexToRgb(GRAYSCALE_PAIR[colour]).join(' ')})`;
   return opacity === 1 ? `rgb(${channels})` : `rgb(${channels} / ${opacity})`;
