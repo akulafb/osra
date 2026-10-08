@@ -1,3 +1,6 @@
+import { alpha } from '@mui/material/styles';
+import { PAPER_ACCENT, type PaperPair } from './paperPair';
+
 export interface ModalTokens {
   scrim: string;
   surface: string;
@@ -124,3 +127,64 @@ export const cosmosModal: ModalTokens = {
     },
   },
 };
+
+export function paperModal({ paper, ink }: PaperPair): ModalTokens {
+  return {
+    scrim: alpha(ink, 0.35),
+    surface: alpha(paper, 0.97),
+    previewShadow: alpha(ink, 0.25),
+    submit: ink,
+    optionSurface: alpha(ink, 0.04),
+    field: {
+      surface: alpha(ink, 0.03),
+      border: alpha(ink, 0.15),
+    },
+    ink: {
+      hint: alpha(ink, 0.45),
+      meta: alpha(ink, 0.6),
+      secondary: alpha(ink, 0.8),
+    },
+    notice: {
+      surface: alpha(ink, 0.04),
+      border: alpha(ink, 0.3),
+    },
+    status: {
+      successSurface: alpha(ink, 0.06),
+      successBorder: alpha(ink, 0.3),
+      errorSurface: alpha(PAPER_ACCENT, 0.08),
+      errorBorder: alpha(PAPER_ACCENT, 0.4),
+    },
+    adminTool: {
+      scrim: alpha(ink, 0.4),
+      surface: paper,
+      raised: alpha(ink, 0.04),
+      well: alpha(ink, 0.06),
+      shadow: alpha(ink, 0.25),
+      border: alpha(ink, 0.15),
+      errorSurface: alpha(PAPER_ACCENT, 0.1),
+      ink: {
+        soft: alpha(ink, 0.9),
+        muted: alpha(ink, 0.7),
+        faint: alpha(ink, 0.55),
+        ghost: alpha(ink, 0.4),
+      },
+      badge: {
+        existing: alpha(ink, 0.08),
+        generated: alpha(ink, 0.08),
+      },
+      tag: {
+        surface: alpha(ink, 0.08),
+        ink,
+      },
+    },
+    adminForm: {
+      scrim: alpha(ink, 0.35),
+      surface: paper,
+      rule: alpha(ink, 0.2),
+      field: {
+        surface: alpha(ink, 0.03),
+        border: alpha(ink, 0.25),
+      },
+    },
+  };
+}

@@ -1,3 +1,6 @@
+import { alpha } from '@mui/material/styles';
+import { PAPER_ACCENT, type PaperPair } from './paperPair';
+
 export interface HudTokens {
   error: string;
   banner: {
@@ -138,3 +141,71 @@ export const cosmosHud: HudTokens = {
     motherTint: 'rgba(244, 114, 182, 0.25)',
   },
 };
+
+export function paperHud({ paper, ink }: PaperPair): HudTokens {
+  return {
+    error: PAPER_ACCENT,
+    banner: {
+      surface: alpha(paper, 0.96),
+      border: ink,
+      glow: alpha(ink, 0.15),
+      ink,
+      highlight: ink,
+    },
+    card: {
+      border: alpha(ink, 0.2),
+      controlBorder: alpha(ink, 0.3),
+      field: alpha(ink, 0.05),
+      shadow: alpha(ink, 0.2),
+      inkSecondary: alpha(ink, 0.8),
+      inkQuiet: alpha(ink, 0.45),
+      highlight: ink,
+      onAccent: paper,
+      disabledFill: alpha(ink, 0.1),
+    },
+    editor: {
+      surface: alpha(paper, 0.96),
+      caption: alpha(ink, 0.65),
+      prompt: alpha(ink, 0.75),
+      pill: alpha(paper, 0.92),
+      pillBorder: alpha(ink, 0.3),
+      pillInk: alpha(ink, 0.85),
+    },
+    targeting: {
+      field: alpha(ink, 0.06),
+      warning: PAPER_ACCENT,
+      option: alpha(ink, 0.08),
+      optionOffSurface: alpha(ink, 0.03),
+      optionOffBorder: alpha(ink, 0.08),
+      optionOffInk: alpha(ink, 0.35),
+    },
+    ghost: {
+      surface: alpha(paper, 0.97),
+      matchSurface: paper,
+      matchBorder: alpha(ink, 0.4),
+      matchActive: alpha(ink, 0.12),
+      matchAction: ink,
+      matchInk: ink,
+      matchMeta: alpha(ink, 0.6),
+      matchMore: alpha(ink, 0.45),
+    },
+    picker: {
+      surface: alpha(paper, 0.98),
+      border: ink,
+      glow: alpha(ink, 0.15),
+      choice: alpha(ink, 0.04),
+      confirm: ink,
+      confirmGlow: alpha(ink, 0.25),
+    },
+    kinship: {
+      parentSource: ink,
+      parentTarget: alpha(ink, 0.55),
+      marriage: ink,
+      divorce: alpha(ink, 0.5),
+      father: ink,
+      fatherTint: alpha(ink, 0.12),
+      mother: alpha(ink, 0.6),
+      motherTint: alpha(ink, 0.06),
+    },
+  };
+}

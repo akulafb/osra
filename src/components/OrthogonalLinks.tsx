@@ -5,6 +5,8 @@ import { LifecycleController, useLifecycleProgress } from '../hooks/useLifecycle
 import { linkInLifecycle, LifecycleSubject } from '../lib/lifecycle';
 import { isPulsingLink } from '../utils/cosmicFx';
 import { linkGrowthAt } from '../utils/canvasFx';
+import type { Emphasis } from '../lib/focusEmphasis';
+import { PAPER_2D_OPACITY } from '../utils/paper2D';
 
 interface OrthogonalLinksProps {
   links: Link2D[];
@@ -14,12 +16,17 @@ interface OrthogonalLinksProps {
    * path growth; the 3D one is a beam pulse (LIN-55). Same lifecycle.
    */
   lifecycles: LifecycleController;
+  /** Set in Paper: every line is drawn in this ink, faded with its fainter end. */
+  paperInk?: string;
+  emphasis?: ReadonlyMap<string, Emphasis> | null;
 }
 
 export const OrthogonalLinks: React.FC<OrthogonalLinksProps> = ({
   links,
   activePreset,
   lifecycles,
+  paperInk,
+  emphasis,
 }) => {
   const spawning = linkInLifecycle(lifecycles.lifecycles, 'spawn');
   const dissolving = linkInLifecycle(lifecycles.lifecycles, 'dissolve');
@@ -43,17 +50,24 @@ export const OrthogonalLinks: React.FC<OrthogonalLinksProps> = ({
         const isDivorce = link.type === 'divorce';
 
         // Marriage links are gold, divorce links are gray, parent links use family color or blue
-        const baseColor = isMarriage
-          ? '#f59e0b'
-          : (isDivorce ? '#9ca3af' : getClusterColor(link.source.familyCluster, '#60a5fa'));
+        const baseColor = paperInk
+          ?? (isMarriage
+            ? '#f59e0b'
+            : (isDivorce ? '#9ca3af' : getClusterColor(link.source.familyCluster, '#60a5fa')));
 
         const strokeWidth = (isMarriage || isDivorce) ? 2.5 : 1.5;
         const opacity = (isMarriage || isDivorce) ? 0.8 : 0.6;
 
         // Dim links not in the active preset
-        const finalOpacity = activePreset && !isInActiveCluster && !isMarriage && !isDivorce
+        const presetOpacity = activePreset && !isInActiveCluster && !isMarriage && !isDivorce
           ? 0.15
           : opacity;
+        const finalOpacity = emphasis
+          ? presetOpacity * Math.min(
+              PAPER_2D_OPACITY[emphasis.get(link.source.id) ?? 'normal'],
+              PAPER_2D_OPACITY[emphasis.get(link.target.id) ?? 'normal']
+            )
+          : presetOpacity;
 
         const endpoints = { aId: link.source.id, bId: link.target.id };
         const isSpawning = spawnProgress !== null && isPulsingLink(endpoints, spawning);

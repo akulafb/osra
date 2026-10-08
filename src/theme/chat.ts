@@ -1,3 +1,6 @@
+import { alpha } from '@mui/material/styles';
+import { type PaperPair } from './paperPair';
+
 export interface ChatTokens {
   surface: string;
   bar: string;
@@ -38,3 +41,21 @@ export const cosmosChat: ChatTokens = {
   shadow: 'rgba(0,0,0,0.5)',
   buttonShadow: 'rgba(0,0,0,0.3)',
 };
+
+export function paperChat({ paper, ink }: PaperPair): ChatTokens {
+  return {
+    surface: paper,
+    bar: alpha(ink, 0.05),
+    border: alpha(ink, 0.15),
+    inputBorder: alpha(ink, 0.25),
+    bubble: alpha(ink, 0.06),
+    userBubble: alpha(ink, 0.14),
+    heading: ink,
+    ink,
+    muted: alpha(ink, 0.6),
+    hint: alpha(ink, 0.45),
+    notice: ink,
+    shadow: alpha(ink, 0.2),
+    buttonShadow: alpha(ink, 0.15),
+  };
+}
