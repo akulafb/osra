@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useSyncExternalStore } from 'react';
 import Button from '@mui/material/Button';
+import { useTheme, type Theme } from '@mui/material/styles';
 import { useAuth } from '../../contexts/AuthContext';
 import { FamilyLink, FamilyNode, PersonGender } from '../../types/graph';
 import { formatNodeDisplayName } from '../../utils/nodeDisplayName';
@@ -65,6 +66,8 @@ export default function AddRelativeModal({
 }: AddRelativeModalProps) {
   const { user, isAdmin, session } = useAuth();
   const { write } = useWorkingRecord();
+  const theme = useTheme();
+  const { modal, panel, primary } = theme.palette;
   const [name, setName] = useState('');
   const [relationship, setRelationship] = useState<RelationshipType>('child');
   const [parentRole, setParentRole] = useState<'mother' | 'father' | null>(null);
@@ -281,18 +284,18 @@ export default function AddRelativeModal({
 
   const overlayStyle: React.CSSProperties = isPreviewConnectMode
     ? {
-        ...modalOverlayStyle,
+        ...modalOverlayStyle(theme),
         backgroundColor: 'transparent',
         pointerEvents: 'none',
         justifyContent: previewNarrow ? 'flex-end' : 'flex-end',
         alignItems: previewNarrow ? 'stretch' : 'center',
         flexDirection: previewNarrow ? 'column' : 'row',
       }
-    : modalOverlayStyle;
+    : modalOverlayStyle(theme);
 
   const panelStyle: React.CSSProperties = isPreviewConnectMode
     ? {
-        ...modalContentStyle,
+        ...modalContentStyle(theme),
         pointerEvents: 'auto',
         maxHeight: previewNarrow ? 'min(44vh, 420px)' : 'min(85vh, 900px)',
         overflowY: 'auto',
@@ -305,9 +308,9 @@ export default function AddRelativeModal({
         maxWidth: previewNarrow ? '100%' : 'min(420px, 92vw)',
         width: previewNarrow ? '100%' : undefined,
         borderRadius: previewNarrow ? '12px 12px 0 0' : '12px',
-        boxShadow: '0 -8px 40px rgba(0,0,0,0.55)',
+        boxShadow: `0 -8px 40px ${modal.previewShadow}`,
       }
-    : modalContentStyle;
+    : modalContentStyle(theme);
 
   const primaryDisabled =
     isSubmitting ||
@@ -324,7 +327,7 @@ export default function AddRelativeModal({
     <div style={overlayStyle}>
       <div style={panelStyle}>
         {isPreviewConnectMode && (
-          <p style={{ margin: '0 0 16px 0', fontSize: '0.75rem', color: '#D4AF37', fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase' }}>
+          <p style={{ margin: '0 0 16px 0', fontSize: '0.75rem', color: primary.main, fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase' }}>
             Preview: cyan dashed line shows the link that will be created.
           </p>
         )}
@@ -332,7 +335,7 @@ export default function AddRelativeModal({
           marginTop: 0, 
           fontFamily: '"Lora", serif', 
           fontSize: '1.5rem',
-          color: 'white',
+          color: panel.ink.strong,
           marginBottom: '24px'
         }}>
           Add relative to {formatNodeDisplayName(targetNode)}
@@ -340,27 +343,27 @@ export default function AddRelativeModal({
 
         <form onSubmit={handleSubmit}>
           <div style={fieldStyle}>
-            <label style={labelStyle}>FIRST NAME</label>
+            <label style={labelStyle(theme)}>FIRST NAME</label>
             <input
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value.slice(0, MAX_NAME_LENGTH))}
               placeholder="Given name only"
-              style={inputStyle}
+              style={inputStyle(theme)}
               maxLength={MAX_NAME_LENGTH}
               required
             />
           </div>
 
           <div style={fieldStyle}>
-            <label style={labelStyle}>RELATIONSHIP</label>
+            <label style={labelStyle(theme)}>RELATIONSHIP</label>
             <select
               value={relationship}
               onChange={(e) => {
                 setRelationship(e.target.value as RelationshipType);
                 if (e.target.value !== 'child') setParentRole(null);
               }}
-              style={inputStyle}
+              style={inputStyle(theme)}
             >
               <option value="child">Add as child</option>
               <option value="parent">Add as parent</option>
@@ -371,11 +374,11 @@ export default function AddRelativeModal({
 
           {!selectedExistingId && (
             <div style={fieldStyle}>
-              <label style={labelStyle}>GENDER</label>
+              <label style={labelStyle(theme)}>GENDER</label>
               <select
                 value={gender ?? ''}
                 onChange={(e) => setGender(e.target.value ? (e.target.value as PersonGender) : null)}
-                style={inputStyle}
+                style={inputStyle(theme)}
               >
                 <option value="">Not recorded</option>
                 <option value="male">Male</option>
@@ -386,11 +389,11 @@ export default function AddRelativeModal({
 
           {relationship === 'child' && anchorParentRole && (
             <div style={fieldStyle}>
-              <label style={labelStyle}>I AM THE…</label>
-              <p style={{ margin: 0, fontSize: '0.9rem', color: 'white' }}>
+              <label style={labelStyle(theme)}>I AM THE…</label>
+              <p style={{ margin: 0, fontSize: '0.9rem', color: panel.ink.strong }}>
                 {anchorParentRole === 'mother' ? 'Mother' : 'Father'}
               </p>
-              <p style={{ margin: '8px 0 0 0', fontSize: '0.7rem', color: 'rgba(255,255,255,0.4)', fontStyle: 'italic' }}>
+              <p style={{ margin: '8px 0 0 0', fontSize: '0.7rem', color: modal.ink.hint, fontStyle: 'italic' }}>
                 From {formatNodeDisplayName(targetNode)}&apos;s recorded gender
               </p>
             </div>
@@ -398,19 +401,19 @@ export default function AddRelativeModal({
 
           {relationship === 'child' && !anchorParentRole && (
             <div style={fieldStyle}>
-              <label style={labelStyle}>I AM THE…</label>
+              <label style={labelStyle(theme)}>I AM THE…</label>
               <select
                 value={parentRole ?? ''}
                 onChange={(e) =>
                   setParentRole(e.target.value ? (e.target.value as 'mother' | 'father') : null)
                 }
-                style={inputStyle}
+                style={inputStyle(theme)}
               >
                 <option value="">— Select (optional) —</option>
                 <option value="mother">Mother</option>
                 <option value="father">Father</option>
               </select>
-              <p style={{ margin: '8px 0 0 0', fontSize: '0.7rem', color: 'rgba(255,255,255,0.4)', fontStyle: 'italic' }}>
+              <p style={{ margin: '8px 0 0 0', fontSize: '0.7rem', color: modal.ink.hint, fontStyle: 'italic' }}>
                 Helps show children on both parents&apos; family trees
               </p>
             </div>
@@ -418,18 +421,18 @@ export default function AddRelativeModal({
 
           {otherParent.kind === 'one' && (
             <div style={fieldStyle}>
-              <label style={labelStyle}>OTHER PARENT</label>
-              <p style={{ margin: 0, fontSize: '0.9rem', color: 'white' }}>{personName(otherParent.personId)}</p>
+              <label style={labelStyle(theme)}>OTHER PARENT</label>
+              <p style={{ margin: 0, fontSize: '0.9rem', color: panel.ink.strong }}>{personName(otherParent.personId)}</p>
             </div>
           )}
 
           {otherParent.kind === 'choose' && (
             <div style={fieldStyle}>
-              <label style={labelStyle}>OTHER PARENT</label>
+              <label style={labelStyle(theme)}>OTHER PARENT</label>
               <select
                 value={otherParentId ?? ''}
                 onChange={(e) => setOtherParentId(e.target.value || null)}
-                style={inputStyle}
+                style={inputStyle(theme)}
               >
                 {otherParent.candidates.map(({ personId, current }) => (
                   <option key={personId} value={personId}>
@@ -442,9 +445,9 @@ export default function AddRelativeModal({
           )}
 
           {matches.length > 0 && (
-            <div style={warningStyle}>
+            <div style={warningStyle(theme)}>
               <strong style={{ fontSize: '0.75rem', letterSpacing: '0.05em' }}>MATCHES DETECTED IN ARCHIVE</strong>
-              <p style={{ fontSize: '0.8rem', margin: '8px 0', color: 'rgba(255,255,255,0.7)' }}>
+              <p style={{ fontSize: '0.8rem', margin: '8px 0', color: panel.ink.body }}>
                 {mustConfirmMatch
                   ? 'Select someone to connect, or confirm this is a new entry.'
                   : 'Someone here may already be this person. Connecting is optional.'}
@@ -457,25 +460,25 @@ export default function AddRelativeModal({
                       onClick={() => selectExisting(person.id)}
                       disabled={isAlreadyConnected}
                       style={{
-                        ...matchRowStyle,
+                        ...matchRowStyle(theme),
                         cursor: isAlreadyConnected ? 'default' : 'pointer',
                         opacity: isAlreadyConnected ? 0.55 : 1,
                         borderColor:
-                          selectedExistingId === person.id ? '#D4AF37' : 'rgba(255,255,255,0.1)',
+                          selectedExistingId === person.id ? primary.main : panel.border.subtle,
                         backgroundColor:
                           selectedExistingId === person.id
-                            ? 'rgba(212, 175, 55, 0.1)'
-                            : 'rgba(0,0,0,0.2)',
+                            ? panel.tint.accent
+                            : modal.optionSurface,
                       }}
                     >
-                      <span style={{ fontWeight: 600, color: 'white' }}>
+                      <span style={{ fontWeight: 600, color: panel.ink.strong }}>
                         {formatNodeDisplayName(person)}
                       </span>
                       {(isSpellingVariant || !isVisible || isAlreadyConnected) && (
                         <span
                           style={{
                             fontSize: '0.65rem',
-                            color: 'rgba(255,255,255,0.55)',
+                            color: modal.ink.meta,
                             display: 'block',
                             marginTop: '2px',
                           }}
@@ -492,7 +495,7 @@ export default function AddRelativeModal({
                       <span
                         style={{
                           fontSize: '0.65rem',
-                          color: 'rgba(255,255,255,0.4)',
+                          color: modal.ink.hint,
                           fontFamily: 'monospace',
                           display: 'block',
                           wordBreak: 'break-all',
@@ -506,7 +509,7 @@ export default function AddRelativeModal({
                 ))}
               </ul>
               {hiddenMatchCount > 0 && (
-                <p style={{ fontSize: '0.7rem', margin: '0 0 8px 0', color: 'rgba(255,255,255,0.5)' }}>
+                <p style={{ fontSize: '0.7rem', margin: '0 0 8px 0', color: panel.ink.faint }}>
                   +{hiddenMatchCount} more match{hiddenMatchCount === 1 ? '' : 'es'} not shown.
                 </p>
               )}
@@ -523,22 +526,22 @@ export default function AddRelativeModal({
                       setConfirmedDifferentPerson(false);
                     }
                   }}
-                  style={{ accentColor: '#D4AF37' }}
+                  style={{ accentColor: primary.main }}
                 />
-                <span style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.8)' }}>I am adding a totally different person</span>
+                <span style={{ fontSize: '0.8rem', color: modal.ink.secondary }}>I am adding a totally different person</span>
               </label>
               )}
             </div>
           )}
 
-          {error && <div style={errorStyle}>{error}</div>}
+          {error && <div style={errorStyle(theme)}>{error}</div>}
 
           <div style={actionsStyle}>
             <Button 
               variant="text" 
               onClick={onClose} 
               disabled={isSubmitting}
-              sx={{ color: 'rgba(255,255,255,0.5)', fontWeight: 600 }}
+              sx={{ color: panel.ink.faint, fontWeight: 600 }}
             >
               Cancel
             </Button>
@@ -547,7 +550,7 @@ export default function AddRelativeModal({
               variant="contained"
               disabled={primaryDisabled}
               sx={{ 
-                background: 'linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)',
+                background: modal.submit,
                 fontWeight: 700,
                 letterSpacing: '0.05em',
                 px: 3
@@ -562,86 +565,86 @@ export default function AddRelativeModal({
   );
 }
 
-const modalOverlayStyle: React.CSSProperties = {
+const modalOverlayStyle = ({ palette }: Theme): React.CSSProperties => ({
   position: 'fixed',
   top: 0,
   left: 0,
   right: 0,
   bottom: 0,
-  backgroundColor: 'rgba(0, 0, 0, 0.8)',
+  backgroundColor: palette.modal.scrim,
   display: 'flex',
   justifyContent: 'center',
   alignItems: 'center',
   zIndex: 2000,
   backdropFilter: 'blur(8px)',
-};
+});
 
-const modalContentStyle: React.CSSProperties = {
-  backgroundColor: 'rgba(5, 5, 5, 0.85)',
+const modalContentStyle = ({ palette }: Theme): React.CSSProperties => ({
+  backgroundColor: palette.modal.surface,
   backdropFilter: 'blur(24px)',
-  color: 'white',
+  color: palette.panel.ink.strong,
   padding: '40px',
   borderRadius: '12px',
   width: '100%',
   maxWidth: '480px',
-  boxShadow: '0 20px 60px rgba(0,0,0,0.6)',
-  border: '1px solid rgba(212, 175, 55, 0.2)',
-};
+  boxShadow: `0 20px 60px ${palette.panel.shadow.raised}`,
+  border: `1px solid ${palette.panel.border.accent}`,
+});
 
 const fieldStyle: React.CSSProperties = {
   marginBottom: '24px',
 };
 
-const labelStyle: React.CSSProperties = {
+const labelStyle = ({ palette }: Theme): React.CSSProperties => ({
   display: 'block',
   marginBottom: '10px',
   fontSize: '0.65rem',
   fontWeight: 700,
   letterSpacing: '0.1em',
-  color: '#D4AF37',
-};
+  color: palette.primary.main,
+});
 
-const inputStyle: React.CSSProperties = {
+const inputStyle = ({ palette }: Theme): React.CSSProperties => ({
   width: '100%',
   padding: '14px',
   borderRadius: '4px',
-  border: '1px solid rgba(255,255,255,0.1)',
-  backgroundColor: 'rgba(255,255,255,0.03)',
-  color: 'white',
+  border: `1px solid ${palette.modal.field.border}`,
+  backgroundColor: palette.modal.field.surface,
+  color: palette.panel.ink.strong,
   fontSize: '0.95rem',
   boxSizing: 'border-box',
   fontFamily: '"Inter", sans-serif',
-};
+});
 
-const warningStyle: React.CSSProperties = {
-  backgroundColor: 'rgba(212, 175, 55, 0.05)',
-  border: '1px solid rgba(212, 175, 55, 0.3)',
-  color: '#D4AF37',
+const warningStyle = ({ palette }: Theme): React.CSSProperties => ({
+  backgroundColor: palette.modal.notice.surface,
+  border: `1px solid ${palette.modal.notice.border}`,
+  color: palette.primary.main,
   padding: '20px',
   borderRadius: '8px',
   marginBottom: '24px',
-};
+});
 
-const matchRowStyle: React.CSSProperties = {
+const matchRowStyle = ({ palette }: Theme): React.CSSProperties => ({
   width: '100%',
   textAlign: 'left',
   padding: '12px 16px',
   borderRadius: '4px',
-  border: '1px solid rgba(255,255,255,0.1)',
-  color: '#fff',
+  border: `1px solid ${palette.panel.border.subtle}`,
+  color: palette.panel.ink.strong,
   cursor: 'pointer',
   transition: 'all 0.2s ease',
-};
+});
 
-const errorStyle: React.CSSProperties = {
-  backgroundColor: 'rgba(239, 68, 68, 0.1)',
-  border: '1px solid rgba(239, 68, 68, 0.3)',
-  color: '#ef4444',
+const errorStyle = ({ palette }: Theme): React.CSSProperties => ({
+  backgroundColor: palette.modal.status.errorSurface,
+  border: `1px solid ${palette.modal.status.errorBorder}`,
+  color: palette.error.main,
   padding: '16px',
   borderRadius: '4px',
   marginBottom: '24px',
   fontSize: '0.85rem',
-};
+});
 
 const actionsStyle: React.CSSProperties = {
   display: 'flex',
