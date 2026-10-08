@@ -53,6 +53,13 @@ export function CanvasModeProvider({ children }: { children: ReactNode }) {
   const [live, setLive] = useState(target);
   const liveRef = useRef(target);
 
+  useLayoutEffect(
+    () => () => {
+      for (const name of Object.values(PAIR_CSS_VARS)) document.documentElement.style.removeProperty(name);
+    },
+    []
+  );
+
   useLayoutEffect(() => {
     const fade = { from: liveRef.current, to: target, startedAt: performance.now() };
     if (fade.from === target) {
@@ -70,13 +77,6 @@ export function CanvasModeProvider({ children }: { children: ReactNode }) {
     frame = requestAnimationFrame(step);
     return () => cancelAnimationFrame(frame);
   }, [target]);
-
-  useEffect(
-    () => () => {
-      for (const name of Object.values(PAIR_CSS_VARS)) document.documentElement.style.removeProperty(name);
-    },
-    []
-  );
 
   const controller = useMemo(
     () => ({ ...preference, setMode, setPaperColour, setFocusedPerson }),

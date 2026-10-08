@@ -632,7 +632,7 @@ export const FamilyTree2D: React.FC<FamilyTree2DProps> = ({
           justifyContent: 'center',
           width: '100%',
           height: '100%',
-          color: 'text.primary',
+          color: panel.role.text,
           fontSize: '1rem',
           textAlign: 'center',
           padding: '24px',
@@ -865,7 +865,7 @@ export const FamilyTree2D: React.FC<FamilyTree2DProps> = ({
             background: panel.surface.toggle,
             backdropFilter: 'blur(24px)',
             border: `1px solid ${panel.border.accent}`,
-            color: 'primary.main',
+            color: panel.role.primary,
             fontWeight: 700,
             letterSpacing: '0.05em',
             '&:hover': {
@@ -913,8 +913,8 @@ export const FamilyTree2D: React.FC<FamilyTree2DProps> = ({
                 fullWidth
                 onClick={onAdminAddPersonClick}
                 sx={{ 
-                  color: 'secondary.main', 
-                  borderColor: 'secondary.main',
+                  color: panel.role.secondary, 
+                  borderColor: panel.role.secondary,
                   fontSize: '0.7rem',
                   fontWeight: 700,
                   '&:hover': { borderColor: 'secondary.light', background: panel.tint.secondary }
@@ -953,7 +953,7 @@ export const FamilyTree2D: React.FC<FamilyTree2DProps> = ({
                 borderRadius: '8px', 
                 border: `1px solid ${panel.border.hairline}` 
               }}>
-                <Typography variant="caption" sx={{ color: 'primary.main', fontWeight: 700, letterSpacing: '0.1em', mb: 1, display: 'block', fontSize: '0.6rem' }}>
+                <Typography variant="caption" sx={{ color: panel.role.primary, fontWeight: 700, letterSpacing: '0.1em', mb: 1, display: 'block', fontSize: '0.6rem' }}>
                   SEARCH ARCHIVE
                 </Typography>
                 <TreeSearchBar
@@ -1047,7 +1047,7 @@ export const FamilyTree2D: React.FC<FamilyTree2DProps> = ({
                         fontSize: '0.7rem',
                         py: 1.5,
                         px: 2,
-                        color: activePreset === cluster ? 'primary.main' : panel.ink.body,
+                        color: activePreset === cluster ? panel.role.primary : panel.ink.body,
                         backgroundColor: activePreset === cluster ? panel.tint.accent : 'transparent',
                         '&:hover': { background: panel.surface.control }
                       }}

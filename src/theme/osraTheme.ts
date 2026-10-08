@@ -4,7 +4,7 @@ import { cosmosHud, paperHud } from './hud';
 import { cosmosModal, paperModal } from './modal';
 import { cosmosPanel, paperPanel } from './panel';
 import { contrastRatio } from '../lib/colourBlend';
-import type { PaperPair } from './paperPair';
+import { livePair, type PaperPair } from './paperPair';
 
 const shared: Pick<ThemeOptions, 'typography' | 'components'> = {
   typography: {
@@ -74,8 +74,27 @@ export const osraTheme = createTheme({
 
 export function createPaperTheme(pair: PaperPair) {
   const { paper, ink, accent } = pair;
+  const { paper: livePaper, ink: liveInk, accent: liveAccent } = livePair;
+  const filled = (fill: typeof liveInk) => ({
+    backgroundColor: fill(),
+    color: livePaper(),
+    '&:hover': { backgroundColor: fill(0.85) },
+  });
   return createTheme({
     ...shared,
+    components: {
+      ...shared.components,
+      MuiButton: {
+        ...shared.components?.MuiButton,
+        variants: [
+          { props: { variant: 'contained', color: 'primary' }, style: filled(liveInk) },
+          { props: { variant: 'contained', color: 'secondary' }, style: filled(liveInk) },
+          { props: { variant: 'contained', color: 'error' }, style: filled(liveAccent) },
+          { props: { variant: 'outlined', color: 'primary' }, style: { color: liveInk(), borderColor: liveInk(0.5) } },
+          { props: { variant: 'text', color: 'primary' }, style: { color: liveInk() } },
+        ],
+      },
+    },
     palette: {
       mode: contrastRatio(paper, '#ffffff') > contrastRatio(paper, '#000000') ? 'dark' : 'light',
       primary: { main: ink, contrastText: paper },
