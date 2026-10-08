@@ -18,19 +18,24 @@ const FOV = 50;
 
 describe('paperIdleRotates', () => {
   it('waits for the idle pause before turning', () => {
-    expect(paperIdleRotates(0, false)).toBe(false);
-    expect(paperIdleRotates(PAPER_IDLE_SECONDS - 0.01, false)).toBe(false);
-    expect(paperIdleRotates(PAPER_IDLE_SECONDS, false)).toBe(true);
-    expect(paperIdleRotates(60, false)).toBe(true);
+    expect(paperIdleRotates(0, false, false)).toBe(false);
+    expect(paperIdleRotates(PAPER_IDLE_SECONDS - 0.01, false, false)).toBe(false);
+    expect(paperIdleRotates(PAPER_IDLE_SECONDS, false, false)).toBe(true);
+    expect(paperIdleRotates(60, false, false)).toBe(true);
   });
 
   it('holds still while a Person is focused, however long the view is idle', () => {
-    expect(paperIdleRotates(PAPER_IDLE_SECONDS, true)).toBe(false);
-    expect(paperIdleRotates(600, true)).toBe(false);
+    expect(paperIdleRotates(PAPER_IDLE_SECONDS, true, false)).toBe(false);
+    expect(paperIdleRotates(600, true, false)).toBe(false);
+  });
+
+  it('holds still while a Person is hovered, however long the view is idle', () => {
+    expect(paperIdleRotates(PAPER_IDLE_SECONDS, false, true)).toBe(false);
+    expect(paperIdleRotates(600, false, true)).toBe(false);
   });
 
   it('holds still when the idle time is not a number', () => {
-    expect(paperIdleRotates(Number.NaN, false)).toBe(false);
+    expect(paperIdleRotates(Number.NaN, false, false)).toBe(false);
   });
 });
 

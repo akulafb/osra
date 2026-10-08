@@ -46,7 +46,7 @@ export function PaperCameraRig({ frame, state, modalOpen }: PaperCameraRigProps)
   useFrame((_, delta) => {
     if (!controls || modalOpen || state.current.reveal) return;
     const idleSeconds = (performance.now() - lastInput.current) / 1000;
-    if (!paperIdleRotates(idleSeconds, state.current.focus !== null)) return;
+    if (!paperIdleRotates(idleSeconds, state.current.focus !== null, state.current.pointedId !== null)) return;
     void controls.rotate(paperIdleRotateSpeed(size.width) * Math.min(delta, MAX_FRAME_SECONDS), 0, true);
   });
 

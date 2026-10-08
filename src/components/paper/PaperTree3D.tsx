@@ -237,6 +237,9 @@ export function PaperTree3D({
 
   const failed = !hasWebGL || sceneFailed || layoutState.status === 'failed';
   const loaded = failed || (!!frame && firstFrameDrawn);
+  useEffect(() => {
+    if (failed) setArrival('settled');
+  }, [failed]);
   const fallback = <PaperWebGLFallback paper={LIVE_PAIR.paper} ink={LIVE_PAIR.ink} />;
 
   return (
