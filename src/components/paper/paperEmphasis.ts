@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import type { Emphasis } from '../../lib/focusEmphasis';
-import type { PaperLayout } from '../../lib/paperLayout';
+import type { PaperLayout, PaperLine } from '../../lib/paperLayout';
 import type { Point3 } from '../../lib/paperHover';
 
 /** How much of its ink a Person keeps in each emphasis; the rest fades into the paper. */
@@ -39,6 +39,14 @@ export function emptyEmphasisState(): PaperEmphasisState {
 
 export function inkOf(state: PaperEmphasisState, id: string): number {
   return PAPER_3D_INK[state.emphasis.get(id) ?? 'normal'];
+}
+
+/**
+ * The ink each end of a line keeps: its own Person's. A faint Person's line
+ * darkens toward a kept relative, so it never crosses their disc as a light wedge.
+ */
+export function lineEndInks(state: PaperEmphasisState, line: PaperLine): [number, number] {
+  return [inkOf(state, line.sourceId), inkOf(state, line.targetId)];
 }
 
 /** Where a Person is drawn: their layout place, plus any lean. */

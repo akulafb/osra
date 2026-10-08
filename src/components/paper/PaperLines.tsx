@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import type { FamilyLink } from '../../types/graph';
 import type { PaperLayout, PaperLine } from '../../lib/paperLayout';
 import { emphasisSubject, linesOf } from '../../lib/paperHover';
-import { fadeInk, inkOf, placeOf, type PaperEmphasisState } from './paperEmphasis';
+import { fadeInk, inkOf, lineEndInks, placeOf, type PaperEmphasisState } from './paperEmphasis';
 import { paperLineSegments } from './paperScene';
 
 interface PaperLinesProps {
@@ -63,8 +63,8 @@ export function PaperLines({ lines, layout, ink, parentInk, paper, state, showAr
 type LineSegments = ElementRef<typeof Line>;
 
 /**
- * One draw call for every line of one kind. A line fades with the fainter of
- * its two Persons, and the hovered or focused Person's own lines darken to full ink.
+ * One draw call for every line of one kind. Each end of a line fades with its
+ * own Person, and the hovered or focused Person's own lines darken to full ink.
  */
 function PaperLineKind({
   lines,
@@ -118,10 +118,10 @@ function PaperLineKind({
       const own = new Set(linesOf(lines, emphasisSubject(emphasis)));
       const rgb = new Float32Array(lines.length * 6);
       lines.forEach((line, i) => {
-        const kept = Math.min(inkOf(state.current, line.sourceId), inkOf(state.current, line.targetId));
-        fadeInk(own.has(line) ? colours.ink : colours.line, colours.paper, kept, colours.out);
-        colours.out.toArray(rgb, i * 6);
-        colours.out.toArray(rgb, i * 6 + 3);
+        const colour = own.has(line) ? colours.ink : colours.line;
+        const [source, target] = lineEndInks(state.current, line);
+        fadeInk(colour, colours.paper, source, colours.out).toArray(rgb, i * 6);
+        fadeInk(colour, colours.paper, target, colours.out).toArray(rgb, i * 6 + 3);
       });
       geometry.setColors(rgb);
     }
@@ -144,7 +144,7 @@ function PaperLineKind({
   );
 }
 
-/** A small cone on each parent line, just short of the child's disc, pointing at the child; it leans and fades with its line. */
+/** A small cone on each parent line, just short of the child's disc, pointing at the child; it leans with its line and fades with the child's end of it. */
 function PaperArrows({
   lines,
   layout,
@@ -208,8 +208,7 @@ function PaperArrows({
 
     if (fresh || colours !== last.colours || emphasis !== last.emphasis) {
       arrows.forEach((line, i) => {
-        const kept = Math.min(inkOf(state.current, line.sourceId), inkOf(state.current, line.targetId));
-        mesh.setColorAt(i, fadeInk(colours.line, colours.paper, kept, colours.out));
+        mesh.setColorAt(i, fadeInk(colours.line, colours.paper, inkOf(state.current, line.targetId), colours.out));
       });
       if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
     }
