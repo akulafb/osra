@@ -35,8 +35,10 @@ import type {
 import type { ChatRecord } from './chatTools';
 import {
   findKinshipPaths,
+  findKinshipTerms,
   findPersonsByName,
   getFormerSpouses,
+  getParents,
   getRecordedGender,
   getRelatives,
   type KinshipRelation,
@@ -258,6 +260,13 @@ const ENGLISH_KINSHIP_WORDS: ReadonlyArray<[synonyms: readonly string[], meaning
   [['stepsister'], { labels: ['step-sibling'], gender: 'female' }],
 ];
 
+/**
+ * A second cousin's six steps: the longest Kinship Path that a word in
+ * `KINSHIP_WORDS` with `labels` can name. "cousin" of any degree has no
+ * longest path, so it is never answered "No.".
+ */
+const LONGEST_WORD_STEPS = 6;
+
 const KINSHIP_WORDS: ReadonlyMap<string, KinshipWord> = new Map([
   ...Object.entries(ARABIC_KINSHIP_WORDS).map(([word, { label, gender, side }]): [string, KinshipWord] => [
     word,
@@ -270,9 +279,19 @@ function kinshipWordKey(word: string): string {
   return word.toLowerCase().replace(/[\s-]+/g, ' ').replace(/^step /, 'step');
 }
 
-function wordFits(word: KinshipWord, relation: KinshipRelation, gender: RecordedGender | null): 'yes' | 'no' | 'unknown' {
+/**
+ * `parentMissing`: the record lacks a parent of either Person, so a "sibling"
+ * may be a half-sibling (`familyGraph.ts` names a half-sibling only from both
+ * Persons' two parents).
+ */
+function wordFits(
+  word: KinshipWord,
+  relation: KinshipRelation,
+  { gender, parentMissing }: { gender: RecordedGender | null; parentMissing: boolean },
+): 'yes' | 'no' | 'unknown' {
   const namesTerm = 'labels' in word ? word.labels.includes(relation.label) : word.anyDegreeOf === relation.name;
-  if (!namesTerm) return 'no';
+  const mayBeHalf = parentMissing && relation.name === 'sibling' && 'labels' in word && word.labels.includes('half-sibling');
+  if (!namesTerm) return mayBeHalf ? 'unknown' : 'no';
   if (word.gender && word.gender !== gender) return gender ? 'no' : 'unknown';
   if (word.side && word.side !== relation.side) return relation.side ? 'no' : 'unknown';
   return 'yes';
@@ -355,7 +374,7 @@ function exactlyOneName(text: string, record: ChatRecord): string | null {
 }
 
 function readIsMy(message: string, record: ChatRecord): { name: string; word: KinshipWord; wordAsWritten: string } | null {
-  const asked = message.normalize('NFC').match(/^\s*is\s+(.+?)\s+my\s+(\p{L}[\p{L}\s'’-]*?)[\s?.!]*$/iu);
+  const asked = message.normalize('NFC').match(/^\s*is\s+(.+?)\s+my\s+(\p{L}[\p{L}\s'’-]*?)[\s?.!؟…]*$/iu);
   const word = asked && KINSHIP_WORDS.get(kinshipWordKey(asked[2]));
   const name = asked && word && exactlyOneName(asked[1], record);
   return name && word ? { name, word, wordAsWritten: asked[2].toLowerCase().replace(/\s+/g, ' ') } : null;
@@ -600,12 +619,18 @@ class Reply {
     return notes;
   }
 
+  /** "No." only when it is proved; when it is not, what the Person is instead. */
   isMy(speakerId: string, personId: string, word: KinshipWord, wordAsWritten: string): string {
-    const gender = getRecordedGender(personId, this.record.links, this.record.nodes);
-    const fits = findKinshipPaths(speakerId, personId, this.record.links).map((path) => wordFits(word, path.relation, gender));
-    const related = fits.length > 0;
+    const { links, nodes } = this.record;
+    const known = {
+      gender: getRecordedGender(personId, links, nodes),
+      parentMissing: [speakerId, personId].some((id) => getParents(id, links).length < 2),
+    };
+    const fits = findKinshipTerms(speakerId, personId, links, LONGEST_WORD_STEPS).map((relation) => wordFits(word, relation, known));
     if (fits.includes('yes')) return `${this.bold(personId)} is your ${wordAsWritten}.`;
-    if (related && !fits.includes('unknown')) return 'No.';
+    const searchedEveryPath = 'labels' in word;
+    const related = findKinshipPaths(speakerId, personId, links).length > 0;
+    if (searchedEveryPath && related && !fits.includes('unknown')) return 'No.';
     return this.howRelated(speakerId, personId, false);
   }
 

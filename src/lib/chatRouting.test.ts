@@ -6,6 +6,7 @@ import type {
   Side,
   Subject,
 } from '../../supabase/functions/family-chat/questionKind.ts';
+import type { Speaker } from '../../supabase/functions/family-chat/prompt.ts';
 import { routeMessage } from './chatRouting';
 import { FIXTURE_IDS as P, KINSHIP_FIXTURE_TREE } from './fixtures/kinshipFixtureTree';
 
@@ -43,7 +44,7 @@ function reading({
   };
 }
 
-function route(message: string, questionKind: QuestionKind | null, speaker: typeof OMAR | null = OMAR) {
+function route(message: string, questionKind: QuestionKind | null, speaker: Speaker | null = OMAR) {
   return routeMessage({ message, questionKind, speaker, record: KINSHIP_FIXTURE_TREE });
 }
 
@@ -318,6 +319,23 @@ describe('routeMessage: "Is <Person> my <word>?" is answered yes or no in code',
     });
   });
 
+  it('yes when a longer Kinship Path fits: Faris is a father-in-law, and an uncle by marriage through Mariam', () => {
+    expect(route('Is Faris my uncle?', null)).toEqual({ by: 'code', answer: '**Faris Khoury** is your uncle.' });
+    const yusufJr = { personId: P.yusufJr, displayName: 'Yusuf Haddad' };
+    expect(route('Is Hani my second cousin?', null, yusufJr)).toEqual({ by: 'code', answer: '**Hani Khoury** is your second cousin.' });
+    expect(route('Is Hani my first cousin?', null, yusufJr)).toEqual({ by: 'code', answer: '**Hani Khoury** is your first cousin.' });
+  });
+
+  it('the Kinship Term, not "No.", for "cousin": a cousin of any degree is too far to search every path', () => {
+    expect(route('Is Samir my cousin?', null)).toEqual({ by: 'code', answer: "**Samir Mansour** is your uncle, on your mother's side." });
+  });
+
+  it('the Kinship Term, not "No.", for a half-sibling when a parent is missing from the record', () => {
+    const dina = { personId: P.dina, displayName: 'Dina Aziz' };
+    expect(route('Is Walid my half sibling?', null, dina)).toEqual({ by: 'code', answer: '**Walid Aziz** is your sibling.' });
+    expect(route('Is Layla Haddad my half sibling?', null)).toEqual({ by: 'code', answer: 'No.' });
+  });
+
   it('not related: the same answer as "how am I related to"', () => {
     expect(route('Is Hana my cousin?', reading({ relation: 'cousins' }))).toEqual({
       by: 'code',
@@ -334,6 +352,11 @@ describe('routeMessage: "Is <Person> my <word>?" is answered yes or no in code',
 
   it('is read from the words, so it is answered even with no reading from Jev', () => {
     expect(route('Is Samir my khalo?', null)).toEqual({ by: 'code', answer: '**Samir Mansour** is your khalo.' });
+  });
+
+  it('ends at an Arabic question mark or an ellipsis too', () => {
+    expect(route('Is Samir my khalo؟', null)).toEqual({ by: 'code', answer: '**Samir Mansour** is your khalo.' });
+    expect(route('Is Samir my khalo…', null)).toEqual({ by: 'code', answer: '**Samir Mansour** is your khalo.' });
   });
 
   it('goes to the model for a word the code does not know', () => {
