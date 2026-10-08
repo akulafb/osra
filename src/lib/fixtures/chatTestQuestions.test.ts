@@ -123,6 +123,12 @@ describe('the chat test questions', () => {
     expect(findKinshipPaths(me, P.walid, links)[0].relation.side).toBe('mother');
   });
 
+  it('expect "No." for the father\'s sister asked as a khalto', () => {
+    expect(byId('is-she-my-khalto').expect).toEqual({ answersNo: true });
+    expect(termsForAToB(P.sara, me)).toEqual(['aunt']);
+    expect(findKinshipPaths(me, P.sara, links).map((path) => path.relation.side)).toEqual(['father']);
+  });
+
   it('ask about a given name with two matches', () => {
     expect(names(findPersonsByName('Omar', nodes, links).map((m) => m.personId))).toEqual([...(byId('two-omars').expect.names ?? [])].sort());
   });

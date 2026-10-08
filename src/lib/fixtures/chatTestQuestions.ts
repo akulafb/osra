@@ -47,6 +47,11 @@ export interface ChatTestExpect {
   /** The reply says the two Persons are not related. */
   notRelated?: true;
   /**
+   * The reply is "No." and nothing more: no other Kinship Term, and no list of
+   * the Persons the word does fit (LIN-88).
+   */
+  answersNo?: true;
+  /**
    * How many Kinship Terms the expected term joins at named Persons, when no
    * one term names the relation: 2 for "your first cousin once removed
    * **Layla Haddad**'s husband". One when not given.
@@ -269,6 +274,13 @@ export const CHAT_TEST_QUESTIONS: readonly ChatTestQuestion[] = [
     group: 'arabic',
     question: 'Is Walid Aziz my khalo?',
     expect: { relations: [/\bkhalo\b/i] },
+  },
+  {
+    id: 'is-she-my-khalto',
+    group: 'arabic',
+    // The father's sister: a khalto is the mother's sister.
+    question: 'Is Sara Khoury my khalto?',
+    expect: { answersNo: true },
   },
 
   {

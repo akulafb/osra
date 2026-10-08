@@ -38,6 +38,21 @@ function jevOther(inputTokens: number) {
   });
 }
 
+/** Jev's answers for "Is Walid Aziz my khalo?": the speaker's aunts and uncles, though a Person is named. */
+function jevKhalo(inputTokens: number) {
+  return json({
+    model: 'jev-1.13.0',
+    usage: { input_tokens: inputTokens, output_tokens: 200 },
+    answers: {
+      relation: { choice: 'aunts_uncles', confidence: 0.95 },
+      side: { choice: 'maternal', confidence: 0.9 },
+      gender: { choice: 'male', confidence: 0.95 },
+      subject: { choice: 'speaker', confidence: 0.6 },
+      wants_count: { noul: 0.02 },
+    },
+  });
+}
+
 function modelTurn(message: Record<string, unknown>, cost: number) {
   return json({ id: 'gen-1', choices: [{ message: { role: 'assistant', ...message } }], usage: { cost } });
 }
@@ -79,6 +94,19 @@ describe('createChatTestRunner', () => {
     });
     // Only TypeSafe went over the network, with the TypeSafe key.
     expect(requests.map((r) => [r.url, r.authorization])).toEqual([[TYPESAFE_URL, 'Bearer ts-test-key']]);
+  });
+
+  it('answers "Is <Person> my <word>?" yes or no in code, with no model call (LIN-88)', async () => {
+    const { network, requests } = scripted({ [TYPESAFE_URL]: [jevKhalo(1400), jevKhalo(1400)] });
+    const runner = createChatTestRunner({ ...KEYS, network });
+
+    const yes = await runner.ask('Is Walid Aziz my khalo?');
+    const no = await runner.ask('Is Sara Khoury my khalto?');
+
+    expect(yes.outcome).toMatchObject({ ok: true, answeredBy: 'code', answer: '**Walid Aziz** is your khalo.' });
+    expect(no.outcome).toMatchObject({ ok: true, answeredBy: 'code', answer: 'No.' });
+    expect([yes.cost.modelCalls, no.cost.modelCalls]).toEqual([0, 0]);
+    expect(requests.map((r) => r.url)).toEqual([TYPESAFE_URL, TYPESAFE_URL]);
   });
 
   it('runs the model\'s tools on the test tree and adds up each model call\'s cost', async () => {
