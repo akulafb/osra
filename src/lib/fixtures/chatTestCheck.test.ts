@@ -94,6 +94,14 @@ describe('checkChatTestReply', () => {
     expect(check(q, 'Fuad is his cousin.').problems).toEqual(['does not say they are not related']);
   });
 
+  it('checks that the reply is "No." and nothing more, with no Kinship Term to put first', () => {
+    const q = question({ answersNo: true }, 'Is Sara Khoury my khalto?', 'arabic');
+    expect(check(q, 'No.')).toEqual({ correct: true, problems: [] });
+    expect(check(q, '**No.**').correct).toBe(true);
+    expect(check(q, "No. **Sara Khoury** is your aunt, on your father's side.").problems).toEqual(['does not answer "No." and nothing more']);
+    expect(check(q, "**Sara Khoury** is your amto.").problems).toEqual(['does not answer "No." and nothing more']);
+  });
+
   it('fails a reply that shows a Person id', () => {
     const q = question({ names: ['Hani Khoury'] });
     expect(check(q, '**Hani Khoury** (fx-hani-khoury)').problems).toEqual(['shows a Person id']);
