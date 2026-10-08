@@ -12,9 +12,9 @@ import {
   type FocusedPerson,
 } from '../hooks/useCanvasMode';
 import type { CanvasMode, PaperColour } from '../lib/canvasMode';
-import { drawOverviewPair, pairAt, pairForFamily } from '../lib/paperPairs';
+import { drawOverviewPair, pairAt, paperTargetPair } from '../lib/paperPairs';
 import { createPaperTheme, osraTheme } from '../theme/osraTheme';
-import { GRAYSCALE_PAIR, PAIR_CSS_VARS, pairCssValues, type PaperPair } from '../theme/paperPair';
+import { PAIR_CSS_VARS, pairCssValues, type PaperPair } from '../theme/paperPair';
 
 function writePairVars(pair: PaperPair) {
   const { style } = document.documentElement;
@@ -45,10 +45,10 @@ export function CanvasModeProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => writeLastOverviewPair(overview), [overview]);
 
-  const target = useMemo(() => {
-    if (preference.mode !== 'paper' || preference.paperColour === 'grayscale') return GRAYSCALE_PAIR;
-    return focused?.familyCluster ? pairForFamily(focused.familyCluster) : overview;
-  }, [preference.mode, preference.paperColour, focused, overview]);
+  const target = useMemo(
+    () => paperTargetPair({ mode: preference.mode, paperColour: preference.paperColour, focused, overview }),
+    [preference.mode, preference.paperColour, focused, overview]
+  );
 
   const [live, setLive] = useState(target);
   const liveRef = useRef(target);

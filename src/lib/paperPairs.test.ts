@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { contrastRatio } from './colourBlend';
-import { drawOverviewPair, mixPair, pairAt, pairForFamily, PAIR_FADE_MS } from './paperPairs';
+import { drawOverviewPair, mixPair, pairAt, pairForFamily, paperTargetPair, PAIR_FADE_MS } from './paperPairs';
 import { GRAYSCALE_PAIR, PAPER_PAIRS, pairCssValues, pairVar } from '../theme/paperPair';
 
 const [green, indigo, red] = PAPER_PAIRS;
@@ -86,5 +86,30 @@ describe('pair CSS variables', () => {
   it('writes each colour as rgb channels and reads it back with a grayscale fallback', () => {
     expect(pairCssValues(red)['--paper-pair-paper']).toBe('212 71 68');
     expect(pairVar('ink', 0.5)).toBe('rgb(var(--paper-pair-ink, 28 28 28) / 0.5)');
+  });
+});
+
+describe('paperTargetPair', () => {
+  const overview = indigo;
+  const colour = { mode: 'paper', paperColour: 'colour', overview } as const;
+
+  it('shows the focused Person\'s family pair', () => {
+    expect(paperTargetPair({ ...colour, focused: { familyCluster: 'Hajjaj' } })).toBe(pairForFamily('Hajjaj'));
+  });
+
+  it('keeps the overview pair for a focused Person with no family cluster', () => {
+    expect(paperTargetPair({ ...colour, focused: {} })).toBe(overview);
+    expect(paperTargetPair({ ...colour, focused: { familyCluster: '' } })).toBe(overview);
+  });
+
+  it('shows the overview pair with nobody focused', () => {
+    expect(paperTargetPair({ ...colour, focused: null })).toBe(overview);
+  });
+
+  it('stays grayscale in grayscale and in Cosmos, focused or not', () => {
+    for (const focused of [null, { familyCluster: 'Hajjaj' }]) {
+      expect(paperTargetPair({ ...colour, paperColour: 'grayscale', focused })).toBe(GRAYSCALE_PAIR);
+      expect(paperTargetPair({ ...colour, mode: 'cosmos', focused })).toBe(GRAYSCALE_PAIR);
+    }
   });
 });
