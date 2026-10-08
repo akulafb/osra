@@ -1,20 +1,14 @@
 import React, { useCallback, useRef, useState, useEffect, useMemo } from 'react';
-import { useSpring, animated } from 'react-spring';
 import ForceGraph3D from 'react-force-graph-3d';
 import SpriteText from 'three-spritetext';
 import * as THREE from 'three';
 import Button from '@mui/material/Button';
 import Box from '@mui/material/Box';
-import Typography from '@mui/material/Typography';
-import Checkbox from '@mui/material/Checkbox';
-import Switch from '@mui/material/Switch';
-import FormControlLabel from '@mui/material/FormControlLabel';
 import { useTheme } from '@mui/material/styles';
 import { FamilyGraph, FamilyNode, RelativeDirection } from '../types/graph';
 import { useAuth } from '../contexts/AuthContext';
 import { createStarfield, type NebulaData } from '../utils/starfield';
 import { isMobile } from '../utils/device';
-import { CanvasModeSwitch } from './CanvasModeSwitch';
 import { getTexturePath } from '../utils/imageFormat';
 import { getClusterColors } from '../utils/familyColors';
 import { getNodeId } from '../lib/familyGraph';
@@ -34,8 +28,9 @@ import {
   CONFIRM_PULSE_COLOR,
   type LinkEndpoints,
 } from '../utils/cosmicFx';
-import { TreeSearchBar } from './TreeSearchBar';
-import { bottomRightControlsClear, topRightControlsClear, type PersonDrawerInset } from '../hooks/usePersonDrawerInset';
+import { type PersonDrawerInset } from '../hooks/usePersonDrawerInset';
+import { TextureMenuSpring, Tree3DOverlay, type Tree3DSceneCamera, type Tree3DSearch } from './tree3d/Tree3DOverlay';
+import { useIsMobileDevice } from './tree3d/useIsMobileDevice';
 import { Manipulation3DPanel, Connect3DControls, Dissolve3DControls } from './Manipulation3DPanel';
 import {
   Candidacy,
@@ -151,40 +146,6 @@ const getMaterial = (color: string, isMobileDevice: boolean = false) => {
   }
   return materialCache.get(color)!;
 };
-
-function SettingsPanelSpring({ isOpen, children }: { isOpen: boolean; children: React.ReactNode }) {
-  const spring = useSpring({
-    maxHeight: isOpen ? 800 : 0,
-    opacity: isOpen ? 1 : 0,
-    config: { tension: 300, friction: 30 },
-  });
-  return (
-    <animated.div style={{ ...spring, overflow: 'hidden', flexShrink: 0 }}>
-      {children}
-    </animated.div>
-  );
-}
-
-function TextureMenuSpring({
-  isOpen,
-  children,
-  maxHeightOpen = 200,
-}: {
-  isOpen: boolean;
-  children: React.ReactNode;
-  maxHeightOpen?: number;
-}) {
-  const spring = useSpring({
-    maxHeight: isOpen ? maxHeightOpen : 0,
-    opacity: isOpen ? 1 : 0,
-    config: { tension: 300, friction: 30 },
-  });
-  return (
-    <animated.div style={{ ...spring, overflow: 'hidden' }}>
-      {children}
-    </animated.div>
-  );
-}
 
 // Props interface for the refactored component
 interface FamilyTree3DProps {
@@ -377,33 +338,14 @@ export const FamilyTree3DContent: React.FC<FamilyTree3DProps> = ({
   // V3 Features: Toggles
   const [showNames, setShowNames] = useState(true);
   const [showLinks, setShowLinks] = useState(true);
-  const [showControls, setShowControls] = useState(false);
   const [nodeTexture, setNodeTexture] = useState<'spheres' | 'planets' | 'none'>('spheres');
   const [showArrows, setShowArrows] = useState(false);
   const [isPresetsOpen, setIsPresetsOpen] = useState(false);
-  const [isVisibilityOpen, setIsVisibilityOpen] = useState(false);
-  const presetsRef = useRef<HTMLDivElement>(null);
-  const visibilityRef = useRef<HTMLDivElement>(null);
-  const textureRef = useRef<HTMLDivElement>(null);
   const [isTextureMenuOpen, setIsTextureMenuOpen] = useState(false);
   const [isAmbienceOn, setIsAmbienceOn] = useState(false);
   const [isStarfieldLoading, setIsStarfieldLoading] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  const [showNavControls, setShowNavControls] = useState(false);
-  const [isMobileDevice, setIsMobileDevice] = useState(
-    () => typeof window !== 'undefined' && isMobile()
-  );
-
-  useEffect(() => {
-    const update = () => {
-      const mob = isMobile();
-      setIsMobileDevice(mob);
-      if (mob) setShowNavControls(false);
-    };
-    update();
-    window.addEventListener('resize', update);
-    return () => window.removeEventListener('resize', update);
-  }, []);
+  const isMobileDevice = useIsMobileDevice();
 
   // Navigation state for WASD/Mouse Steering
   const [isSteeringActive, setIsSteeringActive] = useState(false);
@@ -1519,13 +1461,6 @@ export const FamilyTree3DContent: React.FC<FamilyTree3DProps> = ({
     return () => clearTimeout(t);
   }, [pendingLinkPreview?.anchorId, pendingLinkPreview?.existingId]);
 
-  // Expand settings when Ctrl+F opens search
-  useEffect(() => {
-    if (searchOpenRequested > 0) {
-      setShowControls(true);
-    }
-  }, [searchOpenRequested]);
-
   // Navigate only when arrow is clicked or Enter pressed (not when typing)
   const prevSearchNavigateTrigger = useRef(0);
   useEffect(() => {
@@ -1663,6 +1598,76 @@ export const FamilyTree3DContent: React.FC<FamilyTree3DProps> = ({
     }
   }, []);
 
+  const sceneCamera: Tree3DSceneCamera = { focusPerson: focusNodeById, resetView };
+
+  const search: Tree3DSearch | undefined =
+    onSearchQueryChange && onSearchPrev && onSearchNext && onSearchClose
+      ? {
+          query: searchQuery,
+          onQueryChange: onSearchQueryChange,
+          matches: searchMatches,
+          currentIndex: searchIndex,
+          onPrev: onSearchPrev,
+          onNext: onSearchNext,
+          onClose: onSearchClose,
+          disabled: searchDisabled,
+        }
+      : undefined;
+
+  const instrumentsSceneItems = (
+    <>
+      <div>
+        <Button
+          variant="text"
+          size="small"
+          fullWidth
+          onClick={() => setIsTextureMenuOpen(!isTextureMenuOpen)}
+          sx={{ justifyContent: 'space-between', color: panel.ink.muted, fontSize: '0.7rem' }}
+        >
+          TEXTURE: {nodeTexture.toUpperCase()} {isTextureMenuOpen ? '▴' : '▾'}
+        </Button>
+        <TextureMenuSpring isOpen={isTextureMenuOpen}>
+          <Box sx={{ mt: 0.5, backgroundColor: panel.surface.well, borderRadius: '4px', overflow: 'hidden' }}>
+            <Button fullWidth size="small" sx={{ justifyContent: 'flex-start', fontSize: '0.7rem', py: 1 }} onClick={() => { setNodeTexture('spheres'); setIsTextureMenuOpen(false); }}>Spheres</Button>
+            <Button fullWidth size="small" sx={{ justifyContent: 'flex-start', fontSize: '0.7rem', py: 1 }} onClick={() => { setNodeTexture('planets'); setIsTextureMenuOpen(false); }}>Planets</Button>
+            <Button fullWidth size="small" sx={{ justifyContent: 'flex-start', fontSize: '0.7rem', py: 1 }} onClick={() => { setNodeTexture('none'); setIsTextureMenuOpen(false); }}>None</Button>
+          </Box>
+        </TextureMenuSpring>
+      </div>
+
+      <div>
+        <Button
+          variant="text"
+          size="small"
+          fullWidth
+          onClick={() => setIsPresetsOpen(!isPresetsOpen)}
+          sx={{ justifyContent: 'space-between', color: 'primary.main', fontSize: '0.7rem', fontWeight: 700 }}
+        >
+          FAMILY PRESETS {isPresetsOpen ? '▴' : '▾'}
+        </Button>
+        <TextureMenuSpring isOpen={isPresetsOpen}>
+          <Box sx={{ mt: 0.5, backgroundColor: panel.surface.well, borderRadius: '4px', overflow: 'hidden', maxHeight: '200px', overflowY: 'auto' }}>
+            <Button fullWidth size="small" sx={{ justifyContent: 'flex-start', fontSize: '0.7rem' }} onClick={() => applyPreset(null)}>Global View</Button>
+            {uniqueClusters.map((cluster) => (
+              <Button key={cluster} fullWidth size="small" sx={{ justifyContent: 'flex-start', fontSize: '0.7rem', color: activePreset === cluster ? 'primary.main' : 'inherit' }} onClick={() => applyPreset(cluster)}>{cluster}</Button>
+            ))}
+          </Box>
+        </TextureMenuSpring>
+      </div>
+    </>
+  );
+
+  const navKeys = (
+    <div style={{ lineHeight: '1.6' }}>
+      <div><span style={{ color: isSteeringActive ? panel.nav.keyOn : panel.nav.keyOff, fontWeight: 600 }}>R</span>: Mouse Steering <span style={{ color: isSteeringActive ? panel.nav.keyOn : panel.nav.keyOff }}>({isSteeringActive ? 'ACTIVE' : 'LOCKED'})</span></div>
+      <div><span style={{ color: panel.ink.strong, fontWeight: 600 }}>WASD</span>: Move (Hold <span style={{ color: panel.ink.strong, fontWeight: 600 }}>Shift</span> for Boost)</div>
+      <div><span style={{ color: panel.ink.strong, fontWeight: 600 }}>Q / E</span>: Roll View L / R</div>
+      <div><span style={{ color: panel.ink.strong, fontWeight: 600 }}>Tab</span>: Cycle Names</div>
+      <div><span style={{ color: panel.ink.strong, fontWeight: 600 }}>Enter</span>: Focus selection</div>
+      <div><span style={{ color: panel.ink.strong, fontWeight: 600 }}>Esc</span>: Deselect</div>
+    </div>
+  );
+
   // Render
   return (
     <div style={{ position: 'relative', width: '100%', height: '100%', background: '#0a0a0a' }}>
@@ -1756,348 +1761,35 @@ export const FamilyTree3DContent: React.FC<FamilyTree3DProps> = ({
         showNavInfo={false}
       />
 
-      {/* Settings Controls - Top Right */}
-      <div style={{ position: 'absolute', ...topRightControlsClear(drawerInset), display: 'flex', flexDirection: 'column', gap: '12px', zIndex: 1300, alignItems: 'flex-end' }}>
-        {/* Settings Toggle - First */}
-        <Button
-          variant="contained"
-          onClick={() => setShowControls(!showControls)}
-          sx={{ 
-            minWidth: '140px',
-            background: panel.surface.toggle,
-            backdropFilter: 'blur(24px)',
-            border: `1px solid ${panel.border.accent}`,
-            color: 'primary.main',
-            fontWeight: 700,
-            letterSpacing: '0.05em',
-            '&:hover': {
-              background: panel.surface.toggleHover,
-              borderColor: panel.border.accentHover,
-            }
-          }}
-        >
-          INSTRUMENTS {showControls ? '▴' : '▾'}
-        </Button>
-
-        {/* Ambiance Toggle - Floating slightly below button */}
-        <Box sx={{ 
-          background: panel.surface.pill, 
-          backdropFilter: 'blur(12px)', 
-          px: 1.5, 
-          py: 0.5, 
-          borderRadius: '20px',
-          border: `1px solid ${panel.border.hairline}`
-        }}>
-          <FormControlLabel
-            control={
-              <Switch
-                checked={isAmbienceOn}
-                onChange={() => setIsAmbienceOn(!isAmbienceOn)}
-                color="success"
-                size="small"
-              />
-            }
-            label="AMBIANCE"
-            sx={{ 
-              m: 0,
-              color: panel.ink.muted, 
-              '& .MuiFormControlLabel-label': { 
-                fontSize: '0.65rem', 
-                fontWeight: 700, 
-                letterSpacing: '0.1em' 
-              } 
-            }}
-          />
-        </Box>
-
-        <SettingsPanelSpring isOpen={showControls}>
-          <div style={{ 
-            display: 'flex', 
-            flexDirection: 'column', 
-            gap: '12px', 
-            width: '220px', 
-            backgroundColor: panel.surface.panel, 
-            backdropFilter: 'blur(24px)',
-            padding: '20px', 
-            borderRadius: '12px', 
-            border: `1px solid ${panel.border.accent}`,
-            boxShadow: `0 20px 50px ${panel.shadow.raised}`
-          }}>
-            {userProfile?.node_id && (
-              <Button
-                variant="contained"
-                fullWidth
-                size="small"
-                onClick={() => {
-                  const meNode = graphData?.nodes?.find((n) => n.id === userProfile.node_id);
-                  const c = meNode?.familyCluster || meNode?.maternalFamilyCluster;
-                  if (c) onEnsureClusterVisible3D(c);
-                  focusNodeById(userProfile.node_id!);
-                }}
-                sx={{ 
-                  background: panel.fill.findMe,
-                  fontWeight: 700,
-                  letterSpacing: '0.05em'
-                }}
-              >
-                FIND ME
-              </Button>
-            )}
-
-            {isAdmin && onAdminAddPersonClick && (
-              <Button
-                variant="outlined"
-                size="small"
-                fullWidth
-                onClick={onAdminAddPersonClick}
-                sx={{ 
-                  color: 'secondary.main', 
-                  borderColor: 'secondary.main',
-                  fontSize: '0.7rem',
-                  fontWeight: 700,
-                  '&:hover': { borderColor: 'secondary.light', background: panel.tint.secondary }
-                }}
-              >
-                + ADD PERSON
-              </Button>
-            )}
-
-            <Box sx={{ display: 'flex', gap: 1 }}>
-              <Button 
-                variant={mode === '3D' ? "contained" : "outlined"} 
-                size="small" 
-                onClick={() => onModeChange?.('3D')} 
-                sx={{ flex: 1, fontSize: '0.7rem', fontWeight: 700 }}
-              >
-                3D
-              </Button>
-              <Button 
-                variant={mode === '2D' ? "contained" : "outlined"} 
-                size="small" 
-                onClick={() => onModeChange?.('2D')} 
-                sx={{ flex: 1, fontSize: '0.7rem', fontWeight: 700 }}
-              >
-                2D
-              </Button>
-            </Box>
-
-            <Button 
-              variant="text" 
-              size="small" 
-              onClick={resetView}
-              sx={{ color: panel.ink.faint, fontSize: '0.7rem', fontWeight: 600 }}
-            >
-              RESET VIEWPORT
-            </Button>
-
-            <CanvasModeSwitch />
-
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
-              <FormControlLabel
-                control={<Switch checked={showNames} onChange={() => setShowNames(!showNames)} color="primary" size="small" />}
-                label="LABELS"
-                sx={{ m: 0, color: 'text.primary', '& .MuiFormControlLabel-label': { fontSize: '0.7rem', fontWeight: 600, letterSpacing: '0.05em' } }}
-              />
-              <FormControlLabel
-                control={<Switch checked={showLinks} onChange={() => setShowLinks(!showLinks)} color="primary" size="small" />}
-                label="LINKS"
-                sx={{ m: 0, color: 'text.primary', '& .MuiFormControlLabel-label': { fontSize: '0.7rem', fontWeight: 600, letterSpacing: '0.05em' } }}
-              />
-              <FormControlLabel
-                control={<Switch checked={showArrows} onChange={() => setShowArrows(!showArrows)} color="primary" size="small" />}
-                label="ARROWS"
-                sx={{ m: 0, color: 'text.primary', '& .MuiFormControlLabel-label': { fontSize: '0.7rem', fontWeight: 600, letterSpacing: '0.05em' } }}
-              />
-            </Box>
-
-            {onSearchQueryChange && onSearchPrev && onSearchNext && onSearchClose && (
-              <Box sx={{ 
-                mt: 1, 
-                p: 1.5, 
-                backgroundColor: panel.surface.inset, 
-                borderRadius: '8px', 
-                border: `1px solid ${panel.border.hairline}` 
-              }}>
-                <Typography variant="caption" sx={{ color: 'primary.main', fontWeight: 700, letterSpacing: '0.1em', mb: 1, display: 'block', fontSize: '0.6rem' }}>
-                  SEARCH ARCHIVE
-                </Typography>
-                <TreeSearchBar
-                  query={searchQuery}
-                  onQueryChange={onSearchQueryChange}
-                  matches={searchMatches}
-                  currentIndex={searchIndex}
-                  onPrev={onSearchPrev}
-                  onNext={onSearchNext}
-                  onClose={onSearchClose}
-                  disabled={searchDisabled}
-                  embedded
-                  focusTrigger={searchOpenRequested}
-                />
-              </Box>
-            )}
-
-            <Button
-              variant="outlined"
-              color={effectiveCollapsedNodes.size > 0 ? "primary" : "inherit"}
-              size="small"
-              fullWidth
-              onClick={() => {
-                if (effectiveCollapsedNodes.size > 0) {
-                  effectiveSetCollapsedNodes(new Set());
-                } else {
-                  const parents = new Set<string>();
-                  graphData?.links.forEach(l => {
-                    if (l.type === 'parent') {
-                      const sId = getNodeId(l.source);
-                      parents.add(sId);
-                    }
-                  });
-                  effectiveSetCollapsedNodes(parents);
-                }
-              }}
-              sx={{ mt: 1, fontSize: '0.65rem', fontWeight: 700, borderColor: panel.border.subtle }}
-            >
-              {effectiveCollapsedNodes.size > 0 ? 'EXPAND ALL' : 'COLLAPSE ALL'}
-            </Button>
-
-            <div ref={textureRef}>
-              <Button
-                variant="text"
-                size="small"
-                fullWidth
-                onClick={() => setIsTextureMenuOpen(!isTextureMenuOpen)}
-                sx={{ justifyContent: 'space-between', color: panel.ink.muted, fontSize: '0.7rem' }}
-              >
-                TEXTURE: {nodeTexture.toUpperCase()} {isTextureMenuOpen ? '▴' : '▾'}
-              </Button>
-              <TextureMenuSpring isOpen={isTextureMenuOpen}>
-                <Box sx={{ mt: 0.5, backgroundColor: panel.surface.well, borderRadius: '4px', overflow: 'hidden' }}>
-                  <Button fullWidth size="small" sx={{ justifyContent: 'flex-start', fontSize: '0.7rem', py: 1 }} onClick={() => { setNodeTexture('spheres'); setIsTextureMenuOpen(false); }}>Spheres</Button>
-                  <Button fullWidth size="small" sx={{ justifyContent: 'flex-start', fontSize: '0.7rem', py: 1 }} onClick={() => { setNodeTexture('planets'); setIsTextureMenuOpen(false); }}>Planets</Button>
-                  <Button fullWidth size="small" sx={{ justifyContent: 'flex-start', fontSize: '0.7rem', py: 1 }} onClick={() => { setNodeTexture('none'); setIsTextureMenuOpen(false); }}>None</Button>
-                </Box>
-              </TextureMenuSpring>
-            </div>
-
-            <div ref={presetsRef}>
-              <Button
-                variant="text"
-                size="small"
-                fullWidth
-                onClick={() => setIsPresetsOpen(!isPresetsOpen)}
-                sx={{ justifyContent: 'space-between', color: 'primary.main', fontSize: '0.7rem', fontWeight: 700 }}
-              >
-                FAMILY PRESETS {isPresetsOpen ? '▴' : '▾'}
-              </Button>
-              <TextureMenuSpring isOpen={isPresetsOpen}>
-                <Box sx={{ mt: 0.5, backgroundColor: panel.surface.well, borderRadius: '4px', overflow: 'hidden', maxHeight: '200px', overflowY: 'auto' }}>
-                  <Button fullWidth size="small" sx={{ justifyContent: 'flex-start', fontSize: '0.7rem' }} onClick={() => applyPreset(null)}>Global View</Button>
-                  {uniqueClusters.map((cluster) => (
-                    <Button key={cluster} fullWidth size="small" sx={{ justifyContent: 'flex-start', fontSize: '0.7rem', color: activePreset === cluster ? 'primary.main' : 'inherit' }} onClick={() => applyPreset(cluster)}>{cluster}</Button>
-                  ))}
-                </Box>
-              </TextureMenuSpring>
-            </div>
-
-            <div ref={visibilityRef}>
-              <Button
-                variant="text"
-                size="small"
-                fullWidth
-                onClick={() => setIsVisibilityOpen(!isVisibilityOpen)}
-                sx={{ justifyContent: 'space-between', color: panel.ink.muted, fontSize: '0.7rem' }}
-              >
-                VISIBILITY {isVisibilityOpen ? '▴' : '▾'}
-              </Button>
-              <TextureMenuSpring isOpen={isVisibilityOpen} maxHeightOpen={300}>
-                <Box sx={{ mt: 0.5, backgroundColor: panel.surface.well, borderRadius: '4px', overflow: 'hidden' }}>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', p: 1, borderBottom: `1px solid ${panel.border.hairline}` }}>
-                    <Button size="small" sx={{ fontSize: '0.6rem', minWidth: 0 }} onClick={() => onVisibleClusters3DChange(new Set(uniqueClusters))}>ALL</Button>
-                    <Button size="small" sx={{ fontSize: '0.6rem', minWidth: 0 }} onClick={() => onVisibleClusters3DChange(new Set())}>NONE</Button>
-                  </Box>
-                  <Box sx={{ maxHeight: '180px', overflowY: 'auto' }}>
-                    {uniqueClusters.map((cluster) => (
-                      <Box key={cluster} sx={{ display: 'flex', alignItems: 'center', px: 1 }}>
-                        <Checkbox
-                          size="small"
-                          checked={visibleClusters3D.has(cluster)}
-                          onChange={() => {
-                            onVisibleClusters3DChange((prev) => {
-                              const n = new Set(prev);
-                              if (n.has(cluster)) n.delete(cluster);
-                              else n.add(cluster);
-                              return n;
-                            });
-                          }}
-                          sx={{ p: 0.5, color: panel.ink.ghost, '&.Mui-checked': { color: 'primary.main' } }}
-                        />
-                        <Typography sx={{ fontSize: '0.75rem', color: panel.ink.body }}>{cluster}</Typography>
-                      </Box>
-                    ))}
-                  </Box>
-                </Box>
-              </TextureMenuSpring>
-            </div>
-          </div>
-        </SettingsPanelSpring>
-      </div>
-
-      {/* Nav Controls - Bottom Right (Collapsible); optional "See who's new!" stacked above */}
-      <div
-        style={{
-          position: 'absolute',
-          ...bottomRightControlsClear(drawerInset),
-          zIndex: 1000,
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'stretch',
-          gap: '8px',
-          minWidth: '180px',
-        }}
-      >
-        {seeWhosNewButtonSlot}
-        {!isMobileDevice && (
-          <>
-            <Button
-              variant="outlined"
-              onClick={() => setShowNavControls(!showNavControls)}
-              sx={{
-                backgroundColor: panel.nav.surface,
-                borderColor: panel.border.subtle,
-                color: panel.nav.ink,
-                fontSize: '0.75rem',
-                fontWeight: 700,
-                letterSpacing: '1px',
-                '&:hover': { borderColor: panel.border.subtleHover, backgroundColor: panel.nav.surface },
-              }}
-            >
-              NAV CONTROLS 👁️ {showNavControls ? '▴' : '▾'}
-            </Button>
-            <SettingsPanelSpring isOpen={showNavControls}>
-              <div style={{
-                marginTop: '8px',
-                backgroundColor: panel.nav.surface,
-                padding: '8px 12px',
-                borderRadius: '8px',
-                color: panel.nav.ink,
-                fontSize: '0.7rem',
-                border: `1px solid ${panel.border.subtle}`,
-                boxShadow: `0 10px 40px ${panel.shadow.floating}`,
-                minWidth: '180px',
-              }}>
-                <div style={{ lineHeight: '1.6' }}>
-                  <div><span style={{ color: isSteeringActive ? panel.nav.keyOn : panel.nav.keyOff, fontWeight: 600 }}>R</span>: Mouse Steering <span style={{ color: isSteeringActive ? panel.nav.keyOn : panel.nav.keyOff }}>({isSteeringActive ? 'ACTIVE' : 'LOCKED'})</span></div>
-                  <div><span style={{ color: panel.ink.strong, fontWeight: 600 }}>WASD</span>: Move (Hold <span style={{ color: panel.ink.strong, fontWeight: 600 }}>Shift</span> for Boost)</div>
-                  <div><span style={{ color: panel.ink.strong, fontWeight: 600 }}>Q / E</span>: Roll View L / R</div>
-                  <div><span style={{ color: panel.ink.strong, fontWeight: 600 }}>Tab</span>: Cycle Names</div>
-                  <div><span style={{ color: panel.ink.strong, fontWeight: 600 }}>Enter</span>: Focus selection</div>
-                  <div><span style={{ color: panel.ink.strong, fontWeight: 600 }}>Esc</span>: Deselect</div>
-                </div>
-              </div>
-            </SettingsPanelSpring>
-          </>
-        )}
-      </div>
+      <Tree3DOverlay
+        graphData={graphData}
+        camera={sceneCamera}
+        drawerInset={drawerInset}
+        isMobileDevice={isMobileDevice}
+        mode={mode}
+        onModeChange={onModeChange}
+        isAdmin={isAdmin}
+        onAdminAddPersonClick={onAdminAddPersonClick}
+        isAmbienceOn={isAmbienceOn}
+        onAmbienceChange={setIsAmbienceOn}
+        showNames={showNames}
+        onShowNamesChange={setShowNames}
+        showLinks={showLinks}
+        onShowLinksChange={setShowLinks}
+        showArrows={showArrows}
+        onShowArrowsChange={setShowArrows}
+        search={search}
+        searchOpenRequested={searchOpenRequested}
+        collapsedNodes={effectiveCollapsedNodes}
+        onSetCollapsedNodes={effectiveSetCollapsedNodes}
+        visibleClusters3D={visibleClusters3D}
+        onVisibleClusters3DChange={onVisibleClusters3DChange}
+        uniqueClusters={uniqueClusters}
+        onEnsureClusterVisible3D={onEnsureClusterVisible3D}
+        instrumentsSceneItems={instrumentsSceneItems}
+        navKeys={navKeys}
+        seeWhosNewButtonSlot={seeWhosNewButtonSlot}
+      />
 
       {/*
         Direct manipulation (LIN-46): docked handles + in-scene Ghost Preview.
