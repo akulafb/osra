@@ -15,7 +15,7 @@
 # Name matching is exact; prefix the name with ~ for a substring match (e.g. "~Badran").
 set -euo pipefail
 source "$(dirname "$0")/lib.sh"
-osra_drivable_page "${1:-}"   # refuses unless port 5173 still serves this run's vite at its commit
+osra_set_drivable_page "${1:-}"
 page="$OSRA_PAGE"; cmd="${2:?command}"; shift 2
 
 find_ref() {

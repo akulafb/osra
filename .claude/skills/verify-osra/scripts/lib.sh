@@ -19,19 +19,21 @@ osra_require_run_dir() {
   fi
 }
 
-# Prints why the server on the port is not this run's (vite gone, port taken by another
-# process, another checkout, or another commit). Prints nothing when it is this run's.
+osra_pid_cwd() {
+  lsof -a -p "$1" -d cwd -Fn 2>/dev/null | sed -n 's/^n//p' || true
+}
+
 osra_server_problem() {
   local run_dir="$1" pid holder cwd top want head want_head
   pid="$(cat "$run_dir/state/vite.pid" 2>/dev/null || true)"
   if [[ -z "$pid" ]]; then echo "this run recorded no vite pid in $run_dir/state/vite.pid"; return; fi
   holder="$(osra_port_pid)"
   if ! kill -0 "$pid" 2>/dev/null; then
-    echo "this run's vite (pid $pid) is gone (see $run_dir/evidence/vite.log)${holder:+, and port $OSRA_PORT is now held by pid $holder in $(lsof -a -p "$holder" -d cwd -Fn 2>/dev/null | sed -n 's/^n//p' || true)}"
+    echo "this run's vite (pid $pid) is gone (see $run_dir/evidence/vite.log)${holder:+, and port $OSRA_PORT is now held by pid $holder in $(osra_pid_cwd "$holder")}"
     return
   fi
   if [[ "$holder" != "$pid" ]]; then echo "port $OSRA_PORT is held by pid ${holder:-none}, not this run's vite (pid $pid)"; return; fi
-  cwd="$(lsof -a -p "$pid" -d cwd -Fn 2>/dev/null | sed -n 's/^n//p' || true)"
+  cwd="$(osra_pid_cwd "$pid")"
   top="$(git -C "${cwd:-/nonexistent}" rev-parse --show-toplevel 2>/dev/null || true)"
   want="$(cd "$(cat "$run_dir/state/repo" 2>/dev/null)" 2>/dev/null && pwd -P || true)"
   if [[ -z "$top" || "$(cd "$top" && pwd -P)" != "$want" ]]; then
@@ -44,7 +46,10 @@ osra_server_problem() {
   fi
 }
 
-# Every script that drives the page calls this before it touches the browser.
+osra_recovery_steps() {
+  echo "Discard what you observed since your last passing doctor.sh. Run cleanup.sh $1, then launch.sh (it waits for the port) and open-tab.sh on the new RUN_DIR."
+}
+
 osra_require_live_server() {
   local why
   why="$(osra_server_problem "$1")"
@@ -52,13 +57,12 @@ osra_require_live_server() {
   {
     echo "REFUSE: $why."
     echo "What http://localhost:$OSRA_PORT shows now is not this run's commit, so nothing was sent to the browser."
-    echo "Discard what you observed since your last passing doctor.sh. Run cleanup.sh $1, then launch.sh (it waits for the port) and open-tab.sh on the new RUN_DIR."
+    osra_recovery_steps "$1"
   } >&2
   exit 3
 }
 
-# The one way to get the run's tab: checks the run dir and the server, then sets OSRA_PAGE.
-osra_drivable_page() {
+osra_set_drivable_page() {
   osra_require_run_dir "${1:-}"
   osra_require_live_server "$1"
   OSRA_PAGE="$(cat "$1/state/page" 2>/dev/null || true)"

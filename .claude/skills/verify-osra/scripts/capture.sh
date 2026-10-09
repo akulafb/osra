@@ -3,7 +3,7 @@
 # usage: capture.sh <run-dir> <feature-id> <step-name>
 set -euo pipefail
 source "$(dirname "$0")/lib.sh"
-osra_drivable_page "${1:-}"   # refuses unless port 5173 still serves this run's vite at its commit
+osra_set_drivable_page "${1:-}"
 run_dir="$1"; feature="${2:?feature id}"; step="${3:?step name}"
 page="$OSRA_PAGE"
 out="$run_dir/evidence/$feature"

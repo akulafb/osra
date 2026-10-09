@@ -25,7 +25,7 @@ RUN_DIR=/tmp/osra-verify/...       # copy it from the output
 $S/open-tab.sh "$RUN_DIR"          # opens http://localhost:5173/ in Orca, records the page id
 ```
 
-Ready means `launch.sh` printed `READY http://localhost:5173 ... Supabase: djwqamcfllqziqiyvyjj`. It runs `npm ci` first when `node_modules` is missing. Vite runs in its own session, so it outlives the tool call that started it, even in a runner that kills the call's process group (AGY's does); no `nohup` shim on `PATH` is needed. Vite hot-reloads, so edits after launch show up without a restart. A new worktree has no `.env.local` (it is gitignored), and then `launch.sh` exits 1 without printing anything: copy the file from the main checkout first.
+Ready means `launch.sh` printed `READY http://localhost:5173 ... Supabase: djwqamcfllqziqiyvyjj`. It runs `npm ci` first when `node_modules` is missing. Vite runs in its own session, so it outlives the tool call that started it, even in a runner that kills the call's process group (AGY's does). Uncommitted edits hot-reload without a restart. A commit after launch moves HEAD off the launched commit, so the helpers refuse until you run `cleanup.sh` and launch again. A new worktree has no `.env.local` (it is gitignored), and then `launch.sh` exits 1 without printing anything: copy the file from the main checkout first.
 
 ## Doctor
 
@@ -33,11 +33,11 @@ Ready means `launch.sh` printed `READY http://localhost:5173 ... Supabase: djwqa
 $S/doctor.sh "$RUN_DIR"
 ```
 
-Read-only. Checks: our vite pid is alive, owns port 5173 and serves this run's checkout at the launched HEAD (the same check `ui.sh`, `capture.sh` and `open-tab.sh` refuse on), it announced the dev Supabase ref, the page serves Osra, Orca is reachable, and the run's tab holds a dev Supabase session. Run it first, and again whenever anything looks off. A `WARN ... no dev Supabase session` means the signed-in features will show the landing page: the owner must sign in with Google in that Orca tab.
+Read-only. Checks: our vite pid is alive, owns port 5173 and serves this run's checkout at the launched HEAD (the same check `ui.sh`, `capture.sh` and `open-tab.sh` refuse on; a `FAIL` here prints the same recovery steps), it announced the dev Supabase ref, the page serves Osra, Orca is reachable, and the run's tab holds a dev Supabase session. Run it first, and again whenever anything looks off. A `WARN ... no dev Supabase session` means the signed-in features will show the landing page: the owner must sign in with Google in that Orca tab.
 
 ## Drive
 
-`ui.sh` drives the run's tab by accessible role and name, resolving fresh refs from an Orca snapshot on every call. Before it touches the browser, it (like `capture.sh` and `open-tab.sh`) exits 3 with `REFUSE:` when this run's vite is gone, no longer owns port 5173, or serves another checkout or commit: whatever 5173 shows then is not your commit. Do what the message says (discard what you saw since the last passing `doctor.sh`, `cleanup.sh`, relaunch); never drive the tab past it.
+`ui.sh` drives the run's tab by accessible role and name, resolving fresh refs from an Orca snapshot on every call. Before it touches the browser, it (like `capture.sh` and `open-tab.sh`) exits 3 with `REFUSE:` when this run's vite is gone, no longer owns port 5173, or serves another checkout or commit: whatever 5173 shows then is not your commit. Follow the recovery steps the message prints; never drive the tab past it.
 
 ```bash
 $S/ui.sh "$RUN_DIR" tree                                   # print the accessibility tree
@@ -52,7 +52,7 @@ $S/ui.sh "$RUN_DIR" wait-text "Invalid Invite"
 $S/ui.sh "$RUN_DIR" orca eval --expression "document.title" --json   # any other orca browser command
 ```
 
-Names match exactly; prefix with `~` for a substring (`click button "~SELECT FAMILY"`). Anything else goes through `$S/ui.sh "$RUN_DIR" orca <command> [args]`, which adds the run's `--page` after the same check (`orca eval`, `orca scroll`, `orca reload`; see `orca skills get orca-cli --reference references/browser.md`).
+Names match exactly; prefix with `~` for a substring (`click button "~SELECT FAMILY"`). Anything else goes through `$S/ui.sh "$RUN_DIR" orca <command> [args]`, which adds the run's `--page` after the same check (`orca eval`, `orca scroll`, `orca reload`; see `orca skills get orca-cli --reference references/browser.md`). Where a file in `features/` names a bare `orca <cmd>`, run it as `$S/ui.sh "$RUN_DIR" orca <cmd>`; never add `--page` yourself.
 
 Osra-specific traps:
 

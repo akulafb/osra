@@ -7,7 +7,7 @@ osra_require_run_dir "${1:-}"
 osra_require_live_server "$1"
 run_dir="$1"; path="${2:-/}"
 if [[ -s "$run_dir/state/page" ]]; then
-  echo "this run already owns tab $(cat "$run_dir/state/page"); use orca goto --page <id> to move it" >&2
+  echo "this run already owns tab $(cat "$run_dir/state/page"); use ui.sh $run_dir goto <path> to move it" >&2
   exit 1
 fi
 orca tab create --url "http://localhost:$OSRA_PORT$path" --json \

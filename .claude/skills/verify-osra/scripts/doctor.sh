@@ -7,9 +7,8 @@ run_dir="$1"
 fail() { echo "FAIL  $*"; exit 1; }
 ok() { echo "ok    $*"; }
 
-# The same check ui.sh, capture.sh and open-tab.sh refuse on.
 why="$(osra_server_problem "$run_dir")"
-[[ -z "$why" ]] || fail "$why. Run cleanup.sh $run_dir, then launch.sh and open-tab.sh again."
+[[ -z "$why" ]] || fail "$why. $(osra_recovery_steps "$run_dir")"
 ok "vite pid $(cat "$run_dir/state/vite.pid") owns port $OSRA_PORT and serves $(cat "$run_dir/state/repo") at HEAD $(cut -c1-7 "$run_dir/state/head") on $(cat "$run_dir/state/branch") (the launched commit)"
 
 grep -q "Supabase:  $OSRA_DEV_REF" "$run_dir/evidence/vite.log" || fail "vite did not announce the dev Supabase ref"
