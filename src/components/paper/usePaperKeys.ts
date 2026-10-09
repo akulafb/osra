@@ -28,7 +28,7 @@ export function usePaperKeys(options: PaperKeysOptions): MutableRefObject<PaperH
 
   useEffect(() => {
     const onDown = (e: KeyboardEvent) => {
-      held.current.boost = e.shiftKey;
+      if (e.key === 'Shift') held.current.boost = true;
       if (typing()) return;
       const { actionsBlocked, flightBlocked, onAction } = latest.current;
       const flight = paperFlightKey(e.key);
@@ -41,7 +41,7 @@ export function usePaperKeys(options: PaperKeysOptions): MutableRefObject<PaperH
       if (action && onAction(action)) e.preventDefault();
     };
     const onUp = (e: KeyboardEvent) => {
-      held.current.boost = e.shiftKey;
+      if (e.key === 'Shift') held.current.boost = false;
       const flight = paperFlightKey(e.key);
       if (flight) held.current.keys.delete(flight);
     };
