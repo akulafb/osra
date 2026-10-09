@@ -39,7 +39,7 @@ Preconditions:
 - Paper is the default, so a run that leaves no `family-tree-canvas-mode` key leaves the owner on Paper. That is the intended start state, not a leak.
 - `hidden` (search non-match) is dimmed in 2D rather than removed, because 2D keeps its layout.
 - The Action Handle pills around a selected 2D card are drawn in ink in Paper. Their Cosmos colours are untouched.
-- Paper 2D cards (`.node-card`) and `.handle-connect` are SVG, so `el.click()` is not a function. Dispatch pointer and mouse events on them instead.
+- Paper 2D cards (`.node-card`) and `.handle-connect` are SVG, so `el.click()` is not a function. Dispatch a bubbling `click` (`el.dispatchEvent(new MouseEvent('click', { bubbles: true }))`) instead.
 
 ## Paper colour and the pair fade (LIN-92)
 
@@ -105,7 +105,7 @@ Preconditions:
 - **Colour.** In Paper 3D open INSTRUMENTS and click `Paper colour`. The scene turns into the overview pair. Sample the canvas pixels of a screenshot: the background equals `--paper-pair-paper` and the discs `--paper-pair-ink`.
 - **Fade.** A per-frame proof needs a probe on the composer (a temporary `useFrame` at priority 2 in `PaperEffects` that reads the `paper` uniform and `gl.readPixels` a corner pixel into `window.__duoLog`; never commit it). Record `--paper-pair-paper` and the INSTRUMENTS button colour in the same rAF loop, then tap a disc. Every frame the uniform, the read-back pixel and the variable agree.
 - **Fog.** Open INSTRUMENTS and click `FIND ME`: the camera flies to the owner. The nearest lines are full ink; lines and discs at the back are lighter. Mouse-wheel zoom right into the orbit target fogs everything out, because the fog scales with the distance to the target.
-- **Connect accent.** Grayscale, 2D, a family picked, a Person selected: DOM-click `.handle-connect` (`🔗 Link`), DOM-click another `.node-card`, then click a choice. Its computed background is `color(srgb 0.784 0.212 0.114 / 0.2)`. Leave with the picker's `Cancel` (next to `Establish Link`), then `Cancel (Esc)`. Never click `Establish Link`.
+- **Connect accent.** Grayscale, 2D, a family picked, a Person selected: dispatch a `click` on `.handle-connect` (`🔗 Link`), then on another `.node-card` (they are SVG; see Gotchas), then click a choice. Its computed background is `color(srgb 0.784 0.212 0.114 / 0.2)`. Leave with the picker's `Cancel` (next to `Establish Link`), then `Cancel (Esc)`. Never click `Establish Link`.
 - **Cosmos unchanged.** Diff a computed-style fingerprint of every element (Cosmos 2D with INSTRUMENTS open; Cosmos 3D with INSTRUMENTS and VISIBILITY open) and the drawer's `+ Add Relative` / `Invite to Tree` hover colours, between the base files and the branch, after a reload each time.
 - **Proof.** Capture `paper-3d-duotone grayscale`, `colour-on-overview`, `focus-<person>`, `fog-near-far` and `paper-connect picker-accent`.
 

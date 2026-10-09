@@ -55,12 +55,12 @@ Names match exactly; prefix with `~` for a substring (`click button "~SELECT FAM
 
 Osra-specific traps:
 
-- The snapshot lists controls inside collapsed panels (INSTRUMENTS, SELECT FAMILY) as if visible. Open the panel first (its button's arrow flips `▾` → `▴`) and let it settle about 1.5 s; a click on a hidden control does nothing. `pick` waits for you.
+- The snapshot lists controls inside collapsed panels (INSTRUMENTS, SELECT FAMILY) as if visible. Open the panel first (its button's arrow flips `▾` → `▴`) and let it settle about 1.5 s and pump one `orca screenshot` before clicking; otherwise a click can land on the canvas behind the panel and select a Person; a click on a hidden control does nothing. `pick` waits for you.
 - Reserve `pick` for items of an open scrollable menu. Scrolling a control inside a collapsed panel pans the whole app off-screen; `orca reload` recovers.
 - Person nodes exist in the snapshot only in 2D with a family selected. The 3D view is a WebGL canvas: its nodes have no accessibility handles, so prove 3D with screenshots plus the side panels. The canvas has no `preserveDrawingBuffer`, so `toDataURL` crops come out blank: crop an `orca screenshot` (its base64 `data`) with PIL instead.
 - View mode (`family-tree-view-mode`), Canvas Mode (`family-tree-canvas-mode`, written only by the COSMOS ⇄ PAPER switch; absent means Paper), Paper colour (`family-tree-paper-colour`), the Paper 3D hint (`family-tree-paper-hint-seen`) and the "who's new" acknowledgement persist in the owner's localStorage. The retired `family-tree-background-theme` key may still be there; nothing reads it. Note the starting values and put them back before cleanup (remove any of these keys that was absent). The selected family resets on reload.
 - An off-screen Orca tab is throttled: springs stall, screenshots go stale and clicks on INSTRUMENTS items miss. Bring it forward with `orca tab switch --page "$(cat $RUN_DIR/state/page)" --focus`, re-read state after each step, and check motion and timing only in a visible tab, or report them as unverified for the owner.
-- Clicks during a loader are swallowed in a slow tab: pump `orca screenshot`s until the loader leaves the DOM. Right after a fresh INSTRUMENTS open, a `ui.sh` click can land on the canvas behind the panel and select a Person: pump one screenshot before the click.
+- Clicks during a loader are swallowed in a slow tab: pump `orca screenshot`s until the loader leaves the DOM.
 - `ui.sh person`, `ui.sh tap` and DOM clicks can drop the tab to 1 fps for several seconds, while `ui.sh key` keeps frames coming. Drive motion checks with keys where you can.
 
 The [feature map](features/README.md) holds the per-feature recipes. Read the index, then the feature's file; cover every entry point it lists.
