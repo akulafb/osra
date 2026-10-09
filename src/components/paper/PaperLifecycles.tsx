@@ -14,6 +14,7 @@ import {
   paperSpawnRing,
 } from '../../lib/paperLifecycle';
 import { seedCanvasParticles } from '../../utils/canvasFx';
+import { emphasisSubject } from '../../lib/paperHover';
 import { fadeInk, inkOf, placeOf, type PaperEmphasisState } from './paperEmphasis';
 import { PAPER_LINE_RENDER_ORDER, PAPER_LINE_STYLE } from './paperScene';
 
@@ -69,6 +70,8 @@ export function PaperLifecycles({ lifecycles, progressOf, layout, lines, ink, pa
             toId={toId}
             width={PAPER_LINE_STYLE[type ?? 'parent'].width}
             colour={type === 'parent' || !type ? parentInk : ink}
+            ink={ink}
+            paper={paper}
             progressOf={progressOf}
             layout={layout}
             state={state}
@@ -202,6 +205,8 @@ function LifecycleLine({
   toId,
   width,
   colour,
+  ink,
+  paper,
   progressOf,
   layout,
   state,
@@ -212,11 +217,17 @@ function LifecycleLine({
   toId: string;
   width: number;
   colour: string;
+  ink: string;
+  paper: string;
   progressOf: (key: string) => number | null;
   layout: PaperLayout;
   state: MutableRefObject<PaperEmphasisState>;
 }) {
   const ref = useRef<ElementRef<typeof Line>>(null);
+  const colours = useMemo(
+    () => ({ line: new THREE.Color(colour), ink: new THREE.Color(ink), paper: new THREE.Color(paper) }),
+    [colour, ink, paper]
+  );
   const points = useMemo(() => [[0, 0, 0] as [number, number, number], [0, 0, 0] as [number, number, number]], []);
   const scratch = useMemo(() => ({ from: new THREE.Vector3(), to: new THREE.Vector3() }), []);
 
@@ -229,7 +240,11 @@ function LifecycleLine({
     if (!shown) return;
 
     const { from, to } = scratch;
-    const { drift } = state.current;
+    const { drift, emphasis } = state.current;
+    const subject = emphasisSubject(emphasis);
+    const own = subject === fromId || subject === toId;
+    const kept = Math.min(inkOf(state.current, fromId), inkOf(state.current, toId));
+    fadeInk(own ? colours.ink : colours.line, colours.paper, kept, (segments.material as unknown as { color: THREE.Color }).color);
     placeOf(layout, drift, fromId, from);
     placeOf(layout, drift, toId, to);
     to.lerpVectors(from, to, paperLinkDrawn(kind, progress));
@@ -250,9 +265,7 @@ function LifecycleLine({
       fog
       renderOrder={PAPER_LINE_RENDER_ORDER}
       depthWrite={false}
-      color={colour}
       lineWidth={width}
-      visible={false}
     />
   );
 }
