@@ -839,8 +839,8 @@ export const FamilyTree2D: React.FC<FamilyTree2DProps> = ({
 
           {/* Zoom controls overlay */}
           <g style={{ pointerEvents: 'none' }}>
-            <rect x="10" y="10" width="120" height="40" rx="8" fill={panel.zoomBadge.surface} />
-            <text x="20" y="35" fill={panel.zoomBadge.ink} fontSize={12}>
+            <rect x="20" y="70" width="120" height="40" rx="8" fill={panel.zoomBadge.surface} />
+            <text x="30" y="95" fill={panel.zoomBadge.ink} fontSize={12}>
               Zoom: {(transform.k * 100).toFixed(0)}%
             </text>
           </g>
