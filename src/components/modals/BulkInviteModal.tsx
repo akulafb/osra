@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import Button from '@mui/material/Button';
+import { useTheme, type Theme } from '@mui/material/styles';
 import { useAuth } from '../../contexts/AuthContext';
 import { FamilyNode, FamilyLink } from '../../types/graph';
 import { formatNodeDisplayName } from '../../utils/nodeDisplayName';
@@ -34,6 +35,8 @@ export default function BulkInviteModal({
   onSuccess,
 }: BulkInviteModalProps) {
   const { user, session } = useAuth();
+  const theme = useTheme();
+  const { modal, panel } = theme.palette;
   const [relatives, setRelatives] = useState<RelativeWithInvite[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -242,9 +245,9 @@ export default function BulkInviteModal({
   const inviteTargetNode = inviteForNodeId ? allNodes.find((n) => n.id === inviteForNodeId) : undefined;
 
   return (
-    <div style={modalOverlayStyle}>
-      <div style={modalContentStyle}>
-        <h2 style={{ marginTop: 0, color: 'white' }}>
+    <div style={modalOverlayStyle(theme)}>
+      <div style={modalContentStyle(theme)}>
+        <h2 style={{ marginTop: 0, color: panel.ink.strong }}>
           {step === 'select'
             ? inviteForNodeId
               ? `Generate Invite for ${inviteTargetNode ? formatNodeDisplayName(inviteTargetNode) : 'this person'}`
@@ -253,36 +256,36 @@ export default function BulkInviteModal({
         </h2>
         {step === 'select' ? (
           <>
-            <p style={{ color: '#aaa', marginBottom: '20px', lineHeight: '1.5' }}>
+            <p style={{ color: modal.adminTool.ink.muted, marginBottom: '20px', lineHeight: '1.5' }}>
               {inviteForNodeId
                 ? 'Create a link so this person can claim their profile. Link expires in 7 days.'
                 : 'Select family members to invite. Links expire in 7 days.'}
             </p>
-            {error && <div style={errorStyle}>{error}</div>}
+            {error && <div style={errorStyle(theme)}>{error}</div>}
             <div style={listContainerStyle}>
               {Object.keys(groupedRelatives).length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '40px', color: '#666' }}>
+                <div style={{ textAlign: 'center', padding: '40px', color: modal.adminTool.ink.ghost }}>
                   {inviteForNodeId ? 'Node not found.' : 'No family members found to invite.'}
                 </div>
               ) : (
                 Object.entries(groupedRelatives).map(([relationship, items]) => (
                   <div key={relationship} style={groupStyle}>
-                    <h3 style={groupHeaderStyle}>{relationship} ({items.length})</h3>
+                    <h3 style={groupHeaderStyle(theme)}>{relationship} ({items.length})</h3>
                     {items.map(r => (
-                      <div key={r.node.id} style={{ ...relativeItemStyle, opacity: r.generatedToken ? 0.6 : 1 }}>
+                      <div key={r.node.id} style={{ ...relativeItemStyle(theme), opacity: r.generatedToken ? 0.6 : 1 }}>
                         <label style={checkboxLabelStyle}>
                           <input type="checkbox" checked={r.selected} onChange={() => toggleSelection(r.node.id)} disabled={!!r.generatedToken || isGenerating} style={checkboxStyle} />
                           <span style={nameStyle}>{formatNodeDisplayName(r.node)}</span>
                         </label>
-                        {r.existingInvites > 0 && <span style={existingBadgeStyle}>{r.existingInvites} active invite</span>}
-                        {r.generatedToken && <span style={generatedBadgeStyle}>✓ Created</span>}
+                        {r.existingInvites > 0 && <span style={existingBadgeStyle(theme)}>{r.existingInvites} active invite</span>}
+                        {r.generatedToken && <span style={generatedBadgeStyle(theme)}>✓ Created</span>}
                       </div>
                     ))}
                   </div>
                 ))
               )}
             </div>
-            <div style={actionsStyle}>
+            <div style={actionsStyle(theme)}>
               <Button variant="outlined" onClick={onClose}>Cancel</Button>
               <Button variant="contained" color="primary" onClick={generateInvites} disabled={!relatives.some(r => r.selected) || isGenerating}>
                 {isGenerating ? 'Generating...' : `Generate ${relatives.filter(r => r.selected).length} Invite${relatives.filter(r => r.selected).length === 1 ? '' : 's'}`}
@@ -293,10 +296,10 @@ export default function BulkInviteModal({
           <>
             <div style={generatedListStyle}>
               {relatives.filter(r => r.generatedToken).map(r => (
-                <div key={r.node.id} style={generatedItemStyle}>
-                  <div style={generatedHeaderStyle}><strong>{formatNodeDisplayName(r.node)}</strong><span style={relationshipTagStyle}>{r.relationship}</span></div>
+                <div key={r.node.id} style={generatedItemStyle(theme)}>
+                  <div style={generatedHeaderStyle}><strong>{formatNodeDisplayName(r.node)}</strong><span style={relationshipTagStyle(theme)}>{r.relationship}</span></div>
                   <div style={linkRowStyle}>
-                    <code style={tokenStyle}>{r.generatedToken}</code>
+                    <code style={tokenStyle(theme)}>{r.generatedToken}</code>
                     <Button variant="contained" color={copiedToken === r.generatedToken ? 'success' : 'primary'} size="small" onClick={() => copyLink(r.generatedToken!)}>
                       {copiedToken === r.generatedToken ? 'Copied!' : 'Copy Link'}
                     </Button>
@@ -304,7 +307,7 @@ export default function BulkInviteModal({
                 </div>
               ))}
             </div>
-            <div style={actionsStyle}><Button variant="contained" color="primary" onClick={onClose}>Done</Button></div>
+            <div style={actionsStyle(theme)}><Button variant="contained" color="primary" onClick={onClose}>Done</Button></div>
           </>
         )}
       </div>
@@ -312,22 +315,22 @@ export default function BulkInviteModal({
   );
 }
 
-const modalOverlayStyle: React.CSSProperties = { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0, 0, 0, 0.85)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 2000 };
-const modalContentStyle: React.CSSProperties = { backgroundColor: '#1a1a1a', color: 'white', padding: '30px', borderRadius: '12px', width: '100%', maxWidth: '600px', maxHeight: '80vh', overflow: 'auto', boxShadow: '0 10px 40px rgba(0,0,0,0.8)', border: '1px solid #333' };
+const modalOverlayStyle = ({ palette }: Theme): React.CSSProperties => ({ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: palette.modal.adminTool.scrim, display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 2000 });
+const modalContentStyle = ({ palette }: Theme): React.CSSProperties => ({ backgroundColor: palette.modal.adminTool.surface, color: palette.panel.ink.strong, padding: '30px', borderRadius: '12px', width: '100%', maxWidth: '600px', maxHeight: '80vh', overflow: 'auto', boxShadow: `0 10px 40px ${palette.modal.adminTool.shadow}`, border: `1px solid ${palette.modal.adminTool.border}` });
 const listContainerStyle: React.CSSProperties = { maxHeight: '400px', overflowY: 'auto', marginBottom: '20px' };
 const groupStyle: React.CSSProperties = { marginBottom: '20px' };
-const groupHeaderStyle: React.CSSProperties = { margin: '0 0 10px 0', paddingBottom: '8px', borderBottom: '1px solid #333', color: '#aaa', fontSize: '0.9rem', textTransform: 'uppercase', letterSpacing: '0.5px' };
-const relativeItemStyle: React.CSSProperties = { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px', backgroundColor: '#252525', borderRadius: '8px', marginBottom: '8px', border: '1px solid #333' };
+const groupHeaderStyle = ({ palette }: Theme): React.CSSProperties => ({ margin: '0 0 10px 0', paddingBottom: '8px', borderBottom: `1px solid ${palette.modal.adminTool.border}`, color: palette.modal.adminTool.ink.muted, fontSize: '0.9rem', textTransform: 'uppercase', letterSpacing: '0.5px' });
+const relativeItemStyle = ({ palette }: Theme): React.CSSProperties => ({ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px', backgroundColor: palette.modal.adminTool.raised, borderRadius: '8px', marginBottom: '8px', border: `1px solid ${palette.modal.adminTool.border}` });
 const checkboxLabelStyle: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer', flex: 1 };
 const checkboxStyle: React.CSSProperties = { width: '20px', height: '20px', cursor: 'pointer' };
 const nameStyle: React.CSSProperties = { fontSize: '1rem', fontWeight: 'bold' };
-const existingBadgeStyle: React.CSSProperties = { fontSize: '0.75rem', padding: '4px 8px', backgroundColor: 'rgba(245, 158, 11, 0.2)', color: '#f59e0b', borderRadius: '4px' };
-const generatedBadgeStyle: React.CSSProperties = { fontSize: '0.75rem', padding: '4px 8px', backgroundColor: 'rgba(16, 185, 129, 0.2)', color: '#10b981', borderRadius: '4px' };
-const errorStyle: React.CSSProperties = { backgroundColor: 'rgba(239, 68, 68, 0.15)', border: '1px solid #ef4444', color: '#ef4444', padding: '12px', borderRadius: '6px', marginBottom: '15px', fontSize: '0.9rem' };
-const actionsStyle: React.CSSProperties = { display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '20px', paddingTop: '20px', borderTop: '1px solid #333' };
+const existingBadgeStyle = ({ palette }: Theme): React.CSSProperties => ({ fontSize: '0.75rem', padding: '4px 8px', backgroundColor: palette.modal.adminTool.badge.existing, color: palette.warning.main, borderRadius: '4px' });
+const generatedBadgeStyle = ({ palette }: Theme): React.CSSProperties => ({ fontSize: '0.75rem', padding: '4px 8px', backgroundColor: palette.modal.adminTool.badge.generated, color: palette.success.main, borderRadius: '4px' });
+const errorStyle = ({ palette }: Theme): React.CSSProperties => ({ backgroundColor: palette.modal.adminTool.errorSurface, border: `1px solid ${palette.error.main}`, color: palette.error.main, padding: '12px', borderRadius: '6px', marginBottom: '15px', fontSize: '0.9rem' });
+const actionsStyle = ({ palette }: Theme): React.CSSProperties => ({ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '20px', paddingTop: '20px', borderTop: `1px solid ${palette.modal.adminTool.border}` });
 const generatedListStyle: React.CSSProperties = { maxHeight: '350px', overflowY: 'auto', marginBottom: '20px' };
-const generatedItemStyle: React.CSSProperties = { backgroundColor: '#252525', border: '1px solid #333', borderRadius: '8px', padding: '15px', marginBottom: '12px' };
+const generatedItemStyle = ({ palette }: Theme): React.CSSProperties => ({ backgroundColor: palette.modal.adminTool.raised, border: `1px solid ${palette.modal.adminTool.border}`, borderRadius: '8px', padding: '15px', marginBottom: '12px' });
 const generatedHeaderStyle: React.CSSProperties = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' };
-const relationshipTagStyle: React.CSSProperties = { fontSize: '0.75rem', padding: '4px 10px', backgroundColor: 'rgba(102, 126, 134, 0.2)', color: '#667eea', borderRadius: '12px', textTransform: 'uppercase' };
+const relationshipTagStyle = ({ palette }: Theme): React.CSSProperties => ({ fontSize: '0.75rem', padding: '4px 10px', backgroundColor: palette.modal.adminTool.tag.surface, color: palette.modal.adminTool.tag.ink, borderRadius: '12px', textTransform: 'uppercase' });
 const linkRowStyle: React.CSSProperties = { display: 'flex', gap: '10px', alignItems: 'center' };
-const tokenStyle: React.CSSProperties = { flex: 1, fontFamily: 'monospace', fontSize: '0.85rem', backgroundColor: '#1a1a1a', padding: '8px 12px', borderRadius: '4px', color: '#aaa', wordBreak: 'break-all' };
+const tokenStyle = ({ palette }: Theme): React.CSSProperties => ({ flex: 1, fontFamily: 'monospace', fontSize: '0.85rem', backgroundColor: palette.modal.adminTool.well, padding: '8px 12px', borderRadius: '4px', color: palette.modal.adminTool.ink.muted, wordBreak: 'break-all' });

@@ -13,7 +13,7 @@ Selecting a person opens a details drawer with their given name, family, ID and 
 ## How to get to it (user POV)
 
 - Click a person in the 2D tree.
-- In 3D, click a planet, or Tab through people and press Enter.
+- In 3D, click a Person (an ink disc in Paper, a planet in Cosmos), or Tab through people and press Enter.
 
 ## Driving it with ui.sh
 

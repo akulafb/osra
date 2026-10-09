@@ -3,6 +3,9 @@ import { Node2D, RelativeDirection } from '../types/graph';
 import { getClusterColors } from '../utils/familyColors';
 import { LifecycleController, useLifecycleProgress } from '../hooks/useLifecycles';
 import { cardDissolveAt, cardSpawnAt } from '../utils/canvasFx';
+import type { Emphasis } from '../lib/focusEmphasis';
+import type { PairColours } from '../theme/paperPair';
+import { PAPER_2D_OPACITY } from '../utils/paper2D';
 
 export interface NodeCardProps {
   node: Node2D;
@@ -36,6 +39,9 @@ export interface NodeCardProps {
   lifecycles: LifecycleController;
   isConfirmingDissolve?: boolean;
   onConfirmDissolve?: (node: Node2D) => void;
+  paperPair?: PairColours;
+  emphasis?: Emphasis;
+  onHoverChange?: (nodeId: string, hovering: boolean) => void;
 }
 
 /** Lighten colors for maternal-only nodes (same hue, lighter tint) */
@@ -59,6 +65,49 @@ function lightenColors(base: { bg: string; border: string; text: string }) {
 const HIGHLIGHT_GLOW_COLOR = '#10b981';
 const SEARCH_GLOW_COLOR = '#ef4444';
 
+function PaperHighlights({
+  width,
+  height,
+  ink,
+  accent,
+  isHovered,
+  isSelected,
+  isFindMe,
+  isSearchMatch,
+}: {
+  width: number;
+  height: number;
+  ink: string;
+  accent: string;
+  isHovered: boolean;
+  isSelected: boolean;
+  isFindMe: boolean;
+  isSearchMatch: boolean;
+}) {
+  const ring = (inset: number, stroke: string, strokeWidth: number, dash?: string) => (
+    <rect
+      x={-inset}
+      y={-inset}
+      width={width + inset * 2}
+      height={height + inset * 2}
+      rx={8 + inset}
+      fill="none"
+      stroke={stroke}
+      strokeWidth={strokeWidth}
+      strokeDasharray={dash}
+      pointerEvents="none"
+    />
+  );
+  return (
+    <>
+      {isSearchMatch && ring(11, accent, 2.5, '6 4')}
+      {isFindMe && !isSearchMatch && ring(11, accent, 3)}
+      {isSelected && ring(5, ink, 1.5)}
+      {isHovered && !isSelected && ring(5, ink, 1)}
+    </>
+  );
+}
+
 const NodeCardComponent: React.FC<NodeCardProps> = ({
   node,
   isSelected,
@@ -76,6 +125,9 @@ const NodeCardComponent: React.FC<NodeCardProps> = ({
   lifecycles,
   isConfirmingDissolve = false,
   onConfirmDissolve,
+  paperPair,
+  emphasis = 'normal',
+  onHoverChange,
 }) => {
   const [isHovered, setIsHovered] = React.useState(false);
 
@@ -86,7 +138,11 @@ const NodeCardComponent: React.FC<NodeCardProps> = ({
   const baseColors = getClusterColors(
     isMaternalOnly ? activePreset : node.familyCluster
   );
-  const colors = isMaternalOnly ? lightenColors(baseColors) : baseColors;
+  const colors = paperPair
+    ? { bg: paperPair.paper, border: paperPair.ink, text: paperPair.ink }
+    : isMaternalOnly
+    ? lightenColors(baseColors)
+    : baseColors;
 
   const firstName = node.firstName.trim();
   const lastName = (node.familyCluster ?? '').trim();
@@ -100,6 +156,13 @@ const NodeCardComponent: React.FC<NodeCardProps> = ({
     e.stopPropagation();
     onDoubleClick?.(node);
   };
+
+  // A card can unmount under the pointer (family switch, collapse) without a mouseleave.
+  React.useEffect(() => () => onHoverChange?.(node.id, false), [node.id, onHoverChange]);
+
+  const inkOr = (cosmos: string) => (paperPair ? paperPair.ink : cosmos);
+  const paperOr = (cosmos: string) => (paperPair ? paperPair.paper : cosmos);
+  const accentOr = (cosmos: string) => (paperPair ? paperPair.accent : cosmos);
 
   const showActionHandles = canEdit && (isHovered || isSelected || isConfirmingDissolve);
 
@@ -125,10 +188,18 @@ const NodeCardComponent: React.FC<NodeCardProps> = ({
       transform={`translate(${node.x - node.width / 2}, ${node.y})`}
       onClick={handleClick}
       onDoubleClick={handleDoubleClick}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
+      onMouseEnter={() => {
+        setIsHovered(true);
+        onHoverChange?.(node.id, true);
+      }}
+      onMouseLeave={() => {
+        setIsHovered(false);
+        onHoverChange?.(node.id, false);
+      }}
       style={{
         cursor: 'pointer',
+        opacity: paperPair ? PAPER_2D_OPACITY[emphasis] : undefined,
+        transition: paperPair ? 'opacity 0.15s ease' : undefined,
       }}
       className={`node-card ${isSelected ? 'selected' : ''} ${isHighlighted ? 'highlighted' : ''} ${isSearchHighlighted ? 'search-highlighted' : ''} ${isNewlySpawned ? 'newly-spawned' : ''} ${isDissolving ? 'dissolving' : ''}`}
     >
@@ -145,8 +216,20 @@ const NodeCardComponent: React.FC<NodeCardProps> = ({
           transformBox: 'fill-box',
         }}
       >
+      {paperPair && (
+        <PaperHighlights
+          width={node.width}
+          height={node.height}
+          ink={paperPair.ink}
+          accent={paperPair.accent}
+          isHovered={emphasis === 'hovered'}
+          isSelected={isSelected}
+          isFindMe={isHighlighted}
+          isSearchMatch={isSearchHighlighted}
+        />
+      )}
         {/* Search match highlight (red glow, takes precedence) */}
-      {isSearchHighlighted && (
+      {!paperPair && isSearchHighlighted && (
         <rect
           x={-10}
           y={-10}
@@ -161,7 +244,7 @@ const NodeCardComponent: React.FC<NodeCardProps> = ({
         />
       )}
       {/* Find me! highlight glow */}
-      {isHighlighted && !isSearchHighlighted && (
+      {!paperPair && isHighlighted && !isSearchHighlighted && (
         <rect
           x={-8}
           y={-8}
@@ -177,14 +260,14 @@ const NodeCardComponent: React.FC<NodeCardProps> = ({
       )}
 
       {/* Card shadow */}
-      <rect
+      {!paperPair && <rect
         x={2}
         y={2}
         width={node.width}
         height={node.height}
         rx={8}
         fill="rgba(0, 0, 0, 0.3)"
-      />
+      />}
 
       {/* Main card */}
       <rect
@@ -194,15 +277,15 @@ const NodeCardComponent: React.FC<NodeCardProps> = ({
         height={node.height}
         rx={8}
         fill={colors.bg}
-        stroke={isSelected ? '#fff' : colors.border}
-        strokeWidth={isSelected ? 3 : 2}
+        stroke={isSelected && !paperPair ? '#fff' : colors.border}
+        strokeWidth={paperPair ? (isSelected ? 2.5 : 1.25) : isSelected ? 3 : 2}
         style={{
           transition: 'all 0.2s ease',
         }}
       />
 
       {/* Selection glow effect */}
-      {isSelected && (
+      {isSelected && !paperPair && (
         <rect
           x={-4}
           y={-4}
@@ -286,15 +369,15 @@ const NodeCardComponent: React.FC<NodeCardProps> = ({
               width={60}
               height={20}
               rx={10}
-              fill="rgba(15, 23, 42, 0.95)"
-              stroke="rgba(212, 175, 55, 0.9)"
+              fill={paperOr('rgba(15, 23, 42, 0.95)')}
+              stroke={inkOr('rgba(212, 175, 55, 0.9)')}
               strokeWidth={1.5}
             />
             <text
               x={0}
               y={4}
               textAnchor="middle"
-              fill="#fef08a"
+              fill={inkOr('#fef08a')}
               fontSize={10}
               fontWeight={700}
               style={{ pointerEvents: 'none', userSelect: 'none' }}
@@ -319,15 +402,15 @@ const NodeCardComponent: React.FC<NodeCardProps> = ({
               width={56}
               height={20}
               rx={10}
-              fill="rgba(15, 23, 42, 0.95)"
-              stroke="rgba(59, 130, 246, 0.9)"
+              fill={paperOr('rgba(15, 23, 42, 0.95)')}
+              stroke={inkOr('rgba(59, 130, 246, 0.9)')}
               strokeWidth={1.5}
             />
             <text
               x={0}
               y={4}
               textAnchor="middle"
-              fill="#93c5fd"
+              fill={inkOr('#93c5fd')}
               fontSize={10}
               fontWeight={700}
               style={{ pointerEvents: 'none', userSelect: 'none' }}
@@ -352,15 +435,15 @@ const NodeCardComponent: React.FC<NodeCardProps> = ({
               width={60}
               height={20}
               rx={10}
-              fill="rgba(15, 23, 42, 0.95)"
-              stroke="rgba(236, 72, 153, 0.9)"
+              fill={paperOr('rgba(15, 23, 42, 0.95)')}
+              stroke={inkOr('rgba(236, 72, 153, 0.9)')}
               strokeWidth={1.5}
             />
             <text
               x={0}
               y={4}
               textAnchor="middle"
-              fill="#f472b6"
+              fill={inkOr('#f472b6')}
               fontSize={10}
               fontWeight={700}
               style={{ pointerEvents: 'none', userSelect: 'none' }}
@@ -383,16 +466,16 @@ const NodeCardComponent: React.FC<NodeCardProps> = ({
                   width={130}
                   height={22}
                   rx={11}
-                  fill="rgba(239, 68, 68, 0.98)"
-                  stroke="#fff"
+                  fill={accentOr('rgba(239, 68, 68, 0.98)')}
+                  stroke={paperOr('#fff')}
                   strokeWidth={1.5}
-                  style={{ filter: 'drop-shadow(0 0 8px rgba(239, 68, 68, 0.6))' }}
+                  style={{ filter: paperPair ? undefined : 'drop-shadow(0 0 8px rgba(239, 68, 68, 0.6))' }}
                 />
                 <text
                   x={-24}
                   y={4}
                   textAnchor="middle"
-                  fill="#fff"
+                  fill={paperOr('#fff')}
                   fontSize={10}
                   fontWeight={700}
                   style={{ pointerEvents: 'none', userSelect: 'none' }}
@@ -419,13 +502,13 @@ const NodeCardComponent: React.FC<NodeCardProps> = ({
                     width={28}
                     height={16}
                     rx={8}
-                    fill="#fff"
+                    fill={paperOr('#fff')}
                   />
                   <text
                     x={0}
                     y={4}
                     textAnchor="middle"
-                    fill="#dc2626"
+                    fill={accentOr('#dc2626')}
                     fontSize={10}
                     fontWeight={800}
                     style={{ pointerEvents: 'none', userSelect: 'none' }}
@@ -455,7 +538,7 @@ const NodeCardComponent: React.FC<NodeCardProps> = ({
                     x={0}
                     y={4}
                     textAnchor="middle"
-                    fill="#fff"
+                    fill={paperOr('#fff')}
                     fontSize={9}
                     fontWeight={700}
                     style={{ pointerEvents: 'none', userSelect: 'none' }}
@@ -482,15 +565,15 @@ const NodeCardComponent: React.FC<NodeCardProps> = ({
                     width={50}
                     height={16}
                     rx={8}
-                    fill="rgba(15, 23, 42, 0.95)"
-                    stroke="rgba(168, 85, 247, 0.85)"
+                    fill={paperOr('rgba(15, 23, 42, 0.95)')}
+                    stroke={inkOr('rgba(168, 85, 247, 0.85)')}
                     strokeWidth={1.2}
                   />
                   <text
                     x={0}
                     y={4}
                     textAnchor="middle"
-                    fill="#c084fc"
+                    fill={inkOr('#c084fc')}
                     fontSize={9}
                     fontWeight={600}
                     style={{ pointerEvents: 'none', userSelect: 'none' }}
@@ -516,15 +599,15 @@ const NodeCardComponent: React.FC<NodeCardProps> = ({
                     width={54}
                     height={16}
                     rx={8}
-                    fill="rgba(15, 23, 42, 0.95)"
-                    stroke="rgba(239, 68, 68, 0.85)"
+                    fill={paperOr('rgba(15, 23, 42, 0.95)')}
+                    stroke={inkOr('rgba(239, 68, 68, 0.85)')}
                     strokeWidth={1.2}
                   />
                   <text
                     x={0}
                     y={4}
                     textAnchor="middle"
-                    fill="#f87171"
+                    fill={inkOr('#f87171')}
                     fontSize={9}
                     fontWeight={600}
                     style={{ pointerEvents: 'none', userSelect: 'none' }}

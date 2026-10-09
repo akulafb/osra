@@ -1,9 +1,13 @@
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import Button from '@mui/material/Button';
+import { useTheme } from '@mui/material/styles';
 import FamilyTree3D from './FamilyTree3D';
+import { PaperTree3D } from './paper/PaperTree3D';
+import { PaperLoader } from './paper/PaperLoader';
 import { FamilyTree2D } from './FamilyTree2D';
 import { useViewMode } from '../hooks/useViewMode';
-import { useBackgroundTheme } from '../hooks/useBackgroundTheme';
+import { useCanvasMode } from '../hooks/useCanvasMode';
+import { usePaperLayout } from '../hooks/usePaperLayout';
 import { useWorkingRecord } from '../contexts/WorkingRecordContext';
 import { linkWriteOutcome } from '../hooks/useWorkingRecord';
 import { useNewNodesSinceSignIn } from '../hooks/useNewNodesSinceSignIn';
@@ -58,9 +62,11 @@ function reportWriteFailure(error: unknown, fallback: string): void {
 export const FamilyTree: React.FC = () => {
   const { user, userProfile, isAdmin, session } = useAuth();
   const { mode, switchMode, isHydrated } = useViewMode();
-  const { theme: backgroundTheme, setTheme: setBackgroundTheme } = useBackgroundTheme();
+  const { mode: canvasMode } = useCanvasMode();
   const { working, confirmedNodes, confirmedLinks, isLoading, error, reload, write } =
     useWorkingRecord();
+  const isPaper3D = mode === '3D' && canvasMode === 'paper';
+  const paperLayout = usePaperLayout(working, isPaper3D);
   const {
     newMembers,
     showSeeWhosNewButton,
@@ -471,20 +477,36 @@ export const FamilyTree: React.FC = () => {
 
   const searchHighlightedNodeId = searchMatches[searchIndex]?.id ?? null;
 
+  const { palette } = useTheme();
+  const { panel } = palette;
+
   const seeWhosNewButtonSx = {
     fontWeight: 700,
     ...(buttonGlowActive && {
       '@keyframes seeWhosNewGlow': {
         '0%, 100%': {
-          boxShadow: '0 0 14px rgba(168, 85, 247, 0.65)',
+          boxShadow: `0 0 14px ${panel.attention.glow}`,
         },
         '50%': {
-          boxShadow: '0 0 28px rgba(236, 72, 153, 0.9)',
+          boxShadow: `0 0 28px ${panel.attention.glowPeak}`,
         },
       },
       animation: 'seeWhosNewGlow 1.15s ease-in-out infinite',
     }),
   } as const;
+
+  const seeWhosNewButtonSlot =
+    showSeeWhosNewButton && newMembers.length > 0 ? (
+      <Button
+        variant="contained"
+        color="secondary"
+        onClick={() => setNewMembersModalOpen(true)}
+        fullWidth
+        sx={seeWhosNewButtonSx}
+      >
+        See who&apos;s new!
+      </Button>
+    ) : null;
 
   const handleSearchPrev = useCallback(() => {
     setSearchIndex((i) => (i <= 0 ? searchMatches.length - 1 : i - 1));
@@ -518,6 +540,14 @@ export const FamilyTree: React.FC = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
+  if (canvasMode === 'paper' && !isHydrated) {
+    return <div style={{ width: '100%', height: '100vh', background: panel.page }} />;
+  }
+
+  if (isPaper3D && isLoading) {
+    return <PaperLoader stage="record" />;
+  }
+
   if (!isHydrated || isLoading) {
     return (
       <div
@@ -528,8 +558,8 @@ export const FamilyTree: React.FC = () => {
           width: '100%',
           height: '100vh',
           minHeight: '100vh',
-          background: '#0a0a0a',
-          color: '#fff',
+          background: panel.page,
+          color: panel.ink.strong,
         }}
         aria-busy="true"
         aria-live="polite"
@@ -540,8 +570,8 @@ export const FamilyTree: React.FC = () => {
             style={{
               width: '40px',
               height: '40px',
-              border: '4px solid rgba(255,255,255,0.3)',
-              borderTop: '4px solid #3b82f6',
+              border: `4px solid ${panel.loader.track}`,
+              borderTop: `4px solid ${panel.loader.pageSpinner}`,
               borderRadius: '50%',
               animation: 'spin 1s linear infinite',
               margin: '16px auto',
@@ -562,8 +592,8 @@ export const FamilyTree: React.FC = () => {
         justifyContent: 'center',
         width: '100%',
         height: '100vh',
-        background: '#0a0a0a',
-        color: '#ef4444',
+        background: panel.page,
+        color: palette.error.main,
         textAlign: 'center',
         padding: '20px',
       }}>
@@ -586,8 +616,8 @@ export const FamilyTree: React.FC = () => {
         justifyContent: 'center',
         width: '100%',
         height: '100vh',
-        background: '#0a0a0a',
-        color: '#fff',
+        background: panel.page,
+        color: panel.ink.strong,
         textAlign: 'center',
       }}>
         <div>
@@ -604,7 +634,8 @@ export const FamilyTree: React.FC = () => {
       width: '100%',
       height: '100vh',
       overflow: 'hidden',
-      background: '#0a0a0a',
+      background: panel.page,
+      color: panel.ink.inherited,
     }}>
       {mode === '2D' && showSeeWhosNewButton && newMembers.length > 0 && (
         <div
@@ -721,13 +752,48 @@ export const FamilyTree: React.FC = () => {
         width: '100%',
         height: '100%',
       }}>
-        {mode === '3D' ? (
+        {isPaper3D ? (
+          <PaperTree3D
+            graphData={working}
+            layout={paperLayout}
+            interaction={interaction}
+            collapsedNodes={collapsedNodes}
+            onToggleCollapse={handleToggleCollapse}
+            onSetCollapsedNodes={handleSetCollapsedNodes}
+            mode={mode}
+            onModeChange={handleModeChange}
+            isAddModalOpen={isAddModalOpen}
+            isModalOpen={isAddModalOpen || isEditModalOpen || isBulkInviteOpen || newMembersModalOpen || adminManageLinksOpen || adminAddPersonOpen}
+            searchQuery={searchQuery}
+            onSearchQueryChange={setSearchQuery}
+            searchMatches={searchMatches}
+            searchIndex={searchIndex}
+            onSearchClose={handleSearchClose}
+            searchOpenRequested={searchOpenRequested}
+            searchDisabled={false}
+            visibleClusters3D={visibleClusters3D}
+            onVisibleClusters3DChange={setVisibleClusters3D}
+            uniqueClusters={uniqueClusters}
+            onEnsureClusterVisible3D={ensureClusterVisible3D}
+            drawerInset={drawerInset}
+            seeWhosNewButtonSlot={seeWhosNewButtonSlot}
+            isAdmin={isAdmin}
+            onAdminAddPersonClick={() => setAdminAddPersonOpen(true)}
+            selectedNode={selectedNode}
+            canEditSelected={canEditSelected}
+            onCreateRelative={handleCreateRelativeDirect}
+            onConnectExistingRelative={handleConnectExistingRelativeDirect}
+            onDirectConnectNodes={handleDirectConnectNodes}
+            canDissolveSelected={!!selectedNode && canDissolveNode(selectedNode.id)}
+            onDissolveNode={handleConfirmDissolveDirect}
+            lifecycles={lifecycles}
+            pendingLinkPreview={pendingLinkPreview}
+          />
+        ) : mode === '3D' ? (
           <FamilyTree3D
             graphData={working}
             interaction={interaction}
             selectedNode={selectedNode}
-            backgroundTheme={backgroundTheme}
-            onBackgroundThemeChange={setBackgroundTheme}
             collapsedNodes={collapsedNodes}
             onToggleCollapse={handleToggleCollapse}
             onSetCollapsedNodes={handleSetCollapsedNodes}
@@ -752,19 +818,7 @@ export const FamilyTree: React.FC = () => {
             uniqueClusters={uniqueClusters}
             onEnsureClusterVisible3D={ensureClusterVisible3D}
             drawerInset={drawerInset}
-            seeWhosNewButtonSlot={
-              showSeeWhosNewButton && newMembers.length > 0 ? (
-                <Button
-                  variant="contained"
-                  color="secondary"
-                  onClick={() => setNewMembersModalOpen(true)}
-                  fullWidth
-                  sx={seeWhosNewButtonSx}
-                >
-                  See who&apos;s new!
-                </Button>
-              ) : null
-            }
+            seeWhosNewButtonSlot={seeWhosNewButtonSlot}
             pendingLinkPreview={pendingLinkPreview}
             isAdmin={isAdmin}
             onAdminAddPersonClick={() => setAdminAddPersonOpen(true)}
@@ -783,8 +837,6 @@ export const FamilyTree: React.FC = () => {
             interaction={interaction}
             layoutType="tree"
             activePreset={activePreset}
-            backgroundTheme={backgroundTheme}
-            onBackgroundThemeChange={setBackgroundTheme}
             isMobile={isMobile()}
             drawerInset={drawerInset}
             collapsedNodes={collapsedNodes}

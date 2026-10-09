@@ -15,6 +15,7 @@ import { FIXTURE_IDS as P, FIXTURE_LINKS as links, FIXTURE_PERSONS } from './fix
 
 /** Order of a relatives list is not part of the contract. */
 const sorted = (ids: readonly string[]) => [...ids].sort();
+const COLD_RUN_TIMEOUT_MS = 30_000;
 
 describe('the fixture tree', () => {
   it('has about 40 made-up Persons with unique ids', () => {
@@ -509,7 +510,7 @@ describe('findKinshipPaths against trying every path', () => {
     // The run is not empty by accident.
     expect(pairs).toBeGreaterThan(10000);
     expect(marriagePaths).toBeGreaterThan(1000);
-  });
+  }, COLD_RUN_TIMEOUT_MS);
 });
 
 describe('the name of the relation for a Kinship Path', () => {

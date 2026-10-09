@@ -1,8 +1,8 @@
 import React, { useMemo } from 'react';
 import {
-  CANVAS_FX_COLORS,
   CANVAS_FX_PARTICLES,
   canvasParticleAt,
+  canvasParticleLook,
   seedCanvasParticles,
 } from '../utils/canvasFx';
 
@@ -18,6 +18,8 @@ export interface ParticleDissolveProps {
    * `onComplete` that an early unmount could make unreachable.
    */
   progress: number;
+  /** Paper's ink: the debris drawn in it, with no glow. Absent, Cosmos's colours. */
+  ink?: string;
 }
 
 /** The 2D rendering of a Dissolve: the card frays into drifting debris. */
@@ -28,6 +30,7 @@ export const ParticleDissolve: React.FC<ParticleDissolveProps> = ({
   height,
   color,
   progress,
+  ink,
 }) => {
   const seeds = useMemo(
     () => seedCanvasParticles(CANVAS_FX_PARTICLES.dissolve, 'dissolve'),
@@ -41,15 +44,16 @@ export const ParticleDissolve: React.FC<ParticleDissolveProps> = ({
       {seeds.map((seed, i) => {
         const frame = canvasParticleAt(seed, progress, origin);
         if (frame.opacity <= 0 || frame.r <= 0) return null;
+        const look = canvasParticleLook('dissolve', i, ink);
         return (
           <circle
             key={i}
             cx={frame.x}
             cy={frame.y}
             r={frame.r}
-            fill={color || CANVAS_FX_COLORS.dissolve[i % CANVAS_FX_COLORS.dissolve.length]}
+            fill={color || look.fill}
             opacity={frame.opacity}
-            style={{ filter: 'drop-shadow(0 0 4px currentColor)' }}
+            style={{ filter: look.glow }}
           />
         );
       })}

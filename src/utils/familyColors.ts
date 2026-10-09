@@ -23,7 +23,7 @@ export const FAMILY_COLORS: Record<string, string> = {
 
 const COLOR_VALUES = Object.values(FAMILY_COLORS);
 
-function hashCluster(cluster: string): number {
+export function hashCluster(cluster: string): number {
   let hash = 0;
   for (let i = 0; i < cluster.length; i++) {
     hash = cluster.charCodeAt(i) + ((hash << 5) - hash);

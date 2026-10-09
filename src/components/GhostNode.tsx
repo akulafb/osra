@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
+import { useTheme } from '@mui/material/styles';
 import { Node2D, FamilyNode, RelativeDirection } from '../types/graph';
 import { GhostNodeCard, GHOST_CARD_WIDTH } from './cards/GhostNodeCard';
-import { relationColor } from './cards/relationStyle';
 import type { OtherParentChoice } from '../lib/otherParent';
 
 /**
@@ -65,7 +65,7 @@ export const GhostNode: React.FC<GhostNodeProps> = ({
   onCancel,
 }) => {
   const pos = useMemo(() => getGhostNodePosition(anchorNode, relation), [anchorNode, relation]);
-  const color = relationColor(relation);
+  const color = useTheme().palette.hud.relation[relation].line;
 
   const anchorCenterX = anchorNode.x;
   const anchorCenterY = anchorNode.y + anchorNode.height / 2;

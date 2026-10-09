@@ -4,6 +4,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import ReactMarkdown from 'react-markdown';
 import Button from '@mui/material/Button';
+import { useTheme } from '@mui/material/styles';
 import { MAX_USER_MESSAGE_CHARS } from '../../supabase/functions/family-chat/limits.ts';
 import { useFamilyChat } from '../hooks/useFamilyChat';
 
@@ -18,6 +19,7 @@ export const FamilyChat: React.FC<FamilyChatProps> = ({ behindSheet }) => {
   const [inputValue, setInputValue] = useState('');
   const { messages, isLoading, notice, isLimited, sendMessage, clearChat } = useFamilyChat();
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const { chat } = useTheme().palette;
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -49,10 +51,10 @@ export const FamilyChat: React.FC<FamilyChatProps> = ({ behindSheet }) => {
             style={{
               width: '400px',
               height: '500px',
-              backgroundColor: '#1a1a1a',
+              backgroundColor: chat.surface,
               borderRadius: '12px',
-              boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
-              border: '1px solid #333',
+              boxShadow: `0 8px 32px ${chat.shadow}`,
+              border: `1px solid ${chat.border}`,
               display: 'flex',
               flexDirection: 'column',
               marginBottom: '15px',
@@ -62,14 +64,14 @@ export const FamilyChat: React.FC<FamilyChatProps> = ({ behindSheet }) => {
             {/* Header */}
             <div style={{
               padding: '12px 16px',
-              backgroundColor: '#2a2a2a',
-              borderBottom: '1px solid #333',
+              backgroundColor: chat.bar,
+              borderBottom: `1px solid ${chat.border}`,
               display: 'flex',
               justifyContent: 'space-between',
               alignItems: 'center'
             }} >
-              <div style={{ color: '#fff', fontWeight: 'bold' }}>Family Chat Bot</div>
-              <Button variant="text" size="small" onClick={clearChat} sx={{ color: '#888', minWidth: 'auto' }}>
+              <div style={{ color: chat.ink, fontWeight: 'bold' }}>Family Chat Bot</div>
+              <Button variant="text" size="small" onClick={clearChat} sx={{ color: chat.muted, minWidth: 'auto' }}>
                 Clear
               </Button>
             </div>
@@ -84,7 +86,7 @@ export const FamilyChat: React.FC<FamilyChatProps> = ({ behindSheet }) => {
               gap: '12px'
             }}>
               {messages.length === 0 && (
-                <div style={{ color: '#666', textAlign: 'center', marginTop: '20px', fontSize: '0.9rem' }}>
+                <div style={{ color: chat.hint, textAlign: 'center', marginTop: '20px', fontSize: '0.9rem' }}>
                   Ask me anything about your family tree!
                 </div>
               )}
@@ -98,8 +100,8 @@ export const FamilyChat: React.FC<FamilyChatProps> = ({ behindSheet }) => {
                     borderRadius: '12px',
                     fontSize: '0.9rem',
                     lineHeight: '1.4',
-                    backgroundColor: msg.role === 'user' ? '#3b82f6' : '#333',
-                    color: '#fff',
+                    backgroundColor: msg.role === 'user' ? chat.userBubble : chat.bubble,
+                    color: chat.ink,
                     borderBottomRightRadius: msg.role === 'user' ? '2px' : '12px',
                     borderBottomLeftRadius: msg.role === 'assistant' ? '2px' : '12px',
                   }}
@@ -110,8 +112,8 @@ export const FamilyChat: React.FC<FamilyChatProps> = ({ behindSheet }) => {
                       ul: ({children}) => <ul style={{ margin: '8px 0', paddingLeft: '20px' }}>{children}</ul>,
                       ol: ({children}) => <ol style={{ margin: '8px 0', paddingLeft: '20px' }}>{children}</ol>,
                       li: ({children}) => <li style={{ marginBottom: '4px' }}>{children}</li>,
-                      h3: ({children}) => <h3 style={{ fontSize: '1rem', margin: '12px 0 8px 0', color: '#3b82f6' }}>{children}</h3>,
-                      strong: ({children}) => <strong style={{ color: '#fff', fontWeight: 'bold' }}>{children}</strong>
+                      h3: ({children}) => <h3 style={{ fontSize: '1rem', margin: '12px 0 8px 0', color: chat.heading }}>{children}</h3>,
+                      strong: ({children}) => <strong style={{ color: chat.ink, fontWeight: 'bold' }}>{children}</strong>
                     }}
                   >
                     {msg.content}
@@ -119,12 +121,12 @@ export const FamilyChat: React.FC<FamilyChatProps> = ({ behindSheet }) => {
                 </div>
               ))}
               {isLoading && (
-                <div style={{ alignSelf: 'flex-start', padding: '8px 12px', backgroundColor: '#333', borderRadius: '12px', color: '#888', fontSize: '0.9rem' }}>
+                <div style={{ alignSelf: 'flex-start', padding: '8px 12px', backgroundColor: chat.bubble, borderRadius: '12px', color: chat.muted, fontSize: '0.9rem' }}>
                   AI is thinking...
                 </div>
               )}
               {notice && (
-                <div role="status" style={{ color: '#fbbf24', fontSize: '0.85rem', textAlign: 'center', padding: '5px' }}>
+                <div role="status" style={{ color: chat.notice, fontSize: '0.85rem', textAlign: 'center', padding: '5px' }}>
                   {notice.line}
                 </div>
               )}
@@ -136,8 +138,8 @@ export const FamilyChat: React.FC<FamilyChatProps> = ({ behindSheet }) => {
               onSubmit={handleSend}
               style={{
                 padding: '12px',
-                backgroundColor: '#2a2a2a',
-                borderTop: '1px solid #333',
+                backgroundColor: chat.bar,
+                borderTop: `1px solid ${chat.border}`,
                 display: 'flex',
                 gap: '8px'
               }}
@@ -151,11 +153,11 @@ export const FamilyChat: React.FC<FamilyChatProps> = ({ behindSheet }) => {
                 disabled={isLimited}
                 style={{
                   flex: 1,
-                  backgroundColor: '#1a1a1a',
-                  border: '1px solid #444',
+                  backgroundColor: chat.surface,
+                  border: `1px solid ${chat.inputBorder}`,
                   borderRadius: '6px',
                   padding: '8px 12px',
-                  color: '#fff',
+                  color: chat.ink,
                   outline: 'none'
                 }}
               />
@@ -181,7 +183,7 @@ export const FamilyChat: React.FC<FamilyChatProps> = ({ behindSheet }) => {
             minHeight: 56,
             padding: 0,
             fontSize: '24px',
-            boxShadow: '0 4px 16px rgba(0,0,0,0.3)',
+            boxShadow: `0 4px 16px ${chat.buttonShadow}`,
           }}
         >
           {isOpen ? '✕' : '🤖'}

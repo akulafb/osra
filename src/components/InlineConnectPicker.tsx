@@ -19,6 +19,7 @@ export interface InlineConnectPickerProps {
     otherParentId?: string | null
   ) => Promise<void> | void;
   onCancel: () => void;
+  previewStroke?: string;
 }
 
 export const PICKER_WIDTH = PICKER_CARD_WIDTH;
@@ -30,6 +31,7 @@ export const InlineConnectPicker: React.FC<InlineConnectPickerProps> = ({
   graphData,
   isAdmin,
   onConfirm,
+  previewStroke = '#c084fc',
   onCancel,
 }) => {
   // Position between source and target, or centered on target
@@ -44,7 +46,7 @@ export const InlineConnectPicker: React.FC<InlineConnectPickerProps> = ({
         y1={sourceNode.y + sourceNode.height / 2}
         x2={targetNode.x}
         y2={targetNode.y + targetNode.height / 2}
-        stroke="#c084fc"
+        stroke={previewStroke}
         strokeWidth={2.5}
         strokeDasharray="6 4"
         opacity={0.95}

@@ -1,4 +1,6 @@
 import React, { useState, useMemo } from 'react';
+import { alpha, useTheme } from '@mui/material/styles';
+import { useCanvasMode } from '../../hooks/useCanvasMode';
 import { FamilyGraph } from '../../types/graph';
 import {
   buildConnectOptions,
@@ -48,6 +50,8 @@ export const ConnectPickerCard: React.FC<ConnectPickerCardProps> = ({
   onConfirm,
   onCancel,
 }) => {
+  const { panel, hud } = useTheme().palette;
+  const { mode: canvasMode } = useCanvasMode();
   const [selectedRel, setSelectedRel] = useState<ConnectSelection>('marriage');
   const [parentRole, setParentRole] = useState<ParentRole>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -95,9 +99,9 @@ export const ConnectPickerCard: React.FC<ConnectPickerCardProps> = ({
     justifyContent: 'space-between',
     padding: '6px 8px',
     borderRadius: '6px',
-    border: selectedRel === selection ? `1.5px solid ${accent}` : '1px solid rgba(255,255,255,0.1)',
-    background: selectedRel === selection ? `${accent}33` : 'rgba(255,255,255,0.04)',
-    color: enabled ? '#fff' : 'rgba(255,255,255,0.3)',
+    border: selectedRel === selection ? `1.5px solid ${accent}` : `1px solid ${panel.border.subtle}`,
+    background: selectedRel === selection ? (canvasMode === 'paper' ? `color-mix(in srgb, ${hud.connect.accent} 20%, transparent)` : alpha(accent, 0.2)) : hud.picker.choice,
+    color: enabled ? panel.ink.strong : panel.ink.ghost,
     cursor: enabled ? 'pointer' : 'not-allowed',
     fontSize: '11px',
     fontWeight: 600,
@@ -112,25 +116,25 @@ export const ConnectPickerCard: React.FC<ConnectPickerCardProps> = ({
   }[] = [
     {
       selection: 'parent-source',
-      accent: '#38bdf8',
+      accent: hud.kinship.parentSource,
       validation: options.sourceParent,
       label: <span>👶 {sourceFirstName} is parent of {targetFirstName}</span>,
     },
     {
       selection: 'parent-target',
-      accent: '#fef08a',
+      accent: hud.kinship.parentTarget,
       validation: options.targetParent,
       label: <span>🧑‍🦳 {targetFirstName} is parent of {sourceFirstName}</span>,
     },
     {
       selection: 'marriage',
-      accent: '#f472b6',
+      accent: hud.kinship.marriage,
       validation: options.marriage,
       label: <span>💍 Married / Partners</span>,
     },
     {
       selection: 'divorce',
-      accent: '#94a3b8',
+      accent: hud.kinship.divorce,
       validation: options.divorce,
       label: <span>💔 Divorced</span>,
     },
@@ -142,14 +146,14 @@ export const ConnectPickerCard: React.FC<ConnectPickerCardProps> = ({
     <div
       style={{
         width: `${PICKER_CARD_WIDTH}px`,
-        background: 'rgba(15, 23, 42, 0.98)',
+        background: hud.picker.surface,
         backdropFilter: 'blur(20px)',
-        border: '1.5px solid rgba(168, 85, 247, 0.8)',
+        border: `1.5px solid ${hud.picker.border}`,
         borderRadius: '12px',
-        boxShadow: '0 0 25px rgba(168, 85, 247, 0.35), 0 10px 40px rgba(0,0,0,0.7)',
+        boxShadow: `0 0 25px ${hud.picker.glow}, 0 10px 40px ${hud.card.shadow}`,
         padding: '12px 14px',
         boxSizing: 'border-box',
-        color: '#fff',
+        color: panel.ink.strong,
         display: 'flex',
         flexDirection: 'column',
         gap: '10px',
@@ -163,11 +167,11 @@ export const ConnectPickerCard: React.FC<ConnectPickerCardProps> = ({
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          borderBottom: '1px solid rgba(255,255,255,0.1)',
+          borderBottom: `1px solid ${panel.border.subtle}`,
           paddingBottom: '6px',
         }}
       >
-        <div style={{ fontSize: '11px', fontWeight: 700, color: '#c084fc' }}>
+        <div style={{ fontSize: '11px', fontWeight: 700, color: hud.card.highlight }}>
           Connect {sourceFirstName} ↔ {targetFirstName}
         </div>
         <button
@@ -176,7 +180,7 @@ export const ConnectPickerCard: React.FC<ConnectPickerCardProps> = ({
           style={{
             background: 'transparent',
             border: 'none',
-            color: 'rgba(255,255,255,0.6)',
+            color: panel.ink.muted,
             cursor: 'pointer',
             fontSize: '12px',
             padding: '0',
@@ -208,7 +212,7 @@ export const ConnectPickerCard: React.FC<ConnectPickerCardProps> = ({
       {/* Optional Parent Role Selector for parent links */}
       {isParentChoice && (
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '10px' }}>
-          <span style={{ color: 'rgba(255,255,255,0.7)' }}>Role:</span>
+          <span style={{ color: panel.ink.body }}>Role:</span>
           {(['father', 'mother'] as const).map((role) => (
             <button
               key={role}
@@ -219,15 +223,15 @@ export const ConnectPickerCard: React.FC<ConnectPickerCardProps> = ({
                 borderRadius: '4px',
                 border:
                   parentRole === role
-                    ? `1px solid ${role === 'father' ? '#38bdf8' : '#f472b6'}`
-                    : '1px solid rgba(255,255,255,0.15)',
+                    ? `1px solid ${role === 'father' ? hud.kinship.father : hud.kinship.mother}`
+                    : `1px solid ${hud.card.border}`,
                 background:
                   parentRole === role
                     ? role === 'father'
-                      ? 'rgba(56, 189, 248, 0.25)'
-                      : 'rgba(244, 114, 182, 0.25)'
+                      ? hud.kinship.fatherTint
+                      : hud.kinship.motherTint
                     : 'transparent',
-                color: '#fff',
+                color: panel.ink.strong,
                 fontSize: '9px',
                 cursor: 'pointer',
               }}
@@ -242,7 +246,7 @@ export const ConnectPickerCard: React.FC<ConnectPickerCardProps> = ({
 
       {/* Error Message if any */}
       {submitError && (
-        <div style={{ fontSize: '10px', color: '#f87171', fontWeight: 600 }}>{submitError}</div>
+        <div style={{ fontSize: '10px', color: hud.error, fontWeight: 600 }}>{submitError}</div>
       )}
 
       {/* Actions */}
@@ -254,9 +258,9 @@ export const ConnectPickerCard: React.FC<ConnectPickerCardProps> = ({
             flex: 1,
             padding: '6px',
             borderRadius: '6px',
-            border: '1px solid rgba(255,255,255,0.2)',
+            border: `1px solid ${hud.card.controlBorder}`,
             background: 'transparent',
-            color: 'rgba(255,255,255,0.8)',
+            color: hud.card.inkSecondary,
             fontSize: '11px',
             cursor: 'pointer',
           }}
@@ -272,12 +276,12 @@ export const ConnectPickerCard: React.FC<ConnectPickerCardProps> = ({
             padding: '6px',
             borderRadius: '6px',
             border: 'none',
-            background: '#a855f7',
-            color: '#fff',
+            background: hud.picker.confirm,
+            color: canvasMode === 'paper' ? hud.card.onAccent : panel.ink.strong,
             fontSize: '11px',
             fontWeight: 700,
             cursor: isSubmitting ? 'default' : 'pointer',
-            boxShadow: '0 0 12px rgba(168, 85, 247, 0.5)',
+            boxShadow: `0 0 12px ${hud.picker.confirmGlow}`,
           }}
         >
           {isSubmitting ? 'Linking…' : 'Establish Link'}

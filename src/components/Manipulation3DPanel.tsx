@@ -1,18 +1,18 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import * as THREE from 'three';
+import { useTheme } from '@mui/material/styles';
 import { FamilyGraph, FamilyNode, RelativeDirection } from '../types/graph';
 import { ForceGraphRef, LiveNodePosition } from '../types/forceGraph';
 import { GhostNodeCard, GHOST_CARD_WIDTH } from './cards/GhostNodeCard';
 import { ConnectPickerCard, PICKER_CARD_WIDTH } from './cards/ConnectPickerCard';
 import { KinshipLinkType, ParentRole } from './cards/connectOptions';
 import { Candidacy, ConnectPair, buildTargetOptions } from './cards/connectCandidates';
-import { CONNECT_ACCENT, relationColor } from './cards/relationStyle';
 import { ConnectTargetingBody } from './ConnectTargetingBody';
 import { connectedPersonIds } from '../lib/personMatch';
 import { otherParentChoice } from '../lib/otherParent';
 import { countUnreachable } from '../utils/connectTargeting';
-import { CONFIRM_PULSE_COLOR } from '../utils/cosmicFx';
-import { useGhostPreview } from '../hooks/useGhostPreview';
+import { useGhostPreview, type GhostPreviewLook } from '../hooks/useGhostPreview';
+import { useCanvasMode } from '../hooks/useCanvasMode';
 import { useTargetVisibility } from '../hooks/useTargetVisibility';
 
 /**
@@ -32,10 +32,6 @@ const PANEL_LEFT = 24;
 const PANEL_PADDING = 12;
 /** Clears the chat button docked bottom-left when the panel sits at the bottom. */
 const PANEL_BOTTOM = 88;
-
-/** The same red the scene pulses the aura with, so the pill and the planet
- *  read as one question. */
-const DISSOLVE_ACCENT = CONFIRM_PULSE_COLOR;
 
 const HANDLES: { relation: RelativeDirection; label: string }[] = [
   { relation: 'parent', label: '+ Parent' },
@@ -130,6 +126,8 @@ export interface Manipulation3DPanelProps {
     targetNodeId: string;
     otherParentId?: string | null;
   }) => Promise<void> | void;
+  /** The Ghost Preview's colours in the scene; Paper draws it in ink. */
+  ghostLook?: GhostPreviewLook;
 }
 
 /**
@@ -203,7 +201,7 @@ const AnchorLeaderLine: React.FC<{
           y1={screen.y}
           x2={panelRightEdge}
           y2="50%"
-          stroke={color}
+          style={{ stroke: color }}
           strokeWidth={1.5}
           strokeDasharray="5 4"
           opacity={0.6}
@@ -214,7 +212,7 @@ const AnchorLeaderLine: React.FC<{
         cy={screen.y}
         r={7}
         fill="none"
-        stroke={color}
+        style={{ stroke: color }}
         strokeWidth={1.5}
         opacity={0.9}
       />
@@ -238,7 +236,16 @@ export const Manipulation3DPanel: React.FC<Manipulation3DPanelProps> = ({
   searchMatches,
   onCreateRelative,
   onConnectExistingRelative,
+  ghostLook,
 }) => {
+  const { panel, hud } = useTheme().palette;
+  const isPaper = useCanvasMode().mode === 'paper';
+  const look = {
+    idle: hud.manipulation.idle,
+    dissolve: hud.manipulation.dissolve,
+    connect: hud.connect.accent,
+    relation: (r: RelativeDirection) => hud.relation[r].line,
+  };
   const [relation, setRelation] = useState<RelativeDirection | null>(null);
   const [previewName, setPreviewName] = useState('');
 
@@ -263,6 +270,7 @@ export const Manipulation3DPanel: React.FC<Manipulation3DPanelProps> = ({
     relation,
     name: previewName,
     enabled: visible,
+    look: ghostLook,
   });
 
   const visibility = useTargetVisibility({
@@ -341,12 +349,12 @@ export const Manipulation3DPanel: React.FC<Manipulation3DPanelProps> = ({
   const inConnectMode = Boolean(connect.sourceNode);
   const isConfirmingDissolve = dissolve.isConfirming && !inConnectMode && !relation;
   const accent = inConnectMode
-    ? CONNECT_ACCENT
+    ? look.connect
     : isConfirmingDissolve
-      ? DISSOLVE_ACCENT
+      ? look.dissolve
       : relation
-        ? relationColor(relation)
-        : '#a78bfa';
+        ? look.relation(relation)
+        : look.idle;
 
   // The kinship picker is wider than the Ghost Node card, so the panel takes
   // whichever card it is currently holding.
@@ -378,16 +386,16 @@ export const Manipulation3DPanel: React.FC<Manipulation3DPanelProps> = ({
           zIndex: 1250,
           width: panelWidth,
           boxSizing: 'border-box',
-          background: 'rgba(15, 23, 42, 0.95)',
+          background: hud.editor.surface,
           backdropFilter: 'blur(16px)',
-          border: '1px solid rgba(255,255,255,0.15)',
+          border: `1px solid ${hud.card.border}`,
           borderRadius: 12,
           padding: PANEL_PADDING,
-          color: '#fff',
+          color: panel.ink.strong,
           display: 'flex',
           flexDirection: 'column',
           gap: 8,
-          boxShadow: '0 10px 40px rgba(0,0,0,0.7)',
+          boxShadow: `0 10px 40px ${hud.card.shadow}`,
         }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -395,7 +403,7 @@ export const Manipulation3DPanel: React.FC<Manipulation3DPanelProps> = ({
           style={{
             fontSize: 11,
             fontWeight: 700,
-            color: 'rgba(255,255,255,0.65)',
+            color: hud.editor.caption,
             overflow: 'hidden',
             textOverflow: 'ellipsis',
             whiteSpace: 'nowrap',
@@ -412,7 +420,7 @@ export const Manipulation3DPanel: React.FC<Manipulation3DPanelProps> = ({
            * pixels at distance.
            */
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.75)', lineHeight: 1.4 }}>
+            <div style={{ fontSize: 11, color: hud.editor.prompt, lineHeight: 1.4 }}>
               Dissolve <strong>{selectedNode.firstName}</strong>? This cannot be undone.
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
@@ -422,10 +430,10 @@ export const Manipulation3DPanel: React.FC<Manipulation3DPanelProps> = ({
                 aria-label={`Confirm dissolving ${selectedNode.firstName}`}
                 style={{
                   flex: 1,
-                  background: DISSOLVE_ACCENT,
-                  border: `1.5px solid ${DISSOLVE_ACCENT}`,
+                  background: look.dissolve,
+                  border: `1.5px solid ${look.dissolve}`,
                   borderRadius: 999,
-                  color: '#0f172a',
+                  color: hud.card.onRelation,
                   cursor: 'pointer',
                   fontSize: 13,
                   fontWeight: 800,
@@ -440,10 +448,10 @@ export const Manipulation3DPanel: React.FC<Manipulation3DPanelProps> = ({
                 aria-label="Keep this person"
                 style={{
                   flex: 1,
-                  background: 'rgba(15, 23, 42, 0.92)',
-                  border: '1.5px solid rgba(255,255,255,0.3)',
+                  background: hud.editor.pill,
+                  border: `1.5px solid ${hud.editor.pillBorder}`,
                   borderRadius: 999,
-                  color: 'rgba(255,255,255,0.85)',
+                  color: hud.editor.pillInk,
                   cursor: 'pointer',
                   fontSize: 13,
                   fontWeight: 800,
@@ -464,10 +472,10 @@ export const Manipulation3DPanel: React.FC<Manipulation3DPanelProps> = ({
                 type="button"
                 onClick={() => setRelation(rel)}
                 style={{
-                  background: 'rgba(15, 23, 42, 0.92)',
-                  border: `1.5px solid ${relationColor(rel)}`,
+                  background: hud.editor.pill,
+                  border: `1.5px solid ${look.relation(rel)}`,
                   borderRadius: 999,
-                  color: relationColor(rel),
+                  color: look.relation(rel),
                   cursor: 'pointer',
                   fontSize: 11,
                   fontWeight: 700,
@@ -482,10 +490,10 @@ export const Manipulation3DPanel: React.FC<Manipulation3DPanelProps> = ({
               type="button"
               onClick={startConnect}
               style={{
-                background: 'rgba(15, 23, 42, 0.92)',
-                border: `1.5px solid ${CONNECT_ACCENT}`,
+                background: hud.editor.pill,
+                border: `1.5px solid ${look.connect}`,
                 borderRadius: 999,
-                color: CONNECT_ACCENT,
+                color: look.connect,
                 cursor: 'pointer',
                 fontSize: 11,
                 fontWeight: 700,
@@ -500,10 +508,10 @@ export const Manipulation3DPanel: React.FC<Manipulation3DPanelProps> = ({
                 type="button"
                 onClick={startDissolve}
                 style={{
-                  background: 'rgba(15, 23, 42, 0.92)',
-                  border: `1.5px solid ${DISSOLVE_ACCENT}`,
+                  background: hud.editor.pill,
+                  border: `1.5px solid ${look.dissolve}`,
                   borderRadius: 999,
-                  color: DISSOLVE_ACCENT,
+                  color: look.dissolve,
                   cursor: 'pointer',
                   fontSize: 11,
                   fontWeight: 700,
@@ -545,6 +553,7 @@ export const Manipulation3DPanel: React.FC<Manipulation3DPanelProps> = ({
             onQueryChange={onSearchQueryChange}
             onPickTarget={connect.onPickTarget}
             onExit={connect.onExit}
+            aimTarget={isPaper ? 'a person' : undefined}
           />
         )}
 

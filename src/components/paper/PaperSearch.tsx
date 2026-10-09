@@ -1,0 +1,56 @@
+import { useEffect, useRef, type MutableRefObject } from 'react';
+import { useFrame, useThree } from '@react-three/fiber';
+import type { CameraControls } from '@react-three/drei';
+import type { PaperLayout } from '../../lib/paperLayout';
+import { addOffsets } from '../../lib/paperHover';
+import { paperFlyFrames, paperSearchMotionAt, paperSearchMotionFrom, PAPER_SEARCH_STILL, type PaperSearchMotion } from '../../lib/paperSearch';
+import type { PaperEmphasisState } from './paperEmphasis';
+import { PAPER_SEARCH_FRAME_PRIORITY, type PaperFrame } from './paperScene';
+
+interface PaperSearchProps {
+  /** The scene's layout: the fixed layout, with the matches in their cluster while searching. */
+  layout: PaperLayout;
+  matchIds: ReadonlySet<string> | null;
+  /** The sphere around the cluster; null outside a search or with no match. */
+  cluster: PaperFrame | null;
+  selectedId: string | null;
+  state: MutableRefObject<PaperEmphasisState>;
+  flyTo: MutableRefObject<((id: string) => void) | null>;
+  onOverview: () => void;
+}
+
+/**
+ * Moves the scene into the search cluster and back on the scene clock: the
+ * matches travel from where they are drawn, everyone else shrinks away or
+ * grows back. Each new set of matches frames the cluster, or the selected
+ * match; clearing the search frames the overview.
+ */
+export function PaperSearch({ layout, matchIds, cluster, selectedId, state, flyTo, onOverview }: PaperSearchProps) {
+  const controls = useThree((three) => three.controls) as CameraControls | null;
+  const seen = useRef<{ layout: PaperLayout; matchIds: ReadonlySet<string> | null } | null>(null);
+  const motion = useRef<PaperSearchMotion>(PAPER_SEARCH_STILL);
+  const settled = useRef<PaperSearchMotion | null>(null);
+
+  useFrame(({ clock }) => {
+    const last = seen.current;
+    if (!last) motion.current = paperSearchMotionFrom(PAPER_SEARCH_STILL, layout, layout, matchIds, -Infinity);
+    else if (last.matchIds !== matchIds || last.layout !== layout) motion.current = paperSearchMotionFrom(motion.current, last.layout, layout, matchIds, clock.elapsedTime);
+    seen.current = { layout, matchIds };
+    if (settled.current === motion.current) return;
+
+    const { offsets, sizes, done } = paperSearchMotionAt(motion.current, clock.elapsedTime);
+    if (done) settled.current = motion.current;
+    const { drift } = state.current;
+    state.current = { ...state.current, size: sizes, drift: addOffsets(drift, offsets) };
+  }, PAPER_SEARCH_FRAME_PRIORITY);
+
+  const framedFor = useRef<ReadonlySet<string> | null>(null);
+  useEffect(() => {
+    if (framedFor.current === matchIds || !controls) return;
+    framedFor.current = matchIds;
+    if (selectedId && layout.has(selectedId) && paperFlyFrames(selectedId, matchIds) === 'person') flyTo.current?.(selectedId);
+    else if (cluster || !matchIds) onOverview();
+  }, [controls, matchIds, cluster, selectedId, layout, flyTo, onOverview]);
+
+  return null;
+}

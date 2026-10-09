@@ -1,6 +1,7 @@
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import Button from '@mui/material/Button';
 import Alert from '@mui/material/Alert';
+import { useTheme, type Theme } from '@mui/material/styles';
 import FormControl from '@mui/material/FormControl';
 import InputLabel from '@mui/material/InputLabel';
 import MenuItem from '@mui/material/MenuItem';
@@ -50,6 +51,8 @@ export default function AdminManageLinksModal({
   onDissolveLink,
 }: AdminManageLinksModalProps) {
   const { write } = useWorkingRecord();
+  const theme = useTheme();
+  const { modal, panel } = theme.palette;
   const [editing, setEditing] = useState<FamilyLink | null>(null);
   const [editSource, setEditSource] = useState('');
   const [editTarget, setEditTarget] = useState('');
@@ -202,10 +205,10 @@ export default function AdminManageLinksModal({
   };
 
   return (
-    <div ref={overlayRef} style={overlayStyle}>
-      <div style={contentStyle}>
-        <h2 style={{ marginTop: 0, color: '#fff' }}>Links for this person</h2>
-        <p style={{ color: '#888', fontSize: '0.85rem' }}>
+    <div ref={overlayRef} style={overlayStyle(theme)}>
+      <div style={contentStyle(theme)}>
+        <h2 style={{ marginTop: 0, color: panel.ink.strong }}>Links for this person</h2>
+        <p style={{ color: modal.adminTool.ink.faint, fontSize: '0.85rem' }}>
           Edit or delete relationships. Changes are checked so the tree stays consistent.
         </p>
 
@@ -221,14 +224,14 @@ export default function AdminManageLinksModal({
               key={link.id ?? `${link.source}-${link.target}-${link.type}`}
               style={{
                 padding: '10px 0',
-                borderBottom: '1px solid #333',
+                borderBottom: `1px solid ${modal.adminTool.border}`,
                 display: 'flex',
                 flexWrap: 'wrap',
                 alignItems: 'center',
                 gap: 8,
               }}
             >
-              <span style={{ color: '#ddd', flex: '1 1 200px' }}>
+              <span style={{ color: modal.adminTool.ink.soft, flex: '1 1 200px' }}>
                 <strong>{link.type}</strong> → {otherLabel(link)}
                 {link.parentRole ? ` (${link.parentRole})` : ''}
               </span>
@@ -253,21 +256,21 @@ export default function AdminManageLinksModal({
           ))}
         </ul>
         {incident.length === 0 && (
-          <p style={{ color: '#888' }}>No links touch this person.</p>
+          <p style={{ color: modal.adminTool.ink.faint }}>No links touch this person.</p>
         )}
 
         {editing && (
           <form
             onSubmit={handleSaveEdit}
             style={{
-              borderTop: '1px solid #444',
+              borderTop: `1px solid ${modal.adminForm.rule}`,
               paddingTop: 16,
               marginTop: 8,
             }}
           >
-            <h3 style={{ color: '#fff', fontSize: '1rem' }}>Edit link</h3>
+            <h3 style={{ color: panel.ink.strong, fontSize: '1rem' }}>Edit link</h3>
             <FormControl fullWidth margin="dense" size="small">
-              <InputLabel id="es" sx={{ color: '#aaa' }}>
+              <InputLabel id="es" sx={{ color: modal.adminTool.ink.muted }}>
                 Source (parent for parent links)
               </InputLabel>
               <Select
@@ -275,7 +278,7 @@ export default function AdminManageLinksModal({
                 label="Source (parent for parent links)"
                 value={editSource}
                 onChange={(e) => setEditSource(e.target.value)}
-                sx={{ color: '#fff' }}
+                sx={{ color: panel.ink.strong }}
                 MenuProps={selectMenuProps}
               >
                 {graph.nodes.map((n) => (
@@ -286,7 +289,7 @@ export default function AdminManageLinksModal({
               </Select>
             </FormControl>
             <FormControl fullWidth margin="dense" size="small">
-              <InputLabel id="et" sx={{ color: '#aaa' }}>
+              <InputLabel id="et" sx={{ color: modal.adminTool.ink.muted }}>
                 Target (child for parent links)
               </InputLabel>
               <Select
@@ -294,7 +297,7 @@ export default function AdminManageLinksModal({
                 label="Target (child for parent links)"
                 value={editTarget}
                 onChange={(e) => setEditTarget(e.target.value)}
-                sx={{ color: '#fff' }}
+                sx={{ color: panel.ink.strong }}
                 MenuProps={selectMenuProps}
               >
                 {graph.nodes.map((n) => (
@@ -305,7 +308,7 @@ export default function AdminManageLinksModal({
               </Select>
             </FormControl>
             <FormControl fullWidth margin="dense" size="small">
-              <InputLabel id="ety" sx={{ color: '#aaa' }}>
+              <InputLabel id="ety" sx={{ color: modal.adminTool.ink.muted }}>
                 Type
               </InputLabel>
               <Select
@@ -315,7 +318,7 @@ export default function AdminManageLinksModal({
                 onChange={(e) =>
                   setEditType(e.target.value as FamilyLink['type'])
                 }
-                sx={{ color: '#fff' }}
+                sx={{ color: panel.ink.strong }}
                 MenuProps={selectMenuProps}
               >
                 <MenuItem value="parent">parent</MenuItem>
@@ -325,7 +328,7 @@ export default function AdminManageLinksModal({
             </FormControl>
             {editType === 'parent' && (
               <FormControl fullWidth margin="dense" size="small">
-                <InputLabel id="epr" sx={{ color: '#aaa' }}>
+                <InputLabel id="epr" sx={{ color: modal.adminTool.ink.muted }}>
                   Parent role
                 </InputLabel>
                 <Select
@@ -335,7 +338,7 @@ export default function AdminManageLinksModal({
                   onChange={(e) =>
                     setEditRole(e.target.value as 'mother' | 'father' | '')
                   }
-                  sx={{ color: '#fff' }}
+                  sx={{ color: panel.ink.strong }}
                   MenuProps={selectMenuProps}
                 >
                   <MenuItem value="">Not specified</MenuItem>
@@ -372,27 +375,27 @@ export default function AdminManageLinksModal({
   );
 }
 
-const overlayStyle: React.CSSProperties = {
+const overlayStyle = ({ palette }: Theme): React.CSSProperties => ({
   position: 'fixed',
   inset: 0,
-  background: 'rgba(0,0,0,0.75)',
+  background: palette.modal.adminForm.scrim,
   zIndex: 2000,
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
   padding: 16,
   overflow: 'auto',
-};
+});
 
-const contentStyle: React.CSSProperties = {
+const contentStyle = ({ palette }: Theme): React.CSSProperties => ({
   position: 'relative',
   zIndex: 0,
-  background: '#1a1a24',
+  background: palette.modal.adminForm.surface,
   borderRadius: 12,
   padding: 24,
   maxWidth: 520,
   width: '100%',
-  border: '1px solid rgba(255,255,255,0.1)',
+  border: `1px solid ${palette.panel.border.subtle}`,
   maxHeight: '90vh',
   overflow: 'auto',
-};
+});
