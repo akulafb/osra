@@ -23,6 +23,7 @@ import { NO_OTHER_PARENT, otherParentChoice, stillOfferedOtherParent } from '../
 import { useOtherParentPick } from '../../hooks/useOtherParentPick';
 import { useWorkingRecord } from '../../contexts/WorkingRecordContext';
 import { linkWriteOutcome } from '../../hooks/useWorkingRecord';
+import { addRelativeOverlayStyle } from './addRelativeOverlay';
 
 interface AddRelativeModalProps {
   isOpen: boolean;
@@ -284,16 +285,10 @@ export default function AddRelativeModal({
 
   if (!isOpen) return null;
 
-  const overlayStyle: React.CSSProperties = isPreviewConnectMode
-    ? {
-        ...modalOverlayStyle(theme),
-        backgroundColor: 'transparent',
-        pointerEvents: 'none',
-        justifyContent: previewNarrow ? 'flex-end' : 'flex-end',
-        alignItems: previewNarrow ? 'stretch' : 'center',
-        flexDirection: previewNarrow ? 'column' : 'row',
-      }
-    : modalOverlayStyle(theme);
+  const overlayStyle = addRelativeOverlayStyle(theme, {
+    previewConnect: isPreviewConnectMode,
+    previewNarrow,
+  });
 
   const panelStyle: React.CSSProperties = isPreviewConnectMode
     ? {
@@ -566,20 +561,6 @@ export default function AddRelativeModal({
     </div>
   );
 }
-
-const modalOverlayStyle = ({ palette }: Theme): React.CSSProperties => ({
-  position: 'fixed',
-  top: 0,
-  left: 0,
-  right: 0,
-  bottom: 0,
-  backgroundColor: palette.modal.scrim,
-  display: 'flex',
-  justifyContent: 'center',
-  alignItems: 'center',
-  zIndex: 2000,
-  backdropFilter: 'blur(8px)',
-});
 
 const modalContentStyle = ({ palette }: Theme): React.CSSProperties => ({
   backgroundColor: palette.modal.surface,

@@ -10,6 +10,7 @@ A signed-in user adds a relative to a selected person from the drawer's + Add Re
 - `add-child-existing` connecting an existing person as a child links the other parent too, unless that child already has another parent.
 - `add-child-connect` Connect Mode's "<A> is parent of <B>" shows the same note or select.
 - `add-child-drawn-once` the child has two parent links in the data but one line to it on screen.
+- `preview-sharp` while a picked match is previewed, the tree behind the modal, dashed line included, is sharp: no blur and no scrim. Without a picked match the modal keeps its blurred scrim.
 
 ## How to get to it (user POV)
 
@@ -32,6 +33,7 @@ Preconditions:
 - **Owner: no spouse.** Select P0, + Add Relative, `Zz Lin79 None`, "Add as child". No OTHER PARENT line; the `SELECT` returns one row.
 - **Owner: Connect Mode.** INSTRUMENTS → + ADD PERSON, `Zz Lin79 Connect` in P1's family. Select P1, ADMINISTRATIVE TOOLS → Connect Nodes..., click `Zz Lin79 Connect`, pick "P1 is parent of Zz Lin79 Connect". The picker shows "Other parent: <spouse>"; Establish Link. The `SELECT` (name `Zz Lin79 Connect`) returns P1 and the spouse. Picking P1 as parent of `Zz Lin79 None` instead shows no other-parent line, because that child already has a parent (P0).
 - **Drawn once.** With the family showing `Zz Lin79 One`, `ui.sh tree` lists the node and the screenshot shows one parent line reaching it (from one of the two parents), not two.
+- **Owner: preview sharp (LIN-123).** Writes nothing: never submit, Cancel at the end. In each view (Cosmos 2D, Cosmos 3D, Paper 2D, Paper 3D), select a person, + Add Relative, type an existing Person's name and pick the match. The agent runs `capture.sh "$RUN_DIR" add-relative preview-sharp-<view>`: the dashed preview line and the nodes around it are crisp. Before the pick, the backdrop is blurred and dimmed as before.
 - **Owner: cleanup.** For each `Zz Lin79 …` node: select it, ADMINISTRATIVE TOOLS → Delete Entry, confirm. The agent checks `SELECT count(*) FROM nodes WHERE first_name LIKE 'Zz Lin79%';` returns 0 and `SELECT count(*) FROM links l LEFT JOIN nodes n ON n.id = l.target_node_id WHERE n.id IS NULL;` returns 0.
 
 - **Owner: Paper 3D (LIN-96).** Paper 3D at 1025 px or wider. Select P1, `+ Child`, `Zz Lin96 Child`, Enter: the newcomer's disc appears beside P1 and nobody else moves; the `SELECT` (name `Zz Lin96 Child`) returns P1 and the spouse. INSTRUMENTS → + ADD PERSON `Zz Lin96 Alone`: a disc at the edge of the cloud. Select P1, drawer Connect Nodes..., click `Zz Lin96 Alone`, pick "P1 is parent of Zz Lin96 Alone", Establish Link: the line appears. Clean up as below with `Zz Lin96%`.
