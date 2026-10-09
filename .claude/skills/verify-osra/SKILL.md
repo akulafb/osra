@@ -57,9 +57,11 @@ Osra-specific traps:
 
 - The snapshot lists controls inside collapsed panels (INSTRUMENTS, SELECT FAMILY) as if visible. Open the panel first (its button's arrow flips `▾` → `▴`) and let it settle about 1.5 s; a click on a hidden control does nothing. `pick` waits for you.
 - Reserve `pick` for items of an open scrollable menu. Scrolling a control inside a collapsed panel pans the whole app off-screen; `orca reload` recovers.
-- Person nodes exist in the snapshot only in 2D with a family selected. The 3D view is a WebGL canvas: its nodes have no accessibility handles, so prove 3D with screenshots plus the side panels.
+- Person nodes exist in the snapshot only in 2D with a family selected. The 3D view is a WebGL canvas: its nodes have no accessibility handles, so prove 3D with screenshots plus the side panels. The canvas has no `preserveDrawingBuffer`, so `toDataURL` crops come out blank: crop an `orca screenshot` (its base64 `data`) with PIL instead.
 - View mode (`family-tree-view-mode`), Canvas Mode (`family-tree-canvas-mode`, written only by the COSMOS ⇄ PAPER switch; absent means Paper), Paper colour (`family-tree-paper-colour`), the Paper 3D hint (`family-tree-paper-hint-seen`) and the "who's new" acknowledgement persist in the owner's localStorage. The retired `family-tree-background-theme` key may still be there; nothing reads it. Note the starting values and put them back before cleanup (remove any of these keys that was absent). The selected family resets on reload.
 - An off-screen Orca tab is throttled: springs stall, screenshots go stale and clicks on INSTRUMENTS items miss. Bring it forward with `orca tab switch --page "$(cat $RUN_DIR/state/page)" --focus`, re-read state after each step, and check motion and timing only in a visible tab, or report them as unverified for the owner.
+- Clicks during a loader are swallowed in a slow tab: pump `orca screenshot`s until the loader leaves the DOM. Right after a fresh INSTRUMENTS open, a `ui.sh` click can land on the canvas behind the panel and select a Person: pump one screenshot before the click.
+- `ui.sh person`, `ui.sh tap` and DOM clicks can drop the tab to 1 fps for several seconds, while `ui.sh key` keeps frames coming. Drive motion checks with keys where you can.
 
 The [feature map](features/README.md) holds the per-feature recipes. Read the index, then the feature's file; cover every entry point it lists.
 
@@ -69,13 +71,13 @@ The [feature map](features/README.md) holds the per-feature recipes. Read the in
 $S/capture.sh "$RUN_DIR" <feature-id> <step>   # writes <step>.aria.txt and <step>.png under evidence/<feature-id>/
 ```
 
-Read the PNG back (the Read tool shows it) and check it shows what you claim. Proof standards:
+Read the PNG back (the Read tool shows it) and check it shows what you claim. Screenshots are the main context cost: about 10 full captures used most of a 250k budget, so read a PIL crop of the region that matters. Proof standards:
 
 - Drive the real user path: clicks, typing and keys through the UI. Setting React state, localStorage, or calling Supabase directly is setup at most, never the proof.
 - Capture before and after each action that matters, not only the final screen.
 - Verify side effects alongside the screen. Reads: compare a count or name with the dev database (Supabase MCP `execute_sql`, `project_id: djwqamcfllqziqiyvyjj`, `SELECT` only, one statement per call: only the last statement's rows come back). Save the query and its result to `evidence/<feature-id>/db.txt`. Chat: a new `chat_message_usage` row (see [family chat](features/family-chat.md)).
 - `evidence/vite.log` is part of the proof: it shows the commit's dev server started on dev and any compile errors.
-- Report each entry point as verified, or as skipped with the command tried and the unmet precondition.
+- Report each entry point as verified, or as skipped with the command tried and the unmet precondition. Check one live line at a time and write its verdict before the next; one long runner script for many checks hides progress and can stall.
 
 ## Cleanup
 
