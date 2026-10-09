@@ -3,9 +3,9 @@
 # usage: capture.sh <run-dir> <feature-id> <step-name>
 set -euo pipefail
 source "$(dirname "$0")/lib.sh"
-osra_require_run_dir "${1:-}"
+osra_set_drivable_page "${1:-}"
 run_dir="$1"; feature="${2:?feature id}"; step="${3:?step name}"
-page="$(cat "$run_dir/state/page")"
+page="$OSRA_PAGE"
 out="$run_dir/evidence/$feature"
 mkdir -p "$out"
 base="$out/$(date +%H%M%S)-$step"

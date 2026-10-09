@@ -22,13 +22,13 @@ Paper is the default Canvas Mode: everyone lands on it unless they switched to C
 
 Preconditions:
 
-- Baseline preconditions hold, and the run's tab is visible (`orca tab switch --page "$(cat $RUN_DIR/state/page)" --focus`). Emphasis is a 0.15 s fade that stalls in a throttled tab.
+- Baseline preconditions hold, and the run's tab is visible (`$S/ui.sh "$RUN_DIR" orca tab switch --focus`). Emphasis is a 0.15 s fade that stalls in a throttled tab.
 - Record `localStorage.getItem('family-tree-canvas-mode')` and `family-tree-background-theme` with `orca eval`, and restore both before cleanup.
 
-- **Default.** Set up with `orca eval ... --expression "localStorage.removeItem('family-tree-canvas-mode'); localStorage.setItem('family-tree-background-theme','wax-white')"`, then `orca reload`. The page is light grey, CANVAS MODE shows PAPER pressed (`button[aria-pressed=true]`), and the canvas-mode key is still `null`.
+- **Default.** Set up with `$S/ui.sh "$RUN_DIR" orca eval --expression "localStorage.removeItem('family-tree-canvas-mode'); localStorage.setItem('family-tree-background-theme','wax-white')" --json`, then `$S/ui.sh "$RUN_DIR" orca reload`. The page is light grey, CANVAS MODE shows PAPER pressed (`button[aria-pressed=true]`), and the canvas-mode key is still `null`.
 - **Switch.** Pick a family, run `$S/ui.sh "$RUN_DIR" person <Given> <Family>`, open INSTRUMENTS, then run `$S/ui.sh "$RUN_DIR" click button "COSMOS"`. The page turns dark with neon cards, and the same person stays selected with the drawer open. The key reads `cosmos`; `orca reload` keeps Cosmos. Click `PAPER` to return.
 - **Cards on screen.** A large family can open framed on lines only. Open INSTRUMENTS and click `FIND ME`, or select a Person.
-- **Hover.** Find the card's ref with `ui.sh tree` (a `group` before the given name), then run `orca hover --page "$(cat $RUN_DIR/state/page)" --element <ref>`. Read `getComputedStyle(card).opacity` for the `.node-card` groups: the hovered Person and their direct relatives are `1`, everyone else `0.4`.
+- **Hover.** Find the card's ref with `ui.sh tree` (a `group` before the given name), then run `$S/ui.sh "$RUN_DIR" orca hover --element <ref>`. Read `getComputedStyle(card).opacity` for the `.node-card` groups: the hovered Person and their direct relatives are `1`, everyone else `0.4`.
 - **Focus.** `$S/ui.sh "$RUN_DIR" person <Given> <Family>`. The selected Person and their relatives are `1`, everyone else `0.18`.
 - **Search.** `$S/ui.sh "$RUN_DIR" fill textbox "Search family tree" "<text>"`, then click `Next match` until a match is on screen. Non-matches are `0.12`, every card keeps its `transform`, and the current match has a dashed accent ring. The count under the bar reads `N PEOPLE` (`1 PERSON` for one). With a Person selected, the first Escape deselects and the second clears the search (see [Paper search](#paper-search-lin-97)).
 - **Panels.** Open the drawer, the chat (`🤖`), `Edit Registry` (then `Cancel`), a `+ Child` handle (Ghost Node card, closed with Escape in its textbox) and `🔗 Link` (Connect Mode banner, then `Cancel (Esc)`). Submit nothing.
@@ -81,7 +81,7 @@ Preconditions:
 - **Click.** Nodes have no accessibility handles: pick an isolated disc from the screenshot (PNG pixels ÷ 2 at the 879 px tab) and run `$S/ui.sh "$RUN_DIR" tap <x> <y>`. The drawer heading is the Person's name (`.MuiDrawer-paper h4`). Below 900 px wide (MUI `md`, `useIsDrawerSheet`; the 879 px Orca tab too) it is the phone bottom sheet.
 - **Escape.** Probe first with `window.addEventListener('keydown', …)`, then `$S/ui.sh "$RUN_DIR" key Escape`; `.MuiDrawer-paper h4` disappears.
 - **Stable layout.** Capture, switch CANVAS MODE to `COSMOS` and back to `PAPER`, close INSTRUMENTS and capture again: the same Persons sit in the same places relative to each other (the idle turn and the grain change the pixels).
-- **Background tap.** With a Person selected, press on empty paper, move 4 px and release (`orca mouse move --x <x> --y <y>`, `orca mouse down`, `orca mouse move --x <x+4> --y <y>`, `orca mouse up`, each with `--page`): the drawer closes. The same with a 20 px move is a camera drag and keeps it.
+- **Background tap.** With a Person selected, press on empty paper, move 4 px and release (`$S/ui.sh "$RUN_DIR" orca mouse move --x <x> --y <y>`, `$S/ui.sh "$RUN_DIR" orca mouse down`, `$S/ui.sh "$RUN_DIR" orca mouse move --x <x+4> --y <y>`, `$S/ui.sh "$RUN_DIR" orca mouse up`): the drawer closes. The same with a 20 px move is a camera drag and keeps it.
 - **Unwired controls.** In Paper 3D with INSTRUMENTS open: `AMBIANCE` is absent from `document.body.innerText`; Cosmos 3D shows it.
 - **No WebGL.** The WebGL check runs once per page, so reload first, go to 2D, then `orca eval` `HTMLCanvasElement.prototype.getContext` to return `null` for `webgl*` (keep the original on `window`), then click `3D`. The `role=alert` fallback shows. Restore `getContext` afterwards.
 - **Proof.** Capture `paper-3d overview`, `paper-3d click`, `paper-3d escape`, `paper-3d click-phone` (the bottom sheet at the tab's phone width, a plain screenshot), `paper-3d switch-before`, `paper-3d switch-cosmos`, `paper-3d switch-after` and `paper-3d no-webgl`.
@@ -126,7 +126,7 @@ Preconditions:
 ### Driving it with ui.sh
 
 - Paper 3D, loaded, the tab visible, nobody selected. Pick a disc with several relatives from a screenshot (PNG pixels ÷ 2 at the 879 px tab).
-- **Hover.** `orca mouse move --x <x> --y <y> --page "$(cat $RUN_DIR/state/page)"`, wait a second, capture. Then move to empty paper and capture again: the overview is back.
+- **Hover.** `$S/ui.sh "$RUN_DIR" orca mouse move --x <x> --y <y>`, wait a second, capture. Then move to empty paper and capture again: the overview is back.
 - **Lean and dots.** Both move: take two captures about 0.2 s apart over the same hovered disc. The dots sit at different places along the lines; the relatives' discs are a few pixels nearer the hovered one than in the overview capture.
 - **Selection outranks hover.** `ui.sh tap` a disc (the drawer opens), then hover another disc: no ring and no dimming.
 - **Proof.** Capture `paper-3d-hover overview`, `hover`, `hover-off`, `hover-selected`.
@@ -151,7 +151,7 @@ Preconditions:
 ### Driving it with ui.sh
 
 - Paper 3D, loaded, the tab visible. `ui.sh tap` a disc with several relatives: the drawer opens and the camera flies. Wait 2 s, capture `focused`: the Person sits in the middle of the free space, the relatives are in view and darker than the ghosts.
-- **Phone.** `orca exec "set viewport 820 812 2"` (or 390x844): the drawer is a bottom sheet; the focused Person sits in the middle of the space above it.
+- **Phone.** `$S/ui.sh "$RUN_DIR" orca exec --command "set viewport 820 812 2"` (or 390x844): the drawer is a bottom sheet; the focused Person sits in the middle of the space above it.
 - **Clear.** Press Escape, wait 2 s, capture `overview`: everyone at full ink, no drawer. Then tap again and tap empty paper: the same.
 - **Tap.** Before tapping, run an eval that wraps `window.AudioContext` and counts `createOscillator().start` calls; each focus adds one and the context's `state` is `running`.
 - **Colour.** With colour on, watch `--paper-pair-paper` on `document.documentElement` with a MutationObserver: it steps from the default pair to the family's pair.
@@ -178,8 +178,8 @@ Preconditions:
 - **Idle turn.** No input for 3 s, then two `capture.sh` 15 s apart: discs move between them. Compare blurred greyscale crops (PIL `GaussianBlur(3)`, then count pixels changed by more than 20 levels) so the grain does not count.
 - **Holds on focus.** `ui.sh tap` a disc (or FIND ME), wait 6 s, then two captures 15 s apart: no pixels change by more than 20 levels after the blur.
 - **Zoom.** Dispatch wheel events on the canvas with `orca eval` (`new WheelEvent('wheel', { deltaY: ±100, clientX, clientY, bubbles: true, cancelable: true })`; one event is about one notch, 0.6× the distance). Two notches at an off-centre disc move the view toward it. Twenty more notches past either limit leave the capture unchanged. Before each capture, dispatch one tiny wheel event so the idle turn stays paused.
-- **Effects.** `orca exec "set viewport 1280 812 2"` gives a desktop: discs off the orbit point have soft edges and the empty paper has grain (pixel standard deviation about 3 against about 2 at 935 px). Say in the report that the desktop size is an override.
-- **Reframe.** With the overview and again with a Person focused, `orca exec "set viewport <w> <h> 2"` through 935x812, 820x812, 390x844 and 844x390, 5 s each: the tree refits, or the focused Person moves into the free space beside the drawer or above the sheet.
+- **Effects.** `$S/ui.sh "$RUN_DIR" orca exec --command "set viewport 1280 812 2"` gives a desktop: discs off the orbit point have soft edges and the empty paper has grain (pixel standard deviation about 3 against about 2 at 935 px). Say in the report that the desktop size is an override.
+- **Reframe.** With the overview and again with a Person focused, `$S/ui.sh "$RUN_DIR" orca exec --command "set viewport <w> <h> 2"` through 935x812, 820x812, 390x844 and 844x390, 5 s each: the tree refits, or the focused Person moves into the free space beside the drawer or above the sheet.
 - **Proof.** Capture `paper-3d-camera idle-a`, `idle-b`, `focus-a`, `focus-b`, `zoom-toward-cursor`, `zoom-min-a/b`, `zoom-max-a/b`, `desktop-size-final`, `resize-*` and `focus-*` for each size.
 
 ### Gotchas
@@ -205,7 +205,7 @@ Preconditions:
 - **Loader and reveal.** Set the view-mode key to 3D, `orca reload`, then take screenshots back to back (each takes about 1.3 s). To see the reveal frame by frame, slow the scene clock right after the reload with `orca eval` (`performance.now = () => t0 + (real() - t0) / 8`); the loader's and the hint's Web Animations keep real time. Say so in the report.
 - **Hint.** Remove the key, reload, and sample `document.body.innerText.includes('Drag to rotate')` every 200 ms from an `orca eval` interval: true for about 4 s, and the key reads `1` from its first sample. Reload again: never true.
 - **Cross-fade.** Open INSTRUMENTS, click `COSMOS`, then `PAPER`, while an interval samples `[role=status][aria-label=Loading]` (never present) and the opacity of the div whose inline `transition` names `opacity` (1 down to 0).
-- **Phone.** `orca reload`, then at once `orca exec --command "set viewport 390 844 2"` (a reload clears it) and take screenshots: the title wraps the same, the hint sits beside the chat button.
+- **Phone.** `$S/ui.sh "$RUN_DIR" orca reload`, then at once `$S/ui.sh "$RUN_DIR" orca exec --command "set viewport 390 844 2"` (a reload clears it) and take screenshots: the title wraps the same, the hint sits beside the chat button.
 - **Proof.** Capture `paper-intro load-*`, `slow-*`, `hint-*`, `reload-noh-*`, `switch-paper2-*` and `phone-*`.
 
 ### Gotchas
@@ -229,7 +229,7 @@ Preconditions:
 
 ### Driving it with ui.sh
 
-- Desktop size needs the override `orca exec --page <id> --command "set viewport 1280 812 2"` after each reload; the Orca pane is about 935 px, so the right part of the PNG repeats.
+- Desktop size needs the override `$S/ui.sh "$RUN_DIR" orca exec --command "set viewport 1280 812 2"` after each reload; the Orca pane is about 935 px, so the right part of the PNG repeats.
 - **Handles and ghost.** Paper 3D, INSTRUMENTS → `FIND ME`: the panel shows. `ui.sh click button "+ Child"`, fill the card's name with `Zz Lin96 Preview` and close it with ✕. Never press Enter or Add: that writes.
 - **Connect.** With a Person selected, `ui.sh click button "Connect Nodes..."` (on a phone the sheet hides it below the fold: `orca scrollintoview` its ref first). `ui.sh tree` shows "Connect <name> to…" and `Cancel (Esc)`. Tap a candidate disc: the picker opens; `Cancel` returns to targeting, Escape leaves.
 - **Phone.** `set viewport 820 812 2`: `FIND ME` selects with no handles; `Connect Nodes...` from the sheet opens the bottom-docked panel.
@@ -243,7 +243,7 @@ Preconditions:
 
 ### Gotchas
 
-- Fingerprinting Cosmos for no change: open VISIBILITY and wait about 6 s before capturing; at 3 s its body can still be animating and differ by one element. Park the mouse first (`orca mouse move --x 3 --y 700`). In Connect Mode the candidate list (names per slot follow what is in view), the leader ring's `circle` cx/cy and the canvas cursor always differ: compare those elements' property sets, not hashes. Any SVG element that tracks a node's sub-pixel screen position can differ the same way: re-capture its full computed style on both sides before calling it a diff. Build the base in the same browser session by swapping in the base source for a moment; a base stored from another session carries different Vite `<style>` tags and app state. Filter out the `--paper-pair-*` variables, which every element inherits from `<html>`.
+- Fingerprinting Cosmos for no change: open VISIBILITY and wait about 6 s before capturing; at 3 s its body can still be animating and differ by one element. Park the mouse first (`$S/ui.sh "$RUN_DIR" orca mouse move --x 3 --y 700`). In Connect Mode the candidate list (names per slot follow what is in view), the leader ring's `circle` cx/cy and the canvas cursor always differ: compare those elements' property sets, not hashes. Any SVG element that tracks a node's sub-pixel screen position can differ the same way: re-capture its full computed style on both sides before calling it a diff. Build the base in the same browser session by swapping in the base source for a moment; a base stored from another session carries different Vite `<style>` tags and app state. Filter out the `--paper-pair-*` variables, which every element inherits from `<html>`.
 - At the 1280 px override with no drawer open, INSTRUMENTS and NAV CONTROLS sit beyond the ~935 px the Orca pane paints, so screenshots miss them although the DOM has them open; check the button texts (`INSTRUMENTS ▴`, `VISIBILITY ▴`) instead.
 - In Cosmos 3D, FIND ME just after a reload can do nothing; retry until `.MuiDrawer-paper h4` appears.
 
@@ -259,9 +259,9 @@ Preconditions:
 
 ### Driving it with ui.sh
 
-- Desktop size: `orca exec --page <id> --command "set viewport 1280 812 2"` after each reload. Keep the tab in front.
+- Desktop size: `$S/ui.sh "$RUN_DIR" orca exec --command "set viewport 1280 812 2"` after each reload. Keep the tab in front.
 - **Camera state.** CameraControls is not reachable from the page. A temporary probe in `PaperTree3D` (never commit it), `useEffect(() => { Object.assign(window, { __paperControls: controlsRef, __paperShown: shownIds, __paperLayout: layout, __paperCollapsed: collapsedNodes }); });`, lets `orca eval` read `getPosition`, `getTarget`, `azimuthAngle` and `distance`.
-- **Keys.** `orca exec --page <id> --command "keydown w"`, wait about a second, then `"keyup w"`: position and target move together and the distance holds. `"press r"`, `"press Tab"`, `"press Shift+Tab"`, `"press Enter"`, `"press Escape"` for the rest; read `.MuiDrawer-paper h4` for the selection.
+- **Keys.** `$S/ui.sh "$RUN_DIR" orca exec --command "keydown w"`, wait about a second, then `"keyup w"`: position and target move together and the distance holds. `"press r"`, `"press Tab"`, `"press Shift+Tab"`, `"press Enter"`, `"press Escape"` for the rest; read `.MuiDrawer-paper h4` for the selection.
 - **Collapse.** Open INSTRUMENTS, click `COLLAPSE ALL`, then `EXPAND ALL`; read `__paperShown.length`. For a double-click, project a parent's layout position to the screen with the camera (`new THREE.Vector3(...).project(camera)` from the probe), `orca mouse move` there, then `orca mouse down` / `up` twice: Chromium fires a real `dblclick`.
 - **Probe without a code edit.** A page eval can import R3F's `_roots` from `/node_modules/.vite/deps/@react-three_fiber.js?v=<hash>` (the same module instance the app uses; copy the hash from a loaded script URL) to reach the scene, the camera and CameraControls, and read PaperTree3D's props and hooks from its React fiber for `shown`, `layout`, `arrival` and the selection. The intro has no storage key: it plays on the page's first Paper 3D load, so reload to see it again. A `keydown` sent while the tab draws no frames can be dropped; send keys while a screenshot pumps frames.
 - **Toggles.** With INSTRUMENTS open, click each switch's input and capture a crop around a focused Person.

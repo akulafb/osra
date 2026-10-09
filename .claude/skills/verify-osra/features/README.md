@@ -6,11 +6,11 @@ The maintained source for verifying Osra's user-facing behaviour. Read this inde
 
 - `launch.sh` printed `READY http://localhost:5173 ... Supabase: djwqamcfllqziqiyvyjj`, and `open-tab.sh` recorded the run's tab.
 - `doctor.sh "$RUN_DIR"` passes, including `tab ... has a dev Supabase session` for signed-in features.
-- The tab starts at `http://localhost:5173/` showing the tree (2D: "Select a family above to explore, or try the 3D view."; 3D: Paper's ink discs on paper, or the starfield in Cosmos). Record which with `orca eval --page "$(cat $RUN_DIR/state/page)" --expression "localStorage.getItem('family-tree-view-mode')" --json`.
+- The tab starts at `http://localhost:5173/` showing the tree (2D: "Select a family above to explore, or try the 3D view."; 3D: Paper's ink discs on paper, or the starfield in Cosmos). Record which with `$S/ui.sh "$RUN_DIR" orca eval --expression "localStorage.getItem('family-tree-view-mode')" --json`.
 
 ## Driving conventions
 
-- Drive through `ui.sh` by role and accessible name; fall back to `orca ... --page` only for what `ui.sh` lacks.
+- Drive through `ui.sh` by role and accessible name; fall back to `ui.sh "$RUN_DIR" orca <command> ...` only for what `ui.sh` lacks.
 - Open a panel, let it settle, then act inside it. `pick` for items in a scrollable menu, `click` for everything else.
 - Re-run `ui.sh tree` after anything that changes the page; refs are not stable across snapshots.
 - Every recipe is read-only. Write controls are listed in `../SKILL.md` Guardrails; a write acceptance goes to the owner as steps.

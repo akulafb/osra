@@ -7,23 +7,15 @@ run_dir="$1"
 fail() { echo "FAIL  $*"; exit 1; }
 ok() { echo "ok    $*"; }
 
-pid="$(cat "$run_dir/state/vite.pid")"
-kill -0 "$pid" 2>/dev/null || fail "vite pid $pid is not running (see $run_dir/evidence/vite.log)"
-ok "vite pid $pid running"
-
-[[ "$(osra_port_pid)" == "$pid" ]] || fail "port $OSRA_PORT is held by '$(osra_port_pid)', not our pid $pid"
-ok "port $OSRA_PORT owned by our pid"
+why="$(osra_server_problem "$run_dir")"
+[[ -z "$why" ]] || fail "$why. $(osra_recovery_steps "$run_dir")"
+ok "vite pid $(cat "$run_dir/state/vite.pid") owns port $OSRA_PORT and serves $(cat "$run_dir/state/repo") at HEAD $(cut -c1-7 "$run_dir/state/head") on $(cat "$run_dir/state/branch") (the launched commit)"
 
 grep -q "Supabase:  $OSRA_DEV_REF" "$run_dir/evidence/vite.log" || fail "vite did not announce the dev Supabase ref"
 ok "Supabase project is dev ($OSRA_DEV_REF)"
 
 curl -fsS "http://localhost:$OSRA_PORT/" | grep -q '<title>Osra' || fail "http://localhost:$OSRA_PORT/ did not serve the Osra page"
 ok "http://localhost:$OSRA_PORT serves Osra"
-
-repo="$(cat "$run_dir/state/repo")"
-now="$(git -C "$repo" rev-parse HEAD)"
-[[ "$now" == "$(cat "$run_dir/state/head")" ]] && ok "HEAD $(git -C "$repo" rev-parse --short HEAD) on $(cat "$run_dir/state/branch") (unchanged since launch)" \
-  || echo "WARN  HEAD moved since launch ($(cut -c1-7 "$run_dir/state/head") -> ${now:0:7}); Vite hot-reloads, but say which commit you proved"
 
 orca tab list --json >/dev/null 2>&1 || fail "orca CLI cannot reach Orca (run: orca open --json)"
 ok "Orca reachable"

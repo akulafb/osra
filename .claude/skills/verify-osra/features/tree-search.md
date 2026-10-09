@@ -28,7 +28,7 @@ Preconditions:
 - **Match.** Run `$S/ui.sh "$RUN_DIR" fill textbox "Search family tree" "Zabalawi"`. `ui.sh tree | grep -E '"[0-9]+/[0-9]+"'` shows `1/N` with N ≥ 1, and the screenshot shows one Zabalawi node ringed in red.
 - **Step.** Run `$S/ui.sh "$RUN_DIR" click button "Next match"`. The counter reads `2/N` and the ring moves to another Zabalawi node. `click button "Previous match"` returns to `1/N`.
 - **Keys.** Run `$S/ui.sh "$RUN_DIR" click textbox "Search family tree"`, then `key Enter`. The counter advances by one, wrapping from `N/N` to `1/N`. `key Shift+Enter` steps back. `key Escape` empties the box and the counter reads `0/0`.
-- **Shortcut.** Close INSTRUMENTS, then run `$S/ui.sh "$RUN_DIR" key Control+f`. The button reads "INSTRUMENTS ▴" and `orca eval --page "$(cat $RUN_DIR/state/page)" --expression "String(document.activeElement?.getAttribute('aria-label'))" --json` returns `"Search family tree"`.
+- **Shortcut.** Close INSTRUMENTS, then run `$S/ui.sh "$RUN_DIR" key Control+f`. The button reads "INSTRUMENTS ▴" and `$S/ui.sh "$RUN_DIR" orca eval --expression "String(document.activeElement?.getAttribute('aria-label'))" --json` returns `"Search family tree"`.
 - **Proof.** `capture.sh "$RUN_DIR" tree-search match` after the fill and `capture.sh "$RUN_DIR" tree-search step` after Next.
 
 ## Gotchas

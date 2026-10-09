@@ -19,13 +19,13 @@ A signed-out visitor to Osra sees a scroll-driven landing page: the "Meet Osra" 
 Preconditions:
 
 - Baseline preconditions hold.
-- The tab is on the `127.0.0.1` origin, which has no session: `orca goto --page "$(cat $RUN_DIR/state/page)" --url http://127.0.0.1:5173/ --json`.
+- The tab is on the `127.0.0.1` origin, which has no session: `$S/ui.sh "$RUN_DIR" orca goto --url http://127.0.0.1:5173/ --json`.
 
-- **Confirm signed out.** Run `orca eval --page "$(cat $RUN_DIR/state/page)" --expression "String(!!localStorage.getItem('sb-djwqamcfllqziqiyvyjj-auth-token'))" --json`. The result is `"false"`.
+- **Confirm signed out.** Run `$S/ui.sh "$RUN_DIR" orca eval --expression "String(!!localStorage.getItem('sb-djwqamcfllqziqiyvyjj-auth-token'))" --json`. The result is `"false"`.
 - **Hero.** Run `$S/ui.sh "$RUN_DIR" wait-text "Meet Osra"` and `$S/ui.sh "$RUN_DIR" find button "Returning? Sign in"`. Both succeed.
 - **Metrics.** Run `$S/ui.sh "$RUN_DIR" tree | grep -A6 'On Osra so far'`. A heading "On Osra so far" is followed by a number with "Individuals" and a number with "Families". Cross-check with Supabase MCP `execute_sql` on `djwqamcfllqziqiyvyjj`: `SELECT * FROM get_public_metrics();` returns `{"individuals": …, "families": …}` with the same two numbers.
 - **Steps and CTA.** `ui.sh tree` shows headings "Receive an Invite", "Claim Your Place", "Explore, find your name, and expand the tree!", "Ready to Explore Your Family Tree?" and a button "Sign in with Google".
-- **Proof.** Run `$S/capture.sh "$RUN_DIR" landing top`, then `orca scroll --page "$(cat $RUN_DIR/state/page)" --direction down --json` a few times and `$S/capture.sh "$RUN_DIR" landing cta`.
+- **Proof.** Run `$S/capture.sh "$RUN_DIR" landing top`, then `$S/ui.sh "$RUN_DIR" orca scroll --direction down --json` a few times and `$S/capture.sh "$RUN_DIR" landing cta`.
 - **Return.** Run `$S/ui.sh "$RUN_DIR" goto /` before driving any signed-in feature.
 
 ## Gotchas
