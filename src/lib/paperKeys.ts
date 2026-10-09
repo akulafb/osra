@@ -12,6 +12,28 @@ export interface PaperKeyModifiers {
   alt: boolean;
 }
 
+/** The parts of a KeyboardEvent the keys read. */
+export interface PaperKeyEvent {
+  key: string;
+  code: string;
+  shiftKey: boolean;
+  ctrlKey: boolean;
+  metaKey: boolean;
+  altKey: boolean;
+}
+
+/** Where focus sits: in a text field, on the page or the scene, or on some other control. */
+export type PaperKeyFocus = 'typing' | 'scene' | 'control';
+
+export interface PaperKeyBlocks {
+  actions: boolean;
+  flight: boolean;
+}
+
+export type PaperKeyDown = { kind: 'hold'; key: PaperFlightKey } | { kind: 'action'; action: PaperKeyAction };
+
+export type PaperArrival = 'loader' | 'revealing' | 'crossfade' | 'settled';
+
 /** One frame's camera move, in CameraControls' terms: `truck` slides right, `forward` moves ahead, `azimuth` turns left, in radians. */
 export interface PaperFlightStep {
   truck: number;
@@ -56,6 +78,39 @@ export function paperKeyAction(key: string, modifiers: PaperKeyModifiers): Paper
     default:
       return null;
   }
+}
+
+/** No key acts before the intro settles, since the reveal lands on the view it started from. WASD and Q/E still fly behind the Add Relative preview, as in Cosmos. */
+export function paperKeyBlocks({
+  modalOpen,
+  addModalOpen,
+  arrival,
+}: {
+  modalOpen: boolean;
+  addModalOpen: boolean;
+  arrival: PaperArrival;
+}): PaperKeyBlocks {
+  const arriving = arrival !== 'settled';
+  return { actions: modalOpen || arriving, flight: (modalOpen && !addModalOpen) || arriving };
+}
+
+/** What a key pressed does. Flight keys go by physical key, so a release under Option (which changes `key`) still lets go. Tab and Enter belong to a focused control. */
+export function paperKeyDown(event: PaperKeyEvent, focus: PaperKeyFocus, blocked: PaperKeyBlocks): PaperKeyDown | null {
+  if (focus === 'typing') return null;
+  const flight = paperEventFlightKey(event);
+  if (flight) {
+    const modified = event.ctrlKey || event.metaKey || event.altKey;
+    return blocked.flight || modified ? null : { kind: 'hold', key: flight };
+  }
+  if (blocked.actions) return null;
+  const action = paperKeyAction(event.key, { shift: event.shiftKey, ctrl: event.ctrlKey, meta: event.metaKey, alt: event.altKey });
+  if (!action) return null;
+  if ((action === 'cycle-next' || action === 'cycle-previous' || action === 'focus') && focus !== 'scene') return null;
+  return { kind: 'action', action };
+}
+
+export function paperEventFlightKey(event: Pick<PaperKeyEvent, 'key' | 'code'>): PaperFlightKey | null {
+  return paperFlightKey(event.code ? event.code.replace(/^Key/, '') : event.key);
 }
 
 /** The camera move for `seconds` with these keys held, or null when it stands still. */

@@ -4,7 +4,7 @@ import { Line } from '@react-three/drei';
 import * as THREE from 'three';
 import type { PaperLayout } from '../../lib/paperLayout';
 import { placeOf, type PaperEmphasisState } from './paperEmphasis';
-import { PAPER_DASH, PAPER_LINE_RENDER_ORDER } from './paperScene';
+import { PAPER_DASH, PAPER_LINE_RENDER_ORDER, setPaperSegment } from './paperScene';
 
 const PREVIEW_WIDTH_PX = 1.5;
 
@@ -25,27 +25,14 @@ export function PaperPreviewLine({
   const ref = useRef<ElementRef<typeof Line>>(null);
   const points = useMemo(() => [[0, 0, 0] as [number, number, number], [0, 0, 0] as [number, number, number]], []);
   const scratch = useMemo(() => ({ from: new THREE.Vector3(), to: new THREE.Vector3() }), []);
-  const drawn = useRef<{ geometry?: object; drift?: PaperEmphasisState['drift']; layout?: PaperLayout; ends?: string }>({});
-
   useFrame(() => {
     const segments = ref.current;
     if (!segments) return;
     const { from, to } = scratch;
     const { drift } = state.current;
-    const { geometry } = segments;
-    const ends = `${fromId} ${toId}`;
-    const last = drawn.current;
-    if (last.geometry === geometry && last.drift === drift && last.layout === layout && last.ends === ends) return;
-    drawn.current = { geometry, drift, layout, ends };
     placeOf(layout, drift, fromId, from);
     placeOf(layout, drift, toId, to);
-    const start = geometry.attributes.instanceStart as THREE.InterleavedBufferAttribute;
-    const positions = start.data.array as Float32Array;
-    from.toArray(positions, 0);
-    to.toArray(positions, 3);
-    start.data.needsUpdate = true;
-    geometry.computeBoundingSphere();
-    segments.computeLineDistances();
+    if (setPaperSegment(segments.geometry, 0, from, to)) segments.geometry.computeBoundingSphere();
   });
 
   return (

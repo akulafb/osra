@@ -1,5 +1,14 @@
 import { describe, it, expect } from 'vitest';
-import { paperCycle, paperFlightKey, paperFlightStep, paperKeyAction, type PaperFlightKey } from './paperKeys';
+import {
+  paperCycle,
+  paperFlightKey,
+  paperFlightStep,
+  paperKeyAction,
+  paperKeyBlocks,
+  paperKeyDown,
+  type PaperFlightKey,
+  type PaperKeyEvent,
+} from './paperKeys';
 
 const plain = { shift: false, ctrl: false, meta: false, alt: false };
 
@@ -118,5 +127,72 @@ describe('Tab cycling', () => {
 
   it('selects nobody when nobody is shown', () => {
     expect(paperCycle([], 'a', false)).toBeNull();
+  });
+});
+
+describe('what blocks the keys', () => {
+  const open = { modalOpen: false, addModalOpen: false };
+
+  it('blocks flying and the actions until the intro has settled, so the reveal lands where it meant to', () => {
+    for (const arrival of ['loader', 'revealing', 'crossfade'] as const) {
+      expect(paperKeyBlocks({ ...open, arrival })).toEqual({ actions: true, flight: true });
+    }
+    expect(paperKeyBlocks({ ...open, arrival: 'settled' })).toEqual({ actions: false, flight: false });
+  });
+
+  it('blocks both behind a modal, but still flies behind the Add Relative preview', () => {
+    expect(paperKeyBlocks({ modalOpen: true, addModalOpen: false, arrival: 'settled' })).toEqual({ actions: true, flight: true });
+    expect(paperKeyBlocks({ modalOpen: true, addModalOpen: true, arrival: 'settled' })).toEqual({ actions: true, flight: false });
+  });
+});
+
+describe('a key pressed', () => {
+  const press = (key: string, extra: Partial<PaperKeyEvent> = {}): PaperKeyEvent => ({
+    key,
+    code: /^[a-z]$/i.test(key) ? `Key${key.toUpperCase()}` : key,
+    shiftKey: false,
+    ctrlKey: false,
+    metaKey: false,
+    altKey: false,
+    ...extra,
+  });
+  const free = { actions: false, flight: false };
+
+  it('holds a flight key, read by its physical key so Option does not change it', () => {
+    expect(paperKeyDown(press('w'), 'scene', free)).toEqual({ kind: 'hold', key: 'forward' });
+    expect(paperKeyDown(press('∑', { code: 'KeyW', altKey: false }), 'control', free)).toEqual({ kind: 'hold', key: 'forward' });
+  });
+
+  it('holds no flight key while flying is blocked or under Ctrl, Cmd or Alt', () => {
+    expect(paperKeyDown(press('w'), 'scene', { actions: false, flight: true })).toBeNull();
+    for (const mod of ['ctrlKey', 'metaKey', 'altKey'] as const) {
+      expect(paperKeyDown(press('w', { [mod]: true }), 'scene', free)).toBeNull();
+    }
+  });
+
+  it('does nothing while typing', () => {
+    expect(paperKeyDown(press('w'), 'typing', free)).toBeNull();
+    expect(paperKeyDown(press('r'), 'typing', free)).toBeNull();
+    expect(paperKeyDown(press('Escape'), 'typing', free)).toBeNull();
+  });
+
+  it('runs no action while the actions are blocked, but a flight key still holds', () => {
+    const blocked = { actions: true, flight: false };
+    expect(paperKeyDown(press('r'), 'scene', blocked)).toBeNull();
+    expect(paperKeyDown(press('Escape'), 'scene', blocked)).toBeNull();
+    expect(paperKeyDown(press('w'), 'scene', blocked)).toEqual({ kind: 'hold', key: 'forward' });
+  });
+
+  it('leaves Tab and Enter to a focused control, but R and Esc act wherever focus is', () => {
+    expect(paperKeyDown(press('Tab'), 'control', free)).toBeNull();
+    expect(paperKeyDown(press('Enter'), 'control', free)).toBeNull();
+    expect(paperKeyDown(press('r'), 'control', free)).toEqual({ kind: 'action', action: 'reset' });
+    expect(paperKeyDown(press('Escape'), 'control', free)).toEqual({ kind: 'action', action: 'deselect' });
+    expect(paperKeyDown(press('Tab', { shiftKey: true }), 'scene', free)).toEqual({ kind: 'action', action: 'cycle-previous' });
+    expect(paperKeyDown(press('Enter'), 'scene', free)).toEqual({ kind: 'action', action: 'focus' });
+  });
+
+  it('ignores other keys', () => {
+    expect(paperKeyDown(press('x'), 'scene', free)).toBeNull();
   });
 });

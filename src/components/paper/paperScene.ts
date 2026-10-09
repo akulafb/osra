@@ -37,6 +37,11 @@ export const PAPER_LINE_STYLE: Record<FamilyLink['type'], PaperLineStyle> = {
 
 export const PAPER_DASH = { dashSize: 3, gapSize: 2.5 };
 
+/** Parent lines carry the arrows, so ARROWS keeps them with LINKS off, as in Cosmos. */
+export function paperLineShown(type: FamilyLink['type'], toggles: { links: boolean; arrows: boolean }): boolean {
+  return toggles.links || (type === 'parent' && toggles.arrows);
+}
+
 export const PAPER_HOVER_FRAME_PRIORITY = -1;
 export const PAPER_REVEAL_FRAME_PRIORITY = PAPER_HOVER_FRAME_PRIORITY + 0.5;
 
@@ -122,4 +127,29 @@ export function paperLineSegments(lines: readonly PaperLine[], layout: PaperLayo
     segments[line.type].push([a.x, a.y, a.z], [b.x, b.y, b.z]);
   }
   return segments;
+}
+
+/**
+ * Moves segment `index` of a drei `<Line segments>` to `from`-`to` in the buffers it already has, dash distances included,
+ * and returns whether it moved. `computeLineDistances` allocates a new GPU buffer on every call, and three never frees the
+ * one it replaces. The distances run on from the segment before, as three's do, so write the segments in order.
+ */
+export function setPaperSegment(geometry: THREE.BufferGeometry, index: number, from: Point3, to: Point3): boolean {
+  const start = geometry.attributes.instanceStart as THREE.InterleavedBufferAttribute;
+  const ends = start.data.array as Float32Array;
+  const at = index * 6;
+  const next = [from.x, from.y, from.z, to.x, to.y, to.z];
+  if (next.every((value, i) => ends[at + i] === Math.fround(value))) return false;
+  ends.set(next, at);
+  start.data.needsUpdate = true;
+
+  const distance = geometry.attributes.instanceDistanceStart as THREE.InterleavedBufferAttribute | undefined;
+  if (distance) {
+    const distances = distance.data.array as Float32Array;
+    const begin = index === 0 ? 0 : distances[index * 2 - 1];
+    distances[index * 2] = begin;
+    distances[index * 2 + 1] = begin + Math.hypot(to.x - from.x, to.y - from.y, to.z - from.z);
+    distance.data.needsUpdate = true;
+  }
+  return true;
 }

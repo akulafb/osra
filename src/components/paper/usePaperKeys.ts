@@ -1,5 +1,12 @@
 import { useEffect, useRef, type MutableRefObject } from 'react';
-import { paperFlightKey, paperKeyAction, type PaperFlightKey, type PaperKeyAction } from '../../lib/paperKeys';
+import {
+  paperEventFlightKey,
+  paperKeyDown,
+  type PaperFlightKey,
+  type PaperKeyAction,
+  type PaperKeyBlocks,
+  type PaperKeyFocus,
+} from '../../lib/paperKeys';
 
 export interface PaperHeldKeys {
   keys: Set<PaperFlightKey>;
@@ -7,8 +14,7 @@ export interface PaperHeldKeys {
 }
 
 interface PaperKeysOptions {
-  actionsBlocked: boolean;
-  flightBlocked: boolean;
+  blocked: PaperKeyBlocks;
   /** Returns whether it handled the key, so a key that did nothing keeps its usual effect. */
   onAction: (action: PaperKeyAction) => boolean;
 }
@@ -23,14 +29,10 @@ function typing(): boolean {
 }
 
 /** Tab and Enter belong to whatever control has focus, unless that is the page itself or the scene. */
-function sceneHasFocus(): boolean {
+function keyFocus(): PaperKeyFocus {
+  if (typing()) return 'typing';
   const el = document.activeElement;
-  return !el || el === document.body || el instanceof HTMLCanvasElement;
-}
-
-/** By physical key, so a release under Option (which changes `key`) still lets go. */
-function flightKeyOf(e: KeyboardEvent): PaperFlightKey | null {
-  return paperFlightKey(e.code ? e.code.replace(/^Key/, '') : e.key);
+  return !el || el === document.body || el instanceof HTMLCanvasElement ? 'scene' : 'control';
 }
 
 /** Runs R, Tab, Enter and Esc as they are pressed, and returns the flight keys held down. */
@@ -48,22 +50,14 @@ export function usePaperKeys(options: PaperKeysOptions): MutableRefObject<PaperH
       if (e.key === 'Shift') held.current.boost = true;
       // A Cmd shortcut can swallow the keyup of a key held under it.
       if (MODIFIERS.has(e.key)) held.current.keys.clear();
-      if (typing()) return;
-      const { actionsBlocked, flightBlocked, onAction } = latest.current;
-      const flight = flightKeyOf(e);
-      if (flight) {
-        if (!flightBlocked && !e.ctrlKey && !e.metaKey && !e.altKey) held.current.keys.add(flight);
-        return;
-      }
-      if (actionsBlocked) return;
-      const action = paperKeyAction(e.key, { shift: e.shiftKey, ctrl: e.ctrlKey, meta: e.metaKey, alt: e.altKey });
-      if (!action) return;
-      if ((action === 'cycle-next' || action === 'cycle-previous' || action === 'focus') && !sceneHasFocus()) return;
-      if (onAction(action)) e.preventDefault();
+      const { blocked, onAction } = latest.current;
+      const down = paperKeyDown(e, keyFocus(), blocked);
+      if (down?.kind === 'hold') held.current.keys.add(down.key);
+      else if (down?.kind === 'action' && onAction(down.action)) e.preventDefault();
     };
     const onUp = (e: KeyboardEvent) => {
       if (e.key === 'Shift') held.current.boost = false;
-      const flight = flightKeyOf(e);
+      const flight = paperEventFlightKey(e);
       if (flight) held.current.keys.delete(flight);
     };
     window.addEventListener('keydown', onDown);

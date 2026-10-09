@@ -1,6 +1,17 @@
 import { describe, it, expect } from 'vitest';
 import * as THREE from 'three';
-import { depthFade, isBackgroundTap, isTap, paperFrame, paperLabelSize, paperLineSegments, paperScreenPoint, TAP_SLOP_PX } from './paperScene';
+import {
+  depthFade,
+  isBackgroundTap,
+  isTap,
+  paperFrame,
+  paperLabelSize,
+  paperLineSegments,
+  paperLineShown,
+  paperScreenPoint,
+  setPaperSegment,
+  TAP_SLOP_PX,
+} from './paperScene';
 import type { PaperLayout, PaperLine } from '../../lib/paperLayout';
 
 const layout: PaperLayout = new Map([
@@ -148,5 +159,72 @@ describe('paperScreenPoint: where a scene point lands on the canvas, in CSS pixe
     moved.lookAt(20, 0, 0);
     moved.updateMatrixWorld();
     expect(paperScreenPoint({ x: 20, y: 0, z: 0 }, moved, size)).toEqual({ x: 400, y: 300 });
+  });
+});
+
+/** The buffers drei's `<Line segments>` holds: both ends of each segment interleaved, and a dash distance at each end. */
+function fatLine(segments: number) {
+  const geometry = new THREE.InstancedBufferGeometry();
+  const ends = new THREE.InstancedInterleavedBuffer(new Float32Array(segments * 6), 6, 1);
+  geometry.setAttribute('instanceStart', new THREE.InterleavedBufferAttribute(ends, 3, 0));
+  geometry.setAttribute('instanceEnd', new THREE.InterleavedBufferAttribute(ends, 3, 3));
+  const distances = new THREE.InstancedInterleavedBuffer(new Float32Array(segments * 2), 2, 1);
+  geometry.setAttribute('instanceDistanceStart', new THREE.InterleavedBufferAttribute(distances, 1, 0));
+  geometry.setAttribute('instanceDistanceEnd', new THREE.InterleavedBufferAttribute(distances, 1, 1));
+  return { geometry, ends, distances };
+}
+
+const at = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
+const bufferOf = (geometry: THREE.BufferGeometry, name: string) => (geometry.attributes[name] as THREE.InterleavedBufferAttribute).data;
+
+describe('setPaperSegment: moving one segment of a fat line in place', () => {
+  it('writes the ends and the dash distances into the buffers the line already has', () => {
+    const { geometry, ends, distances } = fatLine(1);
+    expect(setPaperSegment(geometry, 0, at(0, 0, 0), at(3, 4, 0))).toBe(true);
+    expect(bufferOf(geometry, 'instanceStart')).toBe(ends);
+    expect(bufferOf(geometry, 'instanceDistanceStart')).toBe(distances);
+    expect([...ends.array]).toEqual([0, 0, 0, 3, 4, 0]);
+    expect([...distances.array]).toEqual([0, 5]);
+    expect(ends.version).toBe(1);
+    expect(distances.version).toBe(1);
+  });
+
+  it('uploads nothing when the segment has not moved', () => {
+    const { geometry, ends, distances } = fatLine(1);
+    setPaperSegment(geometry, 0, at(1.1, 2.2, 3.3), at(4, 5, 6));
+    expect(setPaperSegment(geometry, 0, at(1.1, 2.2, 3.3), at(4, 5, 6))).toBe(false);
+    expect(ends.version).toBe(1);
+    expect(distances.version).toBe(1);
+  });
+
+  it('updates the distances in place when the segment moves again', () => {
+    const { geometry, distances } = fatLine(1);
+    setPaperSegment(geometry, 0, at(0, 0, 0), at(3, 4, 0));
+    setPaperSegment(geometry, 0, at(0, 0, 0), at(6, 8, 0));
+    expect(bufferOf(geometry, 'instanceDistanceStart')).toBe(distances);
+    expect([...distances.array]).toEqual([0, 10]);
+  });
+
+  it('runs the dashes on from the segment before, as three does', () => {
+    const { geometry, distances } = fatLine(2);
+    setPaperSegment(geometry, 0, at(0, 0, 0), at(3, 4, 0));
+    setPaperSegment(geometry, 1, at(10, 0, 0), at(10, 2, 0));
+    expect([...distances.array]).toEqual([0, 5, 5, 7]);
+  });
+});
+
+describe('paperLineShown: which lines the LINKS and ARROWS toggles draw', () => {
+  const kinds = ['parent', 'marriage', 'divorce'] as const;
+
+  it('draws every kind of line with LINKS on', () => {
+    expect(kinds.map((type) => paperLineShown(type, { links: true, arrows: false }))).toEqual([true, true, true]);
+  });
+
+  it('keeps the parent lines, which carry the arrows, with LINKS off and ARROWS on, as Cosmos does', () => {
+    expect(kinds.map((type) => paperLineShown(type, { links: false, arrows: true }))).toEqual([true, false, false]);
+  });
+
+  it('draws no line with both off', () => {
+    expect(kinds.map((type) => paperLineShown(type, { links: false, arrows: false }))).toEqual([false, false, false]);
   });
 });

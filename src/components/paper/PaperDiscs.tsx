@@ -11,13 +11,12 @@ interface PaperDiscsProps {
   paper: string;
   state: MutableRefObject<PaperEmphasisState>;
   onPersonClick: (id: string, event: ThreeEvent<MouseEvent>) => void;
-  onPersonDoubleClick?: (id: string) => void;
 }
 
 const DISC_SEGMENTS = 40;
 
 /** Every shown Person as one flat ink disc, all in a single instanced draw that turns to face the camera each frame and fades with the emphasis. */
-export function PaperDiscs({ ids, layout, ink, paper, state, onPersonClick, onPersonDoubleClick }: PaperDiscsProps) {
+export function PaperDiscs({ ids, layout, ink, paper, state, onPersonClick }: PaperDiscsProps) {
   const meshRef = useRef<THREE.InstancedMesh>(null);
   const geometry = useMemo(() => new THREE.CircleGeometry(1, DISC_SEGMENTS), []);
   // Lines end at disc centres, at the disc's own depth; the offset keeps the disc on top there.
@@ -90,11 +89,6 @@ export function PaperDiscs({ ids, layout, ink, paper, state, onPersonClick, onPe
         if (e.instanceId === undefined) return;
         e.stopPropagation();
         onPersonClick(state.current.pointedId ?? ids[e.instanceId], e);
-      }}
-      onDoubleClick={(e) => {
-        if (e.instanceId === undefined || !onPersonDoubleClick) return;
-        e.stopPropagation();
-        onPersonDoubleClick(state.current.pointedId ?? ids[e.instanceId]);
       }}
     />
   );

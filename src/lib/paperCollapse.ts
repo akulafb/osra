@@ -12,6 +12,28 @@ export function paperCollapsible(links: readonly FamilyLink[], id: string): bool
   return links.some((l) => l.type === 'parent' && getNodeId(l.source) === id);
 }
 
+export type PaperPersonClick = 'select' | 'pick' | 'deselect-later' | 'ignore';
+
+/**
+ * What a click on a Person does. A double-click is click, click, dblclick: the second click is ignored, and a click on
+ * the selected Person deselects only once no double-click follows, so a double-click collapses and keeps the selection.
+ */
+export function paperPersonClick({
+  id,
+  detail,
+  selectedId,
+  connecting,
+}: {
+  id: string;
+  detail: number;
+  selectedId: string | null;
+  connecting: boolean;
+}): PaperPersonClick {
+  if (detail > 1) return 'ignore';
+  if (connecting) return 'pick';
+  return id === selectedId ? 'deselect-later' : 'select';
+}
+
 /** What Paper 3D draws: the placed Persons left after the collapse and the VISIBILITY filter, each in its fixed place. */
 export function paperShown(
   graph: FamilyGraph,

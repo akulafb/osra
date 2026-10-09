@@ -5,8 +5,8 @@ import * as THREE from 'three';
 import { useTheme } from '@mui/material/styles';
 import type { FamilyGraph, FamilyNode, RelativeDirection } from '../../types/graph';
 import type { ForceGraphHandle, LiveNodePosition } from '../../types/forceGraph';
-import { paperCollapsible, paperShown } from '../../lib/paperCollapse';
-import { paperCycle, type PaperKeyAction } from '../../lib/paperKeys';
+import { paperCollapsible, paperPersonClick, paperShown } from '../../lib/paperCollapse';
+import { paperCycle, paperKeyBlocks, type PaperArrival, type PaperKeyAction } from '../../lib/paperKeys';
 import { GRAYSCALE_PAIR, LIVE_PAIR } from '../../theme/paperPair';
 import type { DirectManipulationController } from '../../hooks/useDirectManipulation';
 import { needsCanvas } from '../../lib/directManipulation';
@@ -44,7 +44,7 @@ import { paperEffects } from '../../lib/paperEffects';
 import { emptyEmphasisState, type PaperEmphasisState } from './paperEmphasis';
 import { PaperWebGLBoundary, PaperWebGLFallback } from './PaperWebGLFallback';
 import { browserHasWebGL } from './browserHasWebGL';
-import { isBackgroundTap, isTap, paperFrame, type ScreenPoint } from './paperScene';
+import { isBackgroundTap, isTap, paperFrame, paperLineShown, type ScreenPoint } from './paperScene';
 import { PaperGraphHandle } from './PaperGraphHandle';
 import { usePaperEditing, type PaperConnectParams } from './usePaperEditing';
 import { PaperFlight } from './PaperFlight';
@@ -113,7 +113,8 @@ const GHOST_LOOK: GhostPreviewLook = {
   labelBackground: `rgba(${hexToRgb(PAPER).join(', ')}, 0.85)`,
 };
 
-type PaperArrival = 'loader' | 'revealing' | 'crossfade' | 'settled';
+/** How long a click on the selected Person waits for a second click before it deselects them: the longest system double-click interval most people keep. */
+const DOUBLE_CLICK_MS = 500;
 
 /** Paper's own 3D scene (ADR 0014): the still layout as ink discs, lines and labels, drawn in grayscale and painted in the live Paper Pair. */
 export function PaperTree3D({
@@ -167,6 +168,10 @@ export function PaperTree3D({
   const hoverPointer = useRef<ScreenPoint | null>(null);
   const emphasisState = useRef<PaperEmphasisState>(emptyEmphasisState());
   const personClick = useRef<MouseEvent | null>(null);
+  const firstClickId = useRef<string | null>(null);
+  const pendingDeselect = useRef<number | undefined>(undefined);
+  const latestInteraction = useRef(interaction);
+  latestInteraction.current = interaction;
   const viewDistance = useRef(0);
   const flyTo = useRef<((id: string) => void) | null>(null);
   const graphHandle = useRef<ForceGraphHandle | null>(null);
@@ -180,16 +185,19 @@ export function PaperTree3D({
   const shownIds = useMemo(() => shown.nodes.map((n) => n.id), [shown.nodes]);
   const inLifecycleIds = useMemo(() => inLifecycle(lifecycles.lifecycles), [lifecycles.lifecycles]);
   const discIds = useMemo(() => shownIds.filter((id) => !inLifecycleIds.has(id)), [shownIds, inLifecycleIds]);
-  const lines = useMemo(() => steadyLines(shown.lines, lifecycles.lifecycles), [shown.lines, lifecycles.lifecycles]);
+  const toggles = useMemo(() => ({ links: showLinks, arrows: showArrows }), [showLinks, showArrows]);
+  const lines = useMemo(
+    () => steadyLines(shown.lines, lifecycles.lifecycles).filter((line) => paperLineShown(line.type, toggles)),
+    [shown.lines, lifecycles.lifecycles, toggles]
+  );
   const lifecycleScene = usePaperLifecycleScene(layout, shown, lifecycles.lifecycles, graphData);
   const progressOf = useMemo(() => holdingProgress(lifecycles.progressOf), [lifecycles.progressOf]);
   const lifecycleDraws = useMemo(
     () =>
-      paperLifecycleDraws(
-        showLinks ? lifecycles.lifecycles : lifecycles.lifecycles.filter((l) => l.subject.kind === 'node'),
-        lifecycleScene
+      paperLifecycleDraws(lifecycles.lifecycles, lifecycleScene).filter(
+        (draw) => draw.kind === 'disc' || paperLineShown(draw.line.type, toggles)
       ),
-    [showLinks, lifecycles.lifecycles, lifecycleScene]
+    [toggles, lifecycles.lifecycles, lifecycleScene]
   );
   const labelInk = useMemo(() => {
     const byPerson = new Map(lifecycles.lifecycles.flatMap((l) => (l.subject.kind === 'node' ? [[l.subject.id, l] as const] : [])));
@@ -272,16 +280,38 @@ export function PaperTree3D({
     fitFrame(true);
   }, [interaction, fitFrame]);
 
+  const cancelDeselect = useCallback(() => {
+    window.clearTimeout(pendingDeselect.current);
+    pendingDeselect.current = undefined;
+  }, []);
+  useEffect(() => cancelDeselect, [cancelDeselect]);
+
   const handlePersonClick = useCallback(
     (id: string, event: ThreeEvent<MouseEvent>) => {
-      personClick.current = event.nativeEvent;
-      if (!isTap(pointerDown.current, { x: event.nativeEvent.clientX, y: event.nativeEvent.clientY })) return;
-      // The second click of a double-click would toggle the selection back off; the double-click collapses instead.
-      if (event.nativeEvent.detail > 1) return;
-      if (interaction.connectSourceId) pickConnectTarget(id);
-      else interaction.selectNode(id);
+      const { nativeEvent } = event;
+      personClick.current = nativeEvent;
+      const tap = isTap(pointerDown.current, { x: nativeEvent.clientX, y: nativeEvent.clientY });
+      const click = paperPersonClick({
+        id,
+        detail: nativeEvent.detail,
+        selectedId: interaction.selectedNodeId,
+        connecting: !!interaction.connectSourceId,
+      });
+      if (click === 'ignore') return;
+      firstClickId.current = tap ? id : null;
+      cancelDeselect();
+      if (!tap) return;
+      if (click === 'pick') pickConnectTarget(id);
+      else if (click === 'select') interaction.selectNode(id);
+      else {
+        pendingDeselect.current = window.setTimeout(() => {
+          pendingDeselect.current = undefined;
+          const { state, selectNode } = latestInteraction.current;
+          if (state.phase === 'selected' && state.selectedNodeId === id) selectNode(id);
+        }, DOUBLE_CLICK_MS);
+      }
     },
-    [interaction, pickConnectTarget]
+    [interaction, pickConnectTarget, cancelDeselect]
   );
 
   // R3F reports a missed click only within 2 px, so the scene decides background taps itself, after R3F has handled the disc clicks.
@@ -289,10 +319,14 @@ export function PaperTree3D({
     (event: React.MouseEvent) => {
       if (!(event.target instanceof HTMLCanvasElement)) return;
       const onPerson = personClick.current === event.nativeEvent;
+      if (!onPerson && event.detail <= 1) {
+        firstClickId.current = null;
+        cancelDeselect();
+      }
       if (!isBackgroundTap(pointerDown.current, { x: event.clientX, y: event.clientY }, onPerson)) return;
       interaction.handleBackgroundClick();
     },
-    [interaction]
+    [interaction, cancelDeselect]
   );
 
   const handleSceneFailed = useCallback(() => setSceneFailed(true), []);
@@ -313,11 +347,15 @@ export function PaperTree3D({
     hoverPointer.current = null;
   }, []);
 
-  const handlePersonDoubleClick = useCallback(
-    (id: string) => {
+  // The Person under the first click, since selecting them may already have flown their disc out from under the pointer.
+  const handleSceneDoubleClick = useCallback(
+    (event: React.MouseEvent) => {
+      const id = firstClickId.current;
+      if (!(event.target instanceof HTMLCanvasElement) || !id) return;
+      cancelDeselect();
       if (!interaction.connectSourceId && paperCollapsible(graphData.links, id)) onToggleCollapse(id);
     },
-    [graphData.links, interaction.connectSourceId, onToggleCollapse]
+    [graphData.links, interaction.connectSourceId, onToggleCollapse, cancelDeselect]
   );
 
   const handleKeyAction = (action: PaperKeyAction): boolean => {
@@ -328,6 +366,7 @@ export function PaperTree3D({
         return true;
       case 'cycle-next':
       case 'cycle-previous': {
+        if (interaction.connectSourceId) return false;
         const next = paperCycle(shownIds, selectedId, action === 'cycle-previous');
         if (next && next !== selectedId) interaction.selectNode(next);
         return true;
@@ -341,13 +380,8 @@ export function PaperTree3D({
         return true;
     }
   };
-  // WASD and Q/E still fly behind the Add Relative preview, as in Cosmos.
-  const flightBlocked = isModalOpen && !isAddModalOpen;
-  const heldKeys = usePaperKeys({
-    actionsBlocked: isModalOpen || arrival !== 'settled',
-    flightBlocked,
-    onAction: handleKeyAction,
-  });
+  const keyBlocks = paperKeyBlocks({ modalOpen: isModalOpen, addModalOpen: !!isAddModalOpen, arrival });
+  const heldKeys = usePaperKeys({ blocked: keyBlocks, onAction: handleKeyAction });
 
   const sceneCamera: Tree3DSceneCamera = { focusPerson, resetView };
 
@@ -386,6 +420,7 @@ export function PaperTree3D({
         pointerDown.current = { x: e.clientX, y: e.clientY };
       }}
       onClick={handleSceneClick}
+      onDoubleClick={handleSceneDoubleClick}
       onClickCapture={wakePaperTap}
       onKeyDownCapture={wakePaperTap}
       onPointerMove={handlePointerMove}
@@ -430,7 +465,7 @@ export function PaperTree3D({
               <>
                 <PaperView viewDistance={viewDistance} />
                 <PaperCameraRig frame={frame} state={emphasisState} modalOpen={isModalOpen} />
-                <PaperFlight held={heldKeys} viewDistance={viewDistance} state={emphasisState} paused={flightBlocked} />
+                <PaperFlight held={heldKeys} viewDistance={viewDistance} state={emphasisState} paused={keyBlocks.flight} />
                 <InitialFraming fit={fitFrame} />
                 <PaperFocus
                   selectedId={interaction.selectedNodeId}
@@ -454,9 +489,9 @@ export function PaperTree3D({
                 {arrival === 'revealing' && (
                   <PaperReveal frame={frame} layout={layout} ids={shownIds} state={emphasisState} onDone={handleArrived} />
                 )}
-                <PaperDiscs ids={discIds} layout={layout} ink={INK} paper={PAPER} state={emphasisState} onPersonClick={handlePersonClick} onPersonDoubleClick={handlePersonDoubleClick} />
+                <PaperDiscs ids={discIds} layout={layout} ink={INK} paper={PAPER} state={emphasisState} onPersonClick={handlePersonClick} />
                 <PaperHoverRing state={emphasisState} layout={layout} ink={INK} />
-                {showLinks && (
+                {lines.length > 0 && (
                   <>
                     <PaperLines
                       lines={lines}

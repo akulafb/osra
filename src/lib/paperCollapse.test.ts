@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { paperCollapsible, paperShown } from './paperCollapse';
+import { paperCollapsible, paperPersonClick, paperShown } from './paperCollapse';
 import type { PaperLayout } from './paperLayout';
 import type { FamilyGraph, FamilyLink, FamilyNode } from '../types/graph';
 
@@ -77,5 +77,29 @@ describe('what a collapse shows', () => {
 
   it('shows nobody without a layout', () => {
     expect(paperShown(graph, null, new Set(), new Set(['F']), ['F'])).toEqual({ nodes: [], lines: [] });
+  });
+});
+
+describe('a click on a Person', () => {
+  const click = (id: string, detail: number, selectedId: string | null, connecting = false) =>
+    paperPersonClick({ id, detail, selectedId, connecting });
+
+  it('selects a Person who is not selected', () => {
+    expect(click('a', 1, null)).toBe('select');
+    expect(click('a', 1, 'b')).toBe('select');
+  });
+
+  it('waits to deselect the selected Person, so a double-click on them collapses and keeps the selection', () => {
+    expect(click('a', 1, 'a')).toBe('deselect-later');
+  });
+
+  it('ignores the second click of a double-click', () => {
+    expect(click('a', 2, 'a')).toBe('ignore');
+    expect(click('a', 2, null)).toBe('ignore');
+  });
+
+  it('picks the target in Connect Mode', () => {
+    expect(click('a', 1, 'b', true)).toBe('pick');
+    expect(click('b', 1, 'b', true)).toBe('pick');
   });
 });

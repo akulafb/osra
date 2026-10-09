@@ -15,7 +15,7 @@ import {
 import { seedCanvasParticles } from '../../utils/canvasFx';
 import { emphasisSubject } from '../../lib/paperHover';
 import { fadeInk, inkOf, placeOf, type PaperEmphasisState } from './paperEmphasis';
-import { PAPER_DASH, PAPER_LINE_RENDER_ORDER, PAPER_LINE_STYLE } from './paperScene';
+import { PAPER_DASH, PAPER_LINE_RENDER_ORDER, PAPER_LINE_STYLE, setPaperSegment } from './paperScene';
 
 interface PaperLifecyclesProps {
   draws: readonly PaperLifecycleDraw[];
@@ -240,14 +240,7 @@ function LifecycleLine({
     placeOf(layout, drift, fromId, from);
     placeOf(layout, drift, toId, to);
     to.lerpVectors(from, to, paperLinkDrawn(kind, progress));
-    const { geometry } = segments;
-    const start = geometry.attributes.instanceStart as THREE.InterleavedBufferAttribute;
-    const positions = start.data.array as Float32Array;
-    from.toArray(positions, 0);
-    to.toArray(positions, 3);
-    start.data.needsUpdate = true;
-    geometry.computeBoundingSphere();
-    if (dashed) segments.computeLineDistances();
+    if (setPaperSegment(segments.geometry, 0, from, to)) segments.geometry.computeBoundingSphere();
   });
 
   return (
