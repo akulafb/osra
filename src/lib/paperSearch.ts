@@ -1,8 +1,11 @@
 import type { FamilyLink } from '../types/graph';
 import { getLinkEndpoints } from './familyGraph';
 import { focusEmphasis, type Emphasis } from './focusEmphasis';
-import { PAPER_DISC_GAP, type PaperLayout } from './paperLayout';
+import type { PaperLayout } from './paperLayout';
 import type { Point3 } from './paperHover';
+
+/** The least space left between two discs in the search cluster: room for a name between them. */
+export const PAPER_CLUSTER_GAP = 20;
 
 const SETTLE_STEPS = 120;
 const START_SHARE = 0.25;
@@ -13,7 +16,7 @@ const COLLISION_PASSES = 200;
 /**
  * Where each match sits in the search cluster: a short, one-off settle on the
  * matches only, which draws them toward their centre, keeps linked matches
- * side by side and leaves the usual gap between every two discs. The same
+ * side by side and leaves PAPER_CLUSTER_GAP between every two discs. The same
  * matches always give the same cluster. The layout is not changed.
  */
 export function packMatches(layout: PaperLayout, matchIds: ReadonlySet<string>, links: readonly FamilyLink[]): Map<string, Point3> {
@@ -40,7 +43,7 @@ export function packMatches(layout: PaperLayout, matchIds: ReadonlySet<string>, 
       place.y += (centre.y - place.y) * CENTRE_PULL * cooling;
       place.z += (centre.z - place.z) * CENTRE_PULL * cooling;
     }
-    for (const [i, j] of pairs) pull(places[i], places[j], radii[i] + radii[j] + PAPER_DISC_GAP, LINK_PULL * cooling);
+    for (const [i, j] of pairs) pull(places[i], places[j], radii[i] + radii[j] + PAPER_CLUSTER_GAP, LINK_PULL * cooling);
     separate(places, radii);
   }
   for (let pass = 0; pass < COLLISION_PASSES && separate(places, radii); pass++);
@@ -71,6 +74,14 @@ export interface PaperSearchEmphasisInput {
 export function paperSearchEmphasis({ ids, links, hoveredId, selectedId, matchIds }: PaperSearchEmphasisInput): Map<string, Emphasis> {
   const matched = (id: string | null) => (id && (!matchIds || matchIds.has(id)) ? id : null);
   return focusEmphasis({ personIds: ids, links, hoveredId: matched(hoveredId), focusedId: matched(selectedId), searchMatchIds: matchIds });
+}
+
+const CLUSTER_VIEW_MARGIN = 1.4;
+const CLUSTER_VIEW_LEAST = 60;
+
+/** How much of the scene the camera keeps in view around a cluster of this radius: the cluster with room for its names, and never so little that a lone match fills the screen. */
+export function paperClusterView(radius: number): number {
+  return Math.max(radius * CLUSTER_VIEW_MARGIN, CLUSTER_VIEW_LEAST);
 }
 
 export const PAPER_GATHER_SECONDS = 3;
@@ -194,7 +205,7 @@ function separate(places: Point3[], radii: readonly number[]): boolean {
     for (let j = i + 1; j < places.length; j++) {
       const a = places[i];
       const b = places[j];
-      const least = radii[i] + radii[j] + PAPER_DISC_GAP;
+      const least = radii[i] + radii[j] + PAPER_CLUSTER_GAP;
       let dx = b.x - a.x;
       let dy = b.y - a.y;
       let dz = b.z - a.z;

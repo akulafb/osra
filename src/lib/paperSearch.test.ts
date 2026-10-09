@@ -1,8 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import type { FamilyLink } from '../types/graph';
-import { PAPER_DISC_GAP, type PaperDisc, type PaperLayout } from './paperLayout';
+import type { PaperDisc, PaperLayout } from './paperLayout';
 import {
   packMatches,
+  PAPER_CLUSTER_GAP,
+  paperClusterView,
   paperSearchEmphasis,
   paperSearchLayout,
   paperSearchMotionAt,
@@ -34,7 +36,7 @@ function overlaps(layout: PaperLayout, packed: ReadonlyMap<string, { x: number; 
   for (let i = 0; i < ids.length; i++) {
     for (let j = i + 1; j < ids.length; j++) {
       const gap = distance(packed.get(ids[i])!, packed.get(ids[j])!) - layout.get(ids[i])!.radius - layout.get(ids[j])!.radius;
-      if (gap < PAPER_DISC_GAP - 1e-6) found.push(`${ids[i]}-${ids[j]}`);
+      if (gap < PAPER_CLUSTER_GAP - 1e-6) found.push(`${ids[i]}-${ids[j]}`);
     }
   }
   return found;
@@ -53,7 +55,7 @@ function clusterRadius(layout: PaperLayout, packed: ReadonlyMap<string, { x: num
 /** The radius of a ball that holds this many discs of the largest size, each with its gap, packed loosely. */
 function compactBound(layout: PaperLayout, ids: readonly string[]): number {
   const largest = Math.max(...ids.map((id) => layout.get(id)!.radius));
-  return 2 * (largest + PAPER_DISC_GAP) * Math.cbrt(ids.length) + largest;
+  return 2 * (largest + PAPER_CLUSTER_GAP) * Math.cbrt(ids.length) + largest;
 }
 
 describe('packMatches', () => {
@@ -140,6 +142,16 @@ describe('paperSearchLayout', () => {
     expect(placed.get('p1')).toEqual({ x: 1, y: 2, z: 3, radius: layout.get('p1')!.radius });
     expect(placed.get('p2')).toBe(layout.get('p2'));
     expect(JSON.stringify([...layout])).toBe(before);
+  });
+});
+
+describe('paperClusterView', () => {
+  it('leaves room around the cluster for its names', () => {
+    expect(paperClusterView(100)).toBeGreaterThan(100);
+  });
+
+  it('keeps a lone match from filling the screen', () => {
+    expect(paperClusterView(6)).toBeGreaterThanOrEqual(60);
   });
 });
 
