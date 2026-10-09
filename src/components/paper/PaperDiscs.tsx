@@ -2,7 +2,7 @@ import { useCallback, useLayoutEffect, useMemo, useRef, type MutableRefObject } 
 import { useFrame, useThree, type ThreeEvent } from '@react-three/fiber';
 import * as THREE from 'three';
 import type { PaperLayout } from '../../lib/paperLayout';
-import { fadeInk, inkOf, placeOf, revealOf, type PaperEmphasisState } from './paperEmphasis';
+import { fadeInk, inkOf, placeOf, sizeOf, type PaperEmphasisState } from './paperEmphasis';
 
 interface PaperDiscsProps {
   ids: readonly string[];
@@ -44,7 +44,7 @@ export function PaperDiscs({ ids, layout, ink, paper, state, onPersonClick }: Pa
       const { drift } = state.current;
       discs.forEach((disc, i) => {
         placeOf(layout, drift, ids[i], position);
-        scale.setScalar(disc.radius * revealOf(state.current, ids[i]));
+        scale.setScalar(disc.radius * sizeOf(state.current, ids[i]));
         mesh.setMatrixAt(i, matrix.compose(position, quaternion, scale));
       });
       mesh.instanceMatrix.needsUpdate = true;
@@ -71,8 +71,8 @@ export function PaperDiscs({ ids, layout, ink, paper, state, onPersonClick }: Pa
   }, [place, paint, camera, placedFacing, state]);
 
   useFrame(() => {
-    const { emphasis, drift } = state.current;
-    if (!placedFacing.equals(camera.quaternion) || drift !== drawn.current.drift) {
+    const { emphasis, drift, size } = state.current;
+    if (!placedFacing.equals(camera.quaternion) || drift !== drawn.current.drift || size !== drawn.current.size) {
       place(camera.quaternion);
       placedFacing.copy(camera.quaternion);
     }

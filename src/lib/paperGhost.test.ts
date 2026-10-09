@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { layoutPaperTree } from './paperLayout';
 import { paperGhostLanding } from './paperGhost';
+import { packMatches, paperSearchLayout } from './paperSearch';
 import { relativeToKinshipLinks } from './treeRecord';
 import { otherParentChoice, resolveOtherParent } from './otherParent';
 import { followWorkingRecord, type ReadyPaperLayout } from '../hooks/usePaperLayout';
@@ -43,5 +44,28 @@ describe('paperGhostLanding: the Ghost Preview shows where the newcomer will lan
 
   it('has no landing for an anchor the layout has not placed', () => {
     expect(paperGhostLanding(ready.layout, TREE, 'nobody', 'child')).toBeNull();
+  });
+
+  describe('during a search, when the anchor sits in the match cluster', () => {
+    const matchIds = new Set([FIXTURE_IDS.huda, FIXTURE_IDS.khalil, FIXTURE_IDS.omar]);
+    const shown = paperSearchLayout(ready.layout, packMatches(ready.layout, matchIds, TREE.links));
+    const anchorId = FIXTURE_IDS.khalil;
+
+    it('lands beside the anchor where the cluster drew it, keeping the still offset and size', () => {
+      const still = paperGhostLanding(ready.layout, TREE, anchorId, 'parent')!;
+      const landing = paperGhostLanding(ready.layout, TREE, anchorId, 'parent', shown)!;
+      const fixedAnchor = ready.layout.get(anchorId)!;
+      const shownAnchor = shown.get(anchorId)!;
+      expect(shownAnchor).not.toEqual(fixedAnchor);
+      expect(landing.x - shownAnchor.x).toBeCloseTo(still.x - fixedAnchor.x);
+      expect(landing.y - shownAnchor.y).toBeCloseTo(still.y - fixedAnchor.y);
+      expect(landing.z - shownAnchor.z).toBeCloseTo(still.z - fixedAnchor.z);
+      expect(landing.radius).toBe(still.radius);
+    });
+
+    it('lands exactly where it does outside a search when the shown layout is the still one', () => {
+      const still = paperGhostLanding(ready.layout, TREE, anchorId, 'parent');
+      expect(paperGhostLanding(ready.layout, TREE, anchorId, 'parent', ready.layout)).toEqual(still);
+    });
   });
 });

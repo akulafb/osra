@@ -9,6 +9,7 @@ Search finds people by name (Arabic or English) among the people currently shown
 - `search-keys` with focus in the box, Enter steps forward, Shift+Enter back (both wrap), Escape clears the query.
 - `search-shortcut` Ctrl+F / Cmd+F opens INSTRUMENTS and focuses the search box.
 - `search-disabled` in 2D with no family selected the box is disabled with placeholder "Select a family to search".
+- In Paper the search adds a `N PEOPLE` / `1 PERSON` count under the counter, Escape deselects before it clears the query, and Paper 3D steps by selecting each match in its cluster; see [Paper search](./paper-mode.md#paper-search-lin-97). Cosmos is as below.
 
 ## How to get to it (user POV)
 

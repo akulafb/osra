@@ -4,7 +4,7 @@ import { Billboard, Text } from '@react-three/drei';
 import * as THREE from 'three';
 import type { FamilyNode } from '../../types/graph';
 import type { PaperLayout } from '../../lib/paperLayout';
-import { inkOf, placeOf, revealOf, type PaperEmphasisState } from './paperEmphasis';
+import { inkOf, placeOf, sizeOf, type PaperEmphasisState } from './paperEmphasis';
 import { depthFade, paperLabelSize } from './paperScene';
 
 const PAPER_LABEL_FONT_URL = '/fonts/kawkab-mono/KawkabMono-Regular.woff';
@@ -52,7 +52,7 @@ export function PaperLabels({ nodes, layout, ink, viewDistance, state, lifecycle
         depthFade(camera.position.distanceTo(point.current), start, end) *
         inkOf(state.current, id) *
         lifecycleInk(id) *
-        revealOf(state.current, id) ** LABEL_REVEAL_POWER;
+        sizeOf(state.current, id) ** LABEL_REVEAL_POWER;
       text.visible = fade > HIDDEN_BELOW;
       text.fillOpacity = fade;
       text.outlineOpacity = fade;

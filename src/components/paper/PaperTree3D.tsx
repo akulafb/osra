@@ -41,6 +41,7 @@ import { wakePaperTap } from './paperTap';
 import { paperFlySmoothTime, PAPER_FLY_SECONDS } from '../../lib/paperFocus';
 import { PAPER_DRAG_SMOOTH_SECONDS } from '../../lib/paperCamera';
 import { paperEffects } from '../../lib/paperEffects';
+import { packMatches, paperClusterView, paperEscape, paperSearchCount, paperSearchLayout, paperSearchOrder } from '../../lib/paperSearch';
 import { emptyEmphasisState, type PaperEmphasisState } from './paperEmphasis';
 import { PaperWebGLBoundary, PaperWebGLFallback } from './PaperWebGLFallback';
 import { browserHasWebGL } from './browserHasWebGL';
@@ -48,6 +49,7 @@ import { isBackgroundTap, isTap, paperFrame, paperLineShown, type ScreenPoint } 
 import { PaperGraphHandle } from './PaperGraphHandle';
 import { usePaperEditing, type PaperConnectParams } from './usePaperEditing';
 import { PaperFlight } from './PaperFlight';
+import { PaperSearch } from './PaperSearch';
 import { usePaperKeys } from './usePaperKeys';
 
 export interface PaperTree3DProps {
@@ -176,28 +178,49 @@ export function PaperTree3D({
   const flyTo = useRef<((id: string) => void) | null>(null);
   const graphHandle = useRef<ForceGraphHandle | null>(null);
   const openDrawerInset = usePersonDrawerInset(true);
-  const layout = layoutState.status === 'ready' ? layoutState.layout : null;
+  const fixedLayout = layoutState.status === 'ready' ? layoutState.layout : null;
 
   const shown = useMemo(
-    () => paperShown(graphData, layout, collapsedNodes, visibleClusters3D, uniqueClusters),
-    [graphData, layout, collapsedNodes, visibleClusters3D, uniqueClusters]
+    () => paperShown(graphData, fixedLayout, collapsedNodes, visibleClusters3D, uniqueClusters),
+    [graphData, fixedLayout, collapsedNodes, visibleClusters3D, uniqueClusters]
   );
   const shownIds = useMemo(() => shown.nodes.map((n) => n.id), [shown.nodes]);
+  const shownIdSet = useMemo(() => new Set(shownIds), [shownIds]);
+
+  const searching = searchQuery.trim() !== '' && !interaction.connectSourceId;
+  const matchKey = searching ? searchMatches.flatMap((n) => (shownIdSet.has(n.id) ? [n.id] : [])).sort().join(',') : null;
+  const matchIds = useMemo(() => (matchKey === null ? null : new Set(matchKey ? matchKey.split(',') : [])), [matchKey]);
+  const layout = useMemo(
+    () =>
+      fixedLayout && matchIds
+        ? paperSearchLayout(fixedLayout, packMatches(fixedLayout, matchIds, shown.lines.map((line) => line.link)))
+        : fixedLayout,
+    [fixedLayout, matchIds, shown.lines]
+  );
+  const cluster = useMemo(() => (layout && matchIds?.size ? paperFrame(layout, matchIds) : null), [layout, matchIds]);
+  const matchOrder = useMemo(() => (matchIds ? paperSearchOrder(searchMatches, matchIds) : null), [searchMatches, matchIds]);
+  const matchOrderIds = useMemo(() => matchOrder?.map((n) => n.id) ?? null, [matchOrder]);
   const inLifecycleIds = useMemo(() => inLifecycle(lifecycles.lifecycles), [lifecycles.lifecycles]);
   const discIds = useMemo(() => shownIds.filter((id) => !inLifecycleIds.has(id)), [shownIds, inLifecycleIds]);
   const toggles = useMemo(() => ({ links: showLinks, arrows: showArrows }), [showLinks, showArrows]);
   const lines = useMemo(
-    () => steadyLines(shown.lines, lifecycles.lifecycles).filter((line) => paperLineShown(line.type, toggles)),
-    [shown.lines, lifecycles.lifecycles, toggles]
+    () =>
+      steadyLines(shown.lines, lifecycles.lifecycles).filter(
+        (line) => paperLineShown(line.type, toggles) && (!matchIds || (matchIds.has(line.sourceId) && matchIds.has(line.targetId)))
+      ),
+    [shown.lines, lifecycles.lifecycles, toggles, matchIds]
   );
   const lifecycleScene = usePaperLifecycleScene(layout, shown, lifecycles.lifecycles, graphData);
   const progressOf = useMemo(() => holdingProgress(lifecycles.progressOf), [lifecycles.progressOf]);
   const lifecycleDraws = useMemo(
     () =>
       paperLifecycleDraws(lifecycles.lifecycles, lifecycleScene).filter(
-        (draw) => draw.kind === 'disc' || paperLineShown(draw.line.type, toggles)
+        (draw) =>
+          draw.kind === 'disc'
+            ? !matchIds || matchIds.has(draw.id)
+            : paperLineShown(draw.line.type, toggles) && (!matchIds || (matchIds.has(draw.from) && matchIds.has(draw.to)))
       ),
-    [toggles, lifecycles.lifecycles, lifecycleScene]
+    [toggles, lifecycles.lifecycles, lifecycleScene, matchIds]
   );
   const labelInk = useMemo(() => {
     const byPerson = new Map(lifecycles.lifecycles.flatMap((l) => (l.subject.kind === 'node' ? [[l.subject.id, l] as const] : [])));
@@ -207,7 +230,6 @@ export function PaperTree3D({
       return lifecycle && progress !== null ? paperLifecycleDisc(lifecycle.kind, progress).ink : 1;
     };
   }, [lifecycles.lifecycles, progressOf]);
-  const shownIdSet = useMemo(() => new Set(shownIds), [shownIds]);
   const previewPair =
     pendingLinkPreview && shownIdSet.has(pendingLinkPreview.anchorId) && shownIdSet.has(pendingLinkPreview.existingId)
       ? pendingLinkPreview
@@ -236,18 +258,18 @@ export function PaperTree3D({
     [connectSourceId, connect.candidateIds, connectTargetId]
   );
 
-  const frame = useMemo(() => (layout ? paperFrame(layout, layout.keys()) : null), [layout]);
+  const frame = useMemo(() => (fixedLayout ? paperFrame(fixedLayout, fixedLayout.keys()) : null), [fixedLayout]);
 
-  const landingFrom = useRef({ layout, graphData });
+  const landingFrom = useRef({ layout: fixedLayout, shownLayout: layout, graphData });
   useLayoutEffect(() => {
-    landingFrom.current = { layout, graphData };
-  }, [layout, graphData]);
+    landingFrom.current = { layout: fixedLayout, shownLayout: layout, graphData };
+  }, [fixedLayout, layout, graphData]);
   const ghostLook = useMemo<GhostPreviewLook>(
     () => ({
       ...GHOST_LOOK,
       landing: (anchorId, relation) => {
-        const { layout: placed, graphData: graph } = landingFrom.current;
-        return placed ? paperGhostLanding(placed, graph, anchorId, relation) : null;
+        const { layout: placed, shownLayout, graphData: graph } = landingFrom.current;
+        return placed ? paperGhostLanding(placed, graph, anchorId, relation, shownLayout ?? placed) : null;
       },
     }),
     []
@@ -273,12 +295,16 @@ export function PaperTree3D({
     [interaction]
   );
 
-  const flyToOverview = useCallback(() => fitFrame(true), [fitFrame]);
+  const flyToOverview = useCallback(() => {
+    if (!cluster) return fitFrame(true);
+    const { center, radius } = cluster;
+    void controlsRef.current?.fitToSphere(new THREE.Sphere(new THREE.Vector3(center.x, center.y, center.z), paperClusterView(radius)), true);
+  }, [cluster, fitFrame]);
 
   const resetView = useCallback(() => {
     interaction.handleBackgroundClick();
-    fitFrame(true);
-  }, [interaction, fitFrame]);
+    flyToOverview();
+  }, [interaction, flyToOverview]);
 
   const cancelDeselect = useCallback(() => {
     window.clearTimeout(pendingDeselect.current);
@@ -358,6 +384,23 @@ export function PaperTree3D({
     [graphData.links, onToggleCollapse, cancelDeselect]
   );
 
+  const escape = (): boolean => {
+    const clears = paperEscape({ interactionIdle: interaction.state.phase === 'idle', searchQuery });
+    if (clears === 'interaction') interaction.handleEscape();
+    else if (clears === 'search') onSearchClose();
+    return clears !== null;
+  };
+
+  const stepMatch = (backwards: boolean) => {
+    const { phase } = interaction.state;
+    if (!matchOrderIds || (phase !== 'idle' && phase !== 'selected')) return;
+    const selectedId = interaction.selectedNodeId;
+    const next = paperCycle(matchOrderIds, selectedId, backwards);
+    if (!next) return;
+    if (next === selectedId) flyTo.current?.(next);
+    else interaction.selectNode(next);
+  };
+
   const handleKeyAction = (action: PaperKeyAction): boolean => {
     const selectedId = interaction.selectedNodeId;
     switch (action) {
@@ -367,7 +410,7 @@ export function PaperTree3D({
       case 'cycle-next':
       case 'cycle-previous': {
         if (interaction.connectSourceId) return false;
-        const next = paperCycle(shownIds, selectedId, action === 'cycle-previous');
+        const next = paperCycle(matchOrderIds ?? shownIds, selectedId, action === 'cycle-previous');
         if (next && next !== selectedId) interaction.selectNode(next);
         return true;
       }
@@ -376,8 +419,7 @@ export function PaperTree3D({
         flyTo.current?.(selectedId);
         return true;
       case 'deselect':
-        interaction.handleEscape();
-        return true;
+        return escape();
     }
   };
   const keyBlocks = paperKeyBlocks({ modalOpen: isModalOpen, modalAllowsFlight: !!isAddModalOpen, arrival });
@@ -388,10 +430,13 @@ export function PaperTree3D({
   const search: Tree3DSearch = {
     query: searchQuery,
     onQueryChange: onSearchQueryChange,
-    matches: searchMatches,
-    currentIndex: searchIndex,
-    onClose: onSearchClose,
+    matches: matchOrder ?? searchMatches,
+    currentIndex: matchOrderIds ? matchOrderIds.indexOf(interaction.selectedNodeId ?? '') : searchIndex,
+    onPrev: matchOrderIds ? () => stepMatch(true) : undefined,
+    onNext: matchOrderIds ? () => stepMatch(false) : undefined,
+    onClose: escape,
     disabled: searchDisabled,
+    countLabel: matchIds ? paperSearchCount(matchIds.size) : undefined,
   };
 
   const navKey = { color: panel.ink.strong, fontWeight: 600 };
@@ -472,9 +517,19 @@ export function PaperTree3D({
                   layout={layout}
                   ids={shownIds}
                   links={graphData.links}
+                  matchIds={matchIds}
                   drawerInset={openDrawerInset}
                   onOverview={flyToOverview}
                   flyTo={flyTo}
+                />
+                <PaperSearch
+                  layout={layout}
+                  matchIds={matchIds}
+                  cluster={cluster}
+                  selectedId={interaction.selectedNodeId}
+                  state={emphasisState}
+                  flyTo={flyTo}
+                  onOverview={flyToOverview}
                 />
                 <PaperHover
                   state={emphasisState}
@@ -483,6 +538,7 @@ export function PaperTree3D({
                   ids={shownIds}
                   links={graphData.links}
                   selectedId={interaction.selectedNodeId}
+                  matchIds={matchIds}
                   connect={connectEmphasis}
                 />
                 <PaperGraphHandle handle={graphHandle} />

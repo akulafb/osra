@@ -11,7 +11,7 @@ export const PAPER_3D_INK: Record<Emphasis, number> = {
   relative: 1,
   dimmed: 0.5,
   ghost: 0.2,
-  hidden: 0,
+  hidden: 1,
 };
 
 /**
@@ -28,6 +28,8 @@ export interface PaperEmphasisState {
   focus: PaperFocus | null;
   /** How far each Person has grown in during the intro reveal; null once it is over. */
   reveal: ReadonlyMap<string, number> | null;
+  /** How much of their disc each Person keeps while a search shrinks the non-matches away; missing means whole. */
+  size: ReadonlyMap<string, number>;
 }
 
 export interface PaperFocus {
@@ -36,7 +38,7 @@ export interface PaperFocus {
 }
 
 export function emptyEmphasisState(): PaperEmphasisState {
-  return { emphasis: new Map(), drift: new Map(), pointedId: null, focus: null, reveal: null };
+  return { emphasis: new Map(), drift: new Map(), pointedId: null, focus: null, reveal: null, size: new Map() };
 }
 
 export function inkOf(state: PaperEmphasisState, id: string): number {
@@ -45,6 +47,10 @@ export function inkOf(state: PaperEmphasisState, id: string): number {
 
 export function revealOf(state: PaperEmphasisState, id: string): number {
   return state.reveal?.get(id) ?? 1;
+}
+
+export function sizeOf(state: PaperEmphasisState, id: string): number {
+  return revealOf(state, id) * (state.size.get(id) ?? 1);
 }
 
 /** The ink each end of a line keeps: its own Person's. */
