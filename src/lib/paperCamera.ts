@@ -6,6 +6,9 @@ export const PAPER_IDLE_SECONDS = 3;
 /** The camera's smoothing time while dragging: it sets how long the view glides after a release. */
 export const PAPER_DRAG_SMOOTH_SECONDS = 0.3;
 
+/** A frame after a stalled tab moves or turns the camera no further than this. */
+export const PAPER_MAX_FRAME_SECONDS = 0.1;
+
 const IDLE_EDGE_PX_PER_SECOND = 15;
 
 /** The closest the camera comes to its orbit point: a large disc still fits on screen. */

@@ -1,15 +1,23 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState, type MutableRefObject } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type MutableRefObject } from 'react';
 import { Canvas, useFrame, useThree, type ThreeEvent } from '@react-three/fiber';
 import { CameraControls } from '@react-three/drei';
 import * as THREE from 'three';
 import { useTheme } from '@mui/material/styles';
-import type { FamilyGraph, FamilyNode } from '../../types/graph';
-import { paperLines } from '../../lib/paperLayout';
-import { filterGraphDataFor3D } from '../../lib/filterGraphData';
+import type { FamilyGraph, FamilyNode, RelativeDirection } from '../../types/graph';
+import type { ForceGraphHandle, LiveNodePosition } from '../../types/forceGraph';
+import { paperCollapsible, paperPersonClick, paperShown } from '../../lib/paperCollapse';
+import { paperCycle, paperKeyBlocks, type PaperArrival, type PaperKeyAction } from '../../lib/paperKeys';
 import { GRAYSCALE_PAIR, LIVE_PAIR } from '../../theme/paperPair';
 import type { DirectManipulationController } from '../../hooks/useDirectManipulation';
+import { needsCanvas } from '../../lib/directManipulation';
+import { hexToRgb } from '../../lib/colourBlend';
+import { Manipulation3DPanel } from '../Manipulation3DPanel';
+import type { GhostPreviewLook } from '../../hooks/useGhostPreview';
 import { usePersonDrawerInset, type PersonDrawerInset } from '../../hooks/usePersonDrawerInset';
 import type { PaperLayoutState } from '../../hooks/usePaperLayout';
+import type { LifecycleController } from '../../hooks/useLifecycles';
+import { holdingProgress, inLifecycle, paperLifecycleDisc, paperLifecycleDraws, steadyLines } from '../../lib/paperLifecycle';
+import { paperGhostLanding } from '../../lib/paperGhost';
 import { Tree3DOverlay, type Tree3DSceneCamera, type Tree3DSearch } from '../tree3d/Tree3DOverlay';
 import { useIsMobileDevice } from '../tree3d/useIsMobileDevice';
 import { PaperDiscs } from './PaperDiscs';
@@ -22,6 +30,9 @@ import { PaperHoverRing } from './PaperHoverRing';
 import { PaperParticles } from './PaperParticles';
 import { PaperRipple } from './PaperRipple';
 import { PaperFocus } from './PaperFocus';
+import { PaperLifecycles } from './PaperLifecycles';
+import { PaperPreviewLine } from './PaperPreviewLine';
+import { usePaperLifecycleScene } from './usePaperLifecycleScene';
 import { PaperReveal } from './PaperReveal';
 import { PaperLoader } from './PaperLoader';
 import { PaperHint } from './PaperHint';
@@ -33,19 +44,22 @@ import { paperEffects } from '../../lib/paperEffects';
 import { emptyEmphasisState, type PaperEmphasisState } from './paperEmphasis';
 import { PaperWebGLBoundary, PaperWebGLFallback } from './PaperWebGLFallback';
 import { browserHasWebGL } from './browserHasWebGL';
-import { isBackgroundTap, isTap, paperFrame, type ScreenPoint } from './paperScene';
+import { isBackgroundTap, isTap, paperFrame, paperLineShown, type ScreenPoint } from './paperScene';
+import { PaperGraphHandle } from './PaperGraphHandle';
+import { usePaperEditing, type PaperConnectParams } from './usePaperEditing';
+import { PaperFlight } from './PaperFlight';
+import { usePaperKeys } from './usePaperKeys';
 
 export interface PaperTree3DProps {
   graphData: FamilyGraph;
   layout: PaperLayoutState;
   interaction: DirectManipulationController;
   collapsedNodes: Set<string>;
+  onToggleCollapse: (nodeId: string) => void;
   onSetCollapsedNodes: (nodes: Set<string>) => void;
   mode?: '3D' | '2D';
   onModeChange?: (mode: '3D' | '2D') => void;
   isAddModalOpen?: boolean;
-  isEditModalOpen?: boolean;
-  isBulkInviteOpen?: boolean;
   isModalOpen?: boolean;
   searchQuery: string;
   onSearchQueryChange: (q: string) => void;
@@ -62,6 +76,27 @@ export interface PaperTree3DProps {
   seeWhosNewButtonSlot?: React.ReactNode;
   isAdmin: boolean;
   onAdminAddPersonClick?: () => void;
+  selectedNode: FamilyNode | null;
+  /** Action Handles appear only when the active user may edit the selected Person. */
+  canEditSelected: boolean;
+  onCreateRelative?: (params: {
+    firstName: string;
+    relation: RelativeDirection;
+    targetNodeId: string;
+    otherParentId?: string | null;
+  }) => Promise<void> | void;
+  onConnectExistingRelative?: (params: {
+    existingNodeId: string;
+    relation: RelativeDirection;
+    targetNodeId: string;
+    otherParentId?: string | null;
+  }) => Promise<void> | void;
+  onDirectConnectNodes?: (params: PaperConnectParams) => Promise<void> | void;
+  canDissolveSelected: boolean;
+  onDissolveNode?: (node: FamilyNode) => Promise<void> | void;
+  /** Spawn and Dissolve progress, drawn in ink. */
+  lifecycles: LifecycleController;
+  pendingLinkPreview?: { anchorId: string; existingId: string } | null;
 }
 
 const PAPER = GRAYSCALE_PAIR.paper;
@@ -72,8 +107,14 @@ const FOG_NEAR = 0.9;
 const FOG_FAR = 2.6;
 const FLY_SMOOTH_TIME = paperFlySmoothTime(PAPER_FLY_SECONDS);
 const CROSSFADE_MS = 500;
+const GHOST_LOOK: GhostPreviewLook = {
+  color: INK,
+  labelColor: INK,
+  labelBackground: `rgba(${hexToRgb(PAPER).join(', ')}, 0.85)`,
+};
 
-type PaperArrival = 'loader' | 'revealing' | 'crossfade' | 'settled';
+/** The usual system double-click interval. */
+const DOUBLE_CLICK_MS = 500;
 
 /** Paper's own 3D scene (ADR 0014): the still layout as ink discs, lines and labels, drawn in grayscale and painted in the live Paper Pair. */
 export function PaperTree3D({
@@ -81,12 +122,11 @@ export function PaperTree3D({
   layout: layoutState,
   interaction,
   collapsedNodes,
+  onToggleCollapse,
   onSetCollapsedNodes,
   mode,
   onModeChange,
   isAddModalOpen,
-  isEditModalOpen,
-  isBulkInviteOpen,
   isModalOpen = false,
   searchQuery,
   onSearchQueryChange,
@@ -103,6 +143,15 @@ export function PaperTree3D({
   seeWhosNewButtonSlot,
   isAdmin,
   onAdminAddPersonClick,
+  selectedNode,
+  canEditSelected,
+  onCreateRelative,
+  onConnectExistingRelative,
+  onDirectConnectNodes,
+  canDissolveSelected,
+  onDissolveNode,
+  lifecycles,
+  pendingLinkPreview = null,
 }: PaperTree3DProps) {
   const { panel } = useTheme().palette;
   const isMobileDevice = useIsMobileDevice();
@@ -119,20 +168,90 @@ export function PaperTree3D({
   const hoverPointer = useRef<ScreenPoint | null>(null);
   const emphasisState = useRef<PaperEmphasisState>(emptyEmphasisState());
   const personClick = useRef<MouseEvent | null>(null);
+  const doubleClickTargetId = useRef<string | null>(null);
+  const pendingDeselect = useRef<number | undefined>(undefined);
+  const latestInteraction = useRef(interaction);
+  latestInteraction.current = interaction;
   const viewDistance = useRef(0);
   const flyTo = useRef<((id: string) => void) | null>(null);
+  const graphHandle = useRef<ForceGraphHandle | null>(null);
   const openDrawerInset = usePersonDrawerInset(true);
   const layout = layoutState.status === 'ready' ? layoutState.layout : null;
 
-  const shown = useMemo(() => {
-    if (!layout) return { nodes: [], lines: [] };
-    const visible = filterGraphDataFor3D(graphData, collapsedNodes, visibleClusters3D, uniqueClusters);
-    const nodes = visible.nodes.filter((n) => layout.has(n.id));
-    return { nodes, lines: paperLines(nodes, visible.links) };
-  }, [graphData, layout, collapsedNodes, visibleClusters3D, uniqueClusters]);
+  const shown = useMemo(
+    () => paperShown(graphData, layout, collapsedNodes, visibleClusters3D, uniqueClusters),
+    [graphData, layout, collapsedNodes, visibleClusters3D, uniqueClusters]
+  );
   const shownIds = useMemo(() => shown.nodes.map((n) => n.id), [shown.nodes]);
+  const inLifecycleIds = useMemo(() => inLifecycle(lifecycles.lifecycles), [lifecycles.lifecycles]);
+  const discIds = useMemo(() => shownIds.filter((id) => !inLifecycleIds.has(id)), [shownIds, inLifecycleIds]);
+  const toggles = useMemo(() => ({ links: showLinks, arrows: showArrows }), [showLinks, showArrows]);
+  const lines = useMemo(
+    () => steadyLines(shown.lines, lifecycles.lifecycles).filter((line) => paperLineShown(line.type, toggles)),
+    [shown.lines, lifecycles.lifecycles, toggles]
+  );
+  const lifecycleScene = usePaperLifecycleScene(layout, shown, lifecycles.lifecycles, graphData);
+  const progressOf = useMemo(() => holdingProgress(lifecycles.progressOf), [lifecycles.progressOf]);
+  const lifecycleDraws = useMemo(
+    () =>
+      paperLifecycleDraws(lifecycles.lifecycles, lifecycleScene).filter(
+        (draw) => draw.kind === 'disc' || paperLineShown(draw.line.type, toggles)
+      ),
+    [toggles, lifecycles.lifecycles, lifecycleScene]
+  );
+  const labelInk = useMemo(() => {
+    const byPerson = new Map(lifecycles.lifecycles.flatMap((l) => (l.subject.kind === 'node' ? [[l.subject.id, l] as const] : [])));
+    return (id: string) => {
+      const lifecycle = byPerson.get(id);
+      const progress = lifecycle ? progressOf(lifecycle.key) : null;
+      return lifecycle && progress !== null ? paperLifecycleDisc(lifecycle.kind, progress).ink : 1;
+    };
+  }, [lifecycles.lifecycles, progressOf]);
+  const shownIdSet = useMemo(() => new Set(shownIds), [shownIds]);
+  const previewPair =
+    pendingLinkPreview && shownIdSet.has(pendingLinkPreview.anchorId) && shownIdSet.has(pendingLinkPreview.existingId)
+      ? pendingLinkPreview
+      : null;
+  const liveNodes = useMemo<LiveNodePosition[]>(
+    () => (layout ? shownIds.map((id) => ({ id, ...layout.get(id)! })) : []),
+    [layout, shownIds]
+  );
+
+  const { connect, dissolve, pickConnectTarget } = usePaperEditing({
+    graphData,
+    shownNodes: shown.nodes,
+    interaction,
+    selectedNode,
+    canDissolveSelected,
+    onDirectConnectNodes,
+    onDissolveNode,
+  });
+  const connectSourceId = connect.sourceNode?.id ?? null;
+  const connectTargetId = connect.pair?.target.id ?? null;
+  const connectEmphasis = useMemo(
+    () =>
+      connectSourceId
+        ? { sourceId: connectSourceId, candidateIds: connect.candidateIds, targetId: connectTargetId }
+        : null,
+    [connectSourceId, connect.candidateIds, connectTargetId]
+  );
 
   const frame = useMemo(() => (layout ? paperFrame(layout, layout.keys()) : null), [layout]);
+
+  const landingFrom = useRef({ layout, graphData });
+  useLayoutEffect(() => {
+    landingFrom.current = { layout, graphData };
+  }, [layout, graphData]);
+  const ghostLook = useMemo<GhostPreviewLook>(
+    () => ({
+      ...GHOST_LOOK,
+      landing: (anchorId, relation) => {
+        const { layout: placed, graphData: graph } = landingFrom.current;
+        return placed ? paperGhostLanding(placed, graph, anchorId, relation) : null;
+      },
+    }),
+    []
+  );
 
   const fitFrame = useCallback(
     (smooth: boolean) => {
@@ -161,30 +280,54 @@ export function PaperTree3D({
     fitFrame(true);
   }, [interaction, fitFrame]);
 
+  const cancelDeselect = useCallback(() => {
+    window.clearTimeout(pendingDeselect.current);
+    pendingDeselect.current = undefined;
+  }, []);
+  useEffect(() => cancelDeselect, [cancelDeselect]);
+
   const handlePersonClick = useCallback(
     (id: string, event: ThreeEvent<MouseEvent>) => {
-      personClick.current = event.nativeEvent;
-      if (!isTap(pointerDown.current, { x: event.nativeEvent.clientX, y: event.nativeEvent.clientY })) return;
-      interaction.selectNode(id);
+      const { nativeEvent } = event;
+      personClick.current = nativeEvent;
+      const tap = isTap(pointerDown.current, { x: nativeEvent.clientX, y: nativeEvent.clientY });
+      const click = paperPersonClick({
+        id,
+        detail: nativeEvent.detail,
+        selectedId: interaction.state.phase === 'selected' ? interaction.selectedNodeId : null,
+        connecting: !!interaction.connectSourceId,
+      });
+      if (click === 'ignore') return;
+      doubleClickTargetId.current = tap && click !== 'pick' ? id : null;
+      cancelDeselect();
+      if (!tap) return;
+      if (click === 'pick') pickConnectTarget(id);
+      else if (click === 'select') interaction.selectNode(id);
+      else {
+        pendingDeselect.current = window.setTimeout(() => {
+          pendingDeselect.current = undefined;
+          const { state, deselect } = latestInteraction.current;
+          if (state.phase === 'selected' && state.selectedNodeId === id) deselect();
+        }, DOUBLE_CLICK_MS);
+      }
     },
-    [interaction]
+    [interaction, pickConnectTarget, cancelDeselect]
   );
-
-  // Paper 3D has no connect picker until LIN-96, so a connect started in another view steps back out on arrival.
-  const { connectSourceId, handleEscape } = interaction;
-  useEffect(() => {
-    if (connectSourceId) handleEscape();
-  }, [connectSourceId, handleEscape]);
 
   // R3F reports a missed click only within 2 px, so the scene decides background taps itself, after R3F has handled the disc clicks.
   const handleSceneClick = useCallback(
     (event: React.MouseEvent) => {
       if (!(event.target instanceof HTMLCanvasElement)) return;
+      if (event.detail > 1) return;
       const onPerson = personClick.current === event.nativeEvent;
+      if (!onPerson) {
+        doubleClickTargetId.current = null;
+        cancelDeselect();
+      }
       if (!isBackgroundTap(pointerDown.current, { x: event.clientX, y: event.clientY }, onPerson)) return;
       interaction.handleBackgroundClick();
     },
-    [interaction]
+    [interaction, cancelDeselect]
   );
 
   const handleSceneFailed = useCallback(() => setSceneFailed(true), []);
@@ -205,18 +348,40 @@ export function PaperTree3D({
     hoverPointer.current = null;
   }, []);
 
-  useEffect(() => {
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape') return;
-      if (isAddModalOpen || isEditModalOpen || isBulkInviteOpen) return;
-      const tag = document.activeElement?.tagName;
-      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
-      e.preventDefault();
-      interaction.handleEscape();
-    };
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [interaction, isAddModalOpen, isEditModalOpen, isBulkInviteOpen]);
+  const handleSceneDoubleClick = useCallback(
+    (event: React.MouseEvent) => {
+      const id = doubleClickTargetId.current;
+      if (!(event.target instanceof HTMLCanvasElement) || !id) return;
+      cancelDeselect();
+      if (paperCollapsible(graphData.links, id)) onToggleCollapse(id);
+    },
+    [graphData.links, onToggleCollapse, cancelDeselect]
+  );
+
+  const handleKeyAction = (action: PaperKeyAction): boolean => {
+    const selectedId = interaction.selectedNodeId;
+    switch (action) {
+      case 'reset':
+        resetView();
+        return true;
+      case 'cycle-next':
+      case 'cycle-previous': {
+        if (interaction.connectSourceId) return false;
+        const next = paperCycle(shownIds, selectedId, action === 'cycle-previous');
+        if (next && next !== selectedId) interaction.selectNode(next);
+        return true;
+      }
+      case 'focus':
+        if (!selectedId) return false;
+        flyTo.current?.(selectedId);
+        return true;
+      case 'deselect':
+        interaction.handleEscape();
+        return true;
+    }
+  };
+  const keyBlocks = paperKeyBlocks({ modalOpen: isModalOpen, modalAllowsFlight: !!isAddModalOpen, arrival });
+  const heldKeys = usePaperKeys({ blocked: keyBlocks, onAction: handleKeyAction });
 
   const sceneCamera: Tree3DSceneCamera = { focusPerson, resetView };
 
@@ -229,9 +394,15 @@ export function PaperTree3D({
     disabled: searchDisabled,
   };
 
+  const navKey = { color: panel.ink.strong, fontWeight: 600 };
   const navKeys = (
     <div style={{ lineHeight: '1.6' }}>
-      <div><span style={{ color: panel.ink.strong, fontWeight: 600 }}>Esc</span>: Deselect</div>
+      <div><span style={navKey}>WASD</span>: Move (Hold <span style={navKey}>Shift</span> for Boost)</div>
+      <div><span style={navKey}>Q / E</span>: Rotate View L / R</div>
+      <div><span style={navKey}>R</span>: Reset View</div>
+      <div><span style={navKey}>Tab</span>: Cycle Names</div>
+      <div><span style={navKey}>Enter</span>: Focus selection</div>
+      <div><span style={navKey}>Esc</span>: Deselect</div>
     </div>
   );
 
@@ -249,6 +420,7 @@ export function PaperTree3D({
         pointerDown.current = { x: e.clientX, y: e.clientY };
       }}
       onClick={handleSceneClick}
+      onDoubleClick={handleSceneDoubleClick}
       onClickCapture={wakePaperTap}
       onKeyDownCapture={wakePaperTap}
       onPointerMove={handlePointerMove}
@@ -293,6 +465,7 @@ export function PaperTree3D({
               <>
                 <PaperView viewDistance={viewDistance} />
                 <PaperCameraRig frame={frame} state={emphasisState} modalOpen={isModalOpen} />
+                <PaperFlight held={heldKeys} viewDistance={viewDistance} state={emphasisState} paused={keyBlocks.flight} />
                 <InitialFraming fit={fitFrame} />
                 <PaperFocus
                   selectedId={interaction.selectedNodeId}
@@ -310,16 +483,18 @@ export function PaperTree3D({
                   ids={shownIds}
                   links={graphData.links}
                   selectedId={interaction.selectedNodeId}
+                  connect={connectEmphasis}
                 />
+                <PaperGraphHandle handle={graphHandle} />
                 {arrival === 'revealing' && (
                   <PaperReveal frame={frame} layout={layout} ids={shownIds} state={emphasisState} onDone={handleArrived} />
                 )}
-                <PaperDiscs ids={shownIds} layout={layout} ink={INK} paper={PAPER} state={emphasisState} onPersonClick={handlePersonClick} />
+                <PaperDiscs ids={discIds} layout={layout} ink={INK} paper={PAPER} state={emphasisState} onPersonClick={handlePersonClick} />
                 <PaperHoverRing state={emphasisState} layout={layout} ink={INK} />
-                {showLinks && (
+                {lines.length > 0 && (
                   <>
                     <PaperLines
-                      lines={shown.lines}
+                      lines={lines}
                       layout={layout}
                       ink={INK}
                       parentInk={PARENT_INK}
@@ -327,12 +502,37 @@ export function PaperTree3D({
                       state={emphasisState}
                       showArrows={showArrows}
                     />
-                    <PaperParticles state={emphasisState} layout={layout} lines={shown.lines} ink={INK} />
-                    <PaperRipple state={emphasisState} layout={layout} lines={shown.lines} ink={INK} />
+                    <PaperParticles state={emphasisState} layout={layout} lines={lines} ink={INK} />
+                    <PaperRipple state={emphasisState} layout={layout} lines={lines} ink={INK} />
                   </>
                 )}
+                {previewPair && (
+                  <PaperPreviewLine
+                    fromId={previewPair.anchorId}
+                    toId={previewPair.existingId}
+                    layout={layout}
+                    ink={INK}
+                    state={emphasisState}
+                  />
+                )}
+                <PaperLifecycles
+                  draws={lifecycleDraws}
+                  progressOf={progressOf}
+                  layout={lifecycleScene.layout}
+                  ink={INK}
+                  parentInk={PARENT_INK}
+                  paper={PAPER}
+                  state={emphasisState}
+                />
                 {showNames && (
-                  <PaperLabels nodes={shown.nodes} layout={layout} ink={INK} viewDistance={viewDistance} state={emphasisState} />
+                  <PaperLabels
+                    nodes={lifecycleScene.nodes}
+                    layout={lifecycleScene.layout}
+                    ink={INK}
+                    viewDistance={viewDistance}
+                    state={emphasisState}
+                    lifecycleInk={labelInk}
+                  />
                 )}
                 <FirstFrame onDrawn={() => setFirstFrameDrawn(true)} />
               </>
@@ -369,6 +569,25 @@ export function PaperTree3D({
         onEnsureClusterVisible3D={onEnsureClusterVisible3D}
         navKeys={navKeys}
         seeWhosNewButtonSlot={seeWhosNewButtonSlot}
+      />
+
+      <Manipulation3DPanel
+        selectedNode={selectedNode}
+        canEdit={isMobileDevice ? needsCanvas(interaction.state) : canEditSelected}
+        dock={isMobileDevice ? 'bottom' : 'side'}
+        existingNodes={graphData.nodes}
+        visibleIds={shownIdSet}
+        graphData={graphData}
+        fgRef={graphHandle}
+        nodes={liveNodes}
+        connect={connect}
+        dissolve={dissolve}
+        searchQuery={searchQuery}
+        onSearchQueryChange={onSearchQueryChange}
+        searchMatches={searchMatches}
+        onCreateRelative={onCreateRelative}
+        onConnectExistingRelative={onConnectExistingRelative}
+        ghostLook={ghostLook}
       />
     </div>
   );

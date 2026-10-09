@@ -4,17 +4,25 @@ import SpriteText from 'three-spritetext';
 import { RelativeDirection } from '../types/graph';
 import { ForceGraphRef, LiveNodePosition } from '../types/forceGraph';
 import {
-  computeGhostPreviewOffset,
   ghostPreviewBreath,
-  GHOST_PREVIEW_RADIUS,
+  ghostPreviewPlacement,
   GHOST_PREVIEW_SHELL_SCALE,
   GHOST_PREVIEW_BODY_OPACITY,
   GHOST_PREVIEW_SHELL_OPACITY,
-  GHOST_PREVIEW_LABEL_HEIGHT,
   GHOST_PREVIEW_TETHER_DASH,
   GHOST_PREVIEW_TETHER_GAP,
+  type GhostPreviewLanding,
 } from '../utils/ghostPreview';
 import { relationColor } from '../components/cards/relationStyle';
+
+/** The marker's colours; Cosmos draws it in the relation's colour with a light label. */
+export interface GhostPreviewLook {
+  color: string;
+  labelColor: string;
+  labelBackground: string;
+  /** Where the host's layout will land the new Tree Node; without it the marker sits a fixed distance away on screen. */
+  landing?: (anchorNodeId: string, relation: RelativeDirection) => GhostPreviewLanding | null;
+}
 
 /**
  * Ghost Preview (LIN-46, ADR 0002): a translucent marker in the 3D scene
@@ -39,8 +47,9 @@ export function useGhostPreview(params: {
   name: string;
   /** Off on touch: 3D manipulation is desktop-only for v1 (ADR 0002). */
   enabled: boolean;
+  look?: GhostPreviewLook;
 }): void {
-  const { fgRef, nodes, anchorNodeId, relation, name, enabled } = params;
+  const { fgRef, nodes, anchorNodeId, relation, name, enabled, look } = params;
 
   // Held in a ref so the render loop is not torn down and rebuilt whenever the
   // caller passes a new array identity — the useClusterBubbles precedent.
@@ -59,12 +68,14 @@ export function useGhostPreview(params: {
 
     // Resolved once, then held — the preview must not swing around as the
     // camera orbits, only follow its anchor.
-    const offset = computeGhostPreviewOffset(camera.quaternion, relation);
-    const color = new THREE.Color(relationColor(relation));
+    const { x = 0, y = 0, z = 0 } = nodesRef.current.find((n) => n.id === anchorNodeId) ?? {};
+    const landing = look?.landing?.(anchorNodeId, relation) ?? null;
+    const { offset, radius, labelHeight } = ghostPreviewPlacement(camera.quaternion, relation, { x, y, z }, landing);
+    const color = new THREE.Color(look?.color ?? relationColor(relation));
 
-    const bodyGeometry = new THREE.SphereGeometry(GHOST_PREVIEW_RADIUS, 16, 16);
+    const bodyGeometry = new THREE.SphereGeometry(radius, 16, 16);
     const shellGeometry = new THREE.SphereGeometry(
-      GHOST_PREVIEW_RADIUS * GHOST_PREVIEW_SHELL_SCALE,
+      radius * GHOST_PREVIEW_SHELL_SCALE,
       12,
       12
     );
@@ -87,12 +98,12 @@ export function useGhostPreview(params: {
     );
 
     const label = new SpriteText('…');
-    label.color = '#ffffff';
-    label.backgroundColor = 'rgba(5, 5, 5, 0.6)';
+    label.color = look?.labelColor ?? '#ffffff';
+    label.backgroundColor = look?.labelBackground ?? 'rgba(5, 5, 5, 0.6)';
     label.textHeight = 4;
     label.padding = 2;
     label.borderRadius = 2;
-    label.position.set(0, GHOST_PREVIEW_LABEL_HEIGHT, 0);
+    label.position.set(0, labelHeight, 0);
     label.material.depthTest = false;
     label.renderOrder = 999;
     labelRef.current = label;
@@ -171,7 +182,7 @@ export function useGhostPreview(params: {
       labelMaterial.dispose();
       labelRef.current = null;
     };
-  }, [active, relation, anchorNodeId, fgRef]);
+  }, [active, relation, anchorNodeId, fgRef, look]);
 
   // The label is updated in place rather than by rebuilding the marker, so
   // typing does not restart the breathing animation on every keystroke.

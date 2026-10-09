@@ -6,7 +6,7 @@ import type { FamilyLink } from '../../types/graph';
 import type { PaperLayout, PaperLine } from '../../lib/paperLayout';
 import { emphasisSubject, linesOf } from '../../lib/paperHover';
 import { fadeInk, inkOf, lineEndInks, placeOf, type PaperEmphasisState } from './paperEmphasis';
-import { PAPER_LINE_RENDER_ORDER, paperLineSegments } from './paperScene';
+import { PAPER_DASH, PAPER_LINE_RENDER_ORDER, PAPER_LINE_STYLE, paperLineSegments } from './paperScene';
 
 interface PaperLinesProps {
   lines: readonly PaperLine[];
@@ -20,17 +20,6 @@ interface PaperLinesProps {
 
 const ARROW_LENGTH = 5;
 const ARROW_RADIUS = 1.6;
-
-interface LineStyle {
-  width: number;
-  dashed?: boolean;
-}
-
-const LINE_STYLE: Record<FamilyLink['type'], LineStyle> = {
-  parent: { width: 1 },
-  marriage: { width: 2.75 },
-  divorce: { width: 1.5, dashed: true },
-};
 
 export function PaperLines({ lines, layout, ink, parentInk, paper, state, showArrows }: PaperLinesProps) {
   const byType = useMemo(() => {
@@ -81,7 +70,7 @@ function PaperLineKind({
   type: FamilyLink['type'];
 }) {
   const ref = useRef<LineSegments>(null);
-  const style = LINE_STYLE[type];
+  const style = PAPER_LINE_STYLE[type];
   const points = useMemo(() => paperLineSegments(lines, layout)[type], [lines, layout, type]);
   const vertexColors = useMemo(() => points.map(() => [1, 1, 1] as [number, number, number]), [points]);
   const colours = useMemo(
@@ -137,8 +126,7 @@ function PaperLineKind({
       depthWrite={false}
       lineWidth={style.width}
       dashed={style.dashed}
-      dashSize={3}
-      gapSize={2.5}
+      {...PAPER_DASH}
     />
   );
 }

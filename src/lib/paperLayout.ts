@@ -355,9 +355,9 @@ export function layoutPaperTree(graph: { nodes: readonly FamilyNode[]; links: re
  * already placed keeps its position and size. The newcomer takes the nearest
  * clear shell around the placed relative closest to all their placed
  * relatives, at the spot in it nearest the others (at the edge of the cloud
- * when none are placed). The same newcomer and relatives always give the same
- * spot. Returns
- * `layout` itself when the newcomer is already placed.
+ * when none are placed). The same relatives always give the same spot,
+ * whatever the newcomer's id, so a Ghost Preview can show it before the id
+ * exists. Returns `layout` itself when the newcomer is already placed.
  */
 export function placeNewcomer(layout: PaperLayout, newcomerId: string, links: readonly FamilyLink[]): PaperLayout {
   if (layout.has(newcomerId)) return layout;
@@ -390,7 +390,7 @@ export function placeNewcomer(layout: PaperLayout, newcomerId: string, links: re
     startDistance = extent + radius + PAPER_DISC_GAP;
   }
 
-  const random = seededRandom(hashString(newcomerId, SEED));
+  const random = seededRandom(hashString([...relativeIds].sort().join('|'), SEED));
   const isClear = (p: Point) =>
     discs.every((d) => {
       const clearance = d.radius + radius + PAPER_DISC_GAP;

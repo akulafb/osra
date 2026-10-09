@@ -676,7 +676,7 @@ export const FamilyTree: React.FC = () => {
         onEdit={() => setIsEditModalOpen(true)}
         onAdd={() => setIsAddModalOpen(true)}
         onInvite={() => setIsBulkInviteOpen(true)}
-        onConnect={isPaper3D ? undefined : () => selectedNode && interaction.startConnect(selectedNode.id)}
+        onConnect={() => selectedNode && interaction.startConnect(selectedNode.id)}
         onManageLinks={() => setAdminManageLinksOpen(true)}
         onDelete={handleAdminDeleteSelectedNode}
       />
@@ -758,12 +758,11 @@ export const FamilyTree: React.FC = () => {
             layout={paperLayout}
             interaction={interaction}
             collapsedNodes={collapsedNodes}
+            onToggleCollapse={handleToggleCollapse}
             onSetCollapsedNodes={handleSetCollapsedNodes}
             mode={mode}
             onModeChange={handleModeChange}
             isAddModalOpen={isAddModalOpen}
-            isEditModalOpen={isEditModalOpen}
-            isBulkInviteOpen={isBulkInviteOpen}
             isModalOpen={isAddModalOpen || isEditModalOpen || isBulkInviteOpen || newMembersModalOpen || adminManageLinksOpen || adminAddPersonOpen}
             searchQuery={searchQuery}
             onSearchQueryChange={setSearchQuery}
@@ -780,6 +779,15 @@ export const FamilyTree: React.FC = () => {
             seeWhosNewButtonSlot={seeWhosNewButtonSlot}
             isAdmin={isAdmin}
             onAdminAddPersonClick={() => setAdminAddPersonOpen(true)}
+            selectedNode={selectedNode}
+            canEditSelected={canEditSelected}
+            onCreateRelative={handleCreateRelativeDirect}
+            onConnectExistingRelative={handleConnectExistingRelativeDirect}
+            onDirectConnectNodes={handleDirectConnectNodes}
+            canDissolveSelected={!!selectedNode && canDissolveNode(selectedNode.id)}
+            onDissolveNode={handleConfirmDissolveDirect}
+            lifecycles={lifecycles}
+            pendingLinkPreview={pendingLinkPreview}
           />
         ) : mode === '3D' ? (
           <FamilyTree3D

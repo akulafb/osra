@@ -234,6 +234,12 @@ describe('placeNewcomer: a newcomer lands near relatives and nobody else moves',
     }
   });
 
+  it('places any newcomer with the same relatives in the same spot, whatever their id', () => {
+    const first = placeNewcomer(layout, 'first', [...KINSHIP_FIXTURE_TREE.links, father(anchor, 'first')]);
+    const second = placeNewcomer(layout, 'second', [...KINSHIP_FIXTURE_TREE.links, father(anchor, 'second')]);
+    expect(second.get('second')).toEqual(first.get('first'));
+  });
+
   it('places a child of two parents far apart beside one of them, clear of every disc', () => {
     const links = [...KINSHIP_FIXTURE_TREE.links, father(FIXTURE_IDS.khalil, 'baby'), mother(FIXTURE_IDS.adel, 'baby')];
     const withBaby = placeNewcomer(layout, 'baby', links);

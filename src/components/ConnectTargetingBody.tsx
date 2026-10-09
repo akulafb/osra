@@ -31,6 +31,7 @@ export interface ConnectTargetingBodyProps {
   onQueryChange?: (query: string) => void;
   onPickTarget: (node: FamilyNode) => void;
   onExit: () => void;
+  aimTarget?: 'a glowing planet' | 'a person';
 }
 
 export const ConnectTargetingBody: React.FC<ConnectTargetingBodyProps> = ({
@@ -44,6 +45,7 @@ export const ConnectTargetingBody: React.FC<ConnectTargetingBodyProps> = ({
   onQueryChange,
   onPickTarget,
   onExit,
+  aimTarget = 'a glowing planet',
 }) => {
   const { panel, hud } = useTheme().palette;
   const truncated = Math.max(0, optionTotal - options.length);
@@ -56,7 +58,7 @@ export const ConnectTargetingBody: React.FC<ConnectTargetingBodyProps> = ({
       <div style={{ fontSize: 10, color: hud.editor.caption, lineHeight: 1.4 }}>
         {candidateCount === 0
           ? 'No one in view can be linked to this person yet.'
-          : 'Click a glowing planet, or pick from the list.'}
+          : `Click ${aimTarget}, or pick from the list.`}
         {unreachableCount > 0 && (
           <>
             {' '}

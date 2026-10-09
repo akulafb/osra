@@ -1,3 +1,4 @@
+import * as THREE from 'three';
 import type { FamilyLink } from '../../types/graph';
 import type { PaperLayout, PaperLine } from '../../lib/paperLayout';
 
@@ -22,6 +23,23 @@ export const TAP_SLOP_PX = 6;
 
 /** Lines draw before the discs and write no depth, so every disc covers the lines that cross it. */
 export const PAPER_LINE_RENDER_ORDER = -2;
+
+export interface PaperLineStyle {
+  width: number;
+  dashed?: boolean;
+}
+
+export const PAPER_LINE_STYLE: Record<FamilyLink['type'], PaperLineStyle> = {
+  parent: { width: 1 },
+  marriage: { width: 2.75 },
+  divorce: { width: 1.5, dashed: true },
+};
+
+export const PAPER_DASH = { dashSize: 3, gapSize: 2.5 };
+
+export function paperLineShown(type: FamilyLink['type'], toggles: { links: boolean; arrows: boolean }): boolean {
+  return toggles.links || (type === 'parent' && toggles.arrows);
+}
 
 export const PAPER_HOVER_FRAME_PRIORITY = -1;
 export const PAPER_REVEAL_FRAME_PRIORITY = PAPER_HOVER_FRAME_PRIORITY + 0.5;
@@ -58,6 +76,14 @@ export function depthFade(distance: number, start: number, end: number): number 
   if (distance <= start) return 1;
   if (distance >= end) return 0;
   return (end - distance) / (end - start);
+}
+
+const projected = new THREE.Vector3();
+
+/** Where a scene point lands on a canvas of `size`, in CSS pixels from its top left: what Cosmos's `graph2ScreenCoords` gives. */
+export function paperScreenPoint(point: Point3, camera: THREE.Camera, size: { width: number; height: number }): ScreenPoint {
+  projected.set(point.x, point.y, point.z).project(camera);
+  return { x: ((projected.x + 1) / 2) * size.width, y: ((1 - projected.y) / 2) * size.height };
 }
 
 export function isTap(down: ScreenPoint | null, up: ScreenPoint): boolean {
@@ -100,4 +126,24 @@ export function paperLineSegments(lines: readonly PaperLine[], layout: PaperLayo
     segments[line.type].push([a.x, a.y, a.z], [b.x, b.y, b.z]);
   }
   return segments;
+}
+
+/** `computeLineDistances` allocates a new GPU buffer on every call, and three never frees the one it replaces. */
+export function setPaperSegment(geometry: THREE.BufferGeometry, index: number, from: Point3, to: Point3): boolean {
+  const start = geometry.attributes.instanceStart as THREE.InterleavedBufferAttribute;
+  const ends = start.data.array as Float32Array;
+  const at = index * 6;
+  const next = [from.x, from.y, from.z, to.x, to.y, to.z];
+  if (next.every((value, i) => ends[at + i] === Math.fround(value))) return false;
+  ends.set(next, at);
+  start.data.needsUpdate = true;
+
+  const distance = geometry.attributes.instanceDistanceStart as THREE.InterleavedBufferAttribute | undefined;
+  if (distance) {
+    const distances = distance.data.array as Float32Array;
+    distances[index * 2] = 0;
+    distances[index * 2 + 1] = Math.hypot(to.x - from.x, to.y - from.y, to.z - from.z);
+    distance.data.needsUpdate = true;
+  }
+  return true;
 }

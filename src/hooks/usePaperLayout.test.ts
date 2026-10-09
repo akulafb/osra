@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { makePaperLayout, needsPaperLayout, type PaperLayoutState } from './usePaperLayout';
+import { followWorkingRecord, makePaperLayout, needsPaperLayout, type PaperLayoutState } from './usePaperLayout';
 import type { FamilyGraph } from '../types/graph';
 
 const graph: FamilyGraph = {
@@ -62,5 +62,48 @@ describe('makePaperLayout', () => {
       throw new Error('no room');
     });
     expect(state).toEqual({ status: 'failed' });
+  });
+});
+
+describe('followWorkingRecord', () => {
+  const ready = makePaperLayout(graph);
+  if (ready.status !== 'ready') throw new Error('layout failed');
+
+  it('places a Person it has not seen beside their relatives, and moves nobody else', () => {
+    const next = followWorkingRecord(ready, grown);
+    expect([...next.layout.keys()].sort()).toEqual(['baby', 'dad', 'kid', 'mum']);
+    for (const [id, disc] of ready.layout) expect(next.layout.get(id)).toEqual(disc);
+    const baby = next.layout.get('baby')!;
+    const kid = next.layout.get('kid')!;
+    expect(Math.hypot(baby.x - kid.x, baby.y - kid.y, baby.z - kid.z)).toBeLessThan((baby.radius + kid.radius) * 4);
+  });
+
+  it('places each newcomer once: later changes to the Working Record leave them where they landed', () => {
+    const placed = followWorkingRecord(ready, grown);
+    const confirmed: FamilyGraph = {
+      nodes: grown.nodes.map((n) => (n.id === 'baby' ? { ...n, familyCluster: 'Kid' } : n)),
+      links: [...grown.links, { source: 'mum', target: 'baby', type: 'parent' }],
+    };
+    expect(followWorkingRecord(placed, confirmed).layout.get('baby')).toEqual(placed.layout.get('baby'));
+  });
+
+  it('returns the same state when everyone is already placed', () => {
+    expect(followWorkingRecord(ready, graph)).toBe(ready);
+  });
+
+  it('drops a newcomer whose Spawn was aborted, so their spot is free again', () => {
+    const placed = followWorkingRecord(ready, grown);
+    const reverted = followWorkingRecord(placed, graph);
+    expect(reverted.layout.has('baby')).toBe(false);
+    expect([...reverted.layout.keys()].sort()).toEqual(['dad', 'kid', 'mum']);
+    expect(followWorkingRecord(reverted, grown).layout.get('baby')).toEqual(placed.layout.get('baby'));
+  });
+
+  it('keeps the spot of a Person from the full layout who leaves the Working Record', () => {
+    const withoutKid: FamilyGraph = {
+      nodes: graph.nodes.filter((n) => n.id !== 'kid'),
+      links: graph.links.filter((l) => l.target !== 'kid'),
+    };
+    expect(followWorkingRecord(ready, withoutKid).layout.get('kid')).toEqual(ready.layout.get('kid'));
   });
 });

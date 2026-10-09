@@ -29,8 +29,12 @@ export const GHOST_PREVIEW_SHELL_SCALE = 1.15;
 export const GHOST_PREVIEW_BODY_OPACITY = 0.18;
 export const GHOST_PREVIEW_SHELL_OPACITY = 0.55;
 
-/** Height of the name label above the marker's centre. */
-export const GHOST_PREVIEW_LABEL_HEIGHT = GHOST_PREVIEW_RADIUS + 8;
+/** Height of the name label above the centre of a marker of this radius. */
+export function ghostPreviewLabelHeight(radius: number): number {
+  return radius + 8;
+}
+
+export const GHOST_PREVIEW_LABEL_HEIGHT = ghostPreviewLabelHeight(GHOST_PREVIEW_RADIUS);
 
 export const GHOST_PREVIEW_TETHER_DASH = 5;
 export const GHOST_PREVIEW_TETHER_GAP = 4;
@@ -77,3 +81,41 @@ export function computeGhostPreviewOffset(
   }
 }
 
+/** Where a host's layout will put the new Tree Node, and its radius there. */
+export interface GhostPreviewLanding {
+  x: number;
+  y: number;
+  z: number;
+  radius: number;
+}
+
+export interface GhostPreviewPlacement {
+  offset: THREE.Vector3;
+  radius: number;
+  labelHeight: number;
+}
+
+/**
+ * The preview's displacement from its anchor and its size. A host that knows
+ * the landing (Paper) gets the preview on it, at the landing's size; without
+ * one (Cosmos) it is the camera-relative offset at the node size.
+ */
+export function ghostPreviewPlacement(
+  cameraQuaternion: THREE.Quaternion,
+  relation: RelativeDirection,
+  anchor: { x: number; y: number; z: number },
+  landing: GhostPreviewLanding | null
+): GhostPreviewPlacement {
+  if (!landing) {
+    return {
+      offset: computeGhostPreviewOffset(cameraQuaternion, relation),
+      radius: GHOST_PREVIEW_RADIUS,
+      labelHeight: GHOST_PREVIEW_LABEL_HEIGHT,
+    };
+  }
+  return {
+    offset: new THREE.Vector3(landing.x - anchor.x, landing.y - anchor.y, landing.z - anchor.z),
+    radius: landing.radius,
+    labelHeight: ghostPreviewLabelHeight(landing.radius),
+  };
+}
