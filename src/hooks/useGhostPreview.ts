@@ -14,6 +14,7 @@ import {
   type GhostPreviewLanding,
 } from '../utils/ghostPreview';
 import { relationColor } from '../theme/relationColors';
+import { setTetherEnds } from './ghostPreviewTether';
 
 /** The marker's colours; Cosmos draws it in the relation's colour with a light label. */
 export interface GhostPreviewLook {
@@ -155,12 +156,7 @@ export function useGhostPreview(params: {
       group.position.copy(target);
       shell.scale.setScalar(ghostPreviewBreath(now - startedAt));
 
-      const positions = tetherGeometry.attributes.position as THREE.BufferAttribute;
-      positions.setXYZ(0, anchorVec.x, anchorVec.y, anchorVec.z);
-      positions.setXYZ(1, target.x, target.y, target.z);
-      positions.needsUpdate = true;
-      tetherGeometry.computeBoundingSphere();
-      tether.computeLineDistances();
+      setTetherEnds(tetherGeometry, anchorVec, target);
     };
     frameId = requestAnimationFrame(tick);
 
