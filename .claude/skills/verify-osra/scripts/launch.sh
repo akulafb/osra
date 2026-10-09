@@ -38,7 +38,11 @@ while :; do
     continue
   fi
 
-  nohup node_modules/.bin/vite --port "$OSRA_PORT" --strictPort > "$run_dir/evidence/vite.log" 2>&1 &
+  # vite gets its own session, so a tool runner that kills the call's process group when the
+  # call ends (AGY's does) leaves it running. macOS has no setsid(1); perl's POSIX::setsid is
+  # built in, and exec keeps the pid, so $! is vite's pid.
+  perl -MPOSIX -e 'POSIX::setsid() or die "setsid: $!\n"; exec { $ARGV[0] } @ARGV or die "exec $ARGV[0]: $!\n"' \
+    node_modules/.bin/vite --port "$OSRA_PORT" --strictPort < /dev/null > "$run_dir/evidence/vite.log" 2>&1 &
   pid=$!
   echo "$pid" > "$run_dir/state/vite.pid"
 

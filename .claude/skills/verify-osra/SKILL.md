@@ -25,7 +25,7 @@ RUN_DIR=/tmp/osra-verify/...       # copy it from the output
 $S/open-tab.sh "$RUN_DIR"          # opens http://localhost:5173/ in Orca, records the page id
 ```
 
-Ready means `launch.sh` printed `READY http://localhost:5173 ... Supabase: djwqamcfllqziqiyvyjj`. It runs `npm ci` first when `node_modules` is missing. Vite hot-reloads, so edits after launch show up without a restart. A new worktree has no `.env.local` (it is gitignored), and then `launch.sh` exits 1 without printing anything: copy the file from the main checkout first.
+Ready means `launch.sh` printed `READY http://localhost:5173 ... Supabase: djwqamcfllqziqiyvyjj`. It runs `npm ci` first when `node_modules` is missing. Vite runs in its own session, so it outlives the tool call that started it, even in a runner that kills the call's process group (AGY's does); no `nohup` shim on `PATH` is needed. Vite hot-reloads, so edits after launch show up without a restart. A new worktree has no `.env.local` (it is gitignored), and then `launch.sh` exits 1 without printing anything: copy the file from the main checkout first.
 
 ## Doctor
 
