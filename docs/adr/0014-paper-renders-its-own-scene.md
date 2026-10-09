@@ -38,7 +38,7 @@ Paper does not restyle Cosmos. Its Persons sit still in a seeded layout (`src/li
   - `src/components/paper/*`: the duotone pass and its pure colour map;
   - `src/theme/panel.ts`: the live pair tokens the panels below read;
   - `TreeSearchBar.tsx` (the counter), `FamilyTree2D.tsx` (the empty state), `PersonDetailDrawer.tsx` (the hover states, and Connect Nodes offered only when a handler is passed) and `ConnectPickerCard.tsx` (the selected choice in the pair's accent);
-  - `Tree3DOverlay.tsx`: optional AMBIANCE and previous/next match props. Paper 3D passes neither, so it hides AMBIANCE (Cosmos-only: the Paper focus tap from LIN-94 always plays, product decision 10) and the match stepping (LIN-97), lists only Esc under NAV CONTROLS (LIN-96 adds WASD, Q/E and R) and offers no Connect Nodes (LIN-96).
+  - `Tree3DOverlay.tsx`: optional AMBIANCE and previous/next match props. Paper 3D passes no AMBIANCE, so it hides it (Cosmos-only: the Paper focus tap from LIN-94 always plays, product decision 10). It hid the match stepping until LIN-97 pass 97b passed its own. It lists only Esc under NAV CONTROLS (LIN-96 adds WASD, Q/E and R) and offers no Connect Nodes (LIN-96).
 - **LIN-94.**
   - `src/components/paper/*`: hover, focus, fly-to, screen-space hit testing, ring, particles, ripple, wobble;
   - new pure `src/lib/paperHover.ts` and `src/lib/paperFocus.ts` with tests: hit testing, the lean, the fly-to framing, the ripple and the wobble;
@@ -69,9 +69,10 @@ Paper does not restyle Cosmos. Its Persons sit still in a seeded layout (`src/li
 - **LIN-97.**
   - pass 97a: a new pure `src/lib/paperSearch.ts` with tests. `packMatches` is a short, one-off settle on the matches only (a pull to their centre, linked matches drawn together, a name's room between every two discs), deterministic for the same matches and never live physics on the full tree. `paperSearchLayout` returns a new layout with the matches moved, so the fixed layout is never changed. `paperSearchEmphasis` is `focusEmphasis` with the non-matches `hidden` and only a match hovered or focused. `paperSearchMotionFrom` / `paperSearchMotionAt` move the scene into the cluster and back on the scene clock, with finite durations (ADR 0007, ADR 0011): each Person travels from where they are drawn, so a new query mid-move turns back smoothly;
   - pass 97a, `src/components/paper/*`: `PaperTree3D` draws from the search layout while searching (not in Connect Mode, whose picker shares the query), keeps only the lines between matches and cycles Tab through the matches. `PaperSearch` writes the move as render offsets and a per-Person size, so non-matches shrink away while keeping their ink (`hidden` keeps full ink in Paper 3D; its size hides it), and frames the cluster, the selected match, or the overview once the search clears. Hover, hit-testing and focus read the same search layout and size;
-  - `TreeSearchBar.tsx`: an optional count label that Paper 2D and Paper 3D pass and Cosmos does not;
-  - `FamilyTree2D.tsx` only for passing that label, since Paper 2D's search emphasis already comes from `focusEmphasis` (ticket 2);
-  - Escape order in Paper (product decision 9): the selected Person first, then the search;
+  - pass 97b: `TreeSearchBar.tsx` takes an optional count label under the bar ("1 PERSON", "N PEOPLE", from `paperSearchCount`); Paper 2D and Paper 3D pass it and Cosmos does not, so Cosmos keeps only its `current/total` counter. `Tree3DOverlay`'s search gains the same optional label;
+  - pass 97b: `FamilyTree2D.tsx` only passes that label, since Paper 2D's search emphasis already comes from `focusEmphasis` (ticket 2): non-matches dim and the 2D layout stays;
+  - pass 97b: Prev/Next and Enter / Shift+Enter in Paper 3D select the next or previous match in the cluster, in the search's order (`paperSearchOrder` with `paperCycle`), and the camera flies to them as on any focus; Tab steps the same order. The `current/total` counter shows the selected match;
+  - pass 97b: Escape order in Paper (product decision 9), from `paperEscape`: the selected Person, or any edit under way, first, then the search. Paper 3D applies it in and outside the box. In Paper 2D, `FamilyTree2D` still sends every Escape to the interaction, so `FamilyTree.tsx` clears the search only when the interaction was idle. Cosmos keeps its Escape;
   - `features/paper-mode.md` and `features/tree-search.md`.
 
   Ctrl/Cmd+F already works through the shared overlay.
