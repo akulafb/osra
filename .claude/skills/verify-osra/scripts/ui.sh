@@ -11,12 +11,12 @@
 #   ui.sh <run-dir> key   <key>                   press a key in the page (Enter, Escape, Tab, Meta+f); refuses unless the page has focus
 #   ui.sh <run-dir> goto  <path>                  navigate to http://localhost:5173<path>
 #   ui.sh <run-dir> wait-text <text>              wait until text is on the page
+#   ui.sh <run-dir> orca <command> [args...]      any other orca browser command on the run's tab (adds --page)
 # Name matching is exact; prefix the name with ~ for a substring match (e.g. "~Badran").
 set -euo pipefail
 source "$(dirname "$0")/lib.sh"
-osra_require_run_dir "${1:-}"
-run_dir="$1"; cmd="${2:?command}"; shift 2
-page="$(cat "$run_dir/state/page")"
+osra_drivable_page "${1:-}"   # refuses unless port 5173 still serves this run's vite at its commit
+page="$OSRA_PAGE"; cmd="${2:?command}"; shift 2
 
 find_ref() {
   orca snapshot --page "$page" --json | python3 -c "
@@ -74,5 +74,6 @@ case "$cmd" in
     orca keypress --page "$page" --key "$1" --json >/dev/null && echo "pressed $1" ;;
   goto) orca goto --page "$page" --url "http://localhost:$OSRA_PORT$1" --json >/dev/null && echo "at $1" ;;
   wait-text) orca wait --page "$page" --text "$1" --json >/dev/null && echo "saw '$1'" ;;
+  orca) orca "$@" --page "$page" ;;
   *) echo "unknown command $cmd" >&2; exit 2 ;;
 esac

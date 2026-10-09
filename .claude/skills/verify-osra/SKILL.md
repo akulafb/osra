@@ -33,11 +33,11 @@ Ready means `launch.sh` printed `READY http://localhost:5173 ... Supabase: djwqa
 $S/doctor.sh "$RUN_DIR"
 ```
 
-Read-only. Checks: our vite pid is alive, it owns port 5173, it announced the dev Supabase ref, the page serves Osra, HEAD vs launch, Orca is reachable, and the run's tab holds a dev Supabase session. Run it first, and again whenever anything looks off. A `WARN ... no dev Supabase session` means the signed-in features will show the landing page: the owner must sign in with Google in that Orca tab.
+Read-only. Checks: our vite pid is alive, owns port 5173 and serves this run's checkout at the launched HEAD (the same check `ui.sh`, `capture.sh` and `open-tab.sh` refuse on), it announced the dev Supabase ref, the page serves Osra, Orca is reachable, and the run's tab holds a dev Supabase session. Run it first, and again whenever anything looks off. A `WARN ... no dev Supabase session` means the signed-in features will show the landing page: the owner must sign in with Google in that Orca tab.
 
 ## Drive
 
-`ui.sh` drives the run's tab by accessible role and name, resolving fresh refs from an Orca snapshot on every call:
+`ui.sh` drives the run's tab by accessible role and name, resolving fresh refs from an Orca snapshot on every call. Before it touches the browser, it (like `capture.sh` and `open-tab.sh`) exits 3 with `REFUSE:` when this run's vite is gone, no longer owns port 5173, or serves another checkout or commit: whatever 5173 shows then is not your commit. Do what the message says (discard what you saw since the last passing `doctor.sh`, `cleanup.sh`, relaunch); never drive the tab past it.
 
 ```bash
 $S/ui.sh "$RUN_DIR" tree                                   # print the accessibility tree
@@ -49,9 +49,10 @@ $S/ui.sh "$RUN_DIR" tap 250 650                             # click empty space 
 $S/ui.sh "$RUN_DIR" key Escape
 $S/ui.sh "$RUN_DIR" goto /invite/some-token                # path on http://localhost:5173
 $S/ui.sh "$RUN_DIR" wait-text "Invalid Invite"
+$S/ui.sh "$RUN_DIR" orca eval --expression "document.title" --json   # any other orca browser command
 ```
 
-Names match exactly; prefix with `~` for a substring (`click button "~SELECT FAMILY"`). Anything else goes through `orca <command> --page "$(cat $RUN_DIR/state/page)"` (`orca eval`, `orca scroll`, `orca reload`; see `orca skills get orca-cli --reference references/browser.md`).
+Names match exactly; prefix with `~` for a substring (`click button "~SELECT FAMILY"`). Anything else goes through `$S/ui.sh "$RUN_DIR" orca <command> [args]`, which adds the run's `--page` after the same check (`orca eval`, `orca scroll`, `orca reload`; see `orca skills get orca-cli --reference references/browser.md`).
 
 Osra-specific traps:
 
@@ -59,7 +60,7 @@ Osra-specific traps:
 - Reserve `pick` for items of an open scrollable menu. Scrolling a control inside a collapsed panel pans the whole app off-screen; `orca reload` recovers.
 - Person nodes exist in the snapshot only in 2D with a family selected. The 3D view is a WebGL canvas: its nodes have no accessibility handles, so prove 3D with screenshots plus the side panels. The canvas has no `preserveDrawingBuffer`, so `toDataURL` crops come out blank: crop an `orca screenshot` (its base64 `data`) with PIL instead.
 - View mode (`family-tree-view-mode`), Canvas Mode (`family-tree-canvas-mode`, written only by the COSMOS ⇄ PAPER switch; absent means Paper), Paper colour (`family-tree-paper-colour`), the Paper 3D hint (`family-tree-paper-hint-seen`) and the "who's new" acknowledgement persist in the owner's localStorage. The retired `family-tree-background-theme` key may still be there; nothing reads it. Note the starting values and put them back before cleanup (remove any of these keys that was absent). The selected family resets on reload.
-- An off-screen Orca tab is throttled: springs stall, screenshots go stale and clicks on INSTRUMENTS items miss. Bring it forward with `orca tab switch --page "$(cat $RUN_DIR/state/page)" --focus`, re-read state after each step, and check motion and timing only in a visible tab, or report them as unverified for the owner.
+- An off-screen Orca tab is throttled: springs stall, screenshots go stale and clicks on INSTRUMENTS items miss. Bring it forward with `$S/ui.sh "$RUN_DIR" orca tab switch --focus`, re-read state after each step, and check motion and timing only in a visible tab, or report them as unverified for the owner.
 - Clicks during a loader are swallowed in a slow tab: pump `orca screenshot`s until the loader leaves the DOM.
 - `ui.sh person`, `ui.sh tap` and DOM clicks can drop the tab to 1 fps for several seconds, while `ui.sh key` keeps frames coming. Drive motion checks with keys where you can.
 

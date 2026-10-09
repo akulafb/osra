@@ -4,6 +4,7 @@
 set -euo pipefail
 source "$(dirname "$0")/lib.sh"
 osra_require_run_dir "${1:-}"
+osra_require_live_server "$1"
 run_dir="$1"; path="${2:-/}"
 if [[ -s "$run_dir/state/page" ]]; then
   echo "this run already owns tab $(cat "$run_dir/state/page"); use orca goto --page <id> to move it" >&2
