@@ -14,7 +14,7 @@ import {
   type GhostPreviewLanding,
 } from '../utils/ghostPreview';
 import { relationColor } from '../theme/relationColors';
-import { setTetherEnds } from './ghostPreviewTether';
+import { setTetherEnds } from '../utils/ghostPreviewTether';
 
 /** The marker's colours; Cosmos draws it in the relation's colour with a light label. */
 export interface GhostPreviewLook {

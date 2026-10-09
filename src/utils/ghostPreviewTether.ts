@@ -1,9 +1,8 @@
 import * as THREE from 'three';
 
 /**
- * Moves the Ghost Preview tether, a two-point dashed `THREE.Line`, every frame.
- * `computeLineDistances` allocates a new GPU buffer on every call, and three never frees the one it replaces,
- * so the dash distances are written in place, and only when the tether's length changes.
+ * `computeLineDistances` allocates a new GPU buffer on every call and three never frees the one it replaces,
+ * so the distances are written in place.
  */
 export function setTetherEnds(geometry: THREE.BufferGeometry, from: THREE.Vector3, to: THREE.Vector3): void {
   const positions = geometry.attributes.position as THREE.BufferAttribute;
