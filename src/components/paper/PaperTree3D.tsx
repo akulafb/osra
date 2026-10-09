@@ -113,7 +113,7 @@ const GHOST_LOOK: GhostPreviewLook = {
   labelBackground: `rgba(${hexToRgb(PAPER).join(', ')}, 0.85)`,
 };
 
-/** How long a click on the selected Person waits for a second click before it deselects them: the longest system double-click interval most people keep. */
+/** The usual system double-click interval. */
 const DOUBLE_CLICK_MS = 500;
 
 /** Paper's own 3D scene (ADR 0014): the still layout as ink discs, lines and labels, drawn in grayscale and painted in the live Paper Pair. */
@@ -168,7 +168,7 @@ export function PaperTree3D({
   const hoverPointer = useRef<ScreenPoint | null>(null);
   const emphasisState = useRef<PaperEmphasisState>(emptyEmphasisState());
   const personClick = useRef<MouseEvent | null>(null);
-  const firstClickId = useRef<string | null>(null);
+  const doubleClickTargetId = useRef<string | null>(null);
   const pendingDeselect = useRef<number | undefined>(undefined);
   const latestInteraction = useRef(interaction);
   latestInteraction.current = interaction;
@@ -294,11 +294,11 @@ export function PaperTree3D({
       const click = paperPersonClick({
         id,
         detail: nativeEvent.detail,
-        selectedId: interaction.selectedNodeId,
+        selectedId: interaction.state.phase === 'selected' ? interaction.selectedNodeId : null,
         connecting: !!interaction.connectSourceId,
       });
       if (click === 'ignore') return;
-      firstClickId.current = tap ? id : null;
+      doubleClickTargetId.current = tap && click !== 'pick' ? id : null;
       cancelDeselect();
       if (!tap) return;
       if (click === 'pick') pickConnectTarget(id);
@@ -306,8 +306,8 @@ export function PaperTree3D({
       else {
         pendingDeselect.current = window.setTimeout(() => {
           pendingDeselect.current = undefined;
-          const { state, selectNode } = latestInteraction.current;
-          if (state.phase === 'selected' && state.selectedNodeId === id) selectNode(id);
+          const { state, deselect } = latestInteraction.current;
+          if (state.phase === 'selected' && state.selectedNodeId === id) deselect();
         }, DOUBLE_CLICK_MS);
       }
     },
@@ -318,9 +318,10 @@ export function PaperTree3D({
   const handleSceneClick = useCallback(
     (event: React.MouseEvent) => {
       if (!(event.target instanceof HTMLCanvasElement)) return;
+      if (event.detail > 1) return;
       const onPerson = personClick.current === event.nativeEvent;
-      if (!onPerson && event.detail <= 1) {
-        firstClickId.current = null;
+      if (!onPerson) {
+        doubleClickTargetId.current = null;
         cancelDeselect();
       }
       if (!isBackgroundTap(pointerDown.current, { x: event.clientX, y: event.clientY }, onPerson)) return;
@@ -347,15 +348,14 @@ export function PaperTree3D({
     hoverPointer.current = null;
   }, []);
 
-  // The Person under the first click, since selecting them may already have flown their disc out from under the pointer.
   const handleSceneDoubleClick = useCallback(
     (event: React.MouseEvent) => {
-      const id = firstClickId.current;
+      const id = doubleClickTargetId.current;
       if (!(event.target instanceof HTMLCanvasElement) || !id) return;
       cancelDeselect();
-      if (!interaction.connectSourceId && paperCollapsible(graphData.links, id)) onToggleCollapse(id);
+      if (paperCollapsible(graphData.links, id)) onToggleCollapse(id);
     },
-    [graphData.links, interaction.connectSourceId, onToggleCollapse, cancelDeselect]
+    [graphData.links, onToggleCollapse, cancelDeselect]
   );
 
   const handleKeyAction = (action: PaperKeyAction): boolean => {
@@ -380,7 +380,7 @@ export function PaperTree3D({
         return true;
     }
   };
-  const keyBlocks = paperKeyBlocks({ modalOpen: isModalOpen, addModalOpen: !!isAddModalOpen, arrival });
+  const keyBlocks = paperKeyBlocks({ modalOpen: isModalOpen, modalAllowsFlight: !!isAddModalOpen, arrival });
   const heldKeys = usePaperKeys({ blocked: keyBlocks, onAction: handleKeyAction });
 
   const sceneCamera: Tree3DSceneCamera = { focusPerson, resetView };

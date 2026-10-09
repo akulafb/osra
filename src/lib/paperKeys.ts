@@ -12,17 +12,8 @@ export interface PaperKeyModifiers {
   alt: boolean;
 }
 
-/** The parts of a KeyboardEvent the keys read. */
-export interface PaperKeyEvent {
-  key: string;
-  code: string;
-  shiftKey: boolean;
-  ctrlKey: boolean;
-  metaKey: boolean;
-  altKey: boolean;
-}
+export type PaperKeyEvent = Pick<KeyboardEvent, 'key' | 'code' | 'shiftKey' | 'ctrlKey' | 'metaKey' | 'altKey'>;
 
-/** Where focus sits: in a text field, on the page or the scene, or on some other control. */
 export type PaperKeyFocus = 'typing' | 'scene' | 'control';
 
 export interface PaperKeyBlocks {
@@ -80,21 +71,19 @@ export function paperKeyAction(key: string, modifiers: PaperKeyModifiers): Paper
   }
 }
 
-/** No key acts before the intro settles, since the reveal lands on the view it started from. WASD and Q/E still fly behind the Add Relative preview, as in Cosmos. */
 export function paperKeyBlocks({
   modalOpen,
-  addModalOpen,
+  modalAllowsFlight,
   arrival,
 }: {
   modalOpen: boolean;
-  addModalOpen: boolean;
+  modalAllowsFlight: boolean;
   arrival: PaperArrival;
 }): PaperKeyBlocks {
   const arriving = arrival !== 'settled';
-  return { actions: modalOpen || arriving, flight: (modalOpen && !addModalOpen) || arriving };
+  return { actions: modalOpen || arriving, flight: (modalOpen && !modalAllowsFlight) || arriving };
 }
 
-/** What a key pressed does. Flight keys go by physical key, so a release under Option (which changes `key`) still lets go. Tab and Enter belong to a focused control. */
 export function paperKeyDown(event: PaperKeyEvent, focus: PaperKeyFocus, blocked: PaperKeyBlocks): PaperKeyDown | null {
   if (focus === 'typing') return null;
   const flight = paperEventFlightKey(event);
@@ -109,6 +98,7 @@ export function paperKeyDown(event: PaperKeyEvent, focus: PaperKeyFocus, blocked
   return { kind: 'action', action };
 }
 
+/** By physical key, since Option changes `key`. */
 export function paperEventFlightKey(event: Pick<PaperKeyEvent, 'key' | 'code'>): PaperFlightKey | null {
   return paperFlightKey(event.code ? event.code.replace(/^Key/, '') : event.key);
 }

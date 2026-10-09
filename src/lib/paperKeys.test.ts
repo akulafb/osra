@@ -131,7 +131,7 @@ describe('Tab cycling', () => {
 });
 
 describe('what blocks the keys', () => {
-  const open = { modalOpen: false, addModalOpen: false };
+  const open = { modalOpen: false, modalAllowsFlight: false };
 
   it('blocks flying and the actions until the intro has settled, so the reveal lands where it meant to', () => {
     for (const arrival of ['loader', 'revealing', 'crossfade'] as const) {
@@ -141,8 +141,8 @@ describe('what blocks the keys', () => {
   });
 
   it('blocks both behind a modal, but still flies behind the Add Relative preview', () => {
-    expect(paperKeyBlocks({ modalOpen: true, addModalOpen: false, arrival: 'settled' })).toEqual({ actions: true, flight: true });
-    expect(paperKeyBlocks({ modalOpen: true, addModalOpen: true, arrival: 'settled' })).toEqual({ actions: true, flight: false });
+    expect(paperKeyBlocks({ modalOpen: true, modalAllowsFlight: false, arrival: 'settled' })).toEqual({ actions: true, flight: true });
+    expect(paperKeyBlocks({ modalOpen: true, modalAllowsFlight: true, arrival: 'settled' })).toEqual({ actions: true, flight: false });
   });
 });
 
@@ -158,9 +158,9 @@ describe('a key pressed', () => {
   });
   const free = { actions: false, flight: false };
 
-  it('holds a flight key, read by its physical key so Option does not change it', () => {
+  it('holds a flight key by its physical key, whatever character the key gives', () => {
     expect(paperKeyDown(press('w'), 'scene', free)).toEqual({ kind: 'hold', key: 'forward' });
-    expect(paperKeyDown(press('∑', { code: 'KeyW', altKey: false }), 'control', free)).toEqual({ kind: 'hold', key: 'forward' });
+    expect(paperKeyDown(press('∑', { code: 'KeyW' }), 'control', free)).toEqual({ kind: 'hold', key: 'forward' });
   });
 
   it('holds no flight key while flying is blocked or under Ctrl, Cmd or Alt', () => {

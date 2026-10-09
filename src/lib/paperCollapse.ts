@@ -14,10 +14,7 @@ export function paperCollapsible(links: readonly FamilyLink[], id: string): bool
 
 export type PaperPersonClick = 'select' | 'pick' | 'deselect-later' | 'ignore';
 
-/**
- * What a click on a Person does. A double-click is click, click, dblclick: the second click is ignored, and a click on
- * the selected Person deselects only once no double-click follows, so a double-click collapses and keeps the selection.
- */
+/** A double-click arrives as click, click (detail 2), dblclick. */
 export function paperPersonClick({
   id,
   detail,

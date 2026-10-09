@@ -37,7 +37,6 @@ export const PAPER_LINE_STYLE: Record<FamilyLink['type'], PaperLineStyle> = {
 
 export const PAPER_DASH = { dashSize: 3, gapSize: 2.5 };
 
-/** Parent lines carry the arrows, so ARROWS keeps them with LINKS off, as in Cosmos. */
 export function paperLineShown(type: FamilyLink['type'], toggles: { links: boolean; arrows: boolean }): boolean {
   return toggles.links || (type === 'parent' && toggles.arrows);
 }
@@ -129,11 +128,7 @@ export function paperLineSegments(lines: readonly PaperLine[], layout: PaperLayo
   return segments;
 }
 
-/**
- * Moves segment `index` of a drei `<Line segments>` to `from`-`to` in the buffers it already has, dash distances included,
- * and returns whether it moved. `computeLineDistances` allocates a new GPU buffer on every call, and three never frees the
- * one it replaces. The distances run on from the segment before, as three's do, so write the segments in order.
- */
+/** `computeLineDistances` allocates a new GPU buffer on every call, and three never frees the one it replaces. */
 export function setPaperSegment(geometry: THREE.BufferGeometry, index: number, from: Point3, to: Point3): boolean {
   const start = geometry.attributes.instanceStart as THREE.InterleavedBufferAttribute;
   const ends = start.data.array as Float32Array;
@@ -146,9 +141,8 @@ export function setPaperSegment(geometry: THREE.BufferGeometry, index: number, f
   const distance = geometry.attributes.instanceDistanceStart as THREE.InterleavedBufferAttribute | undefined;
   if (distance) {
     const distances = distance.data.array as Float32Array;
-    const begin = index === 0 ? 0 : distances[index * 2 - 1];
-    distances[index * 2] = begin;
-    distances[index * 2 + 1] = begin + Math.hypot(to.x - from.x, to.y - from.y, to.z - from.z);
+    distances[index * 2] = 0;
+    distances[index * 2 + 1] = Math.hypot(to.x - from.x, to.y - from.y, to.z - from.z);
     distance.data.needsUpdate = true;
   }
   return true;

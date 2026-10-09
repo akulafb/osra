@@ -162,8 +162,7 @@ describe('paperScreenPoint: where a scene point lands on the canvas, in CSS pixe
   });
 });
 
-/** The buffers drei's `<Line segments>` holds: both ends of each segment interleaved, and a dash distance at each end. */
-function fatLine(segments: number) {
+function dreiSegmentsGeometry(segments: number) {
   const geometry = new THREE.InstancedBufferGeometry();
   const ends = new THREE.InstancedInterleavedBuffer(new Float32Array(segments * 6), 6, 1);
   geometry.setAttribute('instanceStart', new THREE.InterleavedBufferAttribute(ends, 3, 0));
@@ -179,7 +178,7 @@ const bufferOf = (geometry: THREE.BufferGeometry, name: string) => (geometry.att
 
 describe('setPaperSegment: moving one segment of a fat line in place', () => {
   it('writes the ends and the dash distances into the buffers the line already has', () => {
-    const { geometry, ends, distances } = fatLine(1);
+    const { geometry, ends, distances } = dreiSegmentsGeometry(1);
     expect(setPaperSegment(geometry, 0, at(0, 0, 0), at(3, 4, 0))).toBe(true);
     expect(bufferOf(geometry, 'instanceStart')).toBe(ends);
     expect(bufferOf(geometry, 'instanceDistanceStart')).toBe(distances);
@@ -190,7 +189,7 @@ describe('setPaperSegment: moving one segment of a fat line in place', () => {
   });
 
   it('uploads nothing when the segment has not moved', () => {
-    const { geometry, ends, distances } = fatLine(1);
+    const { geometry, ends, distances } = dreiSegmentsGeometry(1);
     setPaperSegment(geometry, 0, at(1.1, 2.2, 3.3), at(4, 5, 6));
     expect(setPaperSegment(geometry, 0, at(1.1, 2.2, 3.3), at(4, 5, 6))).toBe(false);
     expect(ends.version).toBe(1);
@@ -198,18 +197,18 @@ describe('setPaperSegment: moving one segment of a fat line in place', () => {
   });
 
   it('updates the distances in place when the segment moves again', () => {
-    const { geometry, distances } = fatLine(1);
+    const { geometry, distances } = dreiSegmentsGeometry(1);
     setPaperSegment(geometry, 0, at(0, 0, 0), at(3, 4, 0));
     setPaperSegment(geometry, 0, at(0, 0, 0), at(6, 8, 0));
     expect(bufferOf(geometry, 'instanceDistanceStart')).toBe(distances);
     expect([...distances.array]).toEqual([0, 10]);
   });
 
-  it('runs the dashes on from the segment before, as three does', () => {
-    const { geometry, distances } = fatLine(2);
-    setPaperSegment(geometry, 0, at(0, 0, 0), at(3, 4, 0));
+  it("starts each segment's dashes at its own start, whatever order the segments are written in", () => {
+    const { geometry, distances } = dreiSegmentsGeometry(2);
     setPaperSegment(geometry, 1, at(10, 0, 0), at(10, 2, 0));
-    expect([...distances.array]).toEqual([0, 5, 5, 7]);
+    setPaperSegment(geometry, 0, at(0, 0, 0), at(3, 4, 0));
+    expect([...distances.array]).toEqual([0, 5, 0, 2]);
   });
 });
 
