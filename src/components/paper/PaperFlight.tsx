@@ -12,7 +12,6 @@ interface PaperFlightProps {
   paused: boolean;
 }
 
-/** Moves and turns the camera through CameraControls while WASD or Q/E is held (product decision 6). */
 export function PaperFlight({ held, viewDistance, state, paused }: PaperFlightProps) {
   const controls = useThree((three) => three.controls) as CameraControls | null;
   useFrame((_, delta) => {

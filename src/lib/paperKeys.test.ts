@@ -25,10 +25,11 @@ describe('NAV CONTROLS keys', () => {
     expect(paperKeyAction('Escape', plain)).toBe('deselect');
   });
 
-  it('ignores a key held with Ctrl, Cmd or Alt, so browser shortcuts like reload keep working', () => {
+  it('ignores a key held with Ctrl, Cmd or Alt, so browser shortcuts like reload keep working, but Esc still deselects', () => {
     for (const mod of ['ctrl', 'meta', 'alt'] as const) {
       expect(paperKeyAction('r', { ...plain, [mod]: true })).toBeNull();
       expect(paperKeyAction('Tab', { ...plain, [mod]: true })).toBeNull();
+      expect(paperKeyAction('Escape', { ...plain, [mod]: true })).toBe('deselect');
     }
   });
 

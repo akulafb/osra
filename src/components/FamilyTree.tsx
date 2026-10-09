@@ -763,8 +763,6 @@ export const FamilyTree: React.FC = () => {
             mode={mode}
             onModeChange={handleModeChange}
             isAddModalOpen={isAddModalOpen}
-            isEditModalOpen={isEditModalOpen}
-            isBulkInviteOpen={isBulkInviteOpen}
             isModalOpen={isAddModalOpen || isEditModalOpen || isBulkInviteOpen || newMembersModalOpen || adminManageLinksOpen || adminAddPersonOpen}
             searchQuery={searchQuery}
             onSearchQueryChange={setSearchQuery}

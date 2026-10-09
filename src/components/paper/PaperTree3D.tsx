@@ -60,8 +60,6 @@ export interface PaperTree3DProps {
   mode?: '3D' | '2D';
   onModeChange?: (mode: '3D' | '2D') => void;
   isAddModalOpen?: boolean;
-  isEditModalOpen?: boolean;
-  isBulkInviteOpen?: boolean;
   isModalOpen?: boolean;
   searchQuery: string;
   onSearchQueryChange: (q: string) => void;
@@ -128,8 +126,6 @@ export function PaperTree3D({
   mode,
   onModeChange,
   isAddModalOpen,
-  isEditModalOpen,
-  isBulkInviteOpen,
   isModalOpen = false,
   searchQuery,
   onSearchQueryChange,
@@ -280,6 +276,8 @@ export function PaperTree3D({
     (id: string, event: ThreeEvent<MouseEvent>) => {
       personClick.current = event.nativeEvent;
       if (!isTap(pointerDown.current, { x: event.nativeEvent.clientX, y: event.nativeEvent.clientY })) return;
+      // The second click of a double-click would toggle the selection back off; the double-click collapses instead.
+      if (event.nativeEvent.detail > 1) return;
       if (interaction.connectSourceId) pickConnectTarget(id);
       else interaction.selectNode(id);
     },
@@ -317,9 +315,9 @@ export function PaperTree3D({
 
   const handlePersonDoubleClick = useCallback(
     (id: string) => {
-      if (paperCollapsible(graphData.links, id)) onToggleCollapse(id);
+      if (!interaction.connectSourceId && paperCollapsible(graphData.links, id)) onToggleCollapse(id);
     },
-    [graphData.links, onToggleCollapse]
+    [graphData.links, interaction.connectSourceId, onToggleCollapse]
   );
 
   const handleKeyAction = (action: PaperKeyAction): boolean => {
@@ -331,7 +329,7 @@ export function PaperTree3D({
       case 'cycle-next':
       case 'cycle-previous': {
         const next = paperCycle(shownIds, selectedId, action === 'cycle-previous');
-        if (next) interaction.selectNode(next);
+        if (next && next !== selectedId) interaction.selectNode(next);
         return true;
       }
       case 'focus':
@@ -343,9 +341,10 @@ export function PaperTree3D({
         return true;
     }
   };
-  const flightBlocked = !!isEditModalOpen || !!isBulkInviteOpen;
+  // WASD and Q/E still fly behind the Add Relative preview, as in Cosmos.
+  const flightBlocked = isModalOpen && !isAddModalOpen;
   const heldKeys = usePaperKeys({
-    actionsBlocked: !!isAddModalOpen || flightBlocked,
+    actionsBlocked: isModalOpen || arrival !== 'settled',
     flightBlocked,
     onAction: handleKeyAction,
   });

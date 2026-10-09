@@ -1,7 +1,8 @@
-/** A held key that moves or turns the Paper camera (product decision 6). */
+import { PAPER_MAX_FRAME_SECONDS } from './paperCamera';
+
+/** A held key that moves or turns the Paper camera. */
 export type PaperFlightKey = 'forward' | 'back' | 'left' | 'right' | 'turn-left' | 'turn-right';
 
-/** A pressed key that does one thing: R resets the view, Tab cycles the shown Persons, Enter refocuses, Esc deselects. */
 export type PaperKeyAction = 'reset' | 'cycle-next' | 'cycle-previous' | 'focus' | 'deselect';
 
 export interface PaperKeyModifiers {
@@ -35,8 +36,6 @@ const FLIGHT_KEYS: Record<string, PaperFlightKey> = {
 const MOVE_DISTANCES_PER_SECOND = 0.8;
 const BOOST = 4;
 const TURN_RADIANS_PER_SECOND = 0.8;
-/** A frame after a stalled tab moves the camera no further than this. */
-const MAX_FRAME_SECONDS = 0.1;
 const FALLBACK_DISTANCE = 100;
 
 export function paperFlightKey(key: string): PaperFlightKey | null {
@@ -44,16 +43,16 @@ export function paperFlightKey(key: string): PaperFlightKey | null {
 }
 
 export function paperKeyAction(key: string, modifiers: PaperKeyModifiers): PaperKeyAction | null {
+  const lower = key.toLowerCase();
+  if (lower === 'escape') return 'deselect';
   if (modifiers.ctrl || modifiers.meta || modifiers.alt) return null;
-  switch (key.toLowerCase()) {
+  switch (lower) {
     case 'r':
       return 'reset';
     case 'tab':
       return modifiers.shift ? 'cycle-previous' : 'cycle-next';
     case 'enter':
       return 'focus';
-    case 'escape':
-      return 'deselect';
     default:
       return null;
   }
@@ -67,7 +66,7 @@ export function paperFlightStep(
   viewDistance: number
 ): PaperFlightStep | null {
   if (!(seconds > 0)) return null;
-  const dt = Math.min(seconds, MAX_FRAME_SECONDS);
+  const dt = Math.min(seconds, PAPER_MAX_FRAME_SECONDS);
   const axis = (plus: PaperFlightKey, minus: PaperFlightKey) => Number(held.has(plus)) - Number(held.has(minus));
   const ahead = axis('forward', 'back');
   const across = axis('right', 'left');
@@ -84,7 +83,6 @@ export function paperFlightStep(
   };
 }
 
-/** The Person Tab selects next among the shown `ids`, or the one before with `backwards`. */
 export function paperCycle(ids: readonly string[], selectedId: string | null, backwards: boolean): string | null {
   if (ids.length === 0) return null;
   const at = selectedId === null ? -1 : ids.indexOf(selectedId);

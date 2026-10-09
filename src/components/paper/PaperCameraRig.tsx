@@ -2,14 +2,11 @@ import { useEffect, useLayoutEffect, useRef, type MutableRefObject } from 'react
 import { useFrame, useThree } from '@react-three/fiber';
 import type { CameraControls } from '@react-three/drei';
 import * as THREE from 'three';
-import { paperCameraLimits, paperIdleRotates, paperIdleRotateSpeed } from '../../lib/paperCamera';
+import { paperCameraLimits, paperIdleRotates, paperIdleRotateSpeed, PAPER_MAX_FRAME_SECONDS } from '../../lib/paperCamera';
 import type { PaperEmphasisState } from './paperEmphasis';
 import type { PaperFrame } from './paperScene';
 
 const INPUT_EVENTS = ['pointerdown', 'pointermove', 'wheel', 'keydown'] as const;
-
-/** A frame after a stalled tab turns the view no further than this. */
-const MAX_FRAME_SECONDS = 0.1;
 
 interface PaperCameraRigProps {
   frame: PaperFrame;
@@ -47,7 +44,7 @@ export function PaperCameraRig({ frame, state, modalOpen }: PaperCameraRigProps)
     if (!controls || modalOpen || state.current.reveal) return;
     const idleSeconds = (performance.now() - lastInput.current) / 1000;
     if (!paperIdleRotates(idleSeconds, state.current.focus !== null, state.current.pointedId !== null)) return;
-    void controls.rotate(paperIdleRotateSpeed(size.width) * Math.min(delta, MAX_FRAME_SECONDS), 0, true);
+    void controls.rotate(paperIdleRotateSpeed(size.width) * Math.min(delta, PAPER_MAX_FRAME_SECONDS), 0, true);
   });
 
   return null;
