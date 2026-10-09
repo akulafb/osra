@@ -24,7 +24,6 @@ interface PaperRevealProps {
  * The opening reveal: Persons grow outward from the centre of the tree,
  * nearest first, while the camera swings in to where it already stands. Both
  * run on the scene clock and end within PAPER_REVEAL_SECONDS (ADR 0011).
- * A Person picked during the reveal is flown to at the usual pace.
  */
 export function PaperReveal({ frame, layout, ids, selectedId, state, onDone }: PaperRevealProps) {
   const controls = useThree((three) => three.controls) as CameraControls | null;

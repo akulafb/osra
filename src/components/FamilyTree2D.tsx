@@ -32,10 +32,6 @@ import { DirectManipulationController } from '../hooks/useDirectManipulation';
 import { candidacyFor } from './cards/connectCandidates';
 import { otherParentChoice } from '../lib/otherParent';
 
-
-/** Paper's search box leaves its Escape to the window's Escape handler, which clears the selection before the search. */
-const escapeReachesWindow = () => {};
-
 interface FamilyTree2DProps {
   graphData: FamilyGraph;
   layoutType: LayoutType;
@@ -391,7 +387,6 @@ export const FamilyTree2D: React.FC<FamilyTree2DProps> = ({
             .call(zoomBehaviorRef.current.transform as any, targetTransform);
         }
       } else if (e.key === 'Escape') {
-        // Paper: one Escape clears the selected Person first, then the search, the search box's Escape included.
         if (isPaper && paperEscape({ interactionIdle: interaction.state.phase === 'idle', searchQuery }) === 'search') onSearchClose?.();
         else interaction.handleEscape();
       }
@@ -969,7 +964,7 @@ export const FamilyTree2D: React.FC<FamilyTree2DProps> = ({
                   currentIndex={searchIndex}
                   onPrev={onSearchPrev}
                   onNext={onSearchNext}
-                  onClose={isPaper ? escapeReachesWindow : onSearchClose}
+                  onClose={isPaper ? undefined : onSearchClose}
                   disabled={searchDisabled}
                   embedded
                   focusTrigger={searchOpenRequested}

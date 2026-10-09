@@ -1,7 +1,7 @@
 import type { RelativeDirection } from '../types/graph';
 import { CONFIRM_PULSE_COLOR } from '../utils/cosmicFx';
 import { livePair, type PairColours } from './paperPair';
-import { CONNECT_ACCENT, relationColor } from './relationColours';
+import { CONNECT_ACCENT, relationColor } from './relationColors';
 
 export interface HudTokens {
   error: string;
@@ -102,7 +102,6 @@ export const cosmosHud: HudTokens = {
   },
   manipulation: {
     idle: '#a78bfa',
-    // The same red the scene pulses the aura with, so the pill and the planet read as one question.
     dissolve: CONFIRM_PULSE_COLOR,
   },
   banner: {

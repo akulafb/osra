@@ -24,8 +24,8 @@ interface PaperFocusProps {
 
 /**
  * On each focus the camera flies to the Person and a tap plays; clearing the
- * focus flies back to the overview, and a Person the search hides frames the
- * cluster instead. A resize or a turned phone reframes the same way.
+ * focus flies back to the overview. A resize or a turned phone reframes the
+ * same way.
  */
 export function PaperFocus({ selectedId, layout, ids, links, matchIds, drawerInset, onOverview, flyTo }: PaperFocusProps) {
   const controls = useThree((three) => three.controls) as CameraControls | null;

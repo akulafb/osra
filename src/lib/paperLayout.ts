@@ -88,7 +88,7 @@ function squaredDistance(p: Point3, q: Point3): number {
   return dx * dx + dy * dy + dz * dz;
 }
 
-function centroid(points: readonly Point3[]): Point3 {
+export function centroid(points: readonly Point3[]): Point3 {
   const sum = { x: 0, y: 0, z: 0 };
   for (const p of points) {
     sum.x += p.x;

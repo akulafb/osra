@@ -13,7 +13,7 @@ interface TreeSearchBarProps {
   currentIndex: number;
   onPrev: () => void;
   onNext: () => void;
-  onClose: () => void;
+  onClose?: () => void;
   disabled?: boolean;
   placeholder?: string;
   /** When true, render inline in a panel (no absolute positioning) */
@@ -50,6 +50,7 @@ export function TreeSearchBar({
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
       if (e.key === 'Escape') {
+        if (!onClose) return;
         e.preventDefault();
         onClose();
         return;

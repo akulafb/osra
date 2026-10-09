@@ -12,7 +12,6 @@ interface PaperCameraRigProps {
   frame: PaperFrame;
   state: MutableRefObject<PaperEmphasisState>;
   modalOpen: boolean;
-  /** A selected Person holds the view still, even one a search hides, who has no focus. */
   selected: boolean;
 }
 

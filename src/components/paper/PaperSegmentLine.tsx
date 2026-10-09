@@ -4,7 +4,7 @@ import { Line } from '@react-three/drei';
 import * as THREE from 'three';
 import { PAPER_DASH, setPaperSegment } from './paperScene';
 
-export type PaperSegment = ElementRef<typeof Line>;
+type PaperSegment = ElementRef<typeof Line>;
 
 interface PaperSegmentLineProps {
   /** Sets the segment's ends each frame and returns whether it is drawn; it may also recolour the line. */
@@ -15,7 +15,6 @@ interface PaperSegmentLineProps {
   color?: string;
 }
 
-/** One ink line between two points that move every frame, written in place into the line's buffers. */
 export function PaperSegmentLine({ place, renderOrder, lineWidth, dashed, color }: PaperSegmentLineProps) {
   const ref = useRef<PaperSegment>(null);
   const points = useMemo(() => [[0, 0, 0] as [number, number, number], [0, 0, 0] as [number, number, number]], []);

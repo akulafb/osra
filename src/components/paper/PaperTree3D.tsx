@@ -197,7 +197,6 @@ export function PaperTree3D({
   const searching = searchQuery.trim() !== '' && !interaction.connectSourceId;
   const matchKey = searching ? searchMatches.flatMap((n) => (shownIdSet.has(n.id) ? [n.id] : [])).sort().join(',') : null;
   const matchIds = useMemo(() => (matchKey === null ? null : new Set(matchKey ? matchKey.split(',') : [])), [matchKey]);
-  // A new query packs the cluster afresh; a change to the tree under the same matches (Spawn, Dissolve) packs only the newcomers, beside the matches already placed.
   const lastPack = useRef<SearchPack | null>(null);
   const searchPack = useMemo<SearchPack | null>(() => {
     if (!fixedLayout || !matchIds) return null;
@@ -318,10 +317,9 @@ export function PaperTree3D({
   }, [cluster, fitFrame]);
 
   const resetView = useCallback(() => {
-    // Clearing a selection already flies to the overview (PaperFocus).
-    const deselects = interaction.state.phase === 'selected';
+    const focusFliesHome = interaction.state.phase === 'selected';
     interaction.handleBackgroundClick();
-    if (!deselects) flyToOverview();
+    if (!focusFliesHome) flyToOverview();
   }, [interaction, flyToOverview]);
 
   const cancelDeselect = useCallback(() => {

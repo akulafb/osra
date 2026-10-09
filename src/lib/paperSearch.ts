@@ -2,7 +2,7 @@ import type { FamilyLink } from '../types/graph';
 import { getLinkEndpoints } from './familyGraph';
 import { focusEmphasis, type Emphasis } from './focusEmphasis';
 import { easeInOutCubic, easeOutCubic } from './paperEasing';
-import { PaperGrid, type PaperLayout, type Point3 } from './paperLayout';
+import { centroid, PaperGrid, type PaperLayout, type Point3 } from './paperLayout';
 
 /** The least space left between two discs in the search cluster: room for a name between them. */
 export const PAPER_CLUSTER_GAP = 20;
@@ -17,7 +17,7 @@ const COLLISION_PASSES = 200;
  * Where each match sits in the search cluster: a short, one-off settle on the
  * matches only, which draws them toward their centre, keeps linked matches
  * side by side and leaves PAPER_CLUSTER_GAP between every two discs. The same
- * matches always give the same cluster. The layout is not changed.
+ * matches with no earlier pack give the same cluster. The layout is not changed.
  *
  * Given the places an earlier pack gave, every match already placed keeps its
  * place, a removed match drops out, and only the new matches settle, beside
@@ -31,10 +31,10 @@ export function packMatches(
 ): Map<string, Point3> {
   const ids = [...matchIds].filter((id) => layout.has(id)).sort();
   const radii = ids.map((id) => layout.get(id)!.radius);
-  const kept = ids.flatMap((id) => (placed?.has(id) ? [placed.get(id)!] : []));
+  const kept = ids.flatMap((id, i) => (placed?.has(id) ? [{ place: placed.get(id)!, radius: radii[i] }] : []));
   const fixed = ids.map((id) => !!placed?.has(id));
-  const centre = centreOf(kept.length ? kept : ids.map((id) => layout.get(id)!));
-  const places = placed && kept.length ? aroundPlaced(layout, ids, radii, fixed, placed, centre) : gathered(layout, ids, centre);
+  const centre = centroid(kept.length ? kept.map(({ place }) => place) : ids.map((id) => layout.get(id)!));
+  const places = placed && kept.length ? aroundPlaced(layout, ids, radii, fixed, placed, kept, centre) : gathered(layout, ids, centre);
   const index = new Map(ids.map((id, i) => [id, i]));
   const pairs = matchedPairs(links, index);
 
@@ -56,7 +56,6 @@ export function packMatches(
   return new Map(ids.map((id, i) => [id, places[i]]));
 }
 
-/** Each match a quarter of the way from its layout place to the matches' centre. */
 function gathered(layout: PaperLayout, ids: readonly string[], centre: Point3): Point3[] {
   return ids.map((id) => {
     const { x, y, z } = layout.get(id)!;
@@ -64,16 +63,15 @@ function gathered(layout: PaperLayout, ids: readonly string[], centre: Point3): 
   });
 }
 
-/** The matches already placed where they were, and each new one just outside the cluster, on the side its layout place lies. */
 function aroundPlaced(
   layout: PaperLayout,
   ids: readonly string[],
   radii: readonly number[],
   fixed: readonly boolean[],
   placed: ReadonlyMap<string, Point3>,
+  kept: readonly { place: Point3; radius: number }[],
   centre: Point3
 ): Point3[] {
-  const kept = ids.flatMap((id, i) => (fixed[i] ? [{ place: placed.get(id)!, radius: radii[i] }] : []));
   const reach = Math.max(...kept.map(({ place, radius }) => Math.hypot(place.x - centre.x, place.y - centre.y, place.z - centre.z) + radius));
   return ids.map((id, i) => {
     if (fixed[i]) return { ...placed.get(id)! };
@@ -83,16 +81,6 @@ function aroundPlaced(
     const out = reach + radii[i] + PAPER_CLUSTER_GAP;
     return { x: centre.x + dx * out, y: centre.y + dy * out, z: centre.z + dz * out };
   });
-}
-
-function centreOf(points: readonly Point3[]): Point3 {
-  const centre = { x: 0, y: 0, z: 0 };
-  for (const { x, y, z } of points) {
-    centre.x += x / points.length;
-    centre.y += y / points.length;
-    centre.z += z / points.length;
-  }
-  return centre;
 }
 
 /** The layout with each match moved to its cluster place: a new map, the layout itself unchanged. */
@@ -233,9 +221,12 @@ function matchedPairs(links: readonly FamilyLink[], index: ReadonlyMap<string, n
   return [...pairs.values()].sort((p, q) => p[0] - q[0] || p[1] - q[1]);
 }
 
-/** How much of a shared move each disc of a pair takes: half each, or all of it when the other disc is placed for good. */
+const HELD = 0;
+const HALF = 1;
+const WHOLE = 2;
+
 function shares(fixed: readonly boolean[], i: number, j: number): [number, number] {
-  return [fixed[i] ? 0 : fixed[j] ? 2 : 1, fixed[j] ? 0 : fixed[i] ? 2 : 1];
+  return [fixed[i] ? HELD : fixed[j] ? WHOLE : HALF, fixed[j] ? HELD : fixed[i] ? WHOLE : HALF];
 }
 
 function pull(places: Point3[], fixed: readonly boolean[], i: number, j: number, rest: number, strength: number): void {

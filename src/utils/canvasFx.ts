@@ -19,7 +19,7 @@ export const CANVAS_FX_PARTICLES: Record<CanvasEffectKind, number> = {
   dissolve: 32,
 };
 
-export const CANVAS_FX_COLORS: Record<CanvasEffectKind, string[]> = {
+const CANVAS_FX_COLORS: Record<CanvasEffectKind, string[]> = {
   spawn: ['#38bdf8', '#818cf8', '#c084fc', '#f472b6', '#fef08a', '#4ade80'],
   dissolve: ['#f87171', '#fb923c', '#fbbf24', '#c084fc', '#60a5fa', '#ffffff'],
 };

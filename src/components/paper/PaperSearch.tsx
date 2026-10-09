@@ -23,8 +23,7 @@ interface PaperSearchProps {
  * Moves the scene into the search cluster and back on the scene clock: the
  * matches travel from where they are drawn, everyone else shrinks away or
  * grows back. Each new set of matches frames the cluster, or the selected
- * match, and so does a search already typed when the scene opens; clearing
- * the search frames the overview.
+ * match; clearing the search frames the overview.
  */
 export function PaperSearch({ layout, matchIds, cluster, selectedId, state, flyTo, onOverview }: PaperSearchProps) {
   const controls = useThree((three) => three.controls) as CameraControls | null;

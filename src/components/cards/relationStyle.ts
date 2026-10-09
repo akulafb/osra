@@ -1,6 +1,6 @@
 import { RelativeDirection } from '../../types/graph';
 
-export { CONNECT_ACCENT } from '../../theme/relationColours';
+export { CONNECT_ACCENT } from '../../theme/relationColors';
 
 export function relationLabel(relation: RelativeDirection, anchorFirstName: string): string {
   switch (relation) {

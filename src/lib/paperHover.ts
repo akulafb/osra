@@ -99,7 +99,6 @@ export function easeDrift(
   return next;
 }
 
-/** Each Person's drift with an offset added: the lean plus the wobble, a search move or the reveal's pull. */
 export function addOffsets(drift: ReadonlyMap<string, Point3>, offsets: ReadonlyMap<string, Point3>): ReadonlyMap<string, Point3> {
   if (offsets.size === 0) return drift;
   const moved = new Map(drift);
