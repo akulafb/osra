@@ -110,7 +110,7 @@ Preconditions:
 
 ### Gotchas
 
-- An occluded Orca window runs about 1-3 rAF a second, so a 0.4 s fade shows up as 2 or 3 frames. To see the steps, slow the page clock for the recording (wrap `performance.now` and the rAF timestamp at 1/20 speed with `orca eval`), and say so in the report.
+- An occluded Orca window runs between 0 and about 3 rAF a second, and can stay at 0 until an `orca screenshot` pumps a frame, so a 0.4 s fade shows up as a few frames at most. To see the steps, slow the page clock for the recording (wrap `performance.now` and the rAF timestamp at 1/20 speed with `orca eval`), and say so in the report.
 - In the phone sheet, the drawer's buttons sit high: a tap meant to focus the page can land on `+ Add Relative` and open its modal. Tap the heading text (`.MuiDrawer-paper h4`) instead, and Cancel any modal that opens.
 
 
@@ -209,7 +209,8 @@ Preconditions:
 
 ### Gotchas
 
-- A throttled tab (Orca not in front) runs about 1 frame a second, so the reveal and swing need screenshots to pump frames or the slowed clock above; report the feel as unverified unless the tab is visible.
+- A throttled tab (Orca not in front) runs between 0 and about 3 frames a second, so the reveal and swing need screenshots to pump frames or the slowed clock above; report the feel as unverified unless the tab is visible.
+- **Exact pace without a visible tab.** Patch `performance.now` to a virtual clock with `orca eval`, then drive frames with R3F's `advance()` from a 16 ms `setInterval`, so each frame is exactly 1/60 s. To count flights, wrap the CameraControls methods (`fitToSphere`, `setLookAt`) in the same eval and log each call. This gives the pace and the flight count; the feel still needs a visible tab (STANDING 14).
 - A tab can stall at 0 frames: close it and open a fresh one with `open-tab.sh` (delete `state/page` first).
 - Viewport emulation has no touch, so the live hint reads "Scroll to zoom" even at phone size; the pinch copy is covered by `src/lib/paperIntro.test.ts`.
 
@@ -269,7 +270,7 @@ Preconditions:
 ### Gotchas
 
 - agent-browser's `keydown Shift` reports `shiftKey: false` on the events that follow, so the boost follows the Shift key's own down and up, as in Cosmos.
-- An Orca tab that is not on screen draws about 2 frames a second, and each frame's move is capped at 0.1 s, so a held key covers less ground than at full rate. Count frames with a `requestAnimationFrame` counter and compare moves per frame, or report the feel unverified.
+- An Orca tab that is not on screen draws between 0 and about 3 frames a second, and each frame's move is capped at 0.1 s, so a held key covers less ground than at full rate. Count frames with a `requestAnimationFrame` counter and compare moves per frame, or report the feel unverified.
 - `ui.sh fill` can leave focus on a button. Focus the field with `orca eval` before testing that keys do nothing while typing.
 - A MUI dialog captured right after it opens in a throttled tab is mid-fade and looks see-through; capture again after a few seconds.
 
