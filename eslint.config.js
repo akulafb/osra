@@ -23,6 +23,23 @@ export default tseslint.config(
         'warn',
         { allowConstantExport: true },
       ],
+      // drei's Line spreads its rest props onto both the Line2 and its
+      // material, so `visible` is not a plain object toggle (LIN-96).
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector:
+            "Program:has(ImportDeclaration[source.value='@react-three/drei'] > ImportSpecifier[imported.name='Line'][local.name='Line']) JSXOpeningElement[name.name='Line'] > JSXAttribute[name.name='visible']",
+          message:
+            "Don't pass `visible` to drei's <Line>: it lands on the material too. Unmount the line, set opacity or material visibility through a ref, or toggle a wrapping <group visible>.",
+        },
+        {
+          selector:
+            "ImportDeclaration[source.value='@react-three/drei'] > ImportSpecifier[imported.name='Line'][local.name!='Line']",
+          message:
+            "Import drei's Line under its own name, with no `as`, so the rule against its `visible` prop can see it.",
+        },
+      ],
     },
   },
 );
