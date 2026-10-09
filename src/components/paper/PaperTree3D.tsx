@@ -260,16 +260,16 @@ export function PaperTree3D({
 
   const frame = useMemo(() => (fixedLayout ? paperFrame(fixedLayout, fixedLayout.keys()) : null), [fixedLayout]);
 
-  const landingFrom = useRef({ layout: fixedLayout, graphData });
+  const landingFrom = useRef({ layout: fixedLayout, shownLayout: layout, graphData });
   useLayoutEffect(() => {
-    landingFrom.current = { layout: fixedLayout, graphData };
-  }, [fixedLayout, graphData]);
+    landingFrom.current = { layout: fixedLayout, shownLayout: layout, graphData };
+  }, [fixedLayout, layout, graphData]);
   const ghostLook = useMemo<GhostPreviewLook>(
     () => ({
       ...GHOST_LOOK,
       landing: (anchorId, relation) => {
-        const { layout: placed, graphData: graph } = landingFrom.current;
-        return placed ? paperGhostLanding(placed, graph, anchorId, relation) : null;
+        const { layout: placed, shownLayout, graphData: graph } = landingFrom.current;
+        return placed ? paperGhostLanding(placed, graph, anchorId, relation, shownLayout ?? placed) : null;
       },
     }),
     []
@@ -303,8 +303,8 @@ export function PaperTree3D({
 
   const resetView = useCallback(() => {
     interaction.handleBackgroundClick();
-    fitFrame(true);
-  }, [interaction, fitFrame]);
+    flyToOverview();
+  }, [interaction, flyToOverview]);
 
   const cancelDeselect = useCallback(() => {
     window.clearTimeout(pendingDeselect.current);
