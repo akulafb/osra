@@ -212,13 +212,14 @@ Preconditions:
 - A tab can stall at 0 frames: close it and open a fresh one with `open-tab.sh` (delete `state/page` first).
 - Viewport emulation has no touch, so the live hint reads "Scroll to zoom" even at phone size; the pinch copy is covered by `src/lib/paperIntro.test.ts`.
 
-## Paper 3D editing (LIN-96 pass 96a)
+## Paper 3D editing (LIN-96 passes 96a and 96b)
 
 ### Sub-features
 
 - `paper-3d-add-person`: INSTRUMENTS → `+ ADD PERSON` opens the same form as Cosmos, in paper and ink. A Person added during the session (from any path) gets a disc beside their relatives, or at the edge of the cloud with none, and nobody else moves; the full layout is recomputed on the next load. A newcomer who leaves the Working Record again (an aborted Spawn) is dropped.
 - `paper-3d-handles` (desktop, 1025 px and wider): selecting a Person docks the Action Handles panel at the left, as in Cosmos: `+ Parent`, `+ Child`, `+ Spouse` in ink, `🔗 Connect` and `✕ Dissolve` in the pair's accent, with a dashed leader line and a ring on the disc. Phones keep the drawer path: no handles (ADR 0002, LIN-62 amendment).
-- `paper-3d-ghost`: a handle opens the Ghost Node card and the Ghost Preview in ink: a sphere with a wireframe shell (Cosmos's geometry and size), a dashed tether to the Person and an ink label. ✕ or Escape closes it.
+- `paper-3d-ghost`: a handle opens the Ghost Node card and the Ghost Preview in ink: a sphere with a wireframe shell at the newcomer's disc size, a dashed tether to the Person and an ink label. It sits exactly where the newcomer will land if the card is submitted with the other parent it opened with: beside the Person for `+ Parent` and `+ Spouse`, and beside whichever parent `placeNewcomer` picks for `+ Child` (with a spouse that can be the other parent, off to the side of the card). ✕ or Escape closes it.
+- `paper-3d-lifecycles`: Spawn and Dissolve are drawn in ink on the shared lifecycle progress (no glow, no colour). A Spawn grows the newcomer's disc from a dot of no ink, a little past its size and back, with a thin ink ring going out; each new Kinship Link's line grows from the Person already there to the newcomer (Connect Mode's link grows from one end). A Dissolve shrinks the disc as it fades into the paper, with ink specks blown off it, at the Person's last place even after the Working Record has dropped them. A failed write unwinds the same drawing.
 - `paper-3d-connect`: the drawer's `Connect Nodes...` (desktop and phone) or the panel's `🔗 Connect` enters Connect Mode: the panel shows "Connect <name> to…" (on a phone the sheet hides first), the Person stays focused, the candidates keep full ink and everyone else, their relatives included, is ghosted at 0.2 ink. Clicking a candidate disc opens the kinship picker and keeps that disc marked; `Establish Link` writes through the same handler as Cosmos. `Cancel (Esc)` or Escape leaves it. On a phone the panel docks at the bottom with only the ring on the disc.
 - The panel, the Ghost Node card and the Connect picker read the live pair's tokens only in Paper; Cosmos keeps its colours.
 
@@ -229,10 +230,11 @@ Preconditions:
 - **Connect.** With a Person selected, `ui.sh click button "Connect Nodes..."` (on a phone the sheet hides it below the fold: `orca scrollintoview` its ref first). `ui.sh tree` shows "Connect <name> to…" and `Cancel (Esc)`. Tap a candidate disc: the picker opens; `Cancel` returns to targeting, Escape leaves.
 - **Phone.** `set viewport 820 812 2`: `FIND ME` selects with no handles; `Connect Nodes...` from the sheet opens the bottom-docked panel.
 - The writes (Enter in the Ghost Node card, `+ ADD PERSON` submit, `Establish Link`) are **Owner** steps; see [add relative](./add-relative.md).
+- **Ghost landing.** With the card open, an `orca eval` that `await import('/src/lib/paperGhost.ts')` can compare `paperGhostLanding(layout, graph, anchorId, relation)` with the `ghost-preview` object's position in the scene, if a temporary probe exposes the layout and the graph handle on `window` (never commit it). The two are equal and the body's radius is the landing's.
+- **Spawn and Dissolve.** They play only on a write, so the live proof is the Owner walk in [add relative](./add-relative.md) (Enter in the Ghost Node card, then Delete Entry on the test Person). Without writes, a temporary probe that passes a fixed lifecycle list and progress into `PaperLifecycles` shows the frames; an Orca tab that is not on screen runs at about 2 fps, too slow to time the motion.
 - **Proof.** Capture `paper-add-person`, `paper-handles`, `paper-ghost`, `paper-connect`, `paper-connect-escaped`, `paper-connect-pick`, `phone-selected` and `phone-connect`.
 
 ### Gotchas
 
-- The Ghost Preview keeps Cosmos's size and offset, so it is larger than a Paper disc and does not sit where `placeNewcomer` puts the newcomer.
-- The targeting copy still says "Click a glowing planet" in Paper, and the dashed preview edge for Add Relative's connect-to-existing is not drawn yet (LIN-96 pass 96c). Spawn and Dissolve play without their ink animation until pass 96b.
+- The targeting copy still says "Click a glowing planet" in Paper, and the dashed preview edge for Add Relative's connect-to-existing is not drawn yet (LIN-96 pass 96c).
 - Fingerprinting Cosmos for no change: open VISIBILITY and wait about 6 s before capturing; at 3 s its body can still be animating and differ by one element.
