@@ -34,6 +34,6 @@ Preconditions:
 - The 3D view is WebGL: nodes have no accessibility handles. Prove 3D with screenshots and the switch states.
 - Cosmos only: the first seconds of 3D show a "Loading Osra" overlay during the intro fly-in; capture after it clears. Paper 3D has its own loaders (see [Paper mode](./paper-mode.md#paper-3d-scene-lin-93) and its [intro](./paper-mode.md#paper-3d-intro-and-hint-lin-95-pass-95b)).
 - View mode and Canvas Mode persist in the owner's localStorage (`family-tree-view-mode`, `family-tree-canvas-mode`, `family-tree-paper-colour`: `colour` or `grayscale`, absent means grayscale). Restore the starting values; if the Canvas Mode or Paper colour key was absent, remove it. sessionStorage `family-tree-paper-overview-pair` dies with the tab.
-- With a large family picked, the 2D view can open framed on lines with no cards in view. FIND ME or selecting a Person brings cards on screen.
+- With a large family picked, the 2D view can open framed on lines with no cards in view. FIND ME or selecting a Person brings cards on screen. FIND ME in 2D centres on the owner but does not select them; select with `ui.sh person <Given> <Family>`.
 - If a person was selected or a search match was active, switching mode carries the selection: the details drawer may open in 3D.
 - Family list items exist in the snapshot even with the picker closed; a click on them does nothing until the picker is open and settled.

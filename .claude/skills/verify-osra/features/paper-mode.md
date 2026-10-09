@@ -39,6 +39,7 @@ Preconditions:
 - Paper is the default, so a run that leaves no `family-tree-canvas-mode` key leaves the owner on Paper. That is the intended start state, not a leak.
 - `hidden` (search non-match) is dimmed in 2D rather than removed, because 2D keeps its layout.
 - The Action Handle pills around a selected 2D card are drawn in ink in Paper. Their Cosmos colours are untouched.
+- Paper 2D cards (`.node-card`) and `.handle-connect` are SVG, so `el.click()` is not a function. Dispatch a bubbling `click` (`el.dispatchEvent(new MouseEvent('click', { bubbles: true }))`) instead.
 
 ## Paper colour and the pair fade (LIN-92)
 
@@ -104,7 +105,7 @@ Preconditions:
 - **Colour.** In Paper 3D open INSTRUMENTS and click `Paper colour`. The scene turns into the overview pair. Sample the canvas pixels of a screenshot: the background equals `--paper-pair-paper` and the discs `--paper-pair-ink`.
 - **Fade.** A per-frame proof needs a probe on the composer (a temporary `useFrame` at priority 2 in `PaperEffects` that reads the `paper` uniform and `gl.readPixels` a corner pixel into `window.__duoLog`; never commit it). Record `--paper-pair-paper` and the INSTRUMENTS button colour in the same rAF loop, then tap a disc. Every frame the uniform, the read-back pixel and the variable agree.
 - **Fog.** Open INSTRUMENTS and click `FIND ME`: the camera flies to the owner. The nearest lines are full ink; lines and discs at the back are lighter. Mouse-wheel zoom right into the orbit target fogs everything out, because the fog scales with the distance to the target.
-- **Connect accent.** Grayscale, 2D, a family picked, a Person selected: DOM-click `.handle-connect` (`🔗 Link`), DOM-click another `.node-card`, then click a choice. Its computed background is `color(srgb 0.784 0.212 0.114 / 0.2)`. Leave with the picker's `Cancel` (next to `Establish Link`), then `Cancel (Esc)`. Never click `Establish Link`.
+- **Connect accent.** Grayscale, 2D, a family picked, a Person selected: dispatch a `click` on `.handle-connect` (`🔗 Link`), then on another `.node-card` (they are SVG; see Gotchas), then click a choice. Its computed background is `color(srgb 0.784 0.212 0.114 / 0.2)`. Leave with the picker's `Cancel` (next to `Establish Link`), then `Cancel (Esc)`. Never click `Establish Link`.
 - **Cosmos unchanged.** Diff a computed-style fingerprint of every element (Cosmos 2D with INSTRUMENTS open; Cosmos 3D with INSTRUMENTS and VISIBILITY open) and the drawer's `+ Add Relative` / `Invite to Tree` hover colours, between the base files and the branch, after a reload each time.
 - **Proof.** Capture `paper-3d-duotone grayscale`, `colour-on-overview`, `focus-<person>`, `fog-near-far` and `paper-connect picker-accent`.
 
@@ -186,7 +187,7 @@ Preconditions:
 - `orca exec "mouse wheel …"` closes Orca's connection; use dispatched wheel events and say so.
 - Under a 1280 px override the Orca pane still paints only its own width (about 935 px). The rest of the screenshot repeats the left edge, so judge the effects inside the left 935 px.
 - Drag momentum and the feel of the idle turn need a visible tab at full frame rate. An unfocused Orca tab runs a few frames a second, so report motion feel unverified (STANDING 14).
-- Never run an eval that awaits `requestAnimationFrame` in a throttled tab: it can hang Orca's connection. Start a counter in one eval and read it in a later one.
+- Never run an eval that awaits `requestAnimationFrame` in a throttled tab: it can hang Orca's connection. Start a counter in one eval and read it in a later one. Pump frames with one `orca screenshot` at a time: several back to back plus a long rAF eval can leave Orca refusing every page command.
 
 ## Paper 3D intro and hint (LIN-95 pass 95b)
 
@@ -242,7 +243,7 @@ Preconditions:
 
 ### Gotchas
 
-- Fingerprinting Cosmos for no change: open VISIBILITY and wait about 6 s before capturing; at 3 s its body can still be animating and differ by one element. Park the mouse first (`orca mouse move --x 3 --y 700`). In Connect Mode the candidate list (names per slot follow what is in view), the leader ring's `circle` cx/cy and the canvas cursor always differ: compare those elements' property sets, not hashes.
+- Fingerprinting Cosmos for no change: open VISIBILITY and wait about 6 s before capturing; at 3 s its body can still be animating and differ by one element. Park the mouse first (`orca mouse move --x 3 --y 700`). In Connect Mode the candidate list (names per slot follow what is in view), the leader ring's `circle` cx/cy and the canvas cursor always differ: compare those elements' property sets, not hashes. Any SVG element that tracks a node's sub-pixel screen position can differ the same way: re-capture its full computed style on both sides before calling it a diff. Build the base in the same browser session by swapping in the base source for a moment; a base stored from another session carries different Vite `<style>` tags and app state. Filter out the `--paper-pair-*` variables, which every element inherits from `<html>`.
 - At the 1280 px override with no drawer open, INSTRUMENTS and NAV CONTROLS sit beyond the ~935 px the Orca pane paints, so screenshots miss them although the DOM has them open; check the button texts (`INSTRUMENTS ▴`, `VISIBILITY ▴`) instead.
 - In Cosmos 3D, FIND ME just after a reload can do nothing; retry until `.MuiDrawer-paper h4` appears.
 
@@ -292,7 +293,7 @@ Preconditions:
 - **Shortcut.** Tap empty space at the bottom (`ui.sh tap 640 790`), then `ui.sh key Control+f`: INSTRUMENTS reads `▴` and `document.activeElement` is the `Search family tree` box.
 - **Cluster.** `ui.sh fill textbox "Search family tree" "Zabalawi"`, wait 4.5 s, capture: only the matches and their lines remain, framed.
 - **Clear.** Focus the box with `orca eval`, `ui.sh key Escape`, wait 4.5 s, capture: the full tree.
-- **Exact restore.** A page eval that imports R3F's `_roots` (see [navigation](#paper-3d-navigation-and-collapse-lin-96-pass-96d)) finds the scene's instanced mesh with more than 100 instances and reads each instance's translation and scale with `getMatrixAt`. Record it after a reload, after the search settles and after the clear: during the search only the matches have a scale above 0 and each has moved; after the clear every translation and scale equals the first record. After a reload, wait until `_roots.size` is 1 before the first read.
+- **Exact restore.** A page eval that imports R3F's `_roots` (see [navigation](#paper-3d-navigation-and-collapse-lin-96-pass-96d)) finds the scene's instanced mesh with more than 100 instances and reads each instance's translation and scale with `getMatrixAt`. Record it after a reload, after the search settles and after the clear: during the search only the matches have a scale above 0 and each has moved; after the clear every translation and scale equals the first record. After a reload, wait until `_roots.size` is 1 before the first read; under load the root can mount more than 11 s after the reload.
 - **Count and stepping.** After the cluster settles, the count reads `32 PEOPLE` for Badran/"Zabalawi" in 3D (`8 PEOPLE` in Paper 2D with Badran picked). `click button "Next match"` opens the drawer on a match and the counter reads `1/32`; Previous from `1/32` wraps to `32/32`. Read the camera target from R3F's store (`controls.getTarget`): it moves to each match. A full name such as "Abdulrazzaq" gives `1 PERSON`.
 - **Escape order.** Select a match with Next, blur the box (`document.activeElement.blur()`), Escape: the drawer closes, the query stays and the camera target returns to the cluster centre. Escape again: the box empties and the disc record equals the first one.
 - **Re-framing.** With no selection, move the camera away (`controls.setLookAt` as setup), then `set viewport 1100 812 2`: the target returns to the cluster centre. Select a match, then type a query that keeps them ("Abdulfattah"): the target stays on that disc. Select a non-match (a Badran), then type "Zabalawi": the drawer keeps them and the target is the cluster centre.
