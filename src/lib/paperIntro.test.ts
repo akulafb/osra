@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import type { PaperLayout } from './paperLayout';
+import { paperFlySmoothTime, PAPER_FLY_SECONDS } from './paperFocus';
 import {
+  paperRevealSmoothTime,
   paperHintCopy,
   paperRevealProgress,
   paperRevealShares,
@@ -119,5 +121,15 @@ describe('the hint seen key', () => {
 
   it('writes without throwing when storage is blocked', () => {
     expect(() => writePaperHintSeen(() => brokenStorage)).not.toThrow();
+  });
+});
+
+describe('paperRevealSmoothTime', () => {
+  it('swings the camera in over the whole reveal', () => {
+    expect(paperRevealSmoothTime(false)).toBe(paperFlySmoothTime(PAPER_REVEAL_SECONDS));
+  });
+
+  it('flies at the usual pace once a Person is picked during the reveal', () => {
+    expect(paperRevealSmoothTime(true)).toBe(paperFlySmoothTime(PAPER_FLY_SECONDS));
   });
 });

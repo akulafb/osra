@@ -7,7 +7,7 @@ import type { FamilyGraph, FamilyNode, RelativeDirection } from '../../types/gra
 import type { ForceGraphHandle, LiveNodePosition } from '../../types/forceGraph';
 import { paperCollapsible, paperPersonClick, paperShown, type PaperShown } from '../../lib/paperCollapse';
 import { paperCycle, paperKeyBlocks, type PaperArrival, type PaperKeyAction } from '../../lib/paperKeys';
-import { GRAYSCALE_PAIR, LIVE_PAIR } from '../../theme/paperPair';
+import { GRAYSCALE_PAIR, livePair } from '../../theme/paperPair';
 import type { DirectManipulationController } from '../../hooks/useDirectManipulation';
 import { needsCanvas } from '../../lib/directManipulation';
 import { hexToRgb } from '../../lib/colourBlend';
@@ -15,8 +15,7 @@ import { Manipulation3DPanel } from '../Manipulation3DPanel';
 import type { GhostPreviewLook } from '../../hooks/useGhostPreview';
 import { usePersonDrawerInset, type PersonDrawerInset } from '../../hooks/usePersonDrawerInset';
 import type { PaperLayoutState } from '../../hooks/usePaperLayout';
-import type { PaperLayout } from '../../lib/paperLayout';
-import type { Point3 } from '../../lib/paperHover';
+import type { PaperLayout, Point3 } from '../../lib/paperLayout';
 import type { LifecycleController } from '../../hooks/useLifecycles';
 import { holdingProgress, inLifecycle, paperLifecycleDisc, paperLifecycleDraws, steadyLines } from '../../lib/paperLifecycle';
 import { paperGhostLanding } from '../../lib/paperGhost';
@@ -319,8 +318,10 @@ export function PaperTree3D({
   }, [cluster, fitFrame]);
 
   const resetView = useCallback(() => {
+    // Clearing a selection already flies to the overview (PaperFocus).
+    const deselects = interaction.state.phase === 'selected';
     interaction.handleBackgroundClick();
-    flyToOverview();
+    if (!deselects) flyToOverview();
   }, [interaction, flyToOverview]);
 
   const cancelDeselect = useCallback(() => {
@@ -473,11 +474,11 @@ export function PaperTree3D({
   useEffect(() => {
     if (failed) setArrival('settled');
   }, [failed]);
-  const fallback = <PaperWebGLFallback paper={LIVE_PAIR.paper} ink={LIVE_PAIR.ink} />;
+  const fallback = <PaperWebGLFallback paper={livePair.paper()} ink={livePair.ink()} />;
 
   return (
     <div
-      style={{ position: 'relative', width: '100%', height: '100%', background: LIVE_PAIR.paper }}
+      style={{ position: 'relative', width: '100%', height: '100%', background: livePair.paper() }}
       onPointerDownCapture={(e) => {
         pointerDown.current = { x: e.clientX, y: e.clientY };
       }}
@@ -494,7 +495,7 @@ export function PaperTree3D({
       {arrival === 'crossfade' && !failed && (
         <div
           onTransitionEnd={handleArrived}
-          style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: LIVE_PAIR.paper, zIndex: 1000, color: panel.ink.strong, fontSize: '18px', pointerEvents: 'none', opacity: loaded ? 0 : 1, transition: `opacity ${CROSSFADE_MS}ms ease-out` }}
+          style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: livePair.paper(), zIndex: 1000, color: panel.ink.strong, fontSize: '18px', pointerEvents: 'none', opacity: loaded ? 0 : 1, transition: `opacity ${CROSSFADE_MS}ms ease-out` }}
         >
           {!loaded && (
             <div style={{ textAlign: 'center' }}>
@@ -560,7 +561,7 @@ export function PaperTree3D({
                 />
                 <PaperGraphHandle handle={graphHandle} />
                 {arrival === 'revealing' && (
-                  <PaperReveal frame={frame} layout={layout} ids={shownIds} state={emphasisState} onDone={handleArrived} />
+                  <PaperReveal frame={frame} layout={layout} ids={shownIds} selectedId={interaction.selectedNodeId} state={emphasisState} onDone={handleArrived} />
                 )}
                 <PaperDiscs ids={discIds} layout={layout} ink={INK} paper={PAPER} state={emphasisState} onPersonClick={handlePersonClick} />
                 <PaperHoverRing state={emphasisState} layout={layout} ink={INK} />

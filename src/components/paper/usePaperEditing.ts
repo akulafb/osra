@@ -8,8 +8,8 @@ import type { KinshipLinkType, ParentRole } from '../cards/connectOptions';
 export interface PaperConnectParams {
   sourceNodeId: string;
   targetNodeId: string;
-  type: 'parent' | 'marriage' | 'divorce';
-  parentRole?: 'mother' | 'father' | null;
+  type: KinshipLinkType;
+  parentRole?: ParentRole;
   otherParentId?: string | null;
 }
 

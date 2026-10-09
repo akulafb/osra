@@ -1,9 +1,20 @@
-import { CONNECT_ACCENT, relationColor } from '../components/cards/relationStyle';
 import type { RelativeDirection } from '../types/graph';
-import { livePair } from './paperPair';
+import { CONFIRM_PULSE_COLOR } from '../utils/cosmicFx';
+import { livePair, type PairColours } from './paperPair';
+import { CONNECT_ACCENT, relationColor } from './relationColours';
 
 export interface HudTokens {
   error: string;
+  /** The live Paper Pair for the 2D views to draw in; absent in Cosmos, whose views keep their own colours. */
+  pair?: PairColours;
+  canvas: {
+    background: string;
+    pendingLink: string;
+  };
+  manipulation: {
+    idle: string;
+    dissolve: string;
+  };
   banner: {
     surface: string;
     border: string;
@@ -85,6 +96,15 @@ declare module '@mui/material/styles' {
 
 export const cosmosHud: HudTokens = {
   error: '#f87171',
+  canvas: {
+    background: 'linear-gradient(180deg, #0a0a0a 0%, #1a1a2e 100%)',
+    pendingLink: '#22d3ee',
+  },
+  manipulation: {
+    idle: '#a78bfa',
+    // The same red the scene pulses the aura with, so the pill and the planet read as one question.
+    dissolve: CONFIRM_PULSE_COLOR,
+  },
   banner: {
     surface: 'rgba(15, 23, 42, 0.95)',
     border: 'rgba(168, 85, 247, 0.8)',
@@ -164,6 +184,15 @@ export function paperHud(): HudTokens {
   const { paper, ink, accent } = livePair;
   return {
     error: accent(),
+    pair: { paper: paper(), ink: ink(), accent: accent() },
+    canvas: {
+      background: paper(),
+      pendingLink: ink(),
+    },
+    manipulation: {
+      idle: ink(),
+      dissolve: accent(),
+    },
     banner: {
       surface: paper(0.96),
       border: ink(),

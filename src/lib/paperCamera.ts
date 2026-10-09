@@ -1,4 +1,4 @@
-import type { Point3 } from './paperHover';
+import type { Point3 } from './paperLayout';
 
 /** How long the view must sit without pointer, wheel or key input before it starts to turn on its own. */
 export const PAPER_IDLE_SECONDS = 3;

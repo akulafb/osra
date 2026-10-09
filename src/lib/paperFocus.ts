@@ -1,6 +1,6 @@
 import type { Emphasis } from './focusEmphasis';
-import type { PaperDisc, PaperLayout } from './paperLayout';
-import type { Point3 } from './paperHover';
+import type { PaperDisc, PaperLayout, Point3 } from './paperLayout';
+import { hashString } from './seededRandom';
 
 export const PAPER_FLY_SECONDS = 1;
 
@@ -8,9 +8,10 @@ const MIN_REACH_PER_RADIUS = 5;
 const MAX_REACH = 150;
 
 /**
- * How far around the focused Person the camera keeps in view: out to their
- * farthest relative's disc, with a floor for a Person with no relatives and a
- * cap so one distant relative does not pull the camera back to the overview.
+ * How far around the focused Person the camera frames: out to their farthest
+ * relative's disc, with a floor for a Person with no relatives and a cap so
+ * one distant relative does not pull the camera back to the overview. A
+ * relative past the cap stays off screen.
  */
 export function paperFocusReach(layout: PaperLayout, focused: PaperDisc, emphasis: ReadonlyMap<string, Emphasis>): number {
   let reach = focused.radius * MIN_REACH_PER_RADIUS;
@@ -93,13 +94,21 @@ const WOBBLE_RAMP_SECONDS = 0.6;
 
 /**
  * The gentle float of the focused Person's relatives, `seconds` after the
- * focus began: a small offset on top of each relative's layout place.
+ * focus began: a small offset on top of each relative's layout place. Written
+ * into `into`, emptied first, so a frame loop can reuse one map.
  */
-export function paperWobble(layout: PaperLayout, emphasis: ReadonlyMap<string, Emphasis>, seconds: number): Map<string, Point3> {
-  const wobble = new Map<string, Point3>();
+export function paperWobble(
+  layout: PaperLayout,
+  emphasis: ReadonlyMap<string, Emphasis>,
+  focusedId: string,
+  seconds: number,
+  into = new Map<string, Point3>()
+): Map<string, Point3> {
+  const wobble = into;
+  wobble.clear();
   const ramp = Math.min(1, Math.max(0, seconds / WOBBLE_RAMP_SECONDS));
   const strength = ramp * ramp * (3 - 2 * ramp);
-  if (strength === 0 || ![...emphasis.values()].includes('focused')) return wobble;
+  if (strength === 0 || emphasis.get(focusedId) !== 'focused') return wobble;
   for (const [id, state] of emphasis) {
     const disc = layout.get(id);
     if (state !== 'relative' || !disc) continue;
@@ -115,9 +124,7 @@ export function paperWobble(layout: PaperLayout, emphasis: ReadonlyMap<string, E
 }
 
 function phaseOf(id: string): number {
-  let hash = 0;
-  for (let i = 0; i < id.length; i++) hash = (hash * 31 + id.charCodeAt(i)) | 0;
-  return ((hash >>> 0) % 6283) / 1000;
+  return (hashString(id) % 6283) / 1000;
 }
 
 function add(a: Point3, b: Point3): Point3 {

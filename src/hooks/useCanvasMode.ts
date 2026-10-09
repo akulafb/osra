@@ -21,13 +21,11 @@ export interface CanvasModeController extends CanvasModePreference {
 
 export interface CurrentPaperPair {
   pair: PaperPair;
-  target: PaperPair;
 }
 
 export const CanvasModeContext = createContext<CanvasModeController | null>(null);
 export const CurrentPaperPairContext = createContext<CurrentPaperPair>({
   pair: GRAYSCALE_PAIR,
-  target: GRAYSCALE_PAIR,
 });
 
 const LAST_OVERVIEW_PAIR_KEY = 'family-tree-paper-overview-pair';

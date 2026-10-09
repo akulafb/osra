@@ -4,7 +4,7 @@ import { getClusterColors } from '../utils/familyColors';
 import { LifecycleController, useLifecycleProgress } from '../hooks/useLifecycles';
 import { cardDissolveAt, cardSpawnAt } from '../utils/canvasFx';
 import type { Emphasis } from '../lib/focusEmphasis';
-import type { PaperPair } from '../theme/paperPair';
+import type { PairColours } from '../theme/paperPair';
 import { PAPER_2D_OPACITY } from '../utils/paper2D';
 
 export interface NodeCardProps {
@@ -39,7 +39,7 @@ export interface NodeCardProps {
   lifecycles: LifecycleController;
   isConfirmingDissolve?: boolean;
   onConfirmDissolve?: (node: Node2D) => void;
-  paperPair?: PaperPair;
+  paperPair?: PairColours;
   emphasis?: Emphasis;
   onHoverChange?: (nodeId: string, hovering: boolean) => void;
 }

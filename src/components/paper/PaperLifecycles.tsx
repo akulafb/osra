@@ -15,7 +15,9 @@ import {
 import { seedCanvasParticles } from '../../utils/canvasFx';
 import { emphasisSubject } from '../../lib/paperHover';
 import { fadeInk, inkOf, placeOf, type PaperEmphasisState } from './paperEmphasis';
-import { PAPER_DASH, PAPER_LINE_RENDER_ORDER, PAPER_LINE_STYLE, setPaperSegment } from './paperScene';
+import { PAPER_LINE_RENDER_ORDER, PAPER_LINE_STYLE, PAPER_RING_POINTS } from './paperScene';
+import { usePaperDiscMesh } from './usePaperDiscMesh';
+import { PaperSegmentLine } from './PaperSegmentLine';
 
 interface PaperLifecyclesProps {
   draws: readonly PaperLifecycleDraw[];
@@ -28,8 +30,6 @@ interface PaperLifecyclesProps {
   state: MutableRefObject<PaperEmphasisState>;
 }
 
-const DISC_SEGMENTS = 40;
-const RING_SEGMENTS = 64;
 const RING_WIDTH_PX = 1.5;
 const SPECKS = 14;
 
@@ -96,25 +96,11 @@ function LifecycleDisc({
   const ringRef = useRef<THREE.Group>(null);
   const ringLine = useRef<ElementRef<typeof Line>>(null);
   const specksRef = useRef<THREE.InstancedMesh>(null);
-  const geometry = useMemo(() => new THREE.CircleGeometry(1, DISC_SEGMENTS), []);
-  const material = useMemo(
-    () => new THREE.MeshBasicMaterial({ polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -4 }),
-    []
-  );
+  const { geometry, material } = usePaperDiscMesh();
   const speckMaterial = useMemo(() => new THREE.MeshBasicMaterial(), []);
-  useLayoutEffect(() => () => geometry.dispose(), [geometry]);
-  useLayoutEffect(() => () => material.dispose(), [material]);
   useLayoutEffect(() => () => speckMaterial.dispose(), [speckMaterial]);
 
   const seeds = useMemo(() => (kind === 'dissolve' ? seedCanvasParticles(SPECKS, 'dissolve') : []), [kind]);
-  const circle = useMemo(
-    () =>
-      Array.from({ length: RING_SEGMENTS + 1 }, (_, i) => {
-        const a = (i / RING_SEGMENTS) * Math.PI * 2;
-        return [Math.cos(a), Math.sin(a), 0] as [number, number, number];
-      }),
-    []
-  );
   const colours = useMemo(() => ({ ink: new THREE.Color(ink), paper: new THREE.Color(paper), out: new THREE.Color() }), [ink, paper]);
   const scratch = useMemo(
     () => ({
@@ -179,7 +165,7 @@ function LifecycleDisc({
       <mesh ref={discRef} geometry={geometry} material={material} visible={false} />
       {kind === 'spawn' && (
         <group ref={ringRef} visible={false}>
-          <Line ref={ringLine} points={circle} fog color={ink} lineWidth={RING_WIDTH_PX} transparent depthWrite={false} />
+          <Line ref={ringLine} points={PAPER_RING_POINTS} fog color={ink} lineWidth={RING_WIDTH_PX} transparent depthWrite={false} />
         </group>
       )}
       {kind === 'dissolve' && <instancedMesh ref={specksRef} args={[geometry, speckMaterial, SPECKS]} visible={false} />}
@@ -215,45 +201,29 @@ function LifecycleLine({
   layout: PaperLayout;
   state: MutableRefObject<PaperEmphasisState>;
 }) {
-  const ref = useRef<ElementRef<typeof Line>>(null);
   const colours = useMemo(
     () => ({ line: new THREE.Color(colour), ink: new THREE.Color(ink), paper: new THREE.Color(paper) }),
     [colour, ink, paper]
   );
-  const points = useMemo(() => [[0, 0, 0] as [number, number, number], [0, 0, 0] as [number, number, number]], []);
-  const scratch = useMemo(() => ({ from: new THREE.Vector3(), to: new THREE.Vector3() }), []);
-
-  useFrame(() => {
-    const segments = ref.current;
-    if (!segments) return;
-    const progress = progressOf(lifecycleKey);
-    const shown = progress !== null && layout.has(fromId) && layout.has(toId);
-    segments.visible = shown;
-    if (!shown) return;
-
-    const { from, to } = scratch;
-    const { drift, emphasis } = state.current;
-    const subject = emphasisSubject(emphasis);
-    const own = subject === fromId || subject === toId;
-    const kept = Math.min(inkOf(state.current, fromId), inkOf(state.current, toId));
-    fadeInk(own ? colours.ink : colours.line, colours.paper, kept, (segments.material as unknown as { color: THREE.Color }).color);
-    placeOf(layout, drift, fromId, from);
-    placeOf(layout, drift, toId, to);
-    to.lerpVectors(from, to, paperLinkDrawn(kind, progress));
-    if (setPaperSegment(segments.geometry, 0, from, to)) segments.geometry.computeBoundingSphere();
-  });
 
   return (
-    <Line
-      ref={ref}
-      points={points}
-      segments
-      fog
+    <PaperSegmentLine
+      place={(from, to, segment) => {
+        const progress = progressOf(lifecycleKey);
+        if (progress === null || !layout.has(fromId) || !layout.has(toId)) return false;
+        const { drift, emphasis } = state.current;
+        const subject = emphasisSubject(emphasis);
+        const own = subject === fromId || subject === toId;
+        const kept = Math.min(inkOf(state.current, fromId), inkOf(state.current, toId));
+        fadeInk(own ? colours.ink : colours.line, colours.paper, kept, (segment.material as unknown as { color: THREE.Color }).color);
+        placeOf(layout, drift, fromId, from);
+        placeOf(layout, drift, toId, to);
+        to.lerpVectors(from, to, paperLinkDrawn(kind, progress));
+        return true;
+      }}
       renderOrder={PAPER_LINE_RENDER_ORDER}
-      depthWrite={false}
       lineWidth={width}
       dashed={dashed}
-      {...PAPER_DASH}
     />
   );
 }

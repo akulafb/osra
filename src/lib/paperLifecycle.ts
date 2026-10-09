@@ -65,7 +65,7 @@ export function paperLinkDrawn(kind: LifecycleKind, progress: number): number {
 }
 
 /** The two ends of a line in the order it grows: from the Person already there towards a spawning one. */
-export function growingFrom(subject: { aId: string; bId: string }, spawning: ReadonlySet<string>): [string, string] {
+function growingFrom(subject: { aId: string; bId: string }, spawning: ReadonlySet<string>): [string, string] {
   return spawning.has(subject.aId) && !spawning.has(subject.bId) ? [subject.bId, subject.aId] : [subject.aId, subject.bId];
 }
 
@@ -176,7 +176,7 @@ export function holdingProgress(progressOf: ProgressOf): ProgressOf {
  * left it, so a Dissolve plays where the Person was after the Working Record
  * has dropped them. Returns `layout` itself when nobody kept has left.
  */
-export function rememberPositions(previous: PaperLayout, layout: PaperLayout, keep: ReadonlySet<string>): PaperLayout {
+function rememberPositions(previous: PaperLayout, layout: PaperLayout, keep: ReadonlySet<string>): PaperLayout {
   const left = [...keep].filter((id) => !layout.has(id) && previous.has(id));
   if (left.length === 0) return layout;
   const remembered = new Map(layout);

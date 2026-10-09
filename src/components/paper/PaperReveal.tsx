@@ -1,10 +1,9 @@
 import { useEffect, useMemo, useRef, type MutableRefObject } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import type { CameraControls } from '@react-three/drei';
-import type { PaperLayout } from '../../lib/paperLayout';
-import type { Point3 } from '../../lib/paperHover';
-import { paperFlySmoothTime } from '../../lib/paperFocus';
-import { paperRevealProgress, paperRevealShares, PAPER_REVEAL_SECONDS } from '../../lib/paperIntro';
+import type { PaperLayout, Point3 } from '../../lib/paperLayout';
+import { addOffsets } from '../../lib/paperHover';
+import { paperRevealProgress, paperRevealShares, paperRevealSmoothTime, PAPER_REVEAL_SECONDS } from '../../lib/paperIntro';
 import type { PaperEmphasisState } from './paperEmphasis';
 import { PAPER_REVEAL_FRAME_PRIORITY, type PaperFrame } from './paperScene';
 
@@ -16,6 +15,7 @@ interface PaperRevealProps {
   frame: PaperFrame;
   layout: PaperLayout;
   ids: readonly string[];
+  selectedId: string | null;
   state: MutableRefObject<PaperEmphasisState>;
   onDone: () => void;
 }
@@ -24,8 +24,9 @@ interface PaperRevealProps {
  * The opening reveal: Persons grow outward from the centre of the tree,
  * nearest first, while the camera swings in to where it already stands. Both
  * run on the scene clock and end within PAPER_REVEAL_SECONDS (ADR 0011).
+ * A Person picked during the reveal is flown to at the usual pace.
  */
-export function PaperReveal({ frame, layout, ids, state, onDone }: PaperRevealProps) {
+export function PaperReveal({ frame, layout, ids, selectedId, state, onDone }: PaperRevealProps) {
   const controls = useThree((three) => three.controls) as CameraControls | null;
   const shares = useMemo(() => paperRevealShares(layout, ids, frame.center), [layout, ids, frame.center]);
   const startedAt = useRef<number | null>(null);
@@ -43,7 +44,7 @@ export function PaperReveal({ frame, layout, ids, state, onDone }: PaperRevealPr
       azimuth: controls.azimuthAngle,
       polar: controls.polarAngle,
     });
-    controls.smoothTime = paperFlySmoothTime(PAPER_REVEAL_SECONDS);
+    controls.smoothTime = paperRevealSmoothTime(false);
     void controls.rotateTo(azimuth - SWING_AZIMUTH, polar - SWING_POLAR, false);
     void controls.dollyTo(distance * SWING_BACK, false);
     void controls.rotateTo(azimuth, polar, true);
@@ -52,6 +53,11 @@ export function PaperReveal({ frame, layout, ids, state, onDone }: PaperRevealPr
       controls.smoothTime = smoothTime;
     };
   }, [controls]);
+
+  const startedWith = useRef(selectedId);
+  useEffect(() => {
+    if (controls && selectedId !== startedWith.current) controls.smoothTime = paperRevealSmoothTime(true);
+  }, [controls, selectedId]);
 
   useFrame(({ clock }) => {
     if (done.current) return;
@@ -65,20 +71,15 @@ export function PaperReveal({ frame, layout, ids, state, onDone }: PaperRevealPr
     }
     const { center } = frame;
     const reveal = new Map<string, number>();
-    const drift = new Map<string, Point3>(state.current.drift);
+    const pulls = new Map<string, Point3>();
     for (const [id, share] of shares) {
       const disc = layout.get(id)!;
       const progress = paperRevealProgress(share, seconds);
-      const lean = drift.get(id);
       const pull = 1 - progress;
       reveal.set(id, progress);
-      drift.set(id, {
-        x: (lean?.x ?? 0) + (center.x - disc.x) * pull,
-        y: (lean?.y ?? 0) + (center.y - disc.y) * pull,
-        z: (lean?.z ?? 0) + (center.z - disc.z) * pull,
-      });
+      pulls.set(id, { x: (center.x - disc.x) * pull, y: (center.y - disc.y) * pull, z: (center.z - disc.z) * pull });
     }
-    state.current = { ...state.current, drift, reveal };
+    state.current = { ...state.current, drift: addOffsets(state.current.drift, pulls), reveal };
   }, PAPER_REVEAL_FRAME_PRIORITY);
 
   return null;

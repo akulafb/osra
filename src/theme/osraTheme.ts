@@ -59,7 +59,7 @@ export const osraTheme = createTheme({
     },
     background: {
       default: '#050505', // Deep Midnight
-      paper: '#0a0a0a',
+      paper: cosmosPanel.page,
     },
     text: {
       primary: cosmosPanel.role.text,

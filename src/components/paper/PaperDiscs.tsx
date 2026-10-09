@@ -3,6 +3,7 @@ import { useFrame, useThree, type ThreeEvent } from '@react-three/fiber';
 import * as THREE from 'three';
 import type { PaperLayout } from '../../lib/paperLayout';
 import { fadeInk, inkOf, placeOf, sizeOf, type PaperEmphasisState } from './paperEmphasis';
+import { usePaperDiscMesh } from './usePaperDiscMesh';
 
 interface PaperDiscsProps {
   ids: readonly string[];
@@ -13,21 +14,11 @@ interface PaperDiscsProps {
   onPersonClick: (id: string, event: ThreeEvent<MouseEvent>) => void;
 }
 
-const DISC_SEGMENTS = 40;
-
 /** Every shown Person as one flat ink disc, all in a single instanced draw that turns to face the camera each frame and fades with the emphasis. */
 export function PaperDiscs({ ids, layout, ink, paper, state, onPersonClick }: PaperDiscsProps) {
   const meshRef = useRef<THREE.InstancedMesh>(null);
-  const geometry = useMemo(() => new THREE.CircleGeometry(1, DISC_SEGMENTS), []);
-  // Lines end at disc centres, at the disc's own depth; the offset keeps the disc on top there.
-  const material = useMemo(
-    () => new THREE.MeshBasicMaterial({ polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -4 }),
-    []
-  );
+  const { geometry, material } = usePaperDiscMesh();
   const colours = useMemo(() => ({ ink: new THREE.Color(ink), paper: new THREE.Color(paper), disc: new THREE.Color() }), [ink, paper]);
-
-  useLayoutEffect(() => () => geometry.dispose(), [geometry]);
-  useLayoutEffect(() => () => material.dispose(), [material]);
 
   const discs = useMemo(() => ids.map((id) => layout.get(id)!), [ids, layout]);
 

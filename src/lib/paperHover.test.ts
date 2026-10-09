@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { Emphasis } from './focusEmphasis';
 import type { FamilyLink } from '../types/graph';
 import type { PaperLayout, PaperLine } from './paperLayout';
-import { easeDrift, emphasisSubject, linesOf, nearestDiscAt, paperDrift, paperScreenRadius } from './paperHover';
+import { addOffsets, easeDrift, emphasisSubject, linesOf, nearestDiscAt, paperDrift, paperScreenRadius } from './paperHover';
 
 describe('nearestDiscAt', () => {
   const discs = [
@@ -186,5 +186,19 @@ describe('emphasisSubject', () => {
 
   it('is nobody when nobody is hovered or focused', () => {
     expect(emphasisSubject(new Map<string, Emphasis>([['a', 'normal']]))).toBeNull();
+  });
+});
+
+describe('addOffsets', () => {
+  it('adds each offset to the drift a Person already has, and gives one to a Person with none', () => {
+    const drift = new Map([['a', { x: 1, y: 2, z: 3 }]]);
+    const moved = addOffsets(drift, new Map([['a', { x: 10, y: 0, z: -1 }], ['b', { x: 0, y: 5, z: 0 }]]));
+    expect([...moved]).toEqual([['a', { x: 11, y: 2, z: 2 }], ['b', { x: 0, y: 5, z: 0 }]]);
+    expect([...drift]).toEqual([['a', { x: 1, y: 2, z: 3 }]]);
+  });
+
+  it('returns the drift itself when there is nothing to add', () => {
+    const drift = new Map([['a', { x: 1, y: 2, z: 3 }]]);
+    expect(addOffsets(drift, new Map())).toBe(drift);
   });
 });

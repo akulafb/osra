@@ -36,8 +36,7 @@ interface PersonDetailDrawerProps {
   onEdit: () => void;
   onAdd: () => void;
   onInvite: () => void;
-  /** Without it Connect Nodes is not offered. */
-  onConnect?: () => void;
+  onConnect: () => void;
   onManageLinks: () => void;
   onDelete: () => void;
 }
@@ -203,16 +202,14 @@ export const PersonDetailDrawer: React.FC<PersonDetailDrawerProps> = ({
                 Administrative Tools
               </Typography>
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-                {onConnect && (
-                  <Button 
-                    variant="text" 
-                    fullWidth
-                    onClick={onConnect}
-                    sx={{ justifyContent: 'flex-start', color: panel.role.textSecondary }}
-                  >
-                    Connect Nodes...
-                  </Button>
-                )}
+                <Button 
+                  variant="text" 
+                  fullWidth
+                  onClick={onConnect}
+                  sx={{ justifyContent: 'flex-start', color: panel.role.textSecondary }}
+                >
+                  Connect Nodes...
+                </Button>
                 <Button 
                   variant="text" 
                   fullWidth

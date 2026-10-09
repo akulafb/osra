@@ -1,0 +1,24 @@
+import type { RelativeDirection } from '../types/graph';
+
+/**
+ * Presentation of a relation, shared between the Ghost Node card and the hosts
+ * that draw a connector to it — the 2D shell needs the same accent colour for
+ * its dashed line as the card uses for its border.
+ */
+const RELATION_COLORS: Record<RelativeDirection, string> = {
+  parent: '#fef08a',
+  spouse: '#f472b6',
+  child: '#93c5fd',
+  sibling: '#86efac',
+};
+
+/**
+ * Connect Mode's own accent, kept beside the relation colours because it plays
+ * the same role: the 2D HUD, the kinship picker, the docked targeting panel and
+ * the 3D candidate rim-light all have to agree on one purple.
+ */
+export const CONNECT_ACCENT = '#c084fc';
+
+export function relationColor(relation: RelativeDirection): string {
+  return RELATION_COLORS[relation];
+}

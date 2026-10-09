@@ -4,21 +4,20 @@ import * as THREE from 'three';
 import type { FamilyLink } from '../../types/graph';
 import type { Emphasis } from '../../lib/focusEmphasis';
 import { paperSearchEmphasis } from '../../lib/paperSearch';
-import type { PaperLayout } from '../../lib/paperLayout';
+import type { PaperLayout, Point3 } from '../../lib/paperLayout';
 import { paperWobble } from '../../lib/paperFocus';
+import { PAPER_MAX_FRAME_SECONDS } from '../../lib/paperCamera';
 import {
+  addOffsets,
   easeDrift,
   nearestDiscAt,
   paperDrift,
   paperScreenRadius,
-  type Point3,
   type ScreenDisc,
 } from '../../lib/paperHover';
 import { placeOf, sizeOf, type PaperEmphasisState, type PaperFocus } from './paperEmphasis';
 import { PAPER_HOVER_FRAME_PRIORITY, type ScreenPoint } from './paperScene';
 import { paperConnectEmphasis } from './paperConnect';
-
-const LONGEST_FRAME_SECONDS = 0.1;
 
 interface PaperHoverProps {
   state: MutableRefObject<PaperEmphasisState>;
@@ -51,6 +50,7 @@ export function PaperHover({ state, pointer, layout, ids, links, selectedId, mat
   const target = useRef(new Map<string, Point3>());
   const lean = useRef<ReadonlyMap<string, Point3>>(new Map());
   const wrote = useRef<ReadonlyMap<string, Point3>>(new Map());
+  const wobble = useRef(new Map<string, Point3>());
   const scratch = useMemo(() => ({ place: new THREE.Vector3(), view: new THREE.Vector3(), discs: [] as ScreenDisc[] }), []);
 
   const canvas = useThree((three) => three.gl.domElement);
@@ -82,9 +82,9 @@ export function PaperHover({ state, pointer, layout, ids, links, selectedId, mat
     }
     seen.current = { pointer: pointer.current, inputs, hoveredId, size };
 
-    lean.current = easeDrift(lean.current, target.current, Math.min(delta, LONGEST_FRAME_SECONDS));
+    lean.current = easeDrift(lean.current, target.current, Math.min(delta, PAPER_MAX_FRAME_SECONDS));
     const { focus, emphasis } = state.current;
-    const drift = focus ? withWobble(lean.current, paperWobble(layout, emphasis, clock.elapsedTime - focus.since)) : lean.current;
+    const drift = focus ? addOffsets(lean.current, paperWobble(layout, emphasis, focus.id, clock.elapsedTime - focus.since, wobble.current)) : lean.current;
     wrote.current = drift;
     if (drift !== state.current.drift) state.current = { ...state.current, drift };
   }, PAPER_HOVER_FRAME_PRIORITY);
@@ -124,14 +124,4 @@ function focusOf(
 ): PaperFocus | null {
   if (!selectedId || emphasis.get(selectedId) !== 'focused') return null;
   return current?.id === selectedId ? current : { id: selectedId, since: now };
-}
-
-function withWobble(lean: ReadonlyMap<string, Point3>, wobble: ReadonlyMap<string, Point3>): ReadonlyMap<string, Point3> {
-  if (wobble.size === 0) return lean;
-  const drift = new Map(lean);
-  for (const [id, w] of wobble) {
-    const l = drift.get(id);
-    drift.set(id, l ? { x: l.x + w.x, y: l.y + w.y, z: l.z + w.z } : w);
-  }
-  return drift;
 }

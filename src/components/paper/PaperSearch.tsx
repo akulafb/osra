@@ -2,7 +2,7 @@ import { useEffect, useRef, type MutableRefObject } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import type { CameraControls } from '@react-three/drei';
 import type { PaperLayout } from '../../lib/paperLayout';
-import type { Point3 } from '../../lib/paperHover';
+import { addOffsets } from '../../lib/paperHover';
 import { paperFlyFrames, paperSearchMotionAt, paperSearchMotionFrom, PAPER_SEARCH_STILL, type PaperSearchMotion } from '../../lib/paperSearch';
 import type { PaperEmphasisState } from './paperEmphasis';
 import { PAPER_SEARCH_FRAME_PRIORITY, type PaperFrame } from './paperScene';
@@ -42,7 +42,7 @@ export function PaperSearch({ layout, matchIds, cluster, selectedId, state, flyT
     const { offsets, sizes, done } = paperSearchMotionAt(motion.current, clock.elapsedTime);
     if (done) settled.current = motion.current;
     const { drift } = state.current;
-    state.current = { ...state.current, size: sizes, drift: offsets.size ? withOffsets(drift, offsets) : drift };
+    state.current = { ...state.current, size: sizes, drift: addOffsets(drift, offsets) };
   }, PAPER_SEARCH_FRAME_PRIORITY);
 
   const framedFor = useRef<ReadonlySet<string> | null>(null);
@@ -54,13 +54,4 @@ export function PaperSearch({ layout, matchIds, cluster, selectedId, state, flyT
   }, [controls, matchIds, cluster, selectedId, layout, flyTo, onOverview]);
 
   return null;
-}
-
-function withOffsets(drift: ReadonlyMap<string, Point3>, offsets: ReadonlyMap<string, Point3>): ReadonlyMap<string, Point3> {
-  const moved = new Map(drift);
-  for (const [id, o] of offsets) {
-    const d = moved.get(id);
-    moved.set(id, d ? { x: d.x + o.x, y: d.y + o.y, z: d.z + o.z } : o);
-  }
-  return moved;
 }

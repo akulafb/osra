@@ -7,12 +7,10 @@ import { GhostNodeCard, GHOST_CARD_WIDTH } from './cards/GhostNodeCard';
 import { ConnectPickerCard, PICKER_CARD_WIDTH } from './cards/ConnectPickerCard';
 import { KinshipLinkType, ParentRole } from './cards/connectOptions';
 import { Candidacy, ConnectPair, buildTargetOptions } from './cards/connectCandidates';
-import { CONNECT_ACCENT, relationColor } from './cards/relationStyle';
 import { ConnectTargetingBody } from './ConnectTargetingBody';
 import { connectedPersonIds } from '../lib/personMatch';
 import { otherParentChoice } from '../lib/otherParent';
 import { countUnreachable } from '../utils/connectTargeting';
-import { CONFIRM_PULSE_COLOR } from '../utils/cosmicFx';
 import { useGhostPreview, type GhostPreviewLook } from '../hooks/useGhostPreview';
 import { useCanvasMode } from '../hooks/useCanvasMode';
 import { useTargetVisibility } from '../hooks/useTargetVisibility';
@@ -34,10 +32,6 @@ const PANEL_LEFT = 24;
 const PANEL_PADDING = 12;
 /** Clears the chat button docked bottom-left when the panel sits at the bottom. */
 const PANEL_BOTTOM = 88;
-
-/** The same red the scene pulses the aura with, so the pill and the planet
- *  read as one question. */
-const DISSOLVE_ACCENT = CONFIRM_PULSE_COLOR;
 
 const HANDLES: { relation: RelativeDirection; label: string }[] = [
   { relation: 'parent', label: '+ Parent' },
@@ -246,9 +240,12 @@ export const Manipulation3DPanel: React.FC<Manipulation3DPanelProps> = ({
 }) => {
   const { panel, hud } = useTheme().palette;
   const isPaper = useCanvasMode().mode === 'paper';
-  const look = isPaper
-    ? { idle: hud.card.highlight, dissolve: hud.error, connect: hud.connect.accent, relation: (r: RelativeDirection) => hud.relation[r].line }
-    : { idle: '#a78bfa', dissolve: DISSOLVE_ACCENT, connect: CONNECT_ACCENT, relation: relationColor };
+  const look = {
+    idle: hud.manipulation.idle,
+    dissolve: hud.manipulation.dissolve,
+    connect: hud.connect.accent,
+    relation: (r: RelativeDirection) => hud.relation[r].line,
+  };
   const [relation, setRelation] = useState<RelativeDirection | null>(null);
   const [previewName, setPreviewName] = useState('');
 

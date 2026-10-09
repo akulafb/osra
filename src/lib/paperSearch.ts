@@ -1,8 +1,8 @@
 import type { FamilyLink } from '../types/graph';
 import { getLinkEndpoints } from './familyGraph';
 import { focusEmphasis, type Emphasis } from './focusEmphasis';
-import type { PaperLayout } from './paperLayout';
-import type { Point3 } from './paperHover';
+import { easeInOutCubic, easeOutCubic } from './paperEasing';
+import { PaperGrid, type PaperLayout, type Point3 } from './paperLayout';
 
 /** The least space left between two discs in the search cluster: room for a name between them. */
 export const PAPER_CLUSTER_GAP = 20;
@@ -200,8 +200,8 @@ export function paperSearchMotionFrom(
 export function paperSearchMotionAt(motion: PaperSearchMotion, now: number): PaperSearchMotionFrame {
   const seconds = now - motion.since;
   const finite = Number.isFinite(seconds);
-  const gather = finite ? easeInOut(seconds / PAPER_GATHER_SECONDS) : 1;
-  const shrink = finite ? easeOut(seconds / PAPER_SHRINK_SECONDS) : 1;
+  const gather = finite ? easeInOutCubic(seconds / PAPER_GATHER_SECONDS) : 1;
+  const shrink = finite ? easeOutCubic(seconds / PAPER_SHRINK_SECONDS) : 1;
 
   const offsets = new Map<string, Point3>();
   if (gather < 1) {
@@ -218,18 +218,6 @@ export function paperSearchMotionAt(motion: PaperSearchMotion, now: number): Pap
     if (size !== 1 || target !== 1) sizes.set(id, size);
   }
   return { offsets, sizes, done: gather === 1 && shrink === 1 };
-}
-
-function easeInOut(t: number): number {
-  if (!(t > 0)) return 0;
-  if (t >= 1) return 1;
-  return t < 0.5 ? 4 * t ** 3 : 1 - (-2 * t + 2) ** 3 / 2;
-}
-
-function easeOut(t: number): number {
-  if (!(t > 0)) return 0;
-  if (t >= 1) return 1;
-  return 1 - (1 - t) ** 3;
 }
 
 function matchedPairs(links: readonly FamilyLink[], index: ReadonlyMap<string, number>): [number, number][] {
@@ -270,25 +258,14 @@ function pull(places: Point3[], fixed: readonly boolean[], i: number, j: number,
 
 /** One pass that pushes every two overlapping discs apart; true when it moved any. Only discs in neighbouring grid cells can overlap. */
 function separate(places: Point3[], radii: readonly number[], fixed: readonly boolean[]): boolean {
-  const cell = 2 * Math.max(...radii) + PAPER_CLUSTER_GAP;
-  const grid = new Map<number, number[]>();
-  const keyOf = (x: number, y: number, z: number) => (x * 73856093) ^ (y * 19349663) ^ (z * 83492791);
-  places.forEach((p, i) => {
-    const key = keyOf(Math.floor(p.x / cell), Math.floor(p.y / cell), Math.floor(p.z / cell));
-    const bucket = grid.get(key);
-    if (bucket) bucket.push(i);
-    else grid.set(key, [i]);
-  });
+  const grid = new PaperGrid(2 * Math.max(...radii) + PAPER_CLUSTER_GAP);
+  places.forEach((p, i) => grid.add(i, p));
   let moved = false;
-  for (let i = 0; i < places.length; i++) {
-    const cx = Math.floor(places[i].x / cell);
-    const cy = Math.floor(places[i].y / cell);
-    const cz = Math.floor(places[i].z / cell);
-    for (let dx = -1; dx <= 1; dx++)
-      for (let dy = -1; dy <= 1; dy++)
-        for (let dz = -1; dz <= 1; dz++)
-          for (const j of grid.get(keyOf(cx + dx, cy + dy, cz + dz)) ?? []) if (j > i && push(places, radii, fixed, i, j)) moved = true;
-  }
+  places.forEach((p, i) =>
+    grid.forNear(p, (j) => {
+      if (j > i && push(places, radii, fixed, i, j)) moved = true;
+    })
+  );
   return moved;
 }
 

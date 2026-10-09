@@ -6,7 +6,7 @@ import type { FamilyLink } from '../../types/graph';
 import type { PaperLayout, PaperLine } from '../../lib/paperLayout';
 import { emphasisSubject, linesOf } from '../../lib/paperHover';
 import { fadeInk, inkOf, lineEndInks, placeOf, type PaperEmphasisState } from './paperEmphasis';
-import { PAPER_DASH, PAPER_LINE_RENDER_ORDER, PAPER_LINE_STYLE, paperLineSegments, setPaperSegment } from './paperScene';
+import { PAPER_DASH, PAPER_LINE_RENDER_ORDER, PAPER_LINE_STYLE, paperLineSegments, setPaperColours, setPaperSegment } from './paperScene';
 
 interface PaperLinesProps {
   lines: readonly PaperLine[];
@@ -71,8 +71,9 @@ function PaperLineKind({
 }) {
   const ref = useRef<LineSegments>(null);
   const style = PAPER_LINE_STYLE[type];
-  const points = useMemo(() => paperLineSegments(lines, layout)[type], [lines, layout, type]);
+  const points = useMemo(() => paperLineSegments(lines, layout), [lines, layout]);
   const vertexColors = useMemo(() => points.map(() => [1, 1, 1] as [number, number, number]), [points]);
+  const rgb = useMemo(() => new Float32Array(lines.length * 6), [lines]);
   const colours = useMemo(
     () => ({ line: new THREE.Color(colour), ink: new THREE.Color(ink), paper: new THREE.Color(paper), out: new THREE.Color() }),
     [colour, ink, paper]
@@ -101,14 +102,13 @@ function PaperLineKind({
 
     if (fresh || colours !== last.colours || emphasis !== last.emphasis) {
       const own = new Set(linesOf(lines, emphasisSubject(emphasis)));
-      const rgb = new Float32Array(lines.length * 6);
       lines.forEach((line, i) => {
         const colour = own.has(line) ? colours.ink : colours.line;
         const [source, target] = lineEndInks(state.current, line);
         fadeInk(colour, colours.paper, source, colours.out).toArray(rgb, i * 6);
         fadeInk(colour, colours.paper, target, colours.out).toArray(rgb, i * 6 + 3);
       });
-      geometry.setColors(rgb);
+      setPaperColours(geometry, rgb);
     }
 
     drawn.current = { geometry, colours, emphasis, drift };

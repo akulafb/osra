@@ -1,19 +1,13 @@
 import { mixOklab } from './colourBlend';
+import { easeInOutQuad } from './paperEasing';
 import { GRAYSCALE_PAIR, PAPER_PAIRS, type PaperPair } from '../theme/paperPair';
+import { hashCluster } from '../utils/familyColors';
 import type { CanvasMode, PaperColour } from './canvasMode';
 
 export const PAIR_FADE_MS = 400;
 
-function hashFamily(familyCluster: string): number {
-  let hash = 0;
-  for (let i = 0; i < familyCluster.length; i++) {
-    hash = familyCluster.charCodeAt(i) + ((hash << 5) - hash);
-  }
-  return hash;
-}
-
 export function pairForFamily(familyCluster: string): PaperPair {
-  return PAPER_PAIRS[Math.abs(hashFamily(familyCluster)) % PAPER_PAIRS.length];
+  return PAPER_PAIRS[Math.abs(hashCluster(familyCluster)) % PAPER_PAIRS.length];
 }
 
 /** The pair the scene fades to: the focused Person's family pair in Paper colour, else the overview pair; grayscale otherwise. */
@@ -51,12 +45,8 @@ export interface PairFade {
   startedAt: number;
 }
 
-function easeInOut(t: number): number {
-  return t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2;
-}
-
 export function pairAt(fade: PairFade, now: number): PaperPair {
   const t = Math.min(1, Math.max(0, (now - fade.startedAt) / PAIR_FADE_MS));
   if (t === 1) return fade.to;
-  return mixPair(fade.from, fade.to, easeInOut(t));
+  return mixPair(fade.from, fade.to, easeInOutQuad(t));
 }

@@ -72,7 +72,7 @@ const HIDE_MATCH_STEPPING = {
   '& [aria-label="Previous match"], & [aria-label="Next match"]': { display: 'none' },
 };
 
-export interface Tree3DOverlayProps {
+interface Tree3DOverlayProps {
   graphData: FamilyGraph;
   camera: Tree3DSceneCamera;
   drawerInset: PersonDrawerInset;

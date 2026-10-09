@@ -1,9 +1,15 @@
-import type { PaperLayout } from './paperLayout';
-import type { Point3 } from './paperHover';
+import { easeOutCubic } from './paperEasing';
+import { paperFlySmoothTime, PAPER_FLY_SECONDS } from './paperFocus';
+import type { PaperLayout, Point3 } from './paperLayout';
 
 export const PAPER_REVEAL_SECONDS = 1.8;
 
 const PERSON_REVEAL_SECONDS = 0.9;
+
+/** The camera's smoothing while the reveal plays: its slow swing, until a Person picked during it takes the camera at the usual pace. */
+export function paperRevealSmoothTime(interrupted: boolean): number {
+  return paperFlySmoothTime(interrupted ? PAPER_FLY_SECONDS : PAPER_REVEAL_SECONDS);
+}
 
 /** Each Person's share of the way out from `center`: 0 at the centre, 1 for the farthest. */
 export function paperRevealShares(layout: PaperLayout, ids: readonly string[], center: Point3): Map<string, number> {
@@ -30,7 +36,7 @@ export function paperRevealProgress(share: number, seconds: number): number {
   if (!Number.isFinite(seconds)) return 1;
   const start = clamp01(share) * (PAPER_REVEAL_SECONDS - PERSON_REVEAL_SECONDS);
   const t = clamp01((seconds - start) / PERSON_REVEAL_SECONDS);
-  return 1 - (1 - t) ** 3;
+  return easeOutCubic(t);
 }
 
 export const PAPER_HINT_SEEN_KEY = 'family-tree-paper-hint-seen';

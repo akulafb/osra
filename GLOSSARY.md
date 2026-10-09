@@ -82,8 +82,12 @@ The default Canvas Mode: flat ink-on-paper Tree Nodes in a still layout, in gray
 _Avoid_: Atlas, Light mode, Ink mode
 
 **Paper Pair**:
-A hand-picked background colour and the ink colour drawn on it. Each family is assigned one; with colour on, the canvas takes the pair of the focused Person's family.
+A hand-picked background colour, the ink colour drawn on it, and an accent for marks that must stand out from the ink (FIND ME, the current search match, warnings). In the hand-picked pairs the accent is the ink; only grayscale has its own red accent. Each family is assigned one; with colour on, the canvas takes the pair of the focused Person's family.
 _Avoid_: Palette, Section colour, Duotone
+
+**Overview pair**:
+The Paper Pair shown with colour on while nobody with a family is focused: drawn at random on each load and each time a Person is closed, never the same as the last one.
+_Avoid_: Default pair, Home pair
 
 
 ### Direct Interaction

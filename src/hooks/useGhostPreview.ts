@@ -13,7 +13,7 @@ import {
   GHOST_PREVIEW_TETHER_GAP,
   type GhostPreviewLanding,
 } from '../utils/ghostPreview';
-import { relationColor } from '../components/cards/relationStyle';
+import { relationColor } from '../theme/relationColours';
 
 /** The marker's colours; Cosmos draws it in the relation's colour with a light label. */
 export interface GhostPreviewLook {

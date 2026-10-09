@@ -75,20 +75,20 @@ export function paperLines<L extends FamilyLink>(nodes: readonly FamilyNode[], l
   return lines;
 }
 
-interface Point {
+export interface Point3 {
   x: number;
   y: number;
   z: number;
 }
 
-function squaredDistance(p: Point, q: Point): number {
+function squaredDistance(p: Point3, q: Point3): number {
   const dx = p.x - q.x;
   const dy = p.y - q.y;
   const dz = p.z - q.z;
   return dx * dx + dy * dy + dz * dz;
 }
 
-function centroid(points: readonly Point[]): Point {
+function centroid(points: readonly Point3[]): Point3 {
   const sum = { x: 0, y: 0, z: 0 };
   for (const p of points) {
     sum.x += p.x;
@@ -99,7 +99,7 @@ function centroid(points: readonly Point[]): Point {
   return { x: sum.x / count, y: sum.y / count, z: sum.z / count };
 }
 
-function randomUnit(random: () => number): Point {
+function randomUnit(random: () => number): Point3 {
   for (;;) {
     const x = random() * 2 - 1;
     const y = random() * 2 - 1;
@@ -131,12 +131,13 @@ interface Cell {
   members: number[];
 }
 
-class Grid {
+/** A spatial hash: each index in a cube of `size`, so a lookup visits only the 27 cubes around a point. */
+export class PaperGrid {
   private cells = new Map<number, Cell>();
 
   constructor(private size: number) {}
 
-  add(index: number, p: Point): void {
+  add(index: number, p: Point3): void {
     const ix = cellOf(p.x, this.size);
     const iy = cellOf(p.y, this.size);
     const iz = cellOf(p.z, this.size);
@@ -146,7 +147,7 @@ class Grid {
     else this.cells.set(key, { ix, iy, iz, members: [index] });
   }
 
-  forNear(p: Point, visit: (index: number) => void): void {
+  forNear(p: Point3, visit: (index: number) => void): void {
     const ix = cellOf(p.x, this.size);
     const iy = cellOf(p.y, this.size);
     const iz = cellOf(p.z, this.size);
@@ -175,8 +176,8 @@ class Grid {
   }
 }
 
-function repel(points: readonly Point[], velocity: Point[], radii: readonly number[], alpha: number): void {
-  const grid = new Grid(REPULSION_RANGE);
+function repel(points: readonly Point3[], velocity: Point3[], radii: readonly number[], alpha: number): void {
+  const grid = new PaperGrid(REPULSION_RANGE);
   points.forEach((p, i) => grid.add(i, p));
   grid.forEachNearPair((i, j) => {
     const p = points[i];
@@ -226,13 +227,13 @@ function springsBetween(index: Map<string, number>, links: readonly FamilyLink[]
   return [...byPair.values()].sort((s, t) => s.a - t.a || s.b - t.b);
 }
 
-function startingPoints(ids: readonly string[], springs: readonly Spring[]): Point[] {
+function startingPoints(ids: readonly string[], springs: readonly Spring[]): Point3[] {
   const neighbours = ids.map(() => [] as Spring[]);
   for (const spring of springs) {
     neighbours[spring.a].push(spring);
     neighbours[spring.b].push(spring);
   }
-  const points: (Point | undefined)[] = ids.map(() => undefined);
+  const points: (Point3 | undefined)[] = ids.map(() => undefined);
   const spread = LINK_LENGTH.parent * Math.sqrt(ids.length);
   for (let root = 0; root < ids.length; root++) {
     if (points[root]) continue;
@@ -252,10 +253,10 @@ function startingPoints(ids: readonly string[], springs: readonly Spring[]): Poi
       }
     }
   }
-  return points as Point[];
+  return points as Point3[];
 }
 
-function pushOverlapsOutward(ids: readonly string[], points: Point[], radii: readonly number[]): void {
+function pushOverlapsOutward(ids: readonly string[], points: Point3[], radii: readonly number[]): void {
   const order = ids
     .map((_, i) => i)
     .sort((i, j) => {
@@ -263,7 +264,7 @@ function pushOverlapsOutward(ids: readonly string[], points: Point[], radii: rea
       const b = points[j];
       return a.x * a.x + a.y * a.y + a.z * a.z - (b.x * b.x + b.y * b.y + b.z * b.z) || (ids[i] < ids[j] ? -1 : 1);
     });
-  const grid = new Grid(MAX_RADIUS * 2 + PAPER_DISC_GAP);
+  const grid = new PaperGrid(MAX_RADIUS * 2 + PAPER_DISC_GAP);
   for (const i of order) {
     const p = points[i];
     const length = Math.sqrt(p.x * p.x + p.y * p.y + p.z * p.z);
@@ -375,9 +376,9 @@ export function placeNewcomer(layout: PaperLayout, newcomerId: string, links: re
   const discs = [...layout.values()];
   const relatives = [...relativeIds].sort().map((id) => layout.get(id)!);
 
-  let anchor: Point;
+  let anchor: Point3;
   let startDistance: number;
-  let toward: Point;
+  let toward: Point3;
   if (relatives.length > 0) {
     toward = centroid(relatives);
     const beside = relatives.reduce((best, d) => (squaredDistance(d, toward) < squaredDistance(best, toward) ? d : best));
@@ -391,14 +392,14 @@ export function placeNewcomer(layout: PaperLayout, newcomerId: string, links: re
   }
 
   const random = seededRandom(hashString([...relativeIds].sort().join('|'), SEED));
-  const isClear = (p: Point) =>
+  const isClear = (p: Point3) =>
     discs.every((d) => {
       const clearance = d.radius + radius + PAPER_DISC_GAP;
       return squaredDistance(p, d) >= clearance * clearance;
     });
 
   for (let distance = startDistance; ; distance += PAPER_DISC_GAP) {
-    let best: Point | null = null;
+    let best: Point3 | null = null;
     for (let attempt = 0; attempt < 32; attempt++) {
       const direction = randomUnit(random);
       const spot = { x: anchor.x + direction.x * distance, y: anchor.y + direction.y * distance, z: anchor.z + direction.z * distance };

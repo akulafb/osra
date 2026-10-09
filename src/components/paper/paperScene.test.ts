@@ -9,6 +9,7 @@ import {
   paperLineSegments,
   paperLineShown,
   paperScreenPoint,
+  setPaperColours,
   setPaperSegment,
   TAP_SLOP_PX,
 } from './paperScene';
@@ -97,19 +98,13 @@ describe('paperLabelSize', () => {
 });
 
 describe('paperLineSegments', () => {
-  it('groups the lines by kind as start and end points', () => {
-    const segments = paperLineSegments(
-      [line('a', 'b', 'marriage'), line('a', 'c', 'parent'), line('b', 'c', 'divorce'), line('c', 'b', 'parent')],
-      layout
-    );
-    expect(segments.marriage).toEqual([[-10, 0, 0], [10, 0, 0]]);
-    expect(segments.divorce).toEqual([[10, 0, 0], [0, 6, 0]]);
-    expect(segments.parent).toEqual([[-10, 0, 0], [0, 6, 0], [0, 6, 0], [10, 0, 0]]);
+  it('gives each line as its start and end points, in order', () => {
+    const segments = paperLineSegments([line('a', 'c', 'parent'), line('c', 'b', 'parent')], layout);
+    expect(segments).toEqual([[-10, 0, 0], [0, 6, 0], [0, 6, 0], [10, 0, 0]]);
   });
 
   it('leaves out a line whose Person has no disc', () => {
-    const segments = paperLineSegments([line('a', 'missing', 'parent')], layout);
-    expect(segments.parent).toEqual([]);
+    expect(paperLineSegments([line('a', 'missing', 'parent')], layout)).toEqual([]);
   });
 });
 
@@ -234,5 +229,34 @@ describe('paperLineShown: which lines the LINKS and ARROWS toggles draw', () => 
 
   it('draws no line with both off', () => {
     expect(kinds.map((type) => paperLineShown(type, { links: false, arrows: false }))).toEqual([false, false, false]);
+  });
+});
+
+describe('setPaperColours: recolouring the segments of a fat line in place', () => {
+  it('gives a line with no colours its colour buffer', () => {
+    const { geometry } = dreiSegmentsGeometry(1);
+    expect(setPaperColours(geometry, new Float32Array([1, 0, 0, 0, 1, 0]))).toBe(true);
+    expect([...bufferOf(geometry, 'instanceColorStart').array]).toEqual([1, 0, 0, 0, 1, 0]);
+    expect(bufferOf(geometry, 'instanceColorEnd')).toBe(bufferOf(geometry, 'instanceColorStart'));
+  });
+
+  it('writes new colours into the buffer the line already has', () => {
+    const { geometry } = dreiSegmentsGeometry(1);
+    setPaperColours(geometry, new Float32Array([1, 0, 0, 0, 1, 0]));
+    const colours = bufferOf(geometry, 'instanceColorStart');
+    const version = colours.version;
+    expect(setPaperColours(geometry, new Float32Array([0.5, 0.5, 0.5, 0, 0, 1]))).toBe(true);
+    expect(bufferOf(geometry, 'instanceColorStart')).toBe(colours);
+    expect([...colours.array]).toEqual([0.5, 0.5, 0.5, 0, 0, 1]);
+    expect(colours.version).toBe(version + 1);
+  });
+
+  it('uploads nothing when the colours have not changed', () => {
+    const { geometry } = dreiSegmentsGeometry(1);
+    setPaperColours(geometry, new Float32Array([0.1, 0.2, 0.3, 0.4, 0.5, 0.6]));
+    const colours = bufferOf(geometry, 'instanceColorStart');
+    const version = colours.version;
+    expect(setPaperColours(geometry, new Float32Array([0.1, 0.2, 0.3, 0.4, 0.5, 0.6]))).toBe(false);
+    expect(colours.version).toBe(version);
   });
 });

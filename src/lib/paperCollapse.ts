@@ -1,5 +1,5 @@
 import type { FamilyGraph, FamilyLink, FamilyNode } from '../types/graph';
-import { getNodeId } from './familyGraph';
+import { getChildren } from './familyGraph';
 import { filterGraphDataFor3D } from './filterGraphData';
 import { paperLines, type PaperLayout, type PaperLine } from './paperLayout';
 
@@ -9,7 +9,7 @@ export interface PaperShown {
 }
 
 export function paperCollapsible(links: readonly FamilyLink[], id: string): boolean {
-  return links.some((l) => l.type === 'parent' && getNodeId(l.source) === id);
+  return getChildren(id, links).length > 0;
 }
 
 export type PaperPersonClick = 'select' | 'pick' | 'deselect-later' | 'ignore';

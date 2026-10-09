@@ -203,32 +203,32 @@ describe('paperWobble', () => {
   ]);
 
   it('moves only the relatives', () => {
-    const wobble = paperWobble(layout, emphasis, 2.3);
+    const wobble = paperWobble(layout, emphasis, 'focus', 2.3);
     expect([...wobble.keys()].sort()).toEqual(['mum', 'son']);
   });
 
   it('keeps each relative close to their place', () => {
     for (const seconds of [1, 2.3, 7.9]) {
-      for (const offset of paperWobble(layout, emphasis, seconds).values()) {
+      for (const offset of paperWobble(layout, emphasis, 'focus', seconds).values()) {
         expect(Math.hypot(offset.x, offset.y, offset.z)).toBeLessThanOrEqual(3);
       }
     }
   });
 
   it('keeps moving over time', () => {
-    const at = (seconds: number) => paperWobble(layout, emphasis, seconds).get('mum')!;
+    const at = (seconds: number) => paperWobble(layout, emphasis, 'focus', seconds).get('mum')!;
     expect(at(2)).not.toEqual(at(2.5));
   });
 
   it('starts from rest, so nobody jumps when the focus begins', () => {
-    for (const offset of paperWobble(layout, emphasis, 0).values()) {
+    for (const offset of paperWobble(layout, emphasis, 'focus', 0).values()) {
       expect(Math.hypot(offset.x, offset.y, offset.z)).toBe(0);
     }
   });
 
   it('leaves the layout as it was', () => {
     const before = structuredClone([...layout]);
-    paperWobble(layout, emphasis, 3.7);
+    paperWobble(layout, emphasis, 'focus', 3.7);
     expect([...layout]).toEqual(before);
   });
 
@@ -237,6 +237,18 @@ describe('paperWobble', () => {
       ['focus', 'hovered'],
       ['mum', 'relative'],
     ]);
-    expect(paperWobble(layout, hover, 3).size).toBe(0);
+    expect(paperWobble(layout, hover, 'focus', 3).size).toBe(0);
+  });
+
+  it('moves nobody when the Person named is not the focused one', () => {
+    expect(paperWobble(layout, emphasis, 'mum', 3).size).toBe(0);
+  });
+
+  it('writes into the map it is given, emptied first', () => {
+    const into = new Map([['stranger', { x: 9, y: 9, z: 9 }]]);
+    const wobble = paperWobble(layout, emphasis, 'focus', 2.3, into);
+    expect(wobble).toBe(into);
+    expect([...wobble.keys()].sort()).toEqual(['mum', 'son']);
+    expect(wobble.get('mum')).toEqual(paperWobble(layout, emphasis, 'focus', 2.3).get('mum'));
   });
 });

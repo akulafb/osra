@@ -26,14 +26,12 @@ import { topRightControlsClear, type PersonDrawerInset } from '../hooks/usePerso
 import { canEdit } from '../lib/permissions';
 import { CanvasModeSwitch } from './CanvasModeSwitch';
 import { useCanvasMode } from '../hooks/useCanvasMode';
-import { LIVE_PAIR } from '../theme/paperPair';
 import { paperEscape, paperSearchCount } from '../lib/paperSearch';
 import { focusEmphasis } from '../lib/focusEmphasis';
 import { DirectManipulationController } from '../hooks/useDirectManipulation';
 import { candidacyFor } from './cards/connectCandidates';
 import { otherParentChoice } from '../lib/otherParent';
 
-const COSMOS_BACKGROUND = 'linear-gradient(180deg, #0a0a0a 0%, #1a1a2e 100%)';
 
 /** Paper's search box leaves its Escape to the window's Escape handler, which clears the selection before the search. */
 const escapeReachesWindow = () => {};
@@ -158,7 +156,7 @@ export const FamilyTree2D: React.FC<FamilyTree2DProps> = ({
   const { panel, hud } = useTheme().palette;
   const { mode: canvasMode } = useCanvasMode();
   const isPaper = canvasMode === 'paper';
-  const background = isPaper ? LIVE_PAIR.paper : COSMOS_BACKGROUND;
+  const background = hud.canvas.background;
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
   const handleHoverChange = useCallback((nodeId: string, hovering: boolean) => {
     setHoveredNodeId((current) => (hovering ? nodeId : current === nodeId ? null : current));
@@ -691,7 +689,7 @@ export const FamilyTree2D: React.FC<FamilyTree2DProps> = ({
               links={links}
               activePreset={activePreset}
               lifecycles={lifecycles}
-              paperInk={isPaper ? LIVE_PAIR.ink : undefined}
+              paperInk={hud.pair?.ink}
               emphasis={emphasis}
             />
 
@@ -711,7 +709,7 @@ export const FamilyTree2D: React.FC<FamilyTree2DProps> = ({
                     y1={y1}
                     x2={x2}
                     y2={y2}
-                    stroke={isPaper ? LIVE_PAIR.ink : '#22d3ee'}
+                    stroke={hud.canvas.pendingLink}
                     strokeWidth={2.5}
                     strokeDasharray="6 4"
                     opacity={0.95}
@@ -741,7 +739,7 @@ export const FamilyTree2D: React.FC<FamilyTree2DProps> = ({
                 lifecycles={lifecycles}
                 isConfirmingDissolve={interaction.confirmingDissolveId === node.id}
                 onConfirmDissolve={onConfirmDissolve}
-                paperPair={isPaper ? LIVE_PAIR : undefined}
+                paperPair={hud.pair}
                 emphasis={emphasis?.get(node.id)}
                 onHoverChange={isPaper ? handleHoverChange : undefined}
               />
@@ -758,7 +756,7 @@ export const FamilyTree2D: React.FC<FamilyTree2DProps> = ({
                 lifecycle={lifecycle}
                 lifecycles={lifecycles}
                 nodes={nodes}
-                ink={isPaper ? LIVE_PAIR.ink : undefined}
+                ink={hud.pair?.ink}
               />
             ))}
             {lifecyclesOfKind(lifecycles.lifecycles, 'dissolve').map((lifecycle) => (
@@ -767,7 +765,7 @@ export const FamilyTree2D: React.FC<FamilyTree2DProps> = ({
                 lifecycle={lifecycle}
                 lifecycles={lifecycles}
                 nodes={nodes}
-                ink={isPaper ? LIVE_PAIR.ink : undefined}
+                ink={hud.pair?.ink}
               />
             ))}
 
@@ -838,7 +836,7 @@ export const FamilyTree2D: React.FC<FamilyTree2DProps> = ({
                     interaction.selectNode(sourceId);
                   }}
                   onCancel={() => interaction.handleEscape()}
-                  previewStroke={isPaper ? LIVE_PAIR.ink : undefined}
+                  previewStroke={hud.pair?.ink}
                 />
               );
             })()}

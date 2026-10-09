@@ -1,6 +1,6 @@
 # 0014 Paper renders its own 3D scene beside Cosmos
 
-Paper 3D is its own React Three Fiber scene, `PaperTree3D`, mounted as a sibling of the Cosmos view (`FamilyTree3D`): in 3D, `FamilyTree.tsx` renders one or the other by Canvas Mode. The overlay chrome both modes share (INSTRUMENTS, AMBIANCE, NAV CONTROLS, the "See who's new" slot, and the search-open reaction to Ctrl/Cmd+F) moves out of `FamilyTree3D.tsx` once, as a move-only change, into a shared overlay component that both scenes render. Cosmos keeps its force graph, physics, starfield, intro, cluster bubbles, Cosmic FX, flight loop and keyboard exactly as they are.
+Paper 3D is its own React Three Fiber scene, `PaperTree3D`, mounted as a sibling of the Cosmos view (`FamilyTree3D`): in 3D, `FamilyTree.tsx` renders one or the other by Canvas Mode. The overlay chrome both modes share (INSTRUMENTS, NAV CONTROLS, the "See who's new" slot, AMBIANCE as an optional prop only Cosmos passes, and the search-open reaction to Ctrl/Cmd+F) moves out of `FamilyTree3D.tsx` once, as a move-only change, into a shared overlay component that both scenes render. Cosmos keeps its force graph, physics, starfield, intro, cluster bubbles, Cosmic FX, flight loop and keyboard exactly as they are.
 
 Paper does not restyle Cosmos. Its Persons sit still in a seeded layout (`src/lib/paperLayout.ts`) computed once per load, where Cosmos runs live d3 physics. Its colour comes from a duotone pass over a grayscale scene, where Cosmos draws per-node textures, fog and a starfield. Its camera is drei's CameraControls, with momentum and idle rotation, where Cosmos drives the force graph's own controls with hand-written lerps. Making the force graph do all of that would mean switching off most of what it is for, and Cosmos would carry Paper's branches.
 
@@ -37,7 +37,7 @@ Paper does not restyle Cosmos. Its Persons sit still in a seeded layout (`src/li
 - **LIN-93, passes 3 and 4 (duotone, live pair, review fixes).**
   - `src/components/paper/*`: the duotone pass and its pure colour map;
   - `src/theme/panel.ts`: the live pair tokens the panels below read;
-  - `TreeSearchBar.tsx` (the counter), `FamilyTree2D.tsx` (the empty state), `PersonDetailDrawer.tsx` (the hover states, and Connect Nodes offered only when a handler is passed) and `ConnectPickerCard.tsx` (the selected choice in the pair's accent);
+  - `TreeSearchBar.tsx` (the counter), `FamilyTree2D.tsx` (the empty state), `PersonDetailDrawer.tsx` (the hover states; Connect Nodes was offered only when a handler was passed until LIN-96 passed one in Paper 3D, so the handler is required again) and `ConnectPickerCard.tsx` (the selected choice in the pair's accent);
   - `Tree3DOverlay.tsx`: optional AMBIANCE and previous/next match props. Paper 3D passes no AMBIANCE, so it hides it (Cosmos-only: the Paper focus tap from LIN-94 always plays, product decision 10). It hid the match stepping until LIN-97 pass 97b passed its own. It lists only Esc under NAV CONTROLS (LIN-96 adds WASD, Q/E and R) and offers no Connect Nodes (LIN-96).
 - **LIN-94.**
   - `src/components/paper/*`: hover, focus, fly-to, screen-space hit testing, ring, particles, ripple, wobble;

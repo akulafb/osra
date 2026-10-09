@@ -1,10 +1,9 @@
 import * as THREE from 'three';
 import type { Emphasis } from '../../lib/focusEmphasis';
-import type { PaperLayout, PaperLine } from '../../lib/paperLayout';
-import type { Point3 } from '../../lib/paperHover';
+import type { PaperLayout, PaperLine, Point3 } from '../../lib/paperLayout';
 
 /** How much of its ink a Person keeps in each emphasis; the rest fades into the paper. */
-export const PAPER_3D_INK: Record<Emphasis, number> = {
+const PAPER_3D_INK: Record<Emphasis, number> = {
   normal: 1,
   hovered: 1,
   focused: 1,
@@ -45,7 +44,7 @@ export function inkOf(state: PaperEmphasisState, id: string): number {
   return PAPER_3D_INK[state.emphasis.get(id) ?? 'normal'];
 }
 
-export function revealOf(state: PaperEmphasisState, id: string): number {
+function revealOf(state: PaperEmphasisState, id: string): number {
   return state.reveal?.get(id) ?? 1;
 }
 

@@ -20,6 +20,9 @@ export const PAPER_PAIRS: readonly PaperPair[] = [
 
 export type PairColour = keyof PaperPair;
 
+/** A pair's colours as CSS values, such as the live pair's `rgb(var(...))`; a PaperPair holds hex. */
+export type PairColours = Record<PairColour, string>;
+
 export const PAIR_CSS_VARS: Record<PairColour, string> = {
   paper: '--paper-pair-paper',
   ink: '--paper-pair-ink',
@@ -30,12 +33,6 @@ export function pairVar(colour: PairColour, opacity = 1): string {
   const channels = `var(${PAIR_CSS_VARS[colour]}, ${hexToRgb(GRAYSCALE_PAIR[colour]).join(' ')})`;
   return opacity === 1 ? `rgb(${channels})` : `rgb(${channels} / ${opacity})`;
 }
-
-export const LIVE_PAIR: PaperPair = {
-  paper: pairVar('paper'),
-  ink: pairVar('ink'),
-  accent: pairVar('accent'),
-};
 
 export function pairCssValues(pair: PaperPair): Record<string, string> {
   return Object.fromEntries(

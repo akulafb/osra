@@ -1,11 +1,5 @@
 import type { Emphasis } from './focusEmphasis';
-import { PAPER_DISC_GAP, type PaperLayout, type PaperLine } from './paperLayout';
-
-export interface Point3 {
-  x: number;
-  y: number;
-  z: number;
-}
+import { PAPER_DISC_GAP, type PaperLayout, type PaperLine, type Point3 } from './paperLayout';
 
 export interface ScreenDisc {
   id: string;
@@ -103,6 +97,17 @@ export function easeDrift(
     next.set(id, settled ? { ...to } : step);
   }
   return next;
+}
+
+/** Each Person's drift with an offset added: the lean plus the wobble, a search move or the reveal's pull. */
+export function addOffsets(drift: ReadonlyMap<string, Point3>, offsets: ReadonlyMap<string, Point3>): ReadonlyMap<string, Point3> {
+  if (offsets.size === 0) return drift;
+  const moved = new Map(drift);
+  for (const [id, o] of offsets) {
+    const d = moved.get(id);
+    moved.set(id, d ? { x: d.x + o.x, y: d.y + o.y, z: d.z + o.z } : o);
+  }
+  return moved;
 }
 
 export function linesOf<L extends PaperLine>(lines: readonly L[], personId: string | null): L[] {

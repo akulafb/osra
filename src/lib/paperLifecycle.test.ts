@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
   EMPTY_LIFECYCLE_SCENE,
-  growingFrom,
   holdingProgress,
   inLifecycle,
   paperLifecycleDraws,
@@ -11,7 +10,6 @@ import {
   paperSpawnDisc,
   paperSpawnRing,
   rememberLifecycleScene,
-  rememberPositions,
   steadyLines,
 } from './paperLifecycle';
 import { seedCanvasParticles } from '../utils/canvasFx';
@@ -89,12 +87,6 @@ describe('Kinship Link lifecycles in ink', () => {
     expect(paperLinkDrawn('dissolve', 1)).toBe(0);
   });
 
-  it('grows a line from the Person already there towards the newcomer', () => {
-    expect(growingFrom({ aId: 'new', bId: 'old' }, new Set(['new']))).toEqual(['old', 'new']);
-    expect(growingFrom({ aId: 'old', bId: 'new' }, new Set(['new']))).toEqual(['old', 'new']);
-    expect(growingFrom({ aId: 'a', bId: 'b' }, new Set())).toEqual(['a', 'b']);
-  });
-
   it('leaves a spawning line out of the steady lines, whichever way round it was recorded', () => {
     const lines = [line('mum', 'kid'), line('dad', 'kid')];
     const spawning = [lifecycle('spawn', { kind: 'link', aId: 'kid', bId: 'mum' })];
@@ -111,41 +103,6 @@ describe('Kinship Link lifecycles in ink', () => {
   it('knows which Persons are in a lifecycle', () => {
     const playing = [lifecycle('spawn', { kind: 'node', id: 'kid' }), lifecycle('dissolve', { kind: 'link', aId: 'a', bId: 'b' })];
     expect([...inLifecycle(playing)]).toEqual(['kid']);
-  });
-});
-
-describe('rememberPositions: a Person in a lifecycle keeps their last position', () => {
-  const disc = (x: number) => ({ x, y: 0, z: 0, radius: 5 });
-  const before: PaperLayout = new Map([
-    ['kept', disc(1)],
-    ['newcomer', disc(2)],
-  ]);
-  const after: PaperLayout = new Map([['kept', disc(1)]]);
-
-  it('keeps the last position of a Person who left the Working Record while dissolving', () => {
-    const remembered = rememberPositions(before, after, new Set(['newcomer']));
-    expect(remembered.get('newcomer')).toEqual(disc(2));
-    expect(remembered.get('kept')).toEqual(disc(1));
-  });
-
-  it('keeps it for as long as the lifecycle plays', () => {
-    const first = rememberPositions(before, after, new Set(['newcomer']));
-    expect(rememberPositions(first, after, new Set(['newcomer'])).get('newcomer')).toEqual(disc(2));
-  });
-
-  it('forgets a Person once their lifecycle is over', () => {
-    const first = rememberPositions(before, after, new Set(['newcomer']));
-    expect(rememberPositions(first, after, new Set()).has('newcomer')).toBe(false);
-  });
-
-  it('follows the layout for Persons still in it', () => {
-    const moved: PaperLayout = new Map([['kept', disc(9)]]);
-    expect(rememberPositions(before, moved, new Set(['kept'])).get('kept')).toEqual(disc(9));
-  });
-
-  it('returns the layout itself when nobody needs remembering', () => {
-    expect(rememberPositions(before, after, new Set())).toBe(after);
-    expect(rememberPositions(before, before, new Set(['newcomer']))).toBe(before);
   });
 });
 
@@ -176,6 +133,15 @@ describe('which Spawns and Dissolves are drawn, and how', () => {
     const grown = draws.flatMap((d) => (d.kind === 'line' ? [d] : []));
     expect(grown).toHaveLength(1);
     expect(grown[0]).toMatchObject({ from: 'mum', to: 'kid', line: { type: 'parent' } });
+  });
+
+  it('grows a line from the Person already there towards the newcomer, whichever way round it was recorded', () => {
+    const lines = [line('mum', 'kid')];
+    for (const subject of [{ aId: 'kid', bId: 'mum' }, { aId: 'mum', bId: 'kid' }]) {
+      const playing = [lifecycle('spawn', { kind: 'node', id: 'kid' }), lifecycle('spawn', { kind: 'link', ...subject })];
+      const grown = paperLifecycleDraws(playing, scene(shownNodes, lines, playing)).filter((d) => d.kind === 'line');
+      expect(grown).toEqual([expect.objectContaining({ from: 'mum', to: 'kid' })]);
+    }
   });
 
   it('draws each growing line in its own style', () => {
@@ -212,6 +178,8 @@ describe('which Spawns and Dissolves are drawn, and how', () => {
     expect(paperLifecycleDraws(dissolving, during)).toEqual([expect.objectContaining({ kind: 'disc', id: 'kid' })]);
     expect(during.layout.get('kid')).toEqual(disc(2));
     expect(during.nodes.map((n) => n.id)).toContain('kid');
+    expect(scene(shownNodes.slice(0, 2), [], dissolving, during).layout.get('kid')).toEqual(disc(2));
+    expect(scene(shownNodes.slice(0, 2), [], [], during).layout.has('kid')).toBe(false);
   });
 
   it('stops drawing a Person and their line once the view hides them partway through', () => {

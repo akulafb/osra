@@ -82,7 +82,7 @@ export function CanvasModeProvider({ children }: { children: ReactNode }) {
     () => ({ ...preference, setMode, setPaperColour, setFocusedPerson }),
     [preference, setMode, setPaperColour, setFocusedPerson]
   );
-  const currentPaperPair = useMemo<CurrentPaperPair>(() => ({ pair: live, target }), [live, target]);
+  const currentPaperPair = useMemo<CurrentPaperPair>(() => ({ pair: live }), [live]);
   const theme = useMemo(
     () => (preference.mode === 'paper' ? createPaperTheme(target) : osraTheme),
     [preference.mode, target]

@@ -6,7 +6,7 @@ The maintained source for verifying Osra's user-facing behaviour. Read this inde
 
 - `launch.sh` printed `READY http://localhost:5173 ... Supabase: djwqamcfllqziqiyvyjj`, and `open-tab.sh` recorded the run's tab.
 - `doctor.sh "$RUN_DIR"` passes, including `tab ... has a dev Supabase session` for signed-in features.
-- The tab starts at `http://localhost:5173/` showing the tree (2D: "Select a family above to explore, or try the 3D view."; 3D: the starfield). Record which with `orca eval --page "$(cat $RUN_DIR/state/page)" --expression "localStorage.getItem('family-tree-view-mode')" --json`.
+- The tab starts at `http://localhost:5173/` showing the tree (2D: "Select a family above to explore, or try the 3D view."; 3D: Paper's ink discs on paper, or the starfield in Cosmos). Record which with `orca eval --page "$(cat $RUN_DIR/state/page)" --expression "localStorage.getItem('family-tree-view-mode')" --json`.
 
 ## Driving conventions
 

@@ -1,12 +1,6 @@
 import * as THREE from 'three';
 import type { FamilyLink } from '../../types/graph';
-import type { PaperLayout, PaperLine } from '../../lib/paperLayout';
-
-export interface Point3 {
-  x: number;
-  y: number;
-  z: number;
-}
+import type { PaperLayout, PaperLine, Point3 } from '../../lib/paperLayout';
 
 export interface ScreenPoint {
   x: number;
@@ -115,18 +109,40 @@ export function paperLabelSize(discRadius: number): { fontSize: number; weight: 
   };
 }
 
-export type PaperLineSegments = Record<FamilyLink['type'], [number, number, number][]>;
+const RING_SEGMENTS = 64;
 
-/** Each kind of line as consecutive start and end points, for one draw call per kind. */
-export function paperLineSegments(lines: readonly PaperLine[], layout: PaperLayout): PaperLineSegments {
-  const segments: PaperLineSegments = { parent: [], marriage: [], divorce: [] };
+/** A circle of radius 1 facing +z, closed, for a ring drawn as a fat line. */
+export const PAPER_RING_POINTS: [number, number, number][] = Array.from({ length: RING_SEGMENTS + 1 }, (_, i) => {
+  const a = (i / RING_SEGMENTS) * Math.PI * 2;
+  return [Math.cos(a), Math.sin(a), 0];
+});
+
+/** The lines as consecutive start and end points, for one draw call. */
+export function paperLineSegments(lines: readonly PaperLine[], layout: PaperLayout): [number, number, number][] {
+  const segments: [number, number, number][] = [];
   for (const line of lines) {
     const a = layout.get(line.sourceId);
     const b = layout.get(line.targetId);
     if (!a || !b) continue;
-    segments[line.type].push([a.x, a.y, a.z], [b.x, b.y, b.z]);
+    segments.push([a.x, a.y, a.z], [b.x, b.y, b.z]);
   }
   return segments;
+}
+
+/** A fat line's colours, two per segment, written into the buffer it already has; true when they changed. */
+export function setPaperColours(geometry: THREE.BufferGeometry, rgb: Float32Array): boolean {
+  const start = geometry.attributes.instanceColorStart as THREE.InterleavedBufferAttribute | undefined;
+  if (start && start.data.array.length === rgb.length) {
+    const colours = start.data.array as Float32Array;
+    if (colours.every((value, i) => value === rgb[i])) return false;
+    colours.set(rgb);
+    start.data.needsUpdate = true;
+    return true;
+  }
+  const colours = new THREE.InstancedInterleavedBuffer(rgb.slice(), 6, 1);
+  geometry.setAttribute('instanceColorStart', new THREE.InterleavedBufferAttribute(colours, 3, 0));
+  geometry.setAttribute('instanceColorEnd', new THREE.InterleavedBufferAttribute(colours, 3, 3));
+  return true;
 }
 
 /**
