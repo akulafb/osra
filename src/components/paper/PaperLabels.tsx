@@ -27,11 +27,10 @@ interface PaperLabelsProps {
   ink: string;
   viewDistance: MutableRefObject<number>;
   state: MutableRefObject<PaperEmphasisState>;
-  /** How much ink a Person's disc keeps through a Spawn or Dissolve; the name keeps the same. */
   lifecycleInk: (id: string) => number;
 }
 
-/** Uppercase monospace names above each disc, bigger and bolder for larger discs, fading with distance from the camera and with the emphasis. */
+/** Uppercase monospace names above each disc, bigger and bolder for larger discs, fading with distance from the camera, with the emphasis, and with their disc through a Spawn or Dissolve. */
 export function PaperLabels({ nodes, layout, ink, viewDistance, state, lifecycleInk }: PaperLabelsProps) {
   const texts = useRef(new Map<string, TroikaText>());
   const anchors = useRef(new Map<string, THREE.Group>());

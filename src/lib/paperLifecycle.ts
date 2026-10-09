@@ -8,7 +8,8 @@ import {
 } from '../utils/canvasFx';
 import type { Lifecycle, LifecycleKind } from './lifecycle';
 import type { PaperLayout, PaperLine } from './paperLayout';
-import type { FamilyNode } from '../types/graph';
+import { getLinkEndpoints } from './familyGraph';
+import type { FamilyLink, FamilyNode } from '../types/graph';
 
 /**
  * Spawn and Dissolve drawn in ink (LIN-96, ADR 0007): the 2D curves in
@@ -73,12 +74,11 @@ export function inLifecycle(lifecycles: readonly Lifecycle[]): Set<string> {
   return new Set(lifecycles.flatMap((l) => (l.subject.kind === 'node' ? [l.subject.id] : [])));
 }
 
-/** A lifecycle's progress by its key; null once it has ended. */
 export type ProgressOf = (key: string) => number | null;
 
 type LinkSubject = { aId: string; bId: string };
 
-function joins(line: PaperLine, { aId, bId }: LinkSubject): boolean {
+function joins(line: { sourceId: string; targetId: string }, { aId, bId }: LinkSubject): boolean {
   return (line.sourceId === aId && line.targetId === bId) || (line.sourceId === bId && line.targetId === aId);
 }
 
@@ -106,21 +106,30 @@ export interface PaperLifecycleScene {
 
 export const EMPTY_LIFECYCLE_SCENE: PaperLifecycleScene = { layout: new Map(), nodes: [], lines: [] };
 
+/**
+ * `shown`, plus each Person and line in a lifecycle that `previous` drew and
+ * the Working Record (`record`) has since dropped. One the view has only
+ * hidden is not drawn.
+ */
 export function rememberLifecycleScene(
   previous: PaperLifecycleScene,
   layout: PaperLayout,
   shown: { nodes: readonly FamilyNode[]; lines: readonly PaperLine[] },
-  lifecycles: readonly Lifecycle[]
+  lifecycles: readonly Lifecycle[],
+  record: { nodes: readonly FamilyNode[]; links: readonly FamilyLink[] }
 ): PaperLifecycleScene {
-  const ids = inLifecycle(lifecycles);
+  const inRecord = new Set(record.nodes.map((n) => n.id));
+  const left = new Set([...inLifecycle(lifecycles)].filter((id) => !inRecord.has(id)));
   const shownLayout: PaperLayout = new Map(shown.nodes.flatMap((n) => (layout.has(n.id) ? [[n.id, layout.get(n.id)!]] : [])));
-  const leftNodes = previous.nodes.filter((n) => ids.has(n.id) && !shownLayout.has(n.id));
+  const leftNodes = previous.nodes.filter((n) => left.has(n.id) && !shownLayout.has(n.id));
   const links = linkSubjects(lifecycles);
+  const recordPairs = record.links.map(getLinkEndpoints);
   const leftLines = previous.lines.filter(
-    (line) => links.some((link) => joins(line, link)) && !shown.lines.some((l) => joins(l, { aId: line.sourceId, bId: line.targetId }))
+    (line) =>
+      links.some((link) => joins(line, link)) && !recordPairs.some((pair) => joins(pair, { aId: line.sourceId, bId: line.targetId }))
   );
   return {
-    layout: rememberPositions(previous.layout, shownLayout, ids),
+    layout: rememberPositions(previous.layout, shownLayout, left),
     nodes: leftNodes.length ? [...shown.nodes, ...leftNodes] : shown.nodes,
     lines: leftLines.length ? [...shown.lines, ...leftLines] : shown.lines,
   };
@@ -130,7 +139,7 @@ export type PaperLifecycleDraw =
   | { kind: 'disc'; lifecycle: Lifecycle; id: string }
   | { kind: 'line'; lifecycle: Lifecycle; line: PaperLine; from: string; to: string };
 
-/** The Spawns and Dissolves to draw: those of Persons and lines in `scene`, each line in its own style. */
+/** The Spawns and Dissolves whose Person, or whose line and both ends, `scene` holds; a link with no drawn line (a child's second parent, ADR 0012) draws nothing. */
 export function paperLifecycleDraws(lifecycles: readonly Lifecycle[], scene: PaperLifecycleScene): PaperLifecycleDraw[] {
   const spawning = inLifecycle(lifecycles.filter((l) => l.kind === 'spawn'));
   return lifecycles.flatMap((lifecycle): PaperLifecycleDraw[] => {
@@ -143,9 +152,8 @@ export function paperLifecycleDraws(lifecycles: readonly Lifecycle[], scene: Pap
   });
 }
 
-/** How much ink a Person's disc and name keep at `progress` through their Spawn or Dissolve. */
-export function paperLifecycleInk(kind: LifecycleKind, progress: number): number {
-  return (kind === 'spawn' ? paperSpawnDisc(progress) : paperDissolveDisc(progress)).ink;
+export function paperLifecycleDisc(kind: LifecycleKind, progress: number): PaperInkFrame {
+  return kind === 'spawn' ? paperSpawnDisc(progress) : paperDissolveDisc(progress);
 }
 
 /**

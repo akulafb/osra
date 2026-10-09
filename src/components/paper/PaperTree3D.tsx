@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState, type MutableRefObject } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type MutableRefObject } from 'react';
 import { Canvas, useFrame, useThree, type ThreeEvent } from '@react-three/fiber';
 import { CameraControls } from '@react-three/drei';
 import * as THREE from 'three';
@@ -16,7 +16,7 @@ import type { GhostPreviewLook } from '../../hooks/useGhostPreview';
 import { usePersonDrawerInset, type PersonDrawerInset } from '../../hooks/usePersonDrawerInset';
 import type { PaperLayoutState } from '../../hooks/usePaperLayout';
 import type { LifecycleController } from '../../hooks/useLifecycles';
-import { holdingProgress, inLifecycle, paperLifecycleDraws, paperLifecycleInk, steadyLines } from '../../lib/paperLifecycle';
+import { holdingProgress, inLifecycle, paperLifecycleDisc, paperLifecycleDraws, steadyLines } from '../../lib/paperLifecycle';
 import { paperGhostLanding } from '../../lib/paperGhost';
 import { Tree3DOverlay, type Tree3DSceneCamera, type Tree3DSearch } from '../tree3d/Tree3DOverlay';
 import { useIsMobileDevice } from '../tree3d/useIsMobileDevice';
@@ -95,7 +95,6 @@ export interface PaperTree3DProps {
   onDissolveNode?: (node: FamilyNode) => Promise<void> | void;
   /** Spawn and Dissolve progress, drawn in ink. */
   lifecycles: LifecycleController;
-  /** The pair AddRelativeModal's connect-to-existing would link, drawn as a dashed line. */
   pendingLinkPreview?: { anchorId: string; existingId: string } | null;
 }
 
@@ -184,7 +183,7 @@ export function PaperTree3D({
   const inLifecycleIds = useMemo(() => inLifecycle(lifecycles.lifecycles), [lifecycles.lifecycles]);
   const discIds = useMemo(() => shownIds.filter((id) => !inLifecycleIds.has(id)), [shownIds, inLifecycleIds]);
   const lines = useMemo(() => steadyLines(shown.lines, lifecycles.lifecycles), [shown.lines, lifecycles.lifecycles]);
-  const lifecycleScene = usePaperLifecycleScene(layout, shown, lifecycles.lifecycles);
+  const lifecycleScene = usePaperLifecycleScene(layout, shown, lifecycles.lifecycles, graphData);
   const progressOf = useMemo(() => holdingProgress(lifecycles.progressOf), [lifecycles.progressOf]);
   const lifecycleDraws = useMemo(
     () =>
@@ -199,7 +198,7 @@ export function PaperTree3D({
     return (id: string) => {
       const lifecycle = byPerson.get(id);
       const progress = lifecycle ? progressOf(lifecycle.key) : null;
-      return lifecycle && progress !== null ? paperLifecycleInk(lifecycle.kind, progress) : 1;
+      return lifecycle && progress !== null ? paperLifecycleDisc(lifecycle.kind, progress).ink : 1;
     };
   }, [lifecycles.lifecycles, progressOf]);
   const shownIdSet = useMemo(() => new Set(shownIds), [shownIds]);
@@ -234,7 +233,7 @@ export function PaperTree3D({
   const frame = useMemo(() => (layout ? paperFrame(layout, layout.keys()) : null), [layout]);
 
   const landingFrom = useRef({ layout, graphData });
-  useEffect(() => {
+  useLayoutEffect(() => {
     landingFrom.current = { layout, graphData };
   }, [layout, graphData]);
   const ghostLook = useMemo<GhostPreviewLook>(
@@ -440,16 +439,16 @@ export function PaperTree3D({
                     />
                     <PaperParticles state={emphasisState} layout={layout} lines={lines} ink={INK} />
                     <PaperRipple state={emphasisState} layout={layout} lines={lines} ink={INK} />
-                    {previewPair && (
-                      <PaperPreviewLine
-                        fromId={previewPair.anchorId}
-                        toId={previewPair.existingId}
-                        layout={layout}
-                        ink={INK}
-                        state={emphasisState}
-                      />
-                    )}
                   </>
+                )}
+                {previewPair && (
+                  <PaperPreviewLine
+                    fromId={previewPair.anchorId}
+                    toId={previewPair.existingId}
+                    layout={layout}
+                    ink={INK}
+                    state={emphasisState}
+                  />
                 )}
                 <PaperLifecycles
                   draws={lifecycleDraws}

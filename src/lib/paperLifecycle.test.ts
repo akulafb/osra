@@ -155,8 +155,14 @@ describe('which Spawns and Dissolves are drawn, and how', () => {
   const layout: PaperLayout = new Map(['mum', 'dad', 'kid', 'hidden'].map((id, i) => [id, disc(i)]));
   const shownNodes = ['mum', 'dad', 'kid'].map(person);
 
-  function scene(nodes: FamilyNode[], lines: PaperLine[], lifecycles: Lifecycle[], previous = EMPTY_LIFECYCLE_SCENE) {
-    return rememberLifecycleScene(previous, layout, { nodes, lines }, lifecycles);
+  function scene(
+    nodes: FamilyNode[],
+    lines: PaperLine[],
+    lifecycles: Lifecycle[],
+    previous = EMPTY_LIFECYCLE_SCENE,
+    record = { nodes, links: lines.map((l) => l.link) }
+  ) {
+    return rememberLifecycleScene(previous, layout, { nodes, lines }, lifecycles, record);
   }
 
   it('grows only the parent line that is drawn when a child Spawns on both parents', () => {
@@ -206,6 +212,23 @@ describe('which Spawns and Dissolves are drawn, and how', () => {
     expect(paperLifecycleDraws(dissolving, during)).toEqual([expect.objectContaining({ kind: 'disc', id: 'kid' })]);
     expect(during.layout.get('kid')).toEqual(disc(2));
     expect(during.nodes.map((n) => n.id)).toContain('kid');
+  });
+
+  it('stops drawing a Person and their line once the view hides them partway through', () => {
+    const lines = [line('mum', 'kid')];
+    const playing = [lifecycle('spawn', { kind: 'node', id: 'kid' }), lifecycle('spawn', { kind: 'link', aId: 'mum', bId: 'kid' })];
+    const before = scene(shownNodes, lines, playing);
+    const collapsed = scene(shownNodes.slice(0, 2), [], playing, before, { nodes: shownNodes, links: lines.map((l) => l.link) });
+    expect(paperLifecycleDraws(playing, collapsed)).toEqual([]);
+    expect(collapsed.nodes.map((n) => n.id)).not.toContain('kid');
+  });
+
+  it('grows the parent line Paper now draws when its choice of parent changes partway through', () => {
+    const playing = [lifecycle('spawn', { kind: 'link', aId: 'mum', bId: 'kid' }), lifecycle('spawn', { kind: 'link', aId: 'dad', bId: 'kid' })];
+    const record = { nodes: shownNodes, links: [line('mum', 'kid').link, line('dad', 'kid').link] };
+    const before = scene(shownNodes, [line('mum', 'kid')], playing, EMPTY_LIFECYCLE_SCENE, record);
+    const switched = scene(shownNodes, [line('dad', 'kid')], playing, before, record);
+    expect(paperLifecycleDraws(playing, switched)).toEqual([expect.objectContaining({ kind: 'line', from: 'dad', to: 'kid' })]);
   });
 
   it('draws no Dissolve for a Person who was not shown when it began', () => {

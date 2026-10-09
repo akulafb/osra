@@ -31,8 +31,7 @@ export interface ConnectTargetingBodyProps {
   onQueryChange?: (query: string) => void;
   onPickTarget: (node: FamilyNode) => void;
   onExit: () => void;
-  /** How the scene's targets read, after "Click"; Paper's are people, not planets. */
-  aimTarget?: string;
+  aimTarget?: 'a glowing planet' | 'a person';
 }
 
 export const ConnectTargetingBody: React.FC<ConnectTargetingBodyProps> = ({

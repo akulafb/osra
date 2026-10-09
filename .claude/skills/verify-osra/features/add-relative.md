@@ -1,6 +1,6 @@
 # Add relative
 
-A signed-in user adds a relative to a selected person from the drawer's + Add Relative modal, from the 2D `+ Child` pill or the 3D docked panel (the Ghost Node), or by joining two people in Connect Mode. All of it works in Cosmos and Paper, 2D and 3D; Paper 3D draws the panel, the Ghost Preview and Connect Mode in ink (see [Paper 3D editing](./paper-mode.md#paper-3d-editing-lin-96-pass-96a)). Adding a child links the parent's spouse as the child's other parent in the same write: without asking when the parent has had one spouse, with an OTHER PARENT choice (current spouse preselected, former ones marked "(former)", or "Not known") when there were several. One line is still drawn to the child.
+A signed-in user adds a relative to a selected person from the drawer's + Add Relative modal, from the 2D `+ Child` pill or the 3D docked panel (the Ghost Node), or by joining two people in Connect Mode. All of it works in Cosmos and Paper, 2D and 3D; Paper 3D draws the panel, the Ghost Preview and Connect Mode in ink (see [Paper 3D editing](./paper-mode.md#paper-3d-editing-lin-96-passes-96a-to-96c)). Adding a child links the parent's spouse as the child's other parent in the same write: without asking when the parent has had one spouse, with an OTHER PARENT choice (current spouse preselected, former ones marked "(former)", or "Not known") when there were several. One line is still drawn to the child.
 
 ## Sub-features
 
@@ -14,6 +14,7 @@ A signed-in user adds a relative to a selected person from the drawer's + Add Re
 ## How to get to it (user POV)
 
 - Select a person (see [person details](./person-details.md)), then + Add Relative in the drawer, "Add as child".
+- Typing an existing Person's name in the modal lists MATCHES DETECTED IN ARCHIVE; picking one (no submit) previews the link as a dashed line in every view (Paper 3D: see [Paper 3D editing](./paper-mode.md#paper-3d-editing-lin-96-passes-96a-to-96c)).
 - In 2D, select a person and click the `+ Child` pill; in 3D (Cosmos or Paper, desktop only), select a planet or disc and use the docked panel's child handle.
 - ADMINISTRATIVE TOOLS → Connect Nodes..., click the second person, pick "<A> is parent of <B>", then Establish Link.
 - In 3D, the docked panel's `🔗 Connect` enters the same Connect Mode.

@@ -5,10 +5,9 @@ import * as THREE from 'three';
 import type { LifecycleKind } from '../../lib/lifecycle';
 import type { PaperLayout } from '../../lib/paperLayout';
 import {
-  paperDissolveDisc,
   paperDissolveSpecks,
+  paperLifecycleDisc,
   paperLinkDrawn,
-  paperSpawnDisc,
   paperSpawnRing,
   type PaperLifecycleDraw,
   type ProgressOf,
@@ -34,7 +33,7 @@ const RING_SEGMENTS = 64;
 const RING_WIDTH_PX = 1.5;
 const SPECKS = 14;
 
-/** Each playing Spawn and Dissolve drawn in ink, on the shared lifecycle progress (ADR 0007). */
+/** Each of `draws` in ink, on the shared lifecycle progress (ADR 0007). */
 export function PaperLifecycles({ draws, progressOf, layout, ink, parentInk, paper, state }: PaperLifecyclesProps) {
   return (
     <>
@@ -145,7 +144,7 @@ function LifecycleDisc({
     const { centre, right, up, at, scale, matrix } = scratch;
     placeOf(layout, state.current.drift, id, centre);
     const kept = inkOf(state.current, id);
-    const frame = kind === 'spawn' ? paperSpawnDisc(progress) : paperDissolveDisc(progress);
+    const frame = paperLifecycleDisc(kind, progress);
     disc.position.copy(centre);
     disc.quaternion.copy(camera.quaternion);
     disc.scale.setScalar(Math.max(placed.radius * frame.scale, 1e-3));

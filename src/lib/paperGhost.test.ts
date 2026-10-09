@@ -10,7 +10,7 @@ import type { FamilyGraph, RelativeDirection } from '../types/graph';
 const TREE: FamilyGraph = KINSHIP_FIXTURE_TREE;
 const ready: ReadyPaperLayout = { status: 'ready', layout: layoutPaperTree(TREE), newcomers: new Set() };
 
-/** The Working Record after the Ghost Node card is submitted as it opened: FamilyTree's optimistic write. */
+/** The Working Record after the Ghost Node card is submitted for an anchor with no other parent to pick: FamilyTree's optimistic write. */
 function afterSubmit(anchorId: string, relation: RelativeDirection, personId: string): FamilyGraph {
   const otherParentId = relation === 'child' ? resolveOtherParent(otherParentChoice(anchorId, TREE.links), null) : null;
   const otherParent = otherParentId ? TREE.nodes.find((n) => n.id === otherParentId)! : null;
