@@ -758,6 +758,7 @@ export const FamilyTree: React.FC = () => {
             layout={paperLayout}
             interaction={interaction}
             collapsedNodes={collapsedNodes}
+            onToggleCollapse={handleToggleCollapse}
             onSetCollapsedNodes={handleSetCollapsedNodes}
             mode={mode}
             onModeChange={handleModeChange}

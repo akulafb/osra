@@ -5,8 +5,8 @@ import * as THREE from 'three';
 import { useTheme } from '@mui/material/styles';
 import type { FamilyGraph, FamilyNode, RelativeDirection } from '../../types/graph';
 import type { ForceGraphHandle, LiveNodePosition } from '../../types/forceGraph';
-import { paperLines } from '../../lib/paperLayout';
-import { filterGraphDataFor3D } from '../../lib/filterGraphData';
+import { paperCollapsible, paperShown } from '../../lib/paperCollapse';
+import { paperCycle, type PaperKeyAction } from '../../lib/paperKeys';
 import { GRAYSCALE_PAIR, LIVE_PAIR } from '../../theme/paperPair';
 import type { DirectManipulationController } from '../../hooks/useDirectManipulation';
 import { needsCanvas } from '../../lib/directManipulation';
@@ -47,12 +47,15 @@ import { browserHasWebGL } from './browserHasWebGL';
 import { isBackgroundTap, isTap, paperFrame, type ScreenPoint } from './paperScene';
 import { PaperGraphHandle } from './PaperGraphHandle';
 import { usePaperEditing, type PaperConnectParams } from './usePaperEditing';
+import { PaperFlight } from './PaperFlight';
+import { usePaperKeys } from './usePaperKeys';
 
 export interface PaperTree3DProps {
   graphData: FamilyGraph;
   layout: PaperLayoutState;
   interaction: DirectManipulationController;
   collapsedNodes: Set<string>;
+  onToggleCollapse: (nodeId: string) => void;
   onSetCollapsedNodes: (nodes: Set<string>) => void;
   mode?: '3D' | '2D';
   onModeChange?: (mode: '3D' | '2D') => void;
@@ -120,6 +123,7 @@ export function PaperTree3D({
   layout: layoutState,
   interaction,
   collapsedNodes,
+  onToggleCollapse,
   onSetCollapsedNodes,
   mode,
   onModeChange,
@@ -173,12 +177,10 @@ export function PaperTree3D({
   const openDrawerInset = usePersonDrawerInset(true);
   const layout = layoutState.status === 'ready' ? layoutState.layout : null;
 
-  const shown = useMemo(() => {
-    if (!layout) return { nodes: [], lines: [] };
-    const visible = filterGraphDataFor3D(graphData, collapsedNodes, visibleClusters3D, uniqueClusters);
-    const nodes = visible.nodes.filter((n) => layout.has(n.id));
-    return { nodes, lines: paperLines(nodes, visible.links) };
-  }, [graphData, layout, collapsedNodes, visibleClusters3D, uniqueClusters]);
+  const shown = useMemo(
+    () => paperShown(graphData, layout, collapsedNodes, visibleClusters3D, uniqueClusters),
+    [graphData, layout, collapsedNodes, visibleClusters3D, uniqueClusters]
+  );
   const shownIds = useMemo(() => shown.nodes.map((n) => n.id), [shown.nodes]);
   const inLifecycleIds = useMemo(() => inLifecycle(lifecycles.lifecycles), [lifecycles.lifecycles]);
   const discIds = useMemo(() => shownIds.filter((id) => !inLifecycleIds.has(id)), [shownIds, inLifecycleIds]);
@@ -313,18 +315,40 @@ export function PaperTree3D({
     hoverPointer.current = null;
   }, []);
 
-  useEffect(() => {
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape') return;
-      if (isAddModalOpen || isEditModalOpen || isBulkInviteOpen) return;
-      const tag = document.activeElement?.tagName;
-      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
-      e.preventDefault();
-      interaction.handleEscape();
-    };
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [interaction, isAddModalOpen, isEditModalOpen, isBulkInviteOpen]);
+  const handlePersonDoubleClick = useCallback(
+    (id: string) => {
+      if (paperCollapsible(graphData.links, id)) onToggleCollapse(id);
+    },
+    [graphData.links, onToggleCollapse]
+  );
+
+  const handleKeyAction = (action: PaperKeyAction): boolean => {
+    const selectedId = interaction.selectedNodeId;
+    switch (action) {
+      case 'reset':
+        resetView();
+        return true;
+      case 'cycle-next':
+      case 'cycle-previous': {
+        const next = paperCycle(shownIds, selectedId, action === 'cycle-previous');
+        if (next) interaction.selectNode(next);
+        return true;
+      }
+      case 'focus':
+        if (!selectedId) return false;
+        flyTo.current?.(selectedId);
+        return true;
+      case 'deselect':
+        interaction.handleEscape();
+        return true;
+    }
+  };
+  const flightBlocked = !!isEditModalOpen || !!isBulkInviteOpen;
+  const heldKeys = usePaperKeys({
+    actionsBlocked: !!isAddModalOpen || flightBlocked,
+    flightBlocked,
+    onAction: handleKeyAction,
+  });
 
   const sceneCamera: Tree3DSceneCamera = { focusPerson, resetView };
 
@@ -337,9 +361,15 @@ export function PaperTree3D({
     disabled: searchDisabled,
   };
 
+  const navKey = { color: panel.ink.strong, fontWeight: 600 };
   const navKeys = (
     <div style={{ lineHeight: '1.6' }}>
-      <div><span style={{ color: panel.ink.strong, fontWeight: 600 }}>Esc</span>: Deselect</div>
+      <div><span style={navKey}>WASD</span>: Move (Hold <span style={navKey}>Shift</span> for Boost)</div>
+      <div><span style={navKey}>Q / E</span>: Rotate View L / R</div>
+      <div><span style={navKey}>R</span>: Reset View</div>
+      <div><span style={navKey}>Tab</span>: Cycle Names</div>
+      <div><span style={navKey}>Enter</span>: Focus selection</div>
+      <div><span style={navKey}>Esc</span>: Deselect</div>
     </div>
   );
 
@@ -401,6 +431,7 @@ export function PaperTree3D({
               <>
                 <PaperView viewDistance={viewDistance} />
                 <PaperCameraRig frame={frame} state={emphasisState} modalOpen={isModalOpen} />
+                <PaperFlight held={heldKeys} viewDistance={viewDistance} state={emphasisState} paused={flightBlocked} />
                 <InitialFraming fit={fitFrame} />
                 <PaperFocus
                   selectedId={interaction.selectedNodeId}
@@ -424,7 +455,7 @@ export function PaperTree3D({
                 {arrival === 'revealing' && (
                   <PaperReveal frame={frame} layout={layout} ids={shownIds} state={emphasisState} onDone={handleArrived} />
                 )}
-                <PaperDiscs ids={discIds} layout={layout} ink={INK} paper={PAPER} state={emphasisState} onPersonClick={handlePersonClick} />
+                <PaperDiscs ids={discIds} layout={layout} ink={INK} paper={PAPER} state={emphasisState} onPersonClick={handlePersonClick} onPersonDoubleClick={handlePersonDoubleClick} />
                 <PaperHoverRing state={emphasisState} layout={layout} ink={INK} />
                 {showLinks && (
                   <>
