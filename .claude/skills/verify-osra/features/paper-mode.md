@@ -1,6 +1,6 @@
 # Paper mode
 
-Paper is the default Canvas Mode: everyone lands on it unless they switched to Cosmos in this browser. In 2D it draws flat ink cards and ink lines on grayscale paper. Hovering a Person rings them and dims everyone but their direct relatives. Selecting a Person ghosts everyone but their relatives. A search dims the non-matches. FIND ME and the current search match get accent rings. INSTRUMENTS, the drawer, the chat, the cards, the banners and the modals take the same paper and ink. In 3D, Paper draws its own scene of ink discs, lines and labels in a still layout (see [Paper 3D scene](#paper-3d-scene-lin-93)); the camera glides, turns slowly when idle and zooms toward the cursor (see [Paper 3D camera and effects](#paper-3d-camera-and-effects-lin-95-pass-95a)). The page's first Paper 3D load opens with a titled loader and a reveal, and a one-time controls hint (see [intro](#paper-3d-intro-and-hint-lin-95-pass-95b)).
+Paper is the default Canvas Mode: everyone lands on it unless they switched to Cosmos in this browser. In 2D it draws flat ink cards and ink lines on grayscale paper. Hovering a Person rings them and dims everyone but their direct relatives. Selecting a Person ghosts everyone but their relatives. A search dims the non-matches. FIND ME and the current search match get accent rings. INSTRUMENTS, the drawer, the chat, the cards, the banners and the modals take the same paper and ink. In 3D, Paper draws its own scene of ink discs, lines and labels in a still layout (see [Paper 3D scene](#paper-3d-scene-lin-93)); the camera glides, turns slowly when idle and zooms toward the cursor (see [Paper 3D camera and effects](#paper-3d-camera-and-effects-lin-95-pass-95a)). The page's first Paper 3D load opens with a titled loader and a reveal, and a one-time controls hint (see [intro](#paper-3d-intro-and-hint-lin-95-pass-95b)). WASD and Q/E fly the Paper camera, and a double-click collapses a parent's branch (see [navigation](#paper-3d-navigation-and-collapse-lin-96-pass-96d)).
 
 ## Sub-features
 
@@ -70,7 +70,7 @@ Preconditions:
 - `paper-3d-click` selects the clicked Person: the drawer opens (desktop side drawer, phone bottom sheet). A pointer that moves more than 6 px is a camera drag, not a click. Clicking empty paper (up to 6 px of movement) or pressing Escape clears the selection.
 - `paper-3d-stable` keeps the layout for the whole page load: switching to Cosmos or 2D and back shows the same positions.
 - `paper-3d-no-webgl` shows "THE 3D TREE NEEDS WEBGL" in place of the canvas when WebGL is missing, the renderer throws, the layout throws or the WebGL context is lost; INSTRUMENTS still works. The WebGL check runs once per page and gives its context back, so switching Paper and Cosmos never logs "Too many active WebGL contexts".
-- `paper-3d-unwired` hides what Paper 3D does not do yet: no AMBIANCE toggle (Cosmos-only: the Paper focus tap always plays, product decision 10), no previous/next match buttons (the count and highlight stay; LIN-97), and only `Esc` under NAV CONTROLS (LIN-96). Cosmos 3D and Paper 2D keep all of them. The drawer's `Connect Nodes...` is back in Paper 3D (see [Paper 3D editing](#paper-3d-editing-lin-96-passes-96a-to-96c)).
+- `paper-3d-unwired` hides what Paper 3D does not do yet: no AMBIANCE toggle (Cosmos-only: the Paper focus tap always plays, product decision 10), and no previous/next match buttons (the count and highlight stay; LIN-97). Cosmos 3D and Paper 2D keep both. NAV CONTROLS lists Paper's own keys (see [Paper 3D navigation](#paper-3d-navigation-and-collapse-lin-96-pass-96d)). The drawer's `Connect Nodes...` is back in Paper 3D (see [Paper 3D editing](#paper-3d-editing-lin-96-passes-96a-to-96c)).
 
 ### Driving it with ui.sh
 
@@ -80,7 +80,7 @@ Preconditions:
 - **Escape.** Probe first with `window.addEventListener('keydown', …)`, then `$S/ui.sh "$RUN_DIR" key Escape`; `.MuiDrawer-paper h4` disappears.
 - **Stable layout.** Capture, switch CANVAS MODE to `COSMOS` and back to `PAPER`, close INSTRUMENTS and capture again: the same Persons sit in the same places relative to each other (the idle turn and the grain change the pixels).
 - **Background tap.** With a Person selected, press on empty paper, move 4 px and release (`orca mouse move --x <x> --y <y>`, `orca mouse down`, `orca mouse move --x <x+4> --y <y>`, `orca mouse up`, each with `--page`): the drawer closes. The same with a 20 px move is a camera drag and keeps it.
-- **Unwired controls.** In Paper 3D with INSTRUMENTS open: `AMBIANCE` is absent from `document.body.innerText`; type a name in SEARCH ARCHIVE: the count shows and `[aria-label="Next match"]` is `display: none`; NAV CONTROLS' text is only `Esc: Deselect`. Cosmos 3D shows all three.
+- **Unwired controls.** In Paper 3D with INSTRUMENTS open: `AMBIANCE` is absent from `document.body.innerText`; type a name in SEARCH ARCHIVE: the count shows and `[aria-label="Next match"]` is `display: none`. Cosmos 3D shows both.
 - **No WebGL.** The WebGL check runs once per page, so reload first, go to 2D, then `orca eval` `HTMLCanvasElement.prototype.getContext` to return `null` for `webgl*` (keep the original on `window`), then click `3D`. The `role=alert` fallback shows. Restore `getContext` afterwards.
 - **Proof.** Capture `paper-3d overview`, `paper-3d click`, `paper-3d escape`, `paper-3d click-phone` (the bottom sheet at the tab's phone width, a plain screenshot), `paper-3d switch-before`, `paper-3d switch-cosmos`, `paper-3d switch-after` and `paper-3d no-webgl`.
 
@@ -243,3 +243,30 @@ Preconditions:
 - Fingerprinting Cosmos for no change: open VISIBILITY and wait about 6 s before capturing; at 3 s its body can still be animating and differ by one element. Park the mouse first (`orca mouse move --x 3 --y 700`). In Connect Mode the candidate list (names per slot follow what is in view), the leader ring's `circle` cx/cy and the canvas cursor always differ: compare those elements' property sets, not hashes.
 - At the 1280 px override with no drawer open, INSTRUMENTS and NAV CONTROLS sit beyond the ~935 px the Orca pane paints, so screenshots miss them although the DOM has them open; check the button texts (`INSTRUMENTS ▴`, `VISIBILITY ▴`) instead.
 - In Cosmos 3D, FIND ME just after a reload can do nothing; retry until `.MuiDrawer-paper h4` appears.
+
+## Paper 3D navigation and collapse (LIN-96 pass 96d)
+
+### Sub-features
+
+- `paper-3d-nav-keys` (desktop; NAV CONTROLS is hidden on phones): NAV CONTROLS lists `WASD: Move (Hold Shift for Boost)`, `Q / E: Rotate View L / R`, `R: Reset View`, `Tab: Cycle Names`, `Enter: Focus selection`, `Esc: Deselect`. Holding W/S moves the camera and its orbit point forward and back, A/D slide them sideways (the arrow keys too), at 0.8 view distances a second, four times that with Shift. Q/E turn the view about the orbit point. R deselects and flies back to the overview, as RESET VIEWPORT does; Tab and Shift+Tab select the next or previous shown Person (the camera flies there); Enter flies to the selected Person again; Esc deselects. Keys do nothing while a text field has focus or a Ctrl, Cmd or Alt combination is held. Behind the Add Relative preview only WASD and Q/E work, as in Cosmos; behind the edit and invite modals none do.
+- `paper-3d-collapse`: INSTRUMENTS → `COLLAPSE ALL` hides every parent's descendants and turns into `EXPAND ALL`; a double-click on a parent's disc hides or shows that branch. The collapsed Person stays, and nobody shown moves, since the layout is fixed.
+- `paper-3d-toggles`: `LABELS`, `LINKS` and `ARROWS` hide or show the names, the lines (with their particles and ripple) and the arrowheads.
+- `paper-3d-findme`: `FIND ME` selects the signed-in Person and flies to them.
+- `paper-3d-whos-new`: `See who's new!` sits above NAV CONTROLS when there are new members and opens the same "New family members" modal as Cosmos, in Paper colours.
+
+### Driving it with ui.sh
+
+- Desktop size: `orca exec --page <id> --command "set viewport 1280 812 2"` after each reload. Keep the tab in front.
+- **Camera state.** CameraControls is not reachable from the page. A temporary probe in `PaperTree3D` (never commit it), `useEffect(() => { Object.assign(window, { __paperControls: controlsRef, __paperShown: shownIds, __paperLayout: layout, __paperCollapsed: collapsedNodes }); });`, lets `orca eval` read `getPosition`, `getTarget`, `azimuthAngle` and `distance`.
+- **Keys.** `orca exec --page <id> --command "keydown w"`, wait about a second, then `"keyup w"`: position and target move together and the distance holds. `"press r"`, `"press Tab"`, `"press Shift+Tab"`, `"press Enter"`, `"press Escape"` for the rest; read `.MuiDrawer-paper h4` for the selection.
+- **Collapse.** Open INSTRUMENTS, click `COLLAPSE ALL`, then `EXPAND ALL`; read `__paperShown.length`. For a double-click, project a parent's layout position to the screen with the camera (`new THREE.Vector3(...).project(camera)` from the probe), `orca mouse move` there, then `orca mouse down` / `up` twice: Chromium fires a real `dblclick`.
+- **Toggles.** With INSTRUMENTS open, click each switch's input and capture a crop around a focused Person.
+- **See who's new.** The button shows only when a node is newer than `osra_tree_lastAck_<user id>` in localStorage. Record that key, set it to an earlier date, reload, click the button, close the modal, then put the key back.
+- **Proof.** Capture `paper-3d-collapse before-collapse-all`, `after-collapse-all`, `after-expand-all`, `dblclick-collapsed`, `dblclick-expanded`, `paper-3d-toggles *`, `paper-3d-findme after` and `paper-3d-whos-new modal-settled`.
+
+### Gotchas
+
+- agent-browser's `keydown Shift` reports `shiftKey: false` on the events that follow, so the boost follows the Shift key's own down and up, as in Cosmos.
+- An Orca tab that is not on screen draws about 2 frames a second, and each frame's move is capped at 0.1 s, so a held key covers less ground than at full rate. Count frames with a `requestAnimationFrame` counter and compare moves per frame, or report the feel unverified.
+- `ui.sh fill` can leave focus on a button. Focus the field with `orca eval` before testing that keys do nothing while typing.
+- A MUI dialog captured right after it opens in a throttled tab is mid-fade and looks see-through; capture again after a few seconds.
