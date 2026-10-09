@@ -12,7 +12,7 @@ describe("the lint rule against drei Line's visible prop", () => {
   it('flags visible on a drei Line and names the alternatives', async () => {
     const messages = await restrictedSyntax(`
 import { Line } from '@react-three/drei';
-export function Edge({ shown }: { shown: boolean }) {
+export function Fixture({ shown }: { shown: boolean }) {
   return (
     <Line
       points={[[0, 0, 0], [1, 1, 1]]}
@@ -31,7 +31,7 @@ export function Edge({ shown }: { shown: boolean }) {
   it('leaves a Line from another module alone', async () => {
     const messages = await restrictedSyntax(`
 import { Line } from 'react-konva';
-export function Edge() {
+export function Fixture() {
   return <Line points={[0, 0, 1, 1]} visible={false} />;
 }
 `);
@@ -41,7 +41,7 @@ export function Edge() {
   it('leaves a drei Line without visible, and a wrapping group visible, alone', async () => {
     const messages = await restrictedSyntax(`
 import { Line } from '@react-three/drei';
-export function Edge({ shown }: { shown: boolean }) {
+export function Fixture({ shown }: { shown: boolean }) {
   return (
     <group visible={shown}>
       <Line points={[[0, 0, 0], [1, 1, 1]]} transparent opacity={0.5} />
@@ -55,7 +55,7 @@ export function Edge({ shown }: { shown: boolean }) {
   it('flags importing drei Line under another name, which would hide visible from the rule', async () => {
     const messages = await restrictedSyntax(`
 import { Line as DreiLine } from '@react-three/drei';
-export function Edge() {
+export function Fixture() {
   return <DreiLine points={[[0, 0, 0], [1, 1, 1]]} />;
 }
 `);

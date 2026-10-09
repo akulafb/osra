@@ -23,8 +23,6 @@ export default tseslint.config(
         'warn',
         { allowConstantExport: true },
       ],
-      // drei's Line spreads its rest props onto both the Line2 and its
-      // material, so `visible` is not a plain object toggle (LIN-96).
       'no-restricted-syntax': [
         'error',
         {
