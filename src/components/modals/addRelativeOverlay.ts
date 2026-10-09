@@ -25,7 +25,7 @@ export function addRelativeOverlayStyle(
     backgroundColor: 'transparent',
     backdropFilter: 'none',
     pointerEvents: 'none',
-    justifyContent: previewNarrow ? 'flex-end' : 'flex-end',
+    justifyContent: 'flex-end',
     alignItems: previewNarrow ? 'stretch' : 'center',
     flexDirection: previewNarrow ? 'column' : 'row',
   };
