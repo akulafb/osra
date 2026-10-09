@@ -3,6 +3,10 @@ import * as THREE from 'three';
 import {
   computeGhostPreviewOffset,
   ghostPreviewBreath,
+  ghostPreviewLabelHeight,
+  ghostPreviewPlacement,
+  GHOST_PREVIEW_LABEL_HEIGHT,
+  GHOST_PREVIEW_RADIUS,
   GHOST_PREVIEW_OFFSET,
   GHOST_PREVIEW_SPOUSE_SPREAD,
   GHOST_PREVIEW_BREATH_AMPLITUDE,
@@ -85,5 +89,27 @@ describe('ghostPreviewBreath', () => {
       1 + GHOST_PREVIEW_BREATH_AMPLITUDE,
       5
     );
+  });
+});
+
+describe('ghostPreviewPlacement', () => {
+  const anchor = { x: 5, y: -3, z: 12 };
+
+  it('keeps the camera-relative offset and the node size when there is no landing', () => {
+    const placement = ghostPreviewPlacement(rolled90, 'child', anchor, null);
+    const offset = computeGhostPreviewOffset(rolled90, 'child');
+    expectClose(placement.offset, offset.x, offset.y, offset.z);
+    expect(placement.radius).toBe(GHOST_PREVIEW_RADIUS);
+    expect(placement.labelHeight).toBe(GHOST_PREVIEW_LABEL_HEIGHT);
+  });
+
+  it('puts the preview on the landing, at its size, whatever the camera', () => {
+    const landing = { x: 20, y: 4, z: -7, radius: 6.5 };
+    const placement = ghostPreviewPlacement(rolled90, 'spouse', anchor, landing);
+    const at = new THREE.Vector3(anchor.x, anchor.y, anchor.z).add(placement.offset);
+    expectClose(at, landing.x, landing.y, landing.z);
+    expect(placement.radius).toBe(6.5);
+    expect(placement.labelHeight).toBe(ghostPreviewLabelHeight(6.5));
+    expect(ghostPreviewLabelHeight(6.5)).toBeGreaterThan(6.5 * 1.15);
   });
 });

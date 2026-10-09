@@ -787,6 +787,7 @@ export const FamilyTree: React.FC = () => {
             onDirectConnectNodes={handleDirectConnectNodes}
             canDissolveSelected={!!selectedNode && canDissolveNode(selectedNode.id)}
             onDissolveNode={handleConfirmDissolveDirect}
+            lifecycles={lifecycles}
           />
         ) : mode === '3D' ? (
           <FamilyTree3D

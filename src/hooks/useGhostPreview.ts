@@ -4,15 +4,14 @@ import SpriteText from 'three-spritetext';
 import { RelativeDirection } from '../types/graph';
 import { ForceGraphRef, LiveNodePosition } from '../types/forceGraph';
 import {
-  computeGhostPreviewOffset,
   ghostPreviewBreath,
-  GHOST_PREVIEW_RADIUS,
+  ghostPreviewPlacement,
   GHOST_PREVIEW_SHELL_SCALE,
   GHOST_PREVIEW_BODY_OPACITY,
   GHOST_PREVIEW_SHELL_OPACITY,
-  GHOST_PREVIEW_LABEL_HEIGHT,
   GHOST_PREVIEW_TETHER_DASH,
   GHOST_PREVIEW_TETHER_GAP,
+  type GhostPreviewLanding,
 } from '../utils/ghostPreview';
 import { relationColor } from '../components/cards/relationStyle';
 
@@ -21,6 +20,8 @@ export interface GhostPreviewLook {
   color: string;
   labelColor: string;
   labelBackground: string;
+  /** Where the host's layout will land the new Tree Node; without it the marker sits a fixed distance away on screen. */
+  landing?: (anchorNodeId: string, relation: RelativeDirection) => GhostPreviewLanding | null;
 }
 
 /**
@@ -67,12 +68,14 @@ export function useGhostPreview(params: {
 
     // Resolved once, then held — the preview must not swing around as the
     // camera orbits, only follow its anchor.
-    const offset = computeGhostPreviewOffset(camera.quaternion, relation);
+    const { x = 0, y = 0, z = 0 } = nodesRef.current.find((n) => n.id === anchorNodeId) ?? {};
+    const landing = look?.landing?.(anchorNodeId, relation) ?? null;
+    const { offset, radius, labelHeight } = ghostPreviewPlacement(camera.quaternion, relation, { x, y, z }, landing);
     const color = new THREE.Color(look?.color ?? relationColor(relation));
 
-    const bodyGeometry = new THREE.SphereGeometry(GHOST_PREVIEW_RADIUS, 16, 16);
+    const bodyGeometry = new THREE.SphereGeometry(radius, 16, 16);
     const shellGeometry = new THREE.SphereGeometry(
-      GHOST_PREVIEW_RADIUS * GHOST_PREVIEW_SHELL_SCALE,
+      radius * GHOST_PREVIEW_SHELL_SCALE,
       12,
       12
     );
@@ -100,7 +103,7 @@ export function useGhostPreview(params: {
     label.textHeight = 4;
     label.padding = 2;
     label.borderRadius = 2;
-    label.position.set(0, GHOST_PREVIEW_LABEL_HEIGHT, 0);
+    label.position.set(0, labelHeight, 0);
     label.material.depthTest = false;
     label.renderOrder = 999;
     labelRef.current = label;

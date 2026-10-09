@@ -15,6 +15,10 @@ import { Manipulation3DPanel } from '../Manipulation3DPanel';
 import type { GhostPreviewLook } from '../../hooks/useGhostPreview';
 import { usePersonDrawerInset, type PersonDrawerInset } from '../../hooks/usePersonDrawerInset';
 import type { PaperLayoutState } from '../../hooks/usePaperLayout';
+import type { LifecycleController } from '../../hooks/useLifecycles';
+import type { PaperLayout } from '../../lib/paperLayout';
+import { inLifecycle, rememberPositions, steadyLines } from '../../lib/paperLifecycle';
+import { paperGhostLanding } from '../../lib/paperGhost';
 import { Tree3DOverlay, type Tree3DSceneCamera, type Tree3DSearch } from '../tree3d/Tree3DOverlay';
 import { useIsMobileDevice } from '../tree3d/useIsMobileDevice';
 import { PaperDiscs } from './PaperDiscs';
@@ -27,6 +31,7 @@ import { PaperHoverRing } from './PaperHoverRing';
 import { PaperParticles } from './PaperParticles';
 import { PaperRipple } from './PaperRipple';
 import { PaperFocus } from './PaperFocus';
+import { PaperLifecycles } from './PaperLifecycles';
 import { PaperReveal } from './PaperReveal';
 import { PaperLoader } from './PaperLoader';
 import { PaperHint } from './PaperHint';
@@ -87,6 +92,8 @@ export interface PaperTree3DProps {
   onDirectConnectNodes?: (params: PaperConnectParams) => Promise<void> | void;
   canDissolveSelected: boolean;
   onDissolveNode?: (node: FamilyNode) => Promise<void> | void;
+  /** Spawn and Dissolve progress, drawn in ink. */
+  lifecycles: LifecycleController;
 }
 
 const PAPER = GRAYSCALE_PAIR.paper;
@@ -140,6 +147,7 @@ export function PaperTree3D({
   onDirectConnectNodes,
   canDissolveSelected,
   onDissolveNode,
+  lifecycles,
 }: PaperTree3DProps) {
   const { panel } = useTheme().palette;
   const isMobileDevice = useIsMobileDevice();
@@ -169,6 +177,14 @@ export function PaperTree3D({
     return { nodes, lines: paperLines(nodes, visible.links) };
   }, [graphData, layout, collapsedNodes, visibleClusters3D, uniqueClusters]);
   const shownIds = useMemo(() => shown.nodes.map((n) => n.id), [shown.nodes]);
+  const inLifecycleIds = useMemo(() => inLifecycle(lifecycles.lifecycles), [lifecycles.lifecycles]);
+  const discIds = useMemo(() => shownIds.filter((id) => !inLifecycleIds.has(id)), [shownIds, inLifecycleIds]);
+  const lines = useMemo(() => steadyLines(shown.lines, lifecycles.lifecycles), [shown.lines, lifecycles.lifecycles]);
+  const lastLayout = useRef<PaperLayout>(new Map());
+  const lifecycleLayout = useMemo(() => {
+    lastLayout.current = layout ? rememberPositions(lastLayout.current, layout, inLifecycleIds) : lastLayout.current;
+    return lastLayout.current;
+  }, [layout, inLifecycleIds]);
   const shownIdSet = useMemo(() => new Set(shownIds), [shownIds]);
   const liveNodes = useMemo<LiveNodePosition[]>(
     () => (layout ? shownIds.map((id) => ({ id, ...layout.get(id)! })) : []),
@@ -195,6 +211,19 @@ export function PaperTree3D({
   );
 
   const frame = useMemo(() => (layout ? paperFrame(layout, layout.keys()) : null), [layout]);
+
+  const landingFrom = useRef({ layout, graphData });
+  landingFrom.current = { layout, graphData };
+  const ghostLook = useMemo<GhostPreviewLook>(
+    () => ({
+      ...GHOST_LOOK,
+      landing: (anchorId, relation) => {
+        const { layout: placed, graphData: graph } = landingFrom.current;
+        return placed ? paperGhostLanding(placed, graph, anchorId, relation) : null;
+      },
+    }),
+    []
+  );
 
   const fitFrame = useCallback(
     (smooth: boolean) => {
@@ -373,12 +402,12 @@ export function PaperTree3D({
                 {arrival === 'revealing' && (
                   <PaperReveal frame={frame} layout={layout} ids={shownIds} state={emphasisState} onDone={handleArrived} />
                 )}
-                <PaperDiscs ids={shownIds} layout={layout} ink={INK} paper={PAPER} state={emphasisState} onPersonClick={handlePersonClick} />
+                <PaperDiscs ids={discIds} layout={layout} ink={INK} paper={PAPER} state={emphasisState} onPersonClick={handlePersonClick} />
                 <PaperHoverRing state={emphasisState} layout={layout} ink={INK} />
                 {showLinks && (
                   <>
                     <PaperLines
-                      lines={shown.lines}
+                      lines={lines}
                       layout={layout}
                       ink={INK}
                       parentInk={PARENT_INK}
@@ -386,10 +415,20 @@ export function PaperTree3D({
                       state={emphasisState}
                       showArrows={showArrows}
                     />
-                    <PaperParticles state={emphasisState} layout={layout} lines={shown.lines} ink={INK} />
-                    <PaperRipple state={emphasisState} layout={layout} lines={shown.lines} ink={INK} />
+                    <PaperParticles state={emphasisState} layout={layout} lines={lines} ink={INK} />
+                    <PaperRipple state={emphasisState} layout={layout} lines={lines} ink={INK} />
                   </>
                 )}
+                <PaperLifecycles
+                  lifecycles={showLinks ? lifecycles.lifecycles : lifecycles.lifecycles.filter((l) => l.subject.kind === 'node')}
+                  progressOf={lifecycles.progressOf}
+                  layout={lifecycleLayout}
+                  lines={shown.lines}
+                  ink={INK}
+                  parentInk={PARENT_INK}
+                  paper={PAPER}
+                  state={emphasisState}
+                />
                 {showNames && (
                   <PaperLabels nodes={shown.nodes} layout={layout} ink={INK} viewDistance={viewDistance} state={emphasisState} />
                 )}
@@ -446,7 +485,7 @@ export function PaperTree3D({
         searchMatches={searchMatches}
         onCreateRelative={onCreateRelative}
         onConnectExistingRelative={onConnectExistingRelative}
-        ghostLook={GHOST_LOOK}
+        ghostLook={ghostLook}
       />
     </div>
   );
