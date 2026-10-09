@@ -1,6 +1,6 @@
 # Paper mode
 
-Paper is the default Canvas Mode: everyone lands on it unless they switched to Cosmos in this browser. In 2D it draws flat ink cards and ink lines on grayscale paper. Hovering a Person rings them and dims everyone but their direct relatives. Selecting a Person ghosts everyone but their relatives. A search dims the non-matches. FIND ME and the current search match get accent rings. INSTRUMENTS, the drawer, the chat, the cards, the banners and the modals take the same paper and ink. In 3D, Paper draws its own scene of ink discs, lines and labels in a still layout (see [Paper 3D scene](#paper-3d-scene-lin-93)); the camera glides, turns slowly when idle and zooms toward the cursor (see [Paper 3D camera and effects](#paper-3d-camera-and-effects-lin-95-pass-95a)). The page's first Paper 3D load opens with a titled loader and a reveal, and a one-time controls hint (see [intro](#paper-3d-intro-and-hint-lin-95-pass-95b)). WASD and Q/E fly the Paper camera, and a double-click collapses a parent's branch (see [navigation](#paper-3d-navigation-and-collapse-lin-96-pass-96d)).
+Paper is the default Canvas Mode: everyone lands on it unless they switched to Cosmos in this browser. In 2D it draws flat ink cards and ink lines on grayscale paper. Hovering a Person rings them and dims everyone but their direct relatives. Selecting a Person ghosts everyone but their relatives. A search dims the non-matches. FIND ME and the current search match get accent rings. INSTRUMENTS, the drawer, the chat, the cards, the banners and the modals take the same paper and ink. In 3D, Paper draws its own scene of ink discs, lines and labels in a still layout (see [Paper 3D scene](#paper-3d-scene-lin-93)); the camera glides, turns slowly when idle and zooms toward the cursor (see [Paper 3D camera and effects](#paper-3d-camera-and-effects-lin-95-pass-95a)). The page's first Paper 3D load opens with a titled loader and a reveal, and a one-time controls hint (see [intro](#paper-3d-intro-and-hint-lin-95-pass-95b)). WASD and Q/E fly the Paper camera, and a double-click collapses a parent's branch (see [navigation](#paper-3d-navigation-and-collapse-lin-96-pass-96d)). A search in Paper 3D shrinks the non-matches away and gathers the matches into a cluster (see [search](#paper-3d-search-lin-97-pass-97a)).
 
 ## Sub-features
 
@@ -271,3 +271,27 @@ Preconditions:
 - An Orca tab that is not on screen draws about 2 frames a second, and each frame's move is capped at 0.1 s, so a held key covers less ground than at full rate. Count frames with a `requestAnimationFrame` counter and compare moves per frame, or report the feel unverified.
 - `ui.sh fill` can leave focus on a button. Focus the field with `orca eval` before testing that keys do nothing while typing.
 - A MUI dialog captured right after it opens in a throttled tab is mid-fade and looks see-through; capture again after a few seconds.
+
+## Paper 3D search (LIN-97 pass 97a)
+
+### Sub-features
+
+- `paper-3d-search-cluster`: typing in SEARCH ARCHIVE shrinks every non-match to nothing (about 0.8 s) and moves the matches, with only the lines between them, into a compact cluster around their centre (about 3 s, eased in and out). The camera frames the cluster with room for names. Another query moves the scene from wherever it is drawn. A selected match keeps the camera on them; a selected non-match keeps their selection, but the camera frames the cluster. Hover and clicks reach only matches. Tab cycles the matches. In Connect Mode the query belongs to the picker and the scene does not gather.
+- `paper-3d-search-clear`: emptying the box (Escape in the box, or deleting the text) moves everyone back to their fixed place and grows the non-matches back; the camera flies to the overview, or to the selected Person.
+- `paper-3d-search-shortcut`: Ctrl+F (Cmd+F on a Mac) opens INSTRUMENTS and focuses the search box, as in Cosmos.
+- The count, Prev/Next, Enter and the Escape order outside the box are pass 97b.
+
+### Driving it with ui.sh
+
+- Paper 3D at desktop size (`set viewport 1280 812 2`), tab in front, intro settled. Phone: `set viewport 820 812 2`.
+- **Shortcut.** Tap empty space at the bottom (`ui.sh tap 640 790`), then `ui.sh key Control+f`: INSTRUMENTS reads `▴` and `document.activeElement` is the `Search family tree` box.
+- **Cluster.** `ui.sh fill textbox "Search family tree" "Zabalawi"`, wait 4.5 s, capture: only the matches and their lines remain, framed.
+- **Clear.** Focus the box with `orca eval`, `ui.sh key Escape`, wait 4.5 s, capture: the full tree.
+- **Exact restore.** A page eval that imports R3F's `_roots` (see [navigation](#paper-3d-navigation-and-collapse-lin-96-pass-96d)) finds the scene's instanced mesh with more than 100 instances and reads each instance's translation and scale with `getMatrixAt`. Record it after a reload, after the search settles and after the clear: during the search only the matches have a scale above 0 and each has moved; after the clear every translation and scale equals the first record. After a reload, wait until `_roots.size` is 1 before the first read.
+- **Proof.** Capture `paper-search fixed`, `ctrl-f-open`, `settled`, `cleared`, `phone-settled` and `phone-cleared`.
+
+### Gotchas
+
+- `ui.sh key Meta+f` never reaches the page in Orca's browser (a `keydown` listener records nothing); drive the shortcut with `Control+f`. The handler is the shared one in `FamilyTree.tsx`.
+- With INSTRUMENTS open, its panel covers the right of the scene, and on a phone part of the cluster sits under it.
+- A computed-style fingerprint taken a few seconds after typing in Cosmos 3D can catch the Prev/Next buttons mid-transition; capture again once settled before calling it a diff.
