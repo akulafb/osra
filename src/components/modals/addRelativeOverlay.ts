@@ -23,6 +23,7 @@ export function addRelativeOverlayStyle(
   return {
     ...modalOverlayStyle(theme),
     backgroundColor: 'transparent',
+    backdropFilter: 'none',
     pointerEvents: 'none',
     justifyContent: previewNarrow ? 'flex-end' : 'flex-end',
     alignItems: previewNarrow ? 'stretch' : 'center',
