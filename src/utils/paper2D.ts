@@ -9,5 +9,6 @@ export const PAPER_2D_OPACITY: Record<Emphasis, number> = {
   relative: 1,
   dimmed: DIMMED,
   ghost: 0.18,
-  hidden: DIMMED,
+  // Below ghost: a search non-match never outshines a match the focus ghosts.
+  hidden: 0.12,
 };

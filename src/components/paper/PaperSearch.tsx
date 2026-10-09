@@ -3,7 +3,7 @@ import { useFrame, useThree } from '@react-three/fiber';
 import type { CameraControls } from '@react-three/drei';
 import type { PaperLayout } from '../../lib/paperLayout';
 import type { Point3 } from '../../lib/paperHover';
-import { paperSearchMotionAt, paperSearchMotionFrom, PAPER_SEARCH_STILL, type PaperSearchMotion } from '../../lib/paperSearch';
+import { paperFlyFrames, paperSearchMotionAt, paperSearchMotionFrom, PAPER_SEARCH_STILL, type PaperSearchMotion } from '../../lib/paperSearch';
 import type { PaperEmphasisState } from './paperEmphasis';
 import { PAPER_SEARCH_FRAME_PRIORITY, type PaperFrame } from './paperScene';
 
@@ -23,7 +23,8 @@ interface PaperSearchProps {
  * Moves the scene into the search cluster and back on the scene clock: the
  * matches travel from where they are drawn, everyone else shrinks away or
  * grows back. Each new set of matches frames the cluster, or the selected
- * match; clearing the search frames the overview.
+ * match, and so does a search already typed when the scene opens; clearing
+ * the search frames the overview.
  */
 export function PaperSearch({ layout, matchIds, cluster, selectedId, state, flyTo, onOverview }: PaperSearchProps) {
   const controls = useThree((three) => three.controls) as CameraControls | null;
@@ -44,11 +45,11 @@ export function PaperSearch({ layout, matchIds, cluster, selectedId, state, flyT
     state.current = { ...state.current, size: sizes, drift: offsets.size ? withOffsets(drift, offsets) : drift };
   }, PAPER_SEARCH_FRAME_PRIORITY);
 
-  const framedFor = useRef(matchIds);
+  const framedFor = useRef<ReadonlySet<string> | null>(null);
   useEffect(() => {
     if (framedFor.current === matchIds || !controls) return;
     framedFor.current = matchIds;
-    if (selectedId && layout.has(selectedId) && (!matchIds || matchIds.has(selectedId))) flyTo.current?.(selectedId);
+    if (selectedId && layout.has(selectedId) && paperFlyFrames(selectedId, matchIds) === 'person') flyTo.current?.(selectedId);
     else if (cluster || !matchIds) onOverview();
   }, [controls, matchIds, cluster, selectedId, layout, flyTo, onOverview]);
 

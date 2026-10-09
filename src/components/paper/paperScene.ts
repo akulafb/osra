@@ -129,22 +129,30 @@ export function paperLineSegments(lines: readonly PaperLine[], layout: PaperLayo
   return segments;
 }
 
-/** `computeLineDistances` allocates a new GPU buffer on every call, and three never frees the one it replaces. */
+/**
+ * `computeLineDistances` allocates a new GPU buffer on every call, and three never frees the one it replaces.
+ * Each segment's dashes start at its own start, where drei lays them end to end. True when the ends moved.
+ */
 export function setPaperSegment(geometry: THREE.BufferGeometry, index: number, from: Point3, to: Point3): boolean {
   const start = geometry.attributes.instanceStart as THREE.InterleavedBufferAttribute;
   const ends = start.data.array as Float32Array;
   const at = index * 6;
   const next = [from.x, from.y, from.z, to.x, to.y, to.z];
-  if (next.every((value, i) => ends[at + i] === Math.fround(value))) return false;
-  ends.set(next, at);
-  start.data.needsUpdate = true;
+  const moved = !next.every((value, i) => ends[at + i] === Math.fround(value));
+  if (moved) {
+    ends.set(next, at);
+    start.data.needsUpdate = true;
+  }
 
   const distance = geometry.attributes.instanceDistanceStart as THREE.InterleavedBufferAttribute | undefined;
   if (distance) {
     const distances = distance.data.array as Float32Array;
-    distances[index * 2] = 0;
-    distances[index * 2 + 1] = Math.hypot(to.x - from.x, to.y - from.y, to.z - from.z);
-    distance.data.needsUpdate = true;
+    const length = Math.fround(Math.hypot(to.x - from.x, to.y - from.y, to.z - from.z));
+    if (distances[index * 2] !== 0 || distances[index * 2 + 1] !== length) {
+      distances[index * 2] = 0;
+      distances[index * 2 + 1] = length;
+      distance.data.needsUpdate = true;
+    }
   }
-  return true;
+  return moved;
 }

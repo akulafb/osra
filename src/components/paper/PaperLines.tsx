@@ -6,7 +6,7 @@ import type { FamilyLink } from '../../types/graph';
 import type { PaperLayout, PaperLine } from '../../lib/paperLayout';
 import { emphasisSubject, linesOf } from '../../lib/paperHover';
 import { fadeInk, inkOf, lineEndInks, placeOf, type PaperEmphasisState } from './paperEmphasis';
-import { PAPER_DASH, PAPER_LINE_RENDER_ORDER, PAPER_LINE_STYLE, paperLineSegments } from './paperScene';
+import { PAPER_DASH, PAPER_LINE_RENDER_ORDER, PAPER_LINE_STYLE, paperLineSegments, setPaperSegment } from './paperScene';
 
 interface PaperLinesProps {
   lines: readonly PaperLine[];
@@ -78,7 +78,7 @@ function PaperLineKind({
     [colour, ink, paper]
   );
   const drawn = useRef<{ geometry?: object; colours?: object; emphasis?: PaperEmphasisState['emphasis']; drift?: PaperEmphasisState['drift'] }>({});
-  const scratch = useMemo(() => new THREE.Vector3(), []);
+  const scratch = useMemo(() => ({ from: new THREE.Vector3(), to: new THREE.Vector3() }), []);
 
   useFrame(() => {
     const segments = ref.current;
@@ -89,15 +89,14 @@ function PaperLineKind({
     const fresh = last.geometry !== geometry;
 
     if (fresh || drift !== last.drift) {
-      const start = geometry.attributes.instanceStart as THREE.InterleavedBufferAttribute;
-      const positions = start.data.array as Float32Array;
+      const { from, to } = scratch;
+      let moved = false;
       lines.forEach((line, i) => {
-        placeOf(layout, drift, line.sourceId, scratch).toArray(positions, i * 6);
-        placeOf(layout, drift, line.targetId, scratch).toArray(positions, i * 6 + 3);
+        placeOf(layout, drift, line.sourceId, from);
+        placeOf(layout, drift, line.targetId, to);
+        if (setPaperSegment(geometry, i, from, to)) moved = true;
       });
-      start.data.needsUpdate = true;
-      geometry.computeBoundingSphere();
-      if (style.dashed && fresh) segments.computeLineDistances();
+      if (moved || fresh) geometry.computeBoundingSphere();
     }
 
     if (fresh || colours !== last.colours || emphasis !== last.emphasis) {

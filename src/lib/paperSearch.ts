@@ -18,37 +18,81 @@ const COLLISION_PASSES = 200;
  * matches only, which draws them toward their centre, keeps linked matches
  * side by side and leaves PAPER_CLUSTER_GAP between every two discs. The same
  * matches always give the same cluster. The layout is not changed.
+ *
+ * Given the places an earlier pack gave, every match already placed keeps its
+ * place, a removed match drops out, and only the new matches settle, beside
+ * the cluster.
  */
-export function packMatches(layout: PaperLayout, matchIds: ReadonlySet<string>, links: readonly FamilyLink[]): Map<string, Point3> {
+export function packMatches(
+  layout: PaperLayout,
+  matchIds: ReadonlySet<string>,
+  links: readonly FamilyLink[],
+  placed?: ReadonlyMap<string, Point3>
+): Map<string, Point3> {
   const ids = [...matchIds].filter((id) => layout.has(id)).sort();
   const radii = ids.map((id) => layout.get(id)!.radius);
-  const centre = { x: 0, y: 0, z: 0 };
-  for (const id of ids) {
-    const { x, y, z } = layout.get(id)!;
-    centre.x += x / ids.length;
-    centre.y += y / ids.length;
-    centre.z += z / ids.length;
-  }
-  const places = ids.map((id) => {
-    const { x, y, z } = layout.get(id)!;
-    return { x: centre.x + (x - centre.x) * START_SHARE, y: centre.y + (y - centre.y) * START_SHARE, z: centre.z + (z - centre.z) * START_SHARE };
-  });
+  const kept = ids.flatMap((id) => (placed?.has(id) ? [placed.get(id)!] : []));
+  const fixed = ids.map((id) => !!placed?.has(id));
+  const centre = centreOf(kept.length ? kept : ids.map((id) => layout.get(id)!));
+  const places = placed && kept.length ? aroundPlaced(layout, ids, radii, fixed, placed, centre) : gathered(layout, ids, centre);
   const index = new Map(ids.map((id, i) => [id, i]));
   const pairs = matchedPairs(links, index);
 
-  for (let step = 0; step < SETTLE_STEPS; step++) {
-    const cooling = 1 - step / SETTLE_STEPS;
-    for (const place of places) {
-      place.x += (centre.x - place.x) * CENTRE_PULL * cooling;
-      place.y += (centre.y - place.y) * CENTRE_PULL * cooling;
-      place.z += (centre.z - place.z) * CENTRE_PULL * cooling;
+  if (!fixed.every(Boolean)) {
+    for (let step = 0; step < SETTLE_STEPS; step++) {
+      const cooling = 1 - step / SETTLE_STEPS;
+      places.forEach((place, i) => {
+        if (fixed[i]) return;
+        place.x += (centre.x - place.x) * CENTRE_PULL * cooling;
+        place.y += (centre.y - place.y) * CENTRE_PULL * cooling;
+        place.z += (centre.z - place.z) * CENTRE_PULL * cooling;
+      });
+      for (const [i, j] of pairs) pull(places, fixed, i, j, radii[i] + radii[j] + PAPER_CLUSTER_GAP, LINK_PULL * cooling);
+      separate(places, radii, fixed);
     }
-    for (const [i, j] of pairs) pull(places[i], places[j], radii[i] + radii[j] + PAPER_CLUSTER_GAP, LINK_PULL * cooling);
-    separate(places, radii);
+    for (let pass = 0; pass < COLLISION_PASSES && separate(places, radii, fixed); pass++);
   }
-  for (let pass = 0; pass < COLLISION_PASSES && separate(places, radii); pass++);
 
   return new Map(ids.map((id, i) => [id, places[i]]));
+}
+
+/** Each match a quarter of the way from its layout place to the matches' centre. */
+function gathered(layout: PaperLayout, ids: readonly string[], centre: Point3): Point3[] {
+  return ids.map((id) => {
+    const { x, y, z } = layout.get(id)!;
+    return { x: centre.x + (x - centre.x) * START_SHARE, y: centre.y + (y - centre.y) * START_SHARE, z: centre.z + (z - centre.z) * START_SHARE };
+  });
+}
+
+/** The matches already placed where they were, and each new one just outside the cluster, on the side its layout place lies. */
+function aroundPlaced(
+  layout: PaperLayout,
+  ids: readonly string[],
+  radii: readonly number[],
+  fixed: readonly boolean[],
+  placed: ReadonlyMap<string, Point3>,
+  centre: Point3
+): Point3[] {
+  const kept = ids.flatMap((id, i) => (fixed[i] ? [{ place: placed.get(id)!, radius: radii[i] }] : []));
+  const reach = Math.max(...kept.map(({ place, radius }) => Math.hypot(place.x - centre.x, place.y - centre.y, place.z - centre.z) + radius));
+  return ids.map((id, i) => {
+    if (fixed[i]) return { ...placed.get(id)! };
+    const { x, y, z } = layout.get(id)!;
+    const length = Math.hypot(x - centre.x, y - centre.y, z - centre.z);
+    const [dx, dy, dz] = length > 0 ? [(x - centre.x) / length, (y - centre.y) / length, (z - centre.z) / length] : [1, 0, 0];
+    const out = reach + radii[i] + PAPER_CLUSTER_GAP;
+    return { x: centre.x + dx * out, y: centre.y + dy * out, z: centre.z + dz * out };
+  });
+}
+
+function centreOf(points: readonly Point3[]): Point3 {
+  const centre = { x: 0, y: 0, z: 0 };
+  for (const { x, y, z } of points) {
+    centre.x += x / points.length;
+    centre.y += y / points.length;
+    centre.z += z / points.length;
+  }
+  return centre;
 }
 
 /** The layout with each match moved to its cluster place: a new map, the layout itself unchanged. */
@@ -73,6 +117,11 @@ export interface PaperSearchEmphasisInput {
 export function paperSearchEmphasis({ ids, links, hoveredId, selectedId, matchIds }: PaperSearchEmphasisInput): Map<string, Emphasis> {
   const matched = (id: string | null) => (id && (!matchIds || matchIds.has(id)) ? id : null);
   return focusEmphasis({ personIds: ids, links, hoveredId: matched(hoveredId), focusedId: matched(selectedId), searchMatchIds: matchIds });
+}
+
+/** What a flight to a Person frames: the Person, or the search cluster when the search hides them. */
+export function paperFlyFrames(id: string, matchIds: ReadonlySet<string> | null): 'person' | 'cluster' {
+  return !matchIds || matchIds.has(id) ? 'person' : 'cluster';
 }
 
 export function paperSearchCount(matches: number): string {
@@ -196,23 +245,31 @@ function matchedPairs(links: readonly FamilyLink[], index: ReadonlyMap<string, n
   return [...pairs.values()].sort((p, q) => p[0] - q[0] || p[1] - q[1]);
 }
 
-function pull(a: Point3, b: Point3, rest: number, strength: number): void {
+/** How much of a shared move each disc of a pair takes: half each, or all of it when the other disc is placed for good. */
+function shares(fixed: readonly boolean[], i: number, j: number): [number, number] {
+  return [fixed[i] ? 0 : fixed[j] ? 2 : 1, fixed[j] ? 0 : fixed[i] ? 2 : 1];
+}
+
+function pull(places: Point3[], fixed: readonly boolean[], i: number, j: number, rest: number, strength: number): void {
+  const a = places[i];
+  const b = places[j];
   const dx = b.x - a.x;
   const dy = b.y - a.y;
   const dz = b.z - a.z;
   const distance = Math.hypot(dx, dy, dz);
   if (distance <= rest) return;
   const k = ((distance - rest) / distance) * strength * 0.5;
-  a.x += dx * k;
-  a.y += dy * k;
-  a.z += dz * k;
-  b.x -= dx * k;
-  b.y -= dy * k;
-  b.z -= dz * k;
+  const [sa, sb] = shares(fixed, i, j);
+  a.x += dx * k * sa;
+  a.y += dy * k * sa;
+  a.z += dz * k * sa;
+  b.x -= dx * k * sb;
+  b.y -= dy * k * sb;
+  b.z -= dz * k * sb;
 }
 
 /** One pass that pushes every two overlapping discs apart; true when it moved any. Only discs in neighbouring grid cells can overlap. */
-function separate(places: Point3[], radii: readonly number[]): boolean {
+function separate(places: Point3[], radii: readonly number[], fixed: readonly boolean[]): boolean {
   const cell = 2 * Math.max(...radii) + PAPER_CLUSTER_GAP;
   const grid = new Map<number, number[]>();
   const keyOf = (x: number, y: number, z: number) => (x * 73856093) ^ (y * 19349663) ^ (z * 83492791);
@@ -230,12 +287,13 @@ function separate(places: Point3[], radii: readonly number[]): boolean {
     for (let dx = -1; dx <= 1; dx++)
       for (let dy = -1; dy <= 1; dy++)
         for (let dz = -1; dz <= 1; dz++)
-          for (const j of grid.get(keyOf(cx + dx, cy + dy, cz + dz)) ?? []) if (j > i && push(places, radii, i, j)) moved = true;
+          for (const j of grid.get(keyOf(cx + dx, cy + dy, cz + dz)) ?? []) if (j > i && push(places, radii, fixed, i, j)) moved = true;
   }
   return moved;
 }
 
-function push(places: Point3[], radii: readonly number[], i: number, j: number): boolean {
+function push(places: Point3[], radii: readonly number[], fixed: readonly boolean[], i: number, j: number): boolean {
+  if (fixed[i] && fixed[j]) return false;
   const a = places[i];
   const b = places[j];
   const least = radii[i] + radii[j] + PAPER_CLUSTER_GAP;
@@ -252,11 +310,12 @@ function push(places: Point3[], radii: readonly number[], i: number, j: number):
     distance = 1;
   }
   const k = ((least - distance) / distance) * 0.5 * 1.001;
-  a.x -= dx * k;
-  a.y -= dy * k;
-  a.z -= dz * k;
-  b.x += dx * k;
-  b.y += dy * k;
-  b.z += dz * k;
+  const [sa, sb] = shares(fixed, i, j);
+  a.x -= dx * k * sa;
+  a.y -= dy * k * sa;
+  a.z -= dz * k * sa;
+  b.x += dx * k * sb;
+  b.y += dy * k * sb;
+  b.z += dz * k * sb;
   return true;
 }

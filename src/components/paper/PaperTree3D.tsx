@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import { useTheme } from '@mui/material/styles';
 import type { FamilyGraph, FamilyNode, RelativeDirection } from '../../types/graph';
 import type { ForceGraphHandle, LiveNodePosition } from '../../types/forceGraph';
-import { paperCollapsible, paperPersonClick, paperShown } from '../../lib/paperCollapse';
+import { paperCollapsible, paperPersonClick, paperShown, type PaperShown } from '../../lib/paperCollapse';
 import { paperCycle, paperKeyBlocks, type PaperArrival, type PaperKeyAction } from '../../lib/paperKeys';
 import { GRAYSCALE_PAIR, LIVE_PAIR } from '../../theme/paperPair';
 import type { DirectManipulationController } from '../../hooks/useDirectManipulation';
@@ -15,6 +15,8 @@ import { Manipulation3DPanel } from '../Manipulation3DPanel';
 import type { GhostPreviewLook } from '../../hooks/useGhostPreview';
 import { usePersonDrawerInset, type PersonDrawerInset } from '../../hooks/usePersonDrawerInset';
 import type { PaperLayoutState } from '../../hooks/usePaperLayout';
+import type { PaperLayout } from '../../lib/paperLayout';
+import type { Point3 } from '../../lib/paperHover';
 import type { LifecycleController } from '../../hooks/useLifecycles';
 import { holdingProgress, inLifecycle, paperLifecycleDisc, paperLifecycleDraws, steadyLines } from '../../lib/paperLifecycle';
 import { paperGhostLanding } from '../../lib/paperGhost';
@@ -118,6 +120,12 @@ const GHOST_LOOK: GhostPreviewLook = {
 /** The usual system double-click interval. */
 const DOUBLE_CLICK_MS = 500;
 
+interface SearchPack {
+  layout: PaperLayout;
+  lines: PaperShown['lines'];
+  packed: ReadonlyMap<string, Point3>;
+}
+
 /** Paper's own 3D scene (ADR 0014): the still layout as ink discs, lines and labels, drawn in grayscale and painted in the live Paper Pair. */
 export function PaperTree3D({
   graphData,
@@ -190,12 +198,21 @@ export function PaperTree3D({
   const searching = searchQuery.trim() !== '' && !interaction.connectSourceId;
   const matchKey = searching ? searchMatches.flatMap((n) => (shownIdSet.has(n.id) ? [n.id] : [])).sort().join(',') : null;
   const matchIds = useMemo(() => (matchKey === null ? null : new Set(matchKey ? matchKey.split(',') : [])), [matchKey]);
+  // A new query packs the cluster afresh; a change to the tree under the same matches (Spawn, Dissolve) packs only the newcomers, beside the matches already placed.
+  const lastPack = useRef<SearchPack | null>(null);
+  const searchPack = useMemo<SearchPack | null>(() => {
+    if (!fixedLayout || !matchIds) return null;
+    const last = lastPack.current;
+    const treeChanged = !!last && (last.layout !== fixedLayout || last.lines !== shown.lines);
+    const links = shown.lines.map((line) => line.link);
+    return { layout: fixedLayout, lines: shown.lines, packed: packMatches(fixedLayout, matchIds, links, treeChanged ? last.packed : undefined) };
+  }, [fixedLayout, matchIds, shown.lines]);
+  useLayoutEffect(() => {
+    lastPack.current = searchPack;
+  }, [searchPack]);
   const layout = useMemo(
-    () =>
-      fixedLayout && matchIds
-        ? paperSearchLayout(fixedLayout, packMatches(fixedLayout, matchIds, shown.lines.map((line) => line.link)))
-        : fixedLayout,
-    [fixedLayout, matchIds, shown.lines]
+    () => (fixedLayout && searchPack ? paperSearchLayout(fixedLayout, searchPack.packed) : fixedLayout),
+    [fixedLayout, searchPack]
   );
   const cluster = useMemo(() => (layout && matchIds?.size ? paperFrame(layout, matchIds) : null), [layout, matchIds]);
   const matchOrder = useMemo(() => (matchIds ? paperSearchOrder(searchMatches, matchIds) : null), [searchMatches, matchIds]);
@@ -509,7 +526,7 @@ export function PaperTree3D({
             {layout && frame && (
               <>
                 <PaperView viewDistance={viewDistance} />
-                <PaperCameraRig frame={frame} state={emphasisState} modalOpen={isModalOpen} />
+                <PaperCameraRig frame={frame} state={emphasisState} modalOpen={isModalOpen} selected={!!interaction.selectedNodeId} />
                 <PaperFlight held={heldKeys} viewDistance={viewDistance} state={emphasisState} paused={keyBlocks.flight} />
                 <InitialFraming fit={fitFrame} />
                 <PaperFocus

@@ -469,7 +469,7 @@ const NodeCardComponent: React.FC<NodeCardProps> = ({
                   fill={accentOr('rgba(239, 68, 68, 0.98)')}
                   stroke={paperOr('#fff')}
                   strokeWidth={1.5}
-                  style={{ filter: 'drop-shadow(0 0 8px rgba(239, 68, 68, 0.6))' }}
+                  style={{ filter: paperPair ? undefined : 'drop-shadow(0 0 8px rgba(239, 68, 68, 0.6))' }}
                 />
                 <text
                   x={-24}

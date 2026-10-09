@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useSyncExternalStore } from 'react
 import Button from '@mui/material/Button';
 import { useTheme, type Theme } from '@mui/material/styles';
 import { useAuth } from '../../contexts/AuthContext';
+import { useCanvasMode } from '../../hooks/useCanvasMode';
 import { FamilyLink, FamilyNode, PersonGender } from '../../types/graph';
 import { formatNodeDisplayName } from '../../utils/nodeDisplayName';
 import {
@@ -68,6 +69,7 @@ export default function AddRelativeModal({
   const { write } = useWorkingRecord();
   const theme = useTheme();
   const { modal, panel, primary } = theme.palette;
+  const isPaper = useCanvasMode().mode === 'paper';
   const [name, setName] = useState('');
   const [relationship, setRelationship] = useState<RelationshipType>('child');
   const [parentRole, setParentRole] = useState<'mother' | 'father' | null>(null);
@@ -328,7 +330,7 @@ export default function AddRelativeModal({
       <div style={panelStyle}>
         {isPreviewConnectMode && (
           <p style={{ margin: '0 0 16px 0', fontSize: '0.75rem', color: primary.main, fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase' }}>
-            Preview: cyan dashed line shows the link that will be created.
+            Preview: {isPaper ? 'dashed ink line' : 'cyan dashed line'} shows the link that will be created.
           </p>
         )}
         <h2 style={{ 

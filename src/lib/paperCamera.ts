@@ -23,9 +23,9 @@ const MIN_SPAN = 100;
 /** How far the orbit point can wander from the tree's centre, in spans. */
 const BOUNDARY_SPANS = 2;
 
-/** Whether the view turns on its own: after the idle pause, and never while a Person is focused or hovered. */
-export function paperIdleRotates(secondsSinceInput: number, focused: boolean, hovered: boolean): boolean {
-  return !focused && !hovered && secondsSinceInput >= PAPER_IDLE_SECONDS;
+/** Whether the view turns on its own: after the idle pause, and never while a Person is selected or hovered. */
+export function paperIdleRotates(secondsSinceInput: number, selected: boolean, hovered: boolean): boolean {
+  return !selected && !hovered && secondsSinceInput >= PAPER_IDLE_SECONDS;
 }
 
 /** The idle turn in radians a second, so a point as far out as the screen edge moves about 15 px a second. */

@@ -509,7 +509,7 @@ describe('findKinshipPaths against trying every path', () => {
     // The run is not empty by accident.
     expect(pairs).toBeGreaterThan(10000);
     expect(marriagePaths).toBeGreaterThan(1000);
-  });
+  }, 30_000); // Over 10,000 pairs: a cold run can pass the 5 s default.
 });
 
 describe('the name of the relation for a Kinship Path', () => {

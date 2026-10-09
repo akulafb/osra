@@ -7,6 +7,7 @@ import {
   PAPER_CLUSTER_GAP,
   paperClusterView,
   paperEscape,
+  paperFlyFrames,
   paperSearchCount,
   paperSearchEmphasis,
   paperSearchLayout,
@@ -135,6 +136,47 @@ describe('packMatches', () => {
     const packed = packMatches(layout, ids, []);
     expect(overlaps(layout, packed)).toEqual([]);
     expect(clusterRadius(layout, packed)).toBeLessThan(compactBound(layout, [...ids]));
+  });
+});
+
+describe('packMatches around the places already packed', () => {
+  const layout = spreadLayout(40);
+  const links = [parent('p3', 'p13')];
+  const placed = packMatches(layout, new Set(['p3', 'p13', 'p23', 'p31']), links);
+
+  it('keeps every match already placed where it was when a new match joins', () => {
+    const packed = packMatches(layout, new Set(['p3', 'p13', 'p23', 'p31', 'p9']), links, placed);
+    for (const [id, place] of placed) expect(packed.get(id)).toEqual(place);
+  });
+
+  it('sets the newcomer down beside the cluster, clear of every other disc', () => {
+    const packed = packMatches(layout, new Set(['p3', 'p13', 'p23', 'p31', 'p9']), links, placed);
+    const newcomer = packed.get('p9')!;
+    const nearestGap = Math.min(
+      ...[...placed].map(([id, place]) => distance(newcomer, place) - layout.get(id)!.radius - layout.get('p9')!.radius)
+    );
+    expect(overlaps(layout, packed)).toEqual([]);
+    expect(nearestGap).toBeLessThan(2 * PAPER_CLUSTER_GAP);
+  });
+
+  it('drops a removed match without moving the others', () => {
+    const packed = packMatches(layout, new Set(['p3', 'p13', 'p23']), links, placed);
+    expect([...packed]).toEqual([...placed].filter(([id]) => id !== 'p31'));
+  });
+});
+
+describe('paperFlyFrames', () => {
+  it('frames the Person outside a search', () => {
+    expect(paperFlyFrames('a', null)).toBe('person');
+  });
+
+  it('frames the Person when they are a match', () => {
+    expect(paperFlyFrames('a', new Set(['a', 'b']))).toBe('person');
+  });
+
+  it('frames the cluster for a Person the search hides, instead of the empty paper where they stand', () => {
+    expect(paperFlyFrames('c', new Set(['a', 'b']))).toBe('cluster');
+    expect(paperFlyFrames('c', new Set())).toBe('cluster');
   });
 });
 

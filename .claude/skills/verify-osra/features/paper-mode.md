@@ -9,7 +9,8 @@ Paper is the default Canvas Mode: everyone lands on it unless they switched to C
 - `paper-2d` draws flat ink cards, ink lines and grayscale paper.
 - `paper-2d-hover` rings the hovered Person, keeps direct relatives (parents, children, spouses) at full ink and dims the rest.
 - `paper-2d-focus` draws a heavier ink ring on the selected Person, keeps their relatives and ghosts the rest.
-- `paper-2d-marks` draws a solid accent ring for FIND ME and a dashed accent ring for the current search match, and dims non-matches.
+- `paper-2d-marks` draws a solid accent ring for FIND ME and a dashed accent ring for the current search match, and dims non-matches (`0.12`, below a ghosted match's `0.18`, so a selection never makes a non-match outshine a match).
+- `paper-2d-lifecycles`: Spawn's ring and sparkles and Dissolve's debris are plain ink with no glow, and the `Delete?` confirmation pill has no red glow. Cosmos keeps its colours and glows.
 - `paper-panels` puts INSTRUMENTS, the drawer (desktop and phone sheet), the chat, the Ghost Node card, the Connect Mode banner and the modals in paper and ink.
 
 ## How to get to it (user POV)
@@ -29,7 +30,7 @@ Preconditions:
 - **Cards on screen.** A large family can open framed on lines only. Open INSTRUMENTS and click `FIND ME`, or select a Person.
 - **Hover.** Find the card's ref with `ui.sh tree` (a `group` before the given name), then run `orca hover --page "$(cat $RUN_DIR/state/page)" --element <ref>`. Read `getComputedStyle(card).opacity` for the `.node-card` groups: the hovered Person and their direct relatives are `1`, everyone else `0.4`.
 - **Focus.** `$S/ui.sh "$RUN_DIR" person <Given> <Family>`. The selected Person and their relatives are `1`, everyone else `0.18`.
-- **Search.** `$S/ui.sh "$RUN_DIR" fill textbox "Search family tree" "<text>"`, then click `Next match` until a match is on screen. Non-matches are `0.4`, every card keeps its `transform`, and the current match has a dashed accent ring. The count under the bar reads `N PEOPLE` (`1 PERSON` for one). With a Person selected, the first Escape deselects and the second clears the search (see [Paper search](#paper-search-lin-97)).
+- **Search.** `$S/ui.sh "$RUN_DIR" fill textbox "Search family tree" "<text>"`, then click `Next match` until a match is on screen. Non-matches are `0.12`, every card keeps its `transform`, and the current match has a dashed accent ring. The count under the bar reads `N PEOPLE` (`1 PERSON` for one). With a Person selected, the first Escape deselects and the second clears the search (see [Paper search](#paper-search-lin-97)).
 - **Panels.** Open the drawer, the chat (`🤖`), `Edit Registry` (then `Cancel`), a `+ Child` handle (Ghost Node card, closed with Escape in its textbox) and `🔗 Link` (Connect Mode banner, then `Cancel (Esc)`). Submit nothing.
 - **Proof.** Capture `paper default`, `paper switch-cosmos`, `paper hover`, `paper focus`, `paper findme`, `paper search` and `paper panels`.
 
@@ -118,7 +119,7 @@ Preconditions:
 ### Sub-features
 
 - `paper-3d-hover` (mouse only): the Person under the pointer gets a thin ink ring, the same width at any zoom, and a pointer cursor. Their direct relatives (parents, children, spouses and ex-spouses) keep full ink; everyone else and their labels fade to half ink. Each end of a line fades with its own Person, and lines draw beneath every disc, so no line crosses a disc as a light wedge. The hovered Person's own lines darken to full ink and carry ink dots flowing out from them.
-- `paper-3d-hover-lean`: the relatives lean toward the hovered Person by a small share of the distance (at most 6 world units, never into the 4-unit gap between discs) with an easing of 0.12 s time constant (most of the way in about 0.35 s), and ease back when the hover ends. Their labels, lines and arrows follow, and arrows dim with their lines. The layout itself never changes.
+- `paper-3d-hover-lean`: the relatives lean toward the hovered Person by a small share of the distance (at most 6 world units, never into the 4-unit gap between discs) with an easing of 0.12 s time constant (most of the way in about 0.35 s), and ease back when the hover ends. Their labels, lines and arrows follow, and arrows dim with their lines; a divorce line's dashes stay even as it leans, wobbles or gathers into a search cluster. The layout itself never changes.
 - `paper-3d-hover-rules`: emphasis comes from `focusEmphasis`, as in Paper 2D: while a Person is selected the selection outranks the hover, so hovering shows only the pointer cursor. Where discs overlap, a click selects the ringed Person (the nearest centre on screen), not the front-most disc. A camera drag (more than 6 px with a button down), the pointer over INSTRUMENTS or the drawer, or leaving the canvas hovers nobody. Touch has no hover: a phone tap opens the bottom sheet as before.
 
 ### Driving it with ui.sh
@@ -165,7 +166,7 @@ Preconditions:
 ### Sub-features
 
 - `paper-3d-momentum`: a drag keeps the view gliding for a moment after release (CameraControls `draggingSmoothTime` 0.3 s) and settles without bouncing back.
-- `paper-3d-idle-rotate`: 3 s after the last pointer, wheel or key input anywhere on the page, with nobody focused, the view turns slowly about the vertical axis: a point as far out as the screen edge moves about 15 px a second. It stops while a Person is focused (the camera holds still while the relatives wobble) and pauses on any input.
+- `paper-3d-idle-rotate`: 3 s after the last pointer, wheel or key input anywhere on the page, with nobody selected, the view turns slowly about the vertical axis: a point as far out as the screen edge moves about 15 px a second. It stops while a Person is selected (the camera holds still while the relatives wobble), a non-match a search hides included, and pauses on any input.
 - `paper-3d-zoom`: the wheel or a pinch zooms toward the cursor, on the plane through the orbit point, so discs in front of or behind that plane drift by parallax. The camera stops 32 units from its orbit point and at 3 overview distances back, and the orbit point stays in a box 2 tree radii around the tree's centre, so a full zoom-out always brings the tree back.
 - `paper-3d-effects`: on a desktop (`isMobile()` false: wider than 1024 px and no phone UA) a soft depth of field keeps the orbit point sharp and blurs discs in front and behind, with a light animated grain. Lines stay sharp, because they write no depth. On a phone there is no depth of field and the grain is lighter. The duotone runs last, so the pair still paints the final image.
 - `paper-3d-reframe`: a resize or a turned phone reframes without a reload: the overview refits the tree, and a focused Person is framed again in the space the drawer leaves free (side drawer at 900 px and wider, bottom sheet below).
@@ -276,13 +277,13 @@ Preconditions:
 
 ### Sub-features
 
-- `paper-3d-search-cluster`: typing in SEARCH ARCHIVE shrinks every non-match to nothing (about 0.8 s) and moves the matches, with only the lines between them, into a compact cluster around their centre (about 3 s, eased in and out). The camera frames the cluster with room for names. Another query moves the scene from wherever it is drawn. A selected match keeps the camera on them; a selected non-match keeps their selection, but the camera frames the cluster. Hover and clicks reach only matches. Tab cycles the matches. R and RESET VIEWPORT deselect and frame the cluster, not the whole tree. A `+` handle on a selected match puts the Ghost Preview beside that disc in the cluster, at the same offset as outside a search. In Connect Mode the query belongs to the picker and the scene does not gather.
+- `paper-3d-search-cluster`: typing in SEARCH ARCHIVE shrinks every non-match to nothing (about 0.8 s) and moves the matches, with only the lines between them, into a compact cluster around their centre (about 3 s, eased in and out). The camera frames the cluster with room for names. Another query moves the scene from wherever it is drawn. A selected match keeps the camera on them; a selected non-match keeps their selection, but the camera frames the cluster, and so do FIND ME, Enter and a resize for them. A search already typed when Paper 3D opens frames the cluster too. A Spawn or Dissolve of a match during a search moves no other match: a newcomer settles at the cluster's edge and a dissolved match drops out. Hover and clicks reach only matches. Tab cycles the matches. R and RESET VIEWPORT deselect and frame the cluster, not the whole tree. A `+` handle on a selected match puts the Ghost Preview beside that disc in the cluster, at the same offset as outside a search. In Connect Mode the query belongs to the picker and the scene does not gather.
 - `paper-3d-search-clear`: emptying the box (Escape in the box, or deleting the text) moves everyone back to their fixed place and grows the non-matches back; the camera flies to the overview, or to the selected Person.
 - `paper-3d-search-shortcut`: Ctrl+F (Cmd+F on a Mac) opens INSTRUMENTS and focuses the search box, as in Cosmos.
 - `paper-search-count` (2D and 3D): while the box holds text, a count sits under the `current/total` counter: `1 PERSON`, otherwise `N PEOPLE` (`0 PEOPLE` with no match). Cosmos shows no count.
 - `paper-3d-search-step`: Prev/Next, and Enter / Shift+Enter in the box, select the next or previous match in the order the search found them, wrapping round, and the camera flies to each as on any focus (the drawer opens). The counter shows the selected match (`0/N` before the first step or with a non-match selected).
 - `paper-search-escape` (2D and 3D): with a Person selected, Escape (in the box or not) deselects and keeps the search; in 3D the camera frames the cluster again. The next Escape clears the search and restores the fixed layout.
-- `paper-2d-search`: non-matches dim to `0.4` and no card moves; Prev/Next pan to each match as in Cosmos.
+- `paper-2d-search`: non-matches dim to `0.12` and no card moves; Prev/Next pan to each match as in Cosmos.
 
 ### Driving it with ui.sh
 

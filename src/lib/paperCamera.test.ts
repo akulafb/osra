@@ -24,7 +24,7 @@ describe('paperIdleRotates', () => {
     expect(paperIdleRotates(60, false, false)).toBe(true);
   });
 
-  it('holds still while a Person is focused, however long the view is idle', () => {
+  it('holds still while a Person is selected, focused or hidden by a search, however long the view is idle', () => {
     expect(paperIdleRotates(PAPER_IDLE_SECONDS, true, false)).toBe(false);
     expect(paperIdleRotates(600, true, false)).toBe(false);
   });

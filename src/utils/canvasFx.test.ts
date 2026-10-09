@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   seedCanvasParticles,
   canvasParticleAt,
+  canvasParticleLook,
   spawnRingAt,
   cardSpawnAt,
   cardDissolveAt,
@@ -135,5 +136,20 @@ describe('canvasFx — subProgress', () => {
     expect(subProgress(0.25, 0.5)).toBeCloseTo(0.5);
     expect(subProgress(0.5, 0.5)).toBe(1);
     expect(subProgress(0.9, 0.5)).toBe(1);
+  });
+});
+
+describe('canvasParticleLook', () => {
+  it("keeps Cosmos's palette and glow when no ink is given", () => {
+    expect(canvasParticleLook('spawn', 1)).toEqual({ fill: '#818cf8', glow: 'drop-shadow(0 0 5px currentColor)' });
+    expect(canvasParticleLook('dissolve', 0)).toEqual({ fill: '#f87171', glow: 'drop-shadow(0 0 4px currentColor)' });
+  });
+
+  it('draws every particle in plain ink, with no glow, in Paper', () => {
+    for (const kind of ['spawn', 'dissolve'] as const) {
+      for (let i = 0; i < CANVAS_FX_PARTICLES[kind]; i++) {
+        expect(canvasParticleLook(kind, i, 'rgb(20 20 20)')).toEqual({ fill: 'rgb(20 20 20)', glow: undefined });
+      }
+    }
   });
 });

@@ -10,6 +10,8 @@ interface NodeLifecycleFxProps {
   lifecycles: LifecycleController;
   /** The current layout, used once — to pin where the subject was. */
   nodes: Node2D[];
+  /** Paper's ink, for an ink Spawn and Dissolve with no glow. Absent, Cosmos's colours. */
+  ink?: string;
 }
 
 /**
@@ -25,6 +27,7 @@ export const NodeLifecycleFx: React.FC<NodeLifecycleFxProps> = ({
   lifecycle,
   lifecycles,
   nodes,
+  ink,
 }) => {
   const { subject, geometry, key, kind } = lifecycle;
   const nodeId = subject.kind === 'node' ? subject.id : null;
@@ -53,6 +56,7 @@ export const NodeLifecycleFx: React.FC<NodeLifecycleFxProps> = ({
       width={geometry.width}
       height={geometry.height}
       progress={progress}
+      ink={ink}
     />
   ) : (
     <ParticleDissolve
@@ -61,6 +65,7 @@ export const NodeLifecycleFx: React.FC<NodeLifecycleFxProps> = ({
       width={geometry.width}
       height={geometry.height}
       progress={progress}
+      ink={ink}
     />
   );
 };

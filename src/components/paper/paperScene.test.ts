@@ -210,6 +210,15 @@ describe('setPaperSegment: moving one segment of a fat line in place', () => {
     setPaperSegment(geometry, 0, at(0, 0, 0), at(3, 4, 0));
     expect([...distances.array]).toEqual([0, 5, 0, 2]);
   });
+
+  it("restarts drei's end-to-end dash distances at each segment's start, even for a segment that has not moved", () => {
+    const { geometry, ends, distances } = dreiSegmentsGeometry(2);
+    ends.array.set([0, 0, 0, 3, 4, 0, 10, 0, 0, 10, 2, 0]);
+    distances.array.set([0, 5, 5, 7]);
+    expect(setPaperSegment(geometry, 1, at(10, 0, 0), at(10, 2, 0))).toBe(false);
+    expect([...distances.array]).toEqual([0, 5, 0, 2]);
+    expect(ends.version).toBe(0);
+  });
 });
 
 describe('paperLineShown: which lines the LINKS and ARROWS toggles draw', () => {

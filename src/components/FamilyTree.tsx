@@ -18,7 +18,6 @@ import AdminAddPersonModal from './modals/AdminAddPersonModal';
 import { canEdit, canManageInvites } from '../lib/permissions';
 import { filterGraphData, filterGraphDataFor3D } from '../lib/filterGraphData';
 import { searchNodes } from '../utils/treeSearch';
-import { paperEscape } from '../lib/paperSearch';
 import { useDirectManipulation } from '../hooks/useDirectManipulation';
 import { needsCanvas } from '../lib/directManipulation';
 import AddRelativeModal from './modals/AddRelativeModal';
@@ -530,22 +529,6 @@ export const FamilyTree: React.FC = () => {
     }
   }, [searchQuery]);
 
-  // Paper 2D: FamilyTree2D sends every Escape to the interaction, so the search clears only once nothing is selected.
-  const isPaper2D = mode === '2D' && canvasMode === 'paper';
-  const interactionIdle = interaction.state.phase === 'idle';
-  const handlePaperSearchEscape = useCallback(() => {
-    if (paperEscape({ interactionIdle, searchQuery }) === 'search') handleSearchClose();
-  }, [interactionIdle, searchQuery, handleSearchClose]);
-
-  useEffect(() => {
-    if (!isPaper2D) return;
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') handlePaperSearchEscape();
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isPaper2D, handlePaperSearchEscape]);
-
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
@@ -872,7 +855,7 @@ export const FamilyTree: React.FC = () => {
             searchIndex={searchIndex}
             onSearchPrev={handleSearchPrev}
             onSearchNext={handleSearchNext}
-            onSearchClose={isPaper2D ? handlePaperSearchEscape : handleSearchClose}
+            onSearchClose={handleSearchClose}
             searchOpenRequested={searchOpenRequested}
             searchNavigateTrigger={searchNavigateTrigger}
             searchDisabled={!activePreset}

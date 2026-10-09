@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import type { FamilyLink } from '../../types/graph';
 import type { PaperLayout } from '../../lib/paperLayout';
 import { paperFlyTo, paperFocusReach } from '../../lib/paperFocus';
-import { paperSearchEmphasis } from '../../lib/paperSearch';
+import { paperFlyFrames, paperSearchEmphasis } from '../../lib/paperSearch';
 import type { PersonDrawerInset } from '../../hooks/usePersonDrawerInset';
 import { playPaperTap } from './paperTap';
 
@@ -24,8 +24,8 @@ interface PaperFocusProps {
 
 /**
  * On each focus the camera flies to the Person and a tap plays; clearing the
- * focus flies back to the overview. A resize or a turned phone reframes the
- * same way.
+ * focus flies back to the overview, and a Person the search hides frames the
+ * cluster instead. A resize or a turned phone reframes the same way.
  */
 export function PaperFocus({ selectedId, layout, ids, links, matchIds, drawerInset, onOverview, flyTo }: PaperFocusProps) {
   const controls = useThree((three) => three.controls) as CameraControls | null;
@@ -34,6 +34,10 @@ export function PaperFocus({ selectedId, layout, ids, links, matchIds, drawerIns
 
   const fly = useCallback(
     (id: string, smooth: boolean) => {
+      if (paperFlyFrames(id, matchIds) === 'cluster') {
+        onOverview();
+        return true;
+      }
       const disc = layout.get(id);
       if (!controls || !disc || !(controls.camera instanceof THREE.PerspectiveCamera)) return false;
       const emphasis = paperSearchEmphasis({ ids, links, hoveredId: null, selectedId: id, matchIds });
@@ -51,7 +55,7 @@ export function PaperFocus({ selectedId, layout, ids, links, matchIds, drawerIns
       void controls.setLookAt(position.x, position.y, position.z, target.x, target.y, target.z, smooth);
       return true;
     },
-    [controls, canvas, layout, ids, links, matchIds, drawerInset]
+    [controls, canvas, layout, ids, links, matchIds, drawerInset, onOverview]
   );
 
   useEffect(() => {

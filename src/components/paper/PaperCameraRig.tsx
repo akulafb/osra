@@ -12,10 +12,12 @@ interface PaperCameraRigProps {
   frame: PaperFrame;
   state: MutableRefObject<PaperEmphasisState>;
   modalOpen: boolean;
+  /** A selected Person holds the view still, even one a search hides, who has no focus. */
+  selected: boolean;
 }
 
-/** Keeps the camera within its zoom limits and box, and turns the view slowly once it sits idle with nobody focused, outside the intro and behind no modal. */
-export function PaperCameraRig({ frame, state, modalOpen }: PaperCameraRigProps) {
+/** Keeps the camera within its zoom limits and box, and turns the view slowly once it sits idle with nobody selected, outside the intro and behind no modal. */
+export function PaperCameraRig({ frame, state, modalOpen, selected }: PaperCameraRigProps) {
   const controls = useThree((three) => three.controls) as CameraControls | null;
   const camera = useThree((three) => three.camera);
   const size = useThree((three) => three.size);
@@ -43,7 +45,7 @@ export function PaperCameraRig({ frame, state, modalOpen }: PaperCameraRigProps)
   useFrame((_, delta) => {
     if (!controls || modalOpen || state.current.reveal) return;
     const idleSeconds = (performance.now() - lastInput.current) / 1000;
-    if (!paperIdleRotates(idleSeconds, state.current.focus !== null, state.current.pointedId !== null)) return;
+    if (!paperIdleRotates(idleSeconds, selected, state.current.pointedId !== null)) return;
     void controls.rotate(paperIdleRotateSpeed(size.width) * Math.min(delta, PAPER_MAX_FRAME_SECONDS), 0, true);
   });
 

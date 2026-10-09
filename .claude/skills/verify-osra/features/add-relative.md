@@ -14,7 +14,7 @@ A signed-in user adds a relative to a selected person from the drawer's + Add Re
 ## How to get to it (user POV)
 
 - Select a person (see [person details](./person-details.md)), then + Add Relative in the drawer, "Add as child".
-- Typing an existing Person's name in the modal lists MATCHES DETECTED IN ARCHIVE; picking one (no submit) previews the link as a dashed line in every view (Paper 3D: see [Paper 3D editing](./paper-mode.md#paper-3d-editing-lin-96-passes-96a-to-96c)).
+- Typing an existing Person's name in the modal lists MATCHES DETECTED IN ARCHIVE; picking one (no submit) previews the link as a dashed line in every view, and the modal's hint names it: "cyan dashed line" in Cosmos, "dashed ink line" in Paper (Paper 3D: see [Paper 3D editing](./paper-mode.md#paper-3d-editing-lin-96-passes-96a-to-96c)).
 - In 2D, select a person and click the `+ Child` pill; in 3D (Cosmos or Paper, desktop only), select a planet or disc and use the docked panel's child handle.
 - ADMINISTRATIVE TOOLS → Connect Nodes..., click the second person, pick "<A> is parent of <B>", then Establish Link.
 - In 3D, the docked panel's `🔗 Connect` enters the same Connect Mode.

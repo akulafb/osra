@@ -1,8 +1,8 @@
 import React, { useMemo } from 'react';
 import {
-  CANVAS_FX_COLORS,
   CANVAS_FX_PARTICLES,
   canvasParticleAt,
+  canvasParticleLook,
   seedCanvasParticles,
   spawnRingAt,
 } from '../utils/canvasFx';
@@ -17,10 +17,12 @@ export interface SpawnBurstProps {
    * component has no timer and no completion signal of its own.
    */
   progress: number;
+  /** Paper's ink: the ring and sparkles drawn in it, with no glow. Absent, Cosmos's colours. */
+  ink?: string;
 }
 
 /** The 2D rendering of a Spawn: a shockwave ring and radiating sparkles. */
-export const SpawnBurst: React.FC<SpawnBurstProps> = ({ x, y, width, height, progress }) => {
+export const SpawnBurst: React.FC<SpawnBurstProps> = ({ x, y, width, height, progress, ink }) => {
   const seeds = useMemo(
     () => seedCanvasParticles(CANVAS_FX_PARTICLES.spawn, 'spawn'),
     []
@@ -39,25 +41,26 @@ export const SpawnBurst: React.FC<SpawnBurstProps> = ({ x, y, width, height, pro
           cy={centerY}
           r={Math.max(width, height) * ring.scale}
           fill="none"
-          stroke="#38bdf8"
+          stroke={ink ?? '#38bdf8'}
           strokeWidth={3}
           opacity={ring.opacity}
-          style={{ filter: 'drop-shadow(0 0 8px rgba(56, 189, 248, 0.8))' }}
+          style={{ filter: ink ? undefined : 'drop-shadow(0 0 8px rgba(56, 189, 248, 0.8))' }}
         />
       )}
 
       {seeds.map((seed, i) => {
         const frame = canvasParticleAt(seed, progress, origin);
         if (frame.opacity <= 0 || frame.r <= 0) return null;
+        const look = canvasParticleLook('spawn', i, ink);
         return (
           <circle
             key={i}
             cx={frame.x}
             cy={frame.y}
             r={frame.r}
-            fill={CANVAS_FX_COLORS.spawn[i % CANVAS_FX_COLORS.spawn.length]}
+            fill={look.fill}
             opacity={frame.opacity}
-            style={{ filter: 'drop-shadow(0 0 5px currentColor)' }}
+            style={{ filter: look.glow }}
           />
         );
       })}

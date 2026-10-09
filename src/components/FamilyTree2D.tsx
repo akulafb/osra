@@ -27,13 +27,16 @@ import { canEdit } from '../lib/permissions';
 import { CanvasModeSwitch } from './CanvasModeSwitch';
 import { useCanvasMode } from '../hooks/useCanvasMode';
 import { LIVE_PAIR } from '../theme/paperPair';
-import { paperSearchCount } from '../lib/paperSearch';
+import { paperEscape, paperSearchCount } from '../lib/paperSearch';
 import { focusEmphasis } from '../lib/focusEmphasis';
 import { DirectManipulationController } from '../hooks/useDirectManipulation';
 import { candidacyFor } from './cards/connectCandidates';
 import { otherParentChoice } from '../lib/otherParent';
 
 const COSMOS_BACKGROUND = 'linear-gradient(180deg, #0a0a0a 0%, #1a1a2e 100%)';
+
+/** Paper's search box leaves its Escape to the window's Escape handler, which clears the selection before the search. */
+const escapeReachesWindow = () => {};
 
 interface FamilyTree2DProps {
   graphData: FamilyGraph;
@@ -390,13 +393,15 @@ export const FamilyTree2D: React.FC<FamilyTree2DProps> = ({
             .call(zoomBehaviorRef.current.transform as any, targetTransform);
         }
       } else if (e.key === 'Escape') {
-        interaction.handleEscape();
+        // Paper: one Escape clears the selected Person first, then the search, the search box's Escape included.
+        if (isPaper && paperEscape({ interactionIdle: interaction.state.phase === 'idle', searchQuery }) === 'search') onSearchClose?.();
+        else interaction.handleEscape();
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [nodes, interaction, transform.k]);
+  }, [nodes, interaction, transform.k, isPaper, searchQuery, onSearchClose]);
 
   // Focus on specific node (scale 1.25 for subtle "Find me!" zoom; duration in ms)
   const FOCUS_DURATION = 1040;
@@ -753,6 +758,7 @@ export const FamilyTree2D: React.FC<FamilyTree2DProps> = ({
                 lifecycle={lifecycle}
                 lifecycles={lifecycles}
                 nodes={nodes}
+                ink={isPaper ? LIVE_PAIR.ink : undefined}
               />
             ))}
             {lifecyclesOfKind(lifecycles.lifecycles, 'dissolve').map((lifecycle) => (
@@ -761,6 +767,7 @@ export const FamilyTree2D: React.FC<FamilyTree2DProps> = ({
                 lifecycle={lifecycle}
                 lifecycles={lifecycles}
                 nodes={nodes}
+                ink={isPaper ? LIVE_PAIR.ink : undefined}
               />
             ))}
 
@@ -964,7 +971,7 @@ export const FamilyTree2D: React.FC<FamilyTree2DProps> = ({
                   currentIndex={searchIndex}
                   onPrev={onSearchPrev}
                   onNext={onSearchNext}
-                  onClose={onSearchClose}
+                  onClose={isPaper ? escapeReachesWindow : onSearchClose}
                   disabled={searchDisabled}
                   embedded
                   focusTrigger={searchOpenRequested}

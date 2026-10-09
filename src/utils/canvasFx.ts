@@ -24,6 +24,15 @@ export const CANVAS_FX_COLORS: Record<CanvasEffectKind, string[]> = {
   dissolve: ['#f87171', '#fb923c', '#fbbf24', '#c084fc', '#60a5fa', '#ffffff'],
 };
 
+const CANVAS_FX_GLOW_PX: Record<CanvasEffectKind, number> = { spawn: 5, dissolve: 4 };
+
+/** Particle `index`'s fill and glow: Cosmos's palette with a glow, or, given Paper's ink, plain ink with none. */
+export function canvasParticleLook(kind: CanvasEffectKind, index: number, ink?: string): { fill: string; glow: string | undefined } {
+  if (ink) return { fill: ink, glow: undefined };
+  const palette = CANVAS_FX_COLORS[kind];
+  return { fill: palette[index % palette.length], glow: `drop-shadow(0 0 ${CANVAS_FX_GLOW_PX[kind]}px currentColor)` };
+}
+
 /**
  * How much of the lifecycle the card itself takes, leaving the particles to
  * play on after it. The card used to run a 0.45 s CSS animation *beside* a
