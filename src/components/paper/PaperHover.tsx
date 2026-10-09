@@ -2,7 +2,8 @@ import { useEffect, useMemo, useRef, type MutableRefObject } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import type { FamilyLink } from '../../types/graph';
-import { focusEmphasis, type Emphasis } from '../../lib/focusEmphasis';
+import type { Emphasis } from '../../lib/focusEmphasis';
+import { paperSearchEmphasis } from '../../lib/paperSearch';
 import type { PaperLayout } from '../../lib/paperLayout';
 import { paperWobble } from '../../lib/paperFocus';
 import {
@@ -13,7 +14,7 @@ import {
   type Point3,
   type ScreenDisc,
 } from '../../lib/paperHover';
-import { placeOf, type PaperEmphasisState, type PaperFocus } from './paperEmphasis';
+import { placeOf, sizeOf, type PaperEmphasisState, type PaperFocus } from './paperEmphasis';
 import { PAPER_HOVER_FRAME_PRIORITY, type ScreenPoint } from './paperScene';
 import { paperConnectEmphasis } from './paperConnect';
 
@@ -26,18 +27,21 @@ interface PaperHoverProps {
   ids: readonly string[];
   links: readonly FamilyLink[];
   selectedId: string | null;
+  /** The search matches while searching; null outside a search. */
+  matchIds: ReadonlySet<string> | null;
   /** Connect Mode's source, the Persons it may link to and the one picked; null outside Connect Mode. */
   connect: { sourceId: string; candidateIds: ReadonlySet<string>; targetId: string | null } | null;
 }
 
 /**
  * Finds the Person under the mouse, at most once a frame, and turns it into
- * the scene's emphasis (focusEmphasis: a selected Person outranks the hover;
- * in Connect Mode, paperConnectEmphasis), the lean of the hovered Person's
+ * the scene's emphasis (paperSearchEmphasis: a selected Person outranks the
+ * hover, and a search hides the non-matches; in Connect Mode,
+ * paperConnectEmphasis), the lean of the hovered Person's
  * relatives and the wobble of the focused Person's relatives.
  */
-export function PaperHover({ state, pointer, layout, ids, links, selectedId, connect }: PaperHoverProps) {
-  const inputs = useMemo(() => ({ layout, ids, links, selectedId, connect }), [layout, ids, links, selectedId, connect]);
+export function PaperHover({ state, pointer, layout, ids, links, selectedId, matchIds, connect }: PaperHoverProps) {
+  const inputs = useMemo(() => ({ layout, ids, links, selectedId, matchIds, connect }), [layout, ids, links, selectedId, matchIds, connect]);
   const seen = useRef({
     pointer: null as ScreenPoint | null,
     inputs: null as typeof inputs | null,
@@ -70,7 +74,7 @@ export function PaperHover({ state, pointer, layout, ids, links, selectedId, con
     if (hoveredId !== last.hoveredId || inputs !== last.inputs) {
       const emphasis = connect
         ? paperConnectEmphasis(ids, connect.sourceId, connect.candidateIds, hoveredId, connect.targetId)
-        : focusEmphasis({ personIds: ids, links, hoveredId, focusedId: selectedId, searchMatchIds: null });
+        : paperSearchEmphasis({ ids, links, hoveredId, selectedId, matchIds });
       const focus = focusOf(emphasis, selectedId, state.current.focus, clock.elapsedTime);
       // A new focus or none: relatives ease from wherever the last wobble left them.
       if (focus !== state.current.focus) lean.current = wrote.current;
@@ -92,7 +96,7 @@ export function PaperHover({ state, pointer, layout, ids, links, selectedId, con
 function personAt(
   pointer: ScreenPoint,
   { layout, ids }: { layout: PaperLayout; ids: readonly string[] },
-  { drift }: PaperEmphasisState,
+  state: PaperEmphasisState,
   camera: THREE.Camera,
   { width, height }: { width: number; height: number },
   scratch: { place: THREE.Vector3; view: THREE.Vector3; discs: ScreenDisc[] }
@@ -103,9 +107,9 @@ function personAt(
   for (const id of ids) {
     const disc = layout.get(id);
     if (!disc) continue;
-    placeOf(layout, drift, id, place);
+    placeOf(layout, state.drift, id, place);
     const depth = -view.copy(place).applyMatrix4(camera.matrixWorldInverse).z;
-    const radius = paperScreenRadius(disc.radius, depth, camera.fov, height) * camera.zoom;
+    const radius = paperScreenRadius(disc.radius * sizeOf(state, id), depth, camera.fov, height) * camera.zoom;
     if (radius === 0) continue;
     place.project(camera);
     discs.push({ id, x: ((place.x + 1) / 2) * width, y: ((1 - place.y) / 2) * height, radius });

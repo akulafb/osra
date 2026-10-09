@@ -3,9 +3,9 @@ import { useThree } from '@react-three/fiber';
 import type { CameraControls } from '@react-three/drei';
 import * as THREE from 'three';
 import type { FamilyLink } from '../../types/graph';
-import { focusEmphasis } from '../../lib/focusEmphasis';
 import type { PaperLayout } from '../../lib/paperLayout';
 import { paperFlyTo, paperFocusReach } from '../../lib/paperFocus';
+import { paperSearchEmphasis } from '../../lib/paperSearch';
 import type { PersonDrawerInset } from '../../hooks/usePersonDrawerInset';
 import { playPaperTap } from './paperTap';
 
@@ -14,6 +14,7 @@ interface PaperFocusProps {
   layout: PaperLayout;
   ids: readonly string[];
   links: readonly FamilyLink[];
+  matchIds: ReadonlySet<string> | null;
   /** What the person drawer covers once it is open. */
   drawerInset: PersonDrawerInset;
   onOverview: () => void;
@@ -26,7 +27,7 @@ interface PaperFocusProps {
  * focus flies back to the overview. A resize or a turned phone reframes the
  * same way.
  */
-export function PaperFocus({ selectedId, layout, ids, links, drawerInset, onOverview, flyTo }: PaperFocusProps) {
+export function PaperFocus({ selectedId, layout, ids, links, matchIds, drawerInset, onOverview, flyTo }: PaperFocusProps) {
   const controls = useThree((three) => three.controls) as CameraControls | null;
   const canvas = useThree((three) => three.gl.domElement);
   const size = useThree((three) => three.size);
@@ -35,7 +36,7 @@ export function PaperFocus({ selectedId, layout, ids, links, drawerInset, onOver
     (id: string, smooth: boolean) => {
       const disc = layout.get(id);
       if (!controls || !disc || !(controls.camera instanceof THREE.PerspectiveCamera)) return false;
-      const emphasis = focusEmphasis({ personIds: ids, links, hoveredId: null, focusedId: id, searchMatchIds: null });
+      const emphasis = paperSearchEmphasis({ ids, links, hoveredId: null, selectedId: id, matchIds });
       const rect = canvas.getBoundingClientRect();
       const sheetTop = window.innerHeight * (1 - drawerInset.bottomVh / 100);
       const drawerLeft = window.innerWidth - drawerInset.rightPx;
@@ -50,7 +51,7 @@ export function PaperFocus({ selectedId, layout, ids, links, drawerInset, onOver
       void controls.setLookAt(position.x, position.y, position.z, target.x, target.y, target.z, smooth);
       return true;
     },
-    [controls, canvas, layout, ids, links, drawerInset]
+    [controls, canvas, layout, ids, links, matchIds, drawerInset]
   );
 
   useEffect(() => {

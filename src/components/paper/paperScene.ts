@@ -43,6 +43,7 @@ export function paperLineShown(type: FamilyLink['type'], toggles: { links: boole
 
 export const PAPER_HOVER_FRAME_PRIORITY = -1;
 export const PAPER_REVEAL_FRAME_PRIORITY = PAPER_HOVER_FRAME_PRIORITY + 0.5;
+export const PAPER_SEARCH_FRAME_PRIORITY = PAPER_REVEAL_FRAME_PRIORITY + 0.25;
 
 const EMPTY_FRAME_RADIUS = 50;
 
