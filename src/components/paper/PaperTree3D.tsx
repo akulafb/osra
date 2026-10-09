@@ -41,7 +41,7 @@ import { wakePaperTap } from './paperTap';
 import { paperFlySmoothTime, PAPER_FLY_SECONDS } from '../../lib/paperFocus';
 import { PAPER_DRAG_SMOOTH_SECONDS } from '../../lib/paperCamera';
 import { paperEffects } from '../../lib/paperEffects';
-import { packMatches, paperSearchLayout } from '../../lib/paperSearch';
+import { packMatches, paperClusterView, paperSearchLayout } from '../../lib/paperSearch';
 import { emptyEmphasisState, type PaperEmphasisState } from './paperEmphasis';
 import { PaperWebGLBoundary, PaperWebGLFallback } from './PaperWebGLFallback';
 import { browserHasWebGL } from './browserHasWebGL';
@@ -213,9 +213,12 @@ export function PaperTree3D({
   const lifecycleDraws = useMemo(
     () =>
       paperLifecycleDraws(lifecycles.lifecycles, lifecycleScene).filter(
-        (draw) => draw.kind === 'disc' || paperLineShown(draw.line.type, toggles)
+        (draw) =>
+          draw.kind === 'disc'
+            ? !matchIds || matchIds.has(draw.id)
+            : paperLineShown(draw.line.type, toggles) && (!matchIds || (matchIds.has(draw.from) && matchIds.has(draw.to)))
       ),
-    [toggles, lifecycles.lifecycles, lifecycleScene]
+    [toggles, lifecycles.lifecycles, lifecycleScene, matchIds]
   );
   const labelInk = useMemo(() => {
     const byPerson = new Map(lifecycles.lifecycles.flatMap((l) => (l.subject.kind === 'node' ? [[l.subject.id, l] as const] : [])));
@@ -290,7 +293,11 @@ export function PaperTree3D({
     [interaction]
   );
 
-  const flyToOverview = useCallback(() => fitFrame(true), [fitFrame]);
+  const flyToOverview = useCallback(() => {
+    if (!cluster) return fitFrame(true);
+    const { center, radius } = cluster;
+    void controlsRef.current?.fitToSphere(new THREE.Sphere(new THREE.Vector3(center.x, center.y, center.z), paperClusterView(radius)), true);
+  }, [cluster, fitFrame]);
 
   const resetView = useCallback(() => {
     interaction.handleBackgroundClick();

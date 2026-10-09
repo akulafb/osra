@@ -27,7 +27,6 @@ interface PaperHoverProps {
   ids: readonly string[];
   links: readonly FamilyLink[];
   selectedId: string | null;
-  /** The search matches while searching; null outside a search. */
   matchIds: ReadonlySet<string> | null;
   /** Connect Mode's source, the Persons it may link to and the one picked; null outside Connect Mode. */
   connect: { sourceId: string; candidateIds: ReadonlySet<string>; targetId: string | null } | null;

@@ -66,7 +66,6 @@ export interface PaperSearchEmphasisInput {
   links: readonly FamilyLink[];
   hoveredId: string | null;
   selectedId: string | null;
-  /** The matches while searching; null outside a search. */
   matchIds: ReadonlySet<string> | null;
 }
 
@@ -198,35 +197,52 @@ function pull(a: Point3, b: Point3, rest: number, strength: number): void {
   b.z -= dz * k;
 }
 
-/** One pass that pushes every two overlapping discs apart; true when it moved any. */
+/** One pass that pushes every two overlapping discs apart; true when it moved any. Only discs in neighbouring grid cells can overlap. */
 function separate(places: Point3[], radii: readonly number[]): boolean {
+  const cell = 2 * Math.max(...radii) + PAPER_CLUSTER_GAP;
+  const grid = new Map<number, number[]>();
+  const keyOf = (x: number, y: number, z: number) => (x * 73856093) ^ (y * 19349663) ^ (z * 83492791);
+  places.forEach((p, i) => {
+    const key = keyOf(Math.floor(p.x / cell), Math.floor(p.y / cell), Math.floor(p.z / cell));
+    const bucket = grid.get(key);
+    if (bucket) bucket.push(i);
+    else grid.set(key, [i]);
+  });
   let moved = false;
   for (let i = 0; i < places.length; i++) {
-    for (let j = i + 1; j < places.length; j++) {
-      const a = places[i];
-      const b = places[j];
-      const least = radii[i] + radii[j] + PAPER_CLUSTER_GAP;
-      let dx = b.x - a.x;
-      let dy = b.y - a.y;
-      let dz = b.z - a.z;
-      let distance = Math.hypot(dx, dy, dz);
-      if (distance >= least) continue;
-      if (distance === 0) {
-        const angle = (i + j) * 2.399963;
-        dx = Math.cos(angle);
-        dy = Math.sin(angle);
-        dz = 0;
-        distance = 1;
-      }
-      const k = ((least - distance) / distance) * 0.5 * 1.001;
-      a.x -= dx * k;
-      a.y -= dy * k;
-      a.z -= dz * k;
-      b.x += dx * k;
-      b.y += dy * k;
-      b.z += dz * k;
-      moved = true;
-    }
+    const cx = Math.floor(places[i].x / cell);
+    const cy = Math.floor(places[i].y / cell);
+    const cz = Math.floor(places[i].z / cell);
+    for (let dx = -1; dx <= 1; dx++)
+      for (let dy = -1; dy <= 1; dy++)
+        for (let dz = -1; dz <= 1; dz++)
+          for (const j of grid.get(keyOf(cx + dx, cy + dy, cz + dz)) ?? []) if (j > i && push(places, radii, i, j)) moved = true;
   }
   return moved;
+}
+
+function push(places: Point3[], radii: readonly number[], i: number, j: number): boolean {
+  const a = places[i];
+  const b = places[j];
+  const least = radii[i] + radii[j] + PAPER_CLUSTER_GAP;
+  let dx = b.x - a.x;
+  let dy = b.y - a.y;
+  let dz = b.z - a.z;
+  let distance = Math.hypot(dx, dy, dz);
+  if (distance >= least) return false;
+  if (distance === 0) {
+    const angle = (i + j) * 2.399963;
+    dx = Math.cos(angle);
+    dy = Math.sin(angle);
+    dz = 0;
+    distance = 1;
+  }
+  const k = ((least - distance) / distance) * 0.5 * 1.001;
+  a.x -= dx * k;
+  a.y -= dy * k;
+  a.z -= dz * k;
+  b.x += dx * k;
+  b.y += dy * k;
+  b.z += dz * k;
+  return true;
 }

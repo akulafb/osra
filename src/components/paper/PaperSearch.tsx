@@ -1,10 +1,9 @@
 import { useEffect, useRef, type MutableRefObject } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import type { CameraControls } from '@react-three/drei';
-import * as THREE from 'three';
 import type { PaperLayout } from '../../lib/paperLayout';
 import type { Point3 } from '../../lib/paperHover';
-import { paperClusterView, paperSearchMotionAt, paperSearchMotionFrom, PAPER_SEARCH_STILL, type PaperSearchMotion } from '../../lib/paperSearch';
+import { paperSearchMotionAt, paperSearchMotionFrom, PAPER_SEARCH_STILL, type PaperSearchMotion } from '../../lib/paperSearch';
 import type { PaperEmphasisState } from './paperEmphasis';
 import { PAPER_SEARCH_FRAME_PRIORITY, type PaperFrame } from './paperScene';
 
@@ -35,7 +34,7 @@ export function PaperSearch({ layout, matchIds, cluster, selectedId, state, flyT
   useFrame(({ clock }) => {
     const last = seen.current;
     if (!last) motion.current = paperSearchMotionFrom(PAPER_SEARCH_STILL, layout, layout, matchIds, -Infinity);
-    else if (last.matchIds !== matchIds) motion.current = paperSearchMotionFrom(motion.current, last.layout, layout, matchIds, clock.elapsedTime);
+    else if (last.matchIds !== matchIds || last.layout !== layout) motion.current = paperSearchMotionFrom(motion.current, last.layout, layout, matchIds, clock.elapsedTime);
     seen.current = { layout, matchIds };
     if (settled.current === motion.current) return;
 
@@ -50,10 +49,7 @@ export function PaperSearch({ layout, matchIds, cluster, selectedId, state, flyT
     if (framedFor.current === matchIds || !controls) return;
     framedFor.current = matchIds;
     if (selectedId && layout.has(selectedId) && (!matchIds || matchIds.has(selectedId))) flyTo.current?.(selectedId);
-    else if (cluster) {
-      const { center, radius } = cluster;
-      void controls.fitToSphere(new THREE.Sphere(new THREE.Vector3(center.x, center.y, center.z), paperClusterView(radius)), true);
-    } else if (!matchIds) onOverview();
+    else if (cluster || !matchIds) onOverview();
   }, [controls, matchIds, cluster, selectedId, layout, flyTo, onOverview]);
 
   return null;

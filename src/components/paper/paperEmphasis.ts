@@ -49,7 +49,6 @@ export function revealOf(state: PaperEmphasisState, id: string): number {
   return state.reveal?.get(id) ?? 1;
 }
 
-/** How much of their disc a Person is drawn with: grown in by the reveal, shrunk away by a search. */
 export function sizeOf(state: PaperEmphasisState, id: string): number {
   return revealOf(state, id) * (state.size.get(id) ?? 1);
 }
