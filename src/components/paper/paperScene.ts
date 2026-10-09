@@ -35,6 +35,8 @@ export const PAPER_LINE_STYLE: Record<FamilyLink['type'], PaperLineStyle> = {
   divorce: { width: 1.5, dashed: true },
 };
 
+export const PAPER_DASH = { dashSize: 3, gapSize: 2.5 };
+
 export const PAPER_HOVER_FRAME_PRIORITY = -1;
 export const PAPER_REVEAL_FRAME_PRIORITY = PAPER_HOVER_FRAME_PRIORITY + 0.5;
 

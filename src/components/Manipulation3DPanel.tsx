@@ -556,6 +556,7 @@ export const Manipulation3DPanel: React.FC<Manipulation3DPanelProps> = ({
             onQueryChange={onSearchQueryChange}
             onPickTarget={connect.onPickTarget}
             onExit={connect.onExit}
+            aimTarget={isPaper ? 'a person' : undefined}
           />
         )}
 

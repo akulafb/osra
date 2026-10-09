@@ -16,8 +16,7 @@ import type { GhostPreviewLook } from '../../hooks/useGhostPreview';
 import { usePersonDrawerInset, type PersonDrawerInset } from '../../hooks/usePersonDrawerInset';
 import type { PaperLayoutState } from '../../hooks/usePaperLayout';
 import type { LifecycleController } from '../../hooks/useLifecycles';
-import type { PaperLayout } from '../../lib/paperLayout';
-import { inLifecycle, rememberPositions, steadyLines } from '../../lib/paperLifecycle';
+import { holdingProgress, inLifecycle, paperLifecycleDraws, paperLifecycleInk, steadyLines } from '../../lib/paperLifecycle';
 import { paperGhostLanding } from '../../lib/paperGhost';
 import { Tree3DOverlay, type Tree3DSceneCamera, type Tree3DSearch } from '../tree3d/Tree3DOverlay';
 import { useIsMobileDevice } from '../tree3d/useIsMobileDevice';
@@ -32,6 +31,8 @@ import { PaperParticles } from './PaperParticles';
 import { PaperRipple } from './PaperRipple';
 import { PaperFocus } from './PaperFocus';
 import { PaperLifecycles } from './PaperLifecycles';
+import { PaperPreviewLine } from './PaperPreviewLine';
+import { usePaperLifecycleScene } from './usePaperLifecycleScene';
 import { PaperReveal } from './PaperReveal';
 import { PaperLoader } from './PaperLoader';
 import { PaperHint } from './PaperHint';
@@ -94,6 +95,8 @@ export interface PaperTree3DProps {
   onDissolveNode?: (node: FamilyNode) => Promise<void> | void;
   /** Spawn and Dissolve progress, drawn in ink. */
   lifecycles: LifecycleController;
+  /** The pair AddRelativeModal's connect-to-existing would link, drawn as a dashed line. */
+  pendingLinkPreview?: { anchorId: string; existingId: string } | null;
 }
 
 const PAPER = GRAYSCALE_PAIR.paper;
@@ -148,6 +151,7 @@ export function PaperTree3D({
   canDissolveSelected,
   onDissolveNode,
   lifecycles,
+  pendingLinkPreview = null,
 }: PaperTree3DProps) {
   const { panel } = useTheme().palette;
   const isMobileDevice = useIsMobileDevice();
@@ -180,12 +184,29 @@ export function PaperTree3D({
   const inLifecycleIds = useMemo(() => inLifecycle(lifecycles.lifecycles), [lifecycles.lifecycles]);
   const discIds = useMemo(() => shownIds.filter((id) => !inLifecycleIds.has(id)), [shownIds, inLifecycleIds]);
   const lines = useMemo(() => steadyLines(shown.lines, lifecycles.lifecycles), [shown.lines, lifecycles.lifecycles]);
-  const lastLayout = useRef<PaperLayout>(new Map());
-  const lifecycleLayout = useMemo(() => {
-    lastLayout.current = layout ? rememberPositions(lastLayout.current, layout, inLifecycleIds) : lastLayout.current;
-    return lastLayout.current;
-  }, [layout, inLifecycleIds]);
+  const lifecycleScene = usePaperLifecycleScene(layout, shown, lifecycles.lifecycles);
+  const progressOf = useMemo(() => holdingProgress(lifecycles.progressOf), [lifecycles.progressOf]);
+  const lifecycleDraws = useMemo(
+    () =>
+      paperLifecycleDraws(
+        showLinks ? lifecycles.lifecycles : lifecycles.lifecycles.filter((l) => l.subject.kind === 'node'),
+        lifecycleScene
+      ),
+    [showLinks, lifecycles.lifecycles, lifecycleScene]
+  );
+  const labelInk = useMemo(() => {
+    const byPerson = new Map(lifecycles.lifecycles.flatMap((l) => (l.subject.kind === 'node' ? [[l.subject.id, l] as const] : [])));
+    return (id: string) => {
+      const lifecycle = byPerson.get(id);
+      const progress = lifecycle ? progressOf(lifecycle.key) : null;
+      return lifecycle && progress !== null ? paperLifecycleInk(lifecycle.kind, progress) : 1;
+    };
+  }, [lifecycles.lifecycles, progressOf]);
   const shownIdSet = useMemo(() => new Set(shownIds), [shownIds]);
+  const previewPair =
+    pendingLinkPreview && shownIdSet.has(pendingLinkPreview.anchorId) && shownIdSet.has(pendingLinkPreview.existingId)
+      ? pendingLinkPreview
+      : null;
   const liveNodes = useMemo<LiveNodePosition[]>(
     () => (layout ? shownIds.map((id) => ({ id, ...layout.get(id)! })) : []),
     [layout, shownIds]
@@ -213,7 +234,9 @@ export function PaperTree3D({
   const frame = useMemo(() => (layout ? paperFrame(layout, layout.keys()) : null), [layout]);
 
   const landingFrom = useRef({ layout, graphData });
-  landingFrom.current = { layout, graphData };
+  useEffect(() => {
+    landingFrom.current = { layout, graphData };
+  }, [layout, graphData]);
   const ghostLook = useMemo<GhostPreviewLook>(
     () => ({
       ...GHOST_LOOK,
@@ -417,20 +440,35 @@ export function PaperTree3D({
                     />
                     <PaperParticles state={emphasisState} layout={layout} lines={lines} ink={INK} />
                     <PaperRipple state={emphasisState} layout={layout} lines={lines} ink={INK} />
+                    {previewPair && (
+                      <PaperPreviewLine
+                        fromId={previewPair.anchorId}
+                        toId={previewPair.existingId}
+                        layout={layout}
+                        ink={INK}
+                        state={emphasisState}
+                      />
+                    )}
                   </>
                 )}
                 <PaperLifecycles
-                  lifecycles={showLinks ? lifecycles.lifecycles : lifecycles.lifecycles.filter((l) => l.subject.kind === 'node')}
-                  progressOf={lifecycles.progressOf}
-                  layout={lifecycleLayout}
-                  lines={shown.lines}
+                  draws={lifecycleDraws}
+                  progressOf={progressOf}
+                  layout={lifecycleScene.layout}
                   ink={INK}
                   parentInk={PARENT_INK}
                   paper={PAPER}
                   state={emphasisState}
                 />
                 {showNames && (
-                  <PaperLabels nodes={shown.nodes} layout={layout} ink={INK} viewDistance={viewDistance} state={emphasisState} />
+                  <PaperLabels
+                    nodes={lifecycleScene.nodes}
+                    layout={lifecycleScene.layout}
+                    ink={INK}
+                    viewDistance={viewDistance}
+                    state={emphasisState}
+                    lifecycleInk={labelInk}
+                  />
                 )}
                 <FirstFrame onDrawn={() => setFirstFrameDrawn(true)} />
               </>

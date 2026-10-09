@@ -6,7 +6,7 @@ import type { FamilyLink } from '../../types/graph';
 import type { PaperLayout, PaperLine } from '../../lib/paperLayout';
 import { emphasisSubject, linesOf } from '../../lib/paperHover';
 import { fadeInk, inkOf, lineEndInks, placeOf, type PaperEmphasisState } from './paperEmphasis';
-import { PAPER_LINE_RENDER_ORDER, PAPER_LINE_STYLE, paperLineSegments } from './paperScene';
+import { PAPER_DASH, PAPER_LINE_RENDER_ORDER, PAPER_LINE_STYLE, paperLineSegments } from './paperScene';
 
 interface PaperLinesProps {
   lines: readonly PaperLine[];
@@ -126,8 +126,7 @@ function PaperLineKind({
       depthWrite={false}
       lineWidth={style.width}
       dashed={style.dashed}
-      dashSize={3}
-      gapSize={2.5}
+      {...PAPER_DASH}
     />
   );
 }

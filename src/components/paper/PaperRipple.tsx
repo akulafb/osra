@@ -60,5 +60,5 @@ export function PaperRipple({
     geometry.computeBoundingSphere();
   });
 
-  return <Line ref={ref} points={points} segments fog renderOrder={PAPER_LINE_RENDER_ORDER + 1} depthWrite={false} color={ink} lineWidth={RIPPLE_WIDTH_PX} visible={false} />;
+  return <Line ref={ref} points={points} segments fog renderOrder={PAPER_LINE_RENDER_ORDER + 1} depthWrite={false} color={ink} lineWidth={RIPPLE_WIDTH_PX} />;
 }

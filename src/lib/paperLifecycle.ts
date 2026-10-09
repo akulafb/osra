@@ -8,6 +8,7 @@ import {
 } from '../utils/canvasFx';
 import type { Lifecycle, LifecycleKind } from './lifecycle';
 import type { PaperLayout, PaperLine } from './paperLayout';
+import type { FamilyNode } from '../types/graph';
 
 /**
  * Spawn and Dissolve drawn in ink (LIN-96, ADR 0007): the 2D curves in
@@ -72,15 +73,94 @@ export function inLifecycle(lifecycles: readonly Lifecycle[]): Set<string> {
   return new Set(lifecycles.flatMap((l) => (l.subject.kind === 'node' ? [l.subject.id] : [])));
 }
 
-/** The lines not in a Spawn: those are drawn growing instead. */
-export function steadyLines<L extends PaperLine>(lines: readonly L[], lifecycles: readonly Lifecycle[]): readonly L[] {
-  const growing = lifecycles.flatMap((l) => (l.kind === 'spawn' && l.subject.kind === 'link' ? [l.subject] : []));
-  if (growing.length === 0) return lines;
-  const isGrowing = (line: L) =>
-    growing.some(
-      ({ aId, bId }) => (line.sourceId === aId && line.targetId === bId) || (line.sourceId === bId && line.targetId === aId)
-    );
-  return lines.filter((line) => !isGrowing(line));
+/** A lifecycle's progress by its key; null once it has ended. */
+export type ProgressOf = (key: string) => number | null;
+
+type LinkSubject = { aId: string; bId: string };
+
+function joins(line: PaperLine, { aId, bId }: LinkSubject): boolean {
+  return (line.sourceId === aId && line.targetId === bId) || (line.sourceId === bId && line.targetId === aId);
+}
+
+function linkSubjects(lifecycles: readonly Lifecycle[]): LinkSubject[] {
+  return lifecycles.flatMap((l) => (l.subject.kind === 'link' ? [l.subject] : []));
+}
+
+/** The lines not in a Spawn or a Dissolve: those are drawn growing or drawing back instead. */
+export function steadyLines(lines: readonly PaperLine[], lifecycles: readonly Lifecycle[]): readonly PaperLine[] {
+  const links = linkSubjects(lifecycles);
+  if (links.length === 0) return lines;
+  return lines.filter((line) => !links.some((link) => joins(line, link)));
+}
+
+/**
+ * The shown Persons and lines, plus how each one in a lifecycle was last
+ * shown, so a Dissolve plays as what the view drew after the Working Record
+ * has dropped it.
+ */
+export interface PaperLifecycleScene {
+  layout: PaperLayout;
+  nodes: readonly FamilyNode[];
+  lines: readonly PaperLine[];
+}
+
+export const EMPTY_LIFECYCLE_SCENE: PaperLifecycleScene = { layout: new Map(), nodes: [], lines: [] };
+
+export function rememberLifecycleScene(
+  previous: PaperLifecycleScene,
+  layout: PaperLayout,
+  shown: { nodes: readonly FamilyNode[]; lines: readonly PaperLine[] },
+  lifecycles: readonly Lifecycle[]
+): PaperLifecycleScene {
+  const ids = inLifecycle(lifecycles);
+  const shownLayout: PaperLayout = new Map(shown.nodes.flatMap((n) => (layout.has(n.id) ? [[n.id, layout.get(n.id)!]] : [])));
+  const leftNodes = previous.nodes.filter((n) => ids.has(n.id) && !shownLayout.has(n.id));
+  const links = linkSubjects(lifecycles);
+  const leftLines = previous.lines.filter(
+    (line) => links.some((link) => joins(line, link)) && !shown.lines.some((l) => joins(l, { aId: line.sourceId, bId: line.targetId }))
+  );
+  return {
+    layout: rememberPositions(previous.layout, shownLayout, ids),
+    nodes: leftNodes.length ? [...shown.nodes, ...leftNodes] : shown.nodes,
+    lines: leftLines.length ? [...shown.lines, ...leftLines] : shown.lines,
+  };
+}
+
+export type PaperLifecycleDraw =
+  | { kind: 'disc'; lifecycle: Lifecycle; id: string }
+  | { kind: 'line'; lifecycle: Lifecycle; line: PaperLine; from: string; to: string };
+
+/** The Spawns and Dissolves to draw: those of Persons and lines in `scene`, each line in its own style. */
+export function paperLifecycleDraws(lifecycles: readonly Lifecycle[], scene: PaperLifecycleScene): PaperLifecycleDraw[] {
+  const spawning = inLifecycle(lifecycles.filter((l) => l.kind === 'spawn'));
+  return lifecycles.flatMap((lifecycle): PaperLifecycleDraw[] => {
+    const { subject } = lifecycle;
+    if (subject.kind === 'node') return scene.layout.has(subject.id) ? [{ kind: 'disc', lifecycle, id: subject.id }] : [];
+    const line = scene.lines.find((l) => joins(l, subject));
+    if (!line || !scene.layout.has(subject.aId) || !scene.layout.has(subject.bId)) return [];
+    const [from, to] = growingFrom(subject, spawning);
+    return [{ kind: 'line', lifecycle, line, from, to }];
+  });
+}
+
+/** How much ink a Person's disc and name keep at `progress` through their Spawn or Dissolve. */
+export function paperLifecycleInk(kind: LifecycleKind, progress: number): number {
+  return (kind === 'spawn' ? paperSpawnDisc(progress) : paperDissolveDisc(progress)).ink;
+}
+
+/**
+ * `progressOf`, holding each lifecycle's last progress once it has ended, so
+ * its last frame stays drawn until the lifecycle leaves the rendered list and
+ * the steady scene takes the Person or line back.
+ */
+export function holdingProgress(progressOf: ProgressOf): ProgressOf {
+  const last = new Map<string, number>();
+  return (key) => {
+    const progress = progressOf(key);
+    if (progress === null) return last.get(key) ?? null;
+    last.set(key, progress);
+    return progress;
+  };
 }
 
 /**

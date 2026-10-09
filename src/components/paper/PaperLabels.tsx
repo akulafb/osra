@@ -27,10 +27,12 @@ interface PaperLabelsProps {
   ink: string;
   viewDistance: MutableRefObject<number>;
   state: MutableRefObject<PaperEmphasisState>;
+  /** How much ink a Person's disc keeps through a Spawn or Dissolve; the name keeps the same. */
+  lifecycleInk: (id: string) => number;
 }
 
 /** Uppercase monospace names above each disc, bigger and bolder for larger discs, fading with distance from the camera and with the emphasis. */
-export function PaperLabels({ nodes, layout, ink, viewDistance, state }: PaperLabelsProps) {
+export function PaperLabels({ nodes, layout, ink, viewDistance, state, lifecycleInk }: PaperLabelsProps) {
   const texts = useRef(new Map<string, TroikaText>());
   const anchors = useRef(new Map<string, THREE.Group>());
   const placed = useRef({ layout, drift: state.current.drift });
@@ -48,7 +50,10 @@ export function PaperLabels({ nodes, layout, ink, viewDistance, state }: PaperLa
       if (!layout.has(id)) return;
       placeOf(layout, drift, id, point.current);
       const fade =
-        depthFade(camera.position.distanceTo(point.current), start, end) * inkOf(state.current, id) * revealOf(state.current, id) ** LABEL_REVEAL_POWER;
+        depthFade(camera.position.distanceTo(point.current), start, end) *
+        inkOf(state.current, id) *
+        lifecycleInk(id) *
+        revealOf(state.current, id) ** LABEL_REVEAL_POWER;
       text.visible = fade > HIDDEN_BELOW;
       text.fillOpacity = fade;
       text.outlineOpacity = fade;

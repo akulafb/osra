@@ -2,28 +2,27 @@ import { useLayoutEffect, useMemo, useRef, type ElementRef, type MutableRefObjec
 import { useFrame } from '@react-three/fiber';
 import { Line } from '@react-three/drei';
 import * as THREE from 'three';
-import type { Lifecycle, LifecycleKind } from '../../lib/lifecycle';
-import type { PaperLayout, PaperLine } from '../../lib/paperLayout';
+import type { LifecycleKind } from '../../lib/lifecycle';
+import type { PaperLayout } from '../../lib/paperLayout';
 import {
-  growingFrom,
-  inLifecycle,
   paperDissolveDisc,
   paperDissolveSpecks,
   paperLinkDrawn,
   paperSpawnDisc,
   paperSpawnRing,
+  type PaperLifecycleDraw,
+  type ProgressOf,
 } from '../../lib/paperLifecycle';
 import { seedCanvasParticles } from '../../utils/canvasFx';
 import { emphasisSubject } from '../../lib/paperHover';
 import { fadeInk, inkOf, placeOf, type PaperEmphasisState } from './paperEmphasis';
-import { PAPER_LINE_RENDER_ORDER, PAPER_LINE_STYLE } from './paperScene';
+import { PAPER_DASH, PAPER_LINE_RENDER_ORDER, PAPER_LINE_STYLE } from './paperScene';
 
 interface PaperLifecyclesProps {
-  lifecycles: readonly Lifecycle[];
-  progressOf: (key: string) => number | null;
-  /** The layout, plus where each Person in a lifecycle was last placed. */
+  draws: readonly PaperLifecycleDraw[];
+  progressOf: ProgressOf;
+  /** The shown layout, plus where each Person in a lifecycle was last shown. */
   layout: PaperLayout;
-  lines: readonly PaperLine[];
   ink: string;
   parentInk: string;
   paper: string;
@@ -36,48 +35,40 @@ const RING_WIDTH_PX = 1.5;
 const SPECKS = 14;
 
 /** Each playing Spawn and Dissolve drawn in ink, on the shared lifecycle progress (ADR 0007). */
-export function PaperLifecycles({ lifecycles, progressOf, layout, lines, ink, parentInk, paper, state }: PaperLifecyclesProps) {
-  const spawning = useMemo(() => inLifecycle(lifecycles.filter((l) => l.kind === 'spawn')), [lifecycles]);
+export function PaperLifecycles({ draws, progressOf, layout, ink, parentInk, paper, state }: PaperLifecyclesProps) {
   return (
     <>
-      {lifecycles.map((lifecycle) => {
-        const { subject } = lifecycle;
-        if (subject.kind === 'node') {
-          return (
-            <LifecycleDisc
-              key={lifecycle.key}
-              lifecycleKey={lifecycle.key}
-              kind={lifecycle.kind}
-              id={subject.id}
-              progressOf={progressOf}
-              layout={layout}
-              ink={ink}
-              paper={paper}
-              state={state}
-            />
-          );
-        }
-        const [fromId, toId] = growingFrom(subject, spawning);
-        const type = lines.find(
-          (l) => (l.sourceId === fromId && l.targetId === toId) || (l.sourceId === toId && l.targetId === fromId)
-        )?.type;
-        return (
+      {draws.map((draw) =>
+        draw.kind === 'disc' ? (
+          <LifecycleDisc
+            key={draw.lifecycle.key}
+            lifecycleKey={draw.lifecycle.key}
+            kind={draw.lifecycle.kind}
+            id={draw.id}
+            progressOf={progressOf}
+            layout={layout}
+            ink={ink}
+            paper={paper}
+            state={state}
+          />
+        ) : (
           <LifecycleLine
-            key={lifecycle.key}
-            lifecycleKey={lifecycle.key}
-            kind={lifecycle.kind}
-            fromId={fromId}
-            toId={toId}
-            width={PAPER_LINE_STYLE[type ?? 'parent'].width}
-            colour={type === 'parent' || !type ? parentInk : ink}
+            key={draw.lifecycle.key}
+            lifecycleKey={draw.lifecycle.key}
+            kind={draw.lifecycle.kind}
+            fromId={draw.from}
+            toId={draw.to}
+            width={PAPER_LINE_STYLE[draw.line.type].width}
+            dashed={!!PAPER_LINE_STYLE[draw.line.type].dashed}
+            colour={draw.line.type === 'parent' ? parentInk : ink}
             ink={ink}
             paper={paper}
             progressOf={progressOf}
             layout={layout}
             state={state}
           />
-        );
-      })}
+        )
+      )}
     </>
   );
 }
@@ -96,7 +87,7 @@ function LifecycleDisc({
   lifecycleKey: string;
   kind: LifecycleKind;
   id: string;
-  progressOf: (key: string) => number | null;
+  progressOf: ProgressOf;
   layout: PaperLayout;
   ink: string;
   paper: string;
@@ -204,6 +195,7 @@ function LifecycleLine({
   fromId,
   toId,
   width,
+  dashed,
   colour,
   ink,
   paper,
@@ -216,10 +208,11 @@ function LifecycleLine({
   fromId: string;
   toId: string;
   width: number;
+  dashed: boolean;
   colour: string;
   ink: string;
   paper: string;
-  progressOf: (key: string) => number | null;
+  progressOf: ProgressOf;
   layout: PaperLayout;
   state: MutableRefObject<PaperEmphasisState>;
 }) {
@@ -255,6 +248,7 @@ function LifecycleLine({
     to.toArray(positions, 3);
     start.data.needsUpdate = true;
     geometry.computeBoundingSphere();
+    if (dashed) segments.computeLineDistances();
   });
 
   return (
@@ -266,6 +260,8 @@ function LifecycleLine({
       renderOrder={PAPER_LINE_RENDER_ORDER}
       depthWrite={false}
       lineWidth={width}
+      dashed={dashed}
+      {...PAPER_DASH}
     />
   );
 }
