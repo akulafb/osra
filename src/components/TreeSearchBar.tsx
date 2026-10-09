@@ -20,6 +20,8 @@ interface TreeSearchBarProps {
   embedded?: boolean;
   /** Increment to trigger focus on the input (e.g. when Ctrl+F opens search) */
   focusTrigger?: number;
+  /** A match count shown under the bar in the embedded panel, e.g. "4 PEOPLE". */
+  countLabel?: string;
 }
 
 export function TreeSearchBar({
@@ -34,6 +36,7 @@ export function TreeSearchBar({
   placeholder = 'Search names (Ar/En)...',
   embedded = false,
   focusTrigger = 0,
+  countLabel,
 }: TreeSearchBarProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const { panel } = useTheme().palette;
@@ -151,6 +154,15 @@ export function TreeSearchBar({
           sx={textFieldSx}
         />
         {controlsRow}
+        {countLabel !== undefined && (
+          <Typography
+            variant="caption"
+            role="status"
+            sx={{ color: panel.role.primary, fontWeight: 700, letterSpacing: '0.1em', fontSize: '0.6rem', ml: 1 }}
+          >
+            {countLabel}
+          </Typography>
+        )}
       </Box>
     );
   }

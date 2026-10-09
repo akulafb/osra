@@ -1,14 +1,18 @@
 import { describe, it, expect } from 'vitest';
 import type { FamilyLink } from '../types/graph';
 import type { PaperDisc, PaperLayout } from './paperLayout';
+import { paperCycle } from './paperKeys';
 import {
   packMatches,
   PAPER_CLUSTER_GAP,
   paperClusterView,
+  paperEscape,
+  paperSearchCount,
   paperSearchEmphasis,
   paperSearchLayout,
   paperSearchMotionAt,
   paperSearchMotionFrom,
+  paperSearchOrder,
   PAPER_GATHER_SECONDS,
   PAPER_SHRINK_SECONDS,
   type PaperSearchMotion,
@@ -241,5 +245,67 @@ describe('paper search motion', () => {
   it('ends at once when the time is not a finite number (ADR 0011)', () => {
     const motion = paperSearchMotionFrom(still, full, gathered, new Set(['a']), 0);
     expect(paperSearchMotionAt(motion, NaN).done).toBe(true);
+  });
+});
+
+describe('paperSearchCount', () => {
+  it('counts no matches as people', () => {
+    expect(paperSearchCount(0)).toBe('0 PEOPLE');
+  });
+
+  it('counts one match as a person', () => {
+    expect(paperSearchCount(1)).toBe('1 PERSON');
+  });
+
+  it('counts many matches as people', () => {
+    expect(paperSearchCount(32)).toBe('32 PEOPLE');
+  });
+});
+
+describe('paperEscape', () => {
+  it('clears the selected Person before the search', () => {
+    expect(paperEscape({ interactionIdle: false, searchQuery: 'Zabalawi' })).toBe('interaction');
+  });
+
+  it('clears the search once nobody is selected', () => {
+    expect(paperEscape({ interactionIdle: true, searchQuery: 'Zabalawi' })).toBe('search');
+  });
+
+  it('leaves a selection to the interaction when there is no search', () => {
+    expect(paperEscape({ interactionIdle: false, searchQuery: '' })).toBe('interaction');
+  });
+
+  it('does nothing with no selection and no search', () => {
+    expect(paperEscape({ interactionIdle: true, searchQuery: '' })).toBeNull();
+  });
+});
+
+describe('Prev/Next over the search cluster', () => {
+  const matches = [{ id: 'c' }, { id: 'a' }, { id: 'hidden' }, { id: 'b' }];
+  const order = paperSearchOrder(matches, new Set(['a', 'b', 'c'])).map((m) => m.id);
+
+  it('steps in the order the search found the matches, skipping any not in the cluster', () => {
+    expect(order).toEqual(['c', 'a', 'b']);
+  });
+
+  it('starts at the first match going forward and the last going back', () => {
+    expect(paperCycle(order, null, false)).toBe('c');
+    expect(paperCycle(order, null, true)).toBe('b');
+  });
+
+  it('visits every match once before coming round again', () => {
+    const visited: string[] = [];
+    let at: string | null = null;
+    for (let i = 0; i < 4; i++) visited.push((at = paperCycle(order, at, false))!);
+    expect(visited).toEqual(['c', 'a', 'b', 'c']);
+  });
+
+  it('steps back the other way round', () => {
+    expect(paperCycle(order, 'a', true)).toBe('c');
+    expect(paperCycle(order, 'c', true)).toBe('b');
+  });
+
+  it('starts from the first match when a non-match is selected', () => {
+    expect(paperCycle(order, 'hidden', false)).toBe('c');
   });
 });

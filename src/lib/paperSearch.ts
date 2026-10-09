@@ -75,6 +75,22 @@ export function paperSearchEmphasis({ ids, links, hoveredId, selectedId, matchId
   return focusEmphasis({ personIds: ids, links, hoveredId: matched(hoveredId), focusedId: matched(selectedId), searchMatchIds: matchIds });
 }
 
+/** The match count under the search bar in Paper. */
+export function paperSearchCount(matches: number): string {
+  return `${matches} ${matches === 1 ? 'PERSON' : 'PEOPLE'}`;
+}
+
+/** What Escape clears in Paper: the selected Person, or any edit under way, before the search. */
+export function paperEscape({ interactionIdle, searchQuery }: { interactionIdle: boolean; searchQuery: string }): 'interaction' | 'search' | null {
+  if (!interactionIdle) return 'interaction';
+  return searchQuery !== '' ? 'search' : null;
+}
+
+/** The matches Prev/Next step through: those in the cluster, in the order the search found them. */
+export function paperSearchOrder<T extends { id: string }>(matches: readonly T[], clusterIds: ReadonlySet<string>): T[] {
+  return matches.filter((m) => clusterIds.has(m.id));
+}
+
 const CLUSTER_VIEW_MARGIN = 1.4;
 const CLUSTER_VIEW_LEAST = 60;
 

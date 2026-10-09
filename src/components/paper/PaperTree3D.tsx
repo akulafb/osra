@@ -41,7 +41,7 @@ import { wakePaperTap } from './paperTap';
 import { paperFlySmoothTime, PAPER_FLY_SECONDS } from '../../lib/paperFocus';
 import { PAPER_DRAG_SMOOTH_SECONDS } from '../../lib/paperCamera';
 import { paperEffects } from '../../lib/paperEffects';
-import { packMatches, paperClusterView, paperSearchLayout } from '../../lib/paperSearch';
+import { packMatches, paperClusterView, paperEscape, paperSearchCount, paperSearchLayout, paperSearchOrder } from '../../lib/paperSearch';
 import { emptyEmphasisState, type PaperEmphasisState } from './paperEmphasis';
 import { PaperWebGLBoundary, PaperWebGLFallback } from './PaperWebGLFallback';
 import { browserHasWebGL } from './browserHasWebGL';
@@ -198,6 +198,8 @@ export function PaperTree3D({
     [fixedLayout, matchIds, shown.lines]
   );
   const cluster = useMemo(() => (layout && matchIds?.size ? paperFrame(layout, matchIds) : null), [layout, matchIds]);
+  const matchOrder = useMemo(() => (matchIds ? paperSearchOrder(searchMatches, matchIds) : null), [searchMatches, matchIds]);
+  const matchOrderIds = useMemo(() => matchOrder?.map((n) => n.id) ?? null, [matchOrder]);
   const inLifecycleIds = useMemo(() => inLifecycle(lifecycles.lifecycles), [lifecycles.lifecycles]);
   const discIds = useMemo(() => shownIds.filter((id) => !inLifecycleIds.has(id)), [shownIds, inLifecycleIds]);
   const toggles = useMemo(() => ({ links: showLinks, arrows: showArrows }), [showLinks, showArrows]);
@@ -382,6 +384,22 @@ export function PaperTree3D({
     [graphData.links, onToggleCollapse, cancelDeselect]
   );
 
+  const escape = (): boolean => {
+    const clears = paperEscape({ interactionIdle: interaction.state.phase === 'idle', searchQuery });
+    if (clears === 'interaction') interaction.handleEscape();
+    else if (clears === 'search') onSearchClose();
+    return clears !== null;
+  };
+
+  const stepMatch = (backwards: boolean) => {
+    if (!matchOrderIds) return;
+    const selectedId = interaction.selectedNodeId;
+    const next = paperCycle(matchOrderIds, selectedId, backwards);
+    if (!next) return;
+    if (next === selectedId) flyTo.current?.(next);
+    else interaction.selectNode(next);
+  };
+
   const handleKeyAction = (action: PaperKeyAction): boolean => {
     const selectedId = interaction.selectedNodeId;
     switch (action) {
@@ -391,7 +409,7 @@ export function PaperTree3D({
       case 'cycle-next':
       case 'cycle-previous': {
         if (interaction.connectSourceId) return false;
-        const next = paperCycle(matchIds ? shownIds.filter((id) => matchIds.has(id)) : shownIds, selectedId, action === 'cycle-previous');
+        const next = paperCycle(matchOrderIds ?? shownIds, selectedId, action === 'cycle-previous');
         if (next && next !== selectedId) interaction.selectNode(next);
         return true;
       }
@@ -400,8 +418,7 @@ export function PaperTree3D({
         flyTo.current?.(selectedId);
         return true;
       case 'deselect':
-        interaction.handleEscape();
-        return true;
+        return escape();
     }
   };
   const keyBlocks = paperKeyBlocks({ modalOpen: isModalOpen, modalAllowsFlight: !!isAddModalOpen, arrival });
@@ -412,10 +429,13 @@ export function PaperTree3D({
   const search: Tree3DSearch = {
     query: searchQuery,
     onQueryChange: onSearchQueryChange,
-    matches: searchMatches,
-    currentIndex: searchIndex,
-    onClose: onSearchClose,
+    matches: matchOrder ?? searchMatches,
+    currentIndex: matchOrderIds ? matchOrderIds.indexOf(interaction.selectedNodeId ?? '') : searchIndex,
+    onPrev: () => stepMatch(true),
+    onNext: () => stepMatch(false),
+    onClose: escape,
     disabled: searchDisabled,
+    countLabel: matchIds ? paperSearchCount(matchIds.size) : undefined,
   };
 
   const navKey = { color: panel.ink.strong, fontWeight: 600 };

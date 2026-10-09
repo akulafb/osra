@@ -63,6 +63,7 @@ export interface Tree3DSearch {
   onNext?: () => void;
   onClose: () => void;
   disabled: boolean;
+  countLabel?: string;
 }
 
 const noop = () => {};
@@ -162,6 +163,7 @@ export function Tree3DOverlay({
       disabled={search.disabled}
       embedded
       focusTrigger={searchOpenRequested}
+      countLabel={search.countLabel}
     />
   );
 

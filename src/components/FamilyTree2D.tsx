@@ -27,6 +27,7 @@ import { canEdit } from '../lib/permissions';
 import { CanvasModeSwitch } from './CanvasModeSwitch';
 import { useCanvasMode } from '../hooks/useCanvasMode';
 import { LIVE_PAIR } from '../theme/paperPair';
+import { paperSearchCount } from '../lib/paperSearch';
 import { focusEmphasis } from '../lib/focusEmphasis';
 import { DirectManipulationController } from '../hooks/useDirectManipulation';
 import { candidacyFor } from './cards/connectCandidates';
@@ -967,6 +968,7 @@ export const FamilyTree2D: React.FC<FamilyTree2DProps> = ({
                   disabled={searchDisabled}
                   embedded
                   focusTrigger={searchOpenRequested}
+                  countLabel={isPaper && searchQuery.trim() ? paperSearchCount(searchMatches.length) : undefined}
                 />
               </Box>
             )}
