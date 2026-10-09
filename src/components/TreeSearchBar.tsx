@@ -20,7 +20,7 @@ interface TreeSearchBarProps {
   embedded?: boolean;
   /** Increment to trigger focus on the input (e.g. when Ctrl+F opens search) */
   focusTrigger?: number;
-  /** A match count shown under the bar in the embedded panel, e.g. "4 PEOPLE". */
+  /** Shown under the bar in the embedded panel. */
   countLabel?: string;
 }
 

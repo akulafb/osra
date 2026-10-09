@@ -392,7 +392,8 @@ export function PaperTree3D({
   };
 
   const stepMatch = (backwards: boolean) => {
-    if (!matchOrderIds) return;
+    const { phase } = interaction.state;
+    if (!matchOrderIds || (phase !== 'idle' && phase !== 'selected')) return;
     const selectedId = interaction.selectedNodeId;
     const next = paperCycle(matchOrderIds, selectedId, backwards);
     if (!next) return;
@@ -431,8 +432,8 @@ export function PaperTree3D({
     onQueryChange: onSearchQueryChange,
     matches: matchOrder ?? searchMatches,
     currentIndex: matchOrderIds ? matchOrderIds.indexOf(interaction.selectedNodeId ?? '') : searchIndex,
-    onPrev: () => stepMatch(true),
-    onNext: () => stepMatch(false),
+    onPrev: matchOrderIds ? () => stepMatch(true) : undefined,
+    onNext: matchOrderIds ? () => stepMatch(false) : undefined,
     onClose: escape,
     disabled: searchDisabled,
     countLabel: matchIds ? paperSearchCount(matchIds.size) : undefined,
