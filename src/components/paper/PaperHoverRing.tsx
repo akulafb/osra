@@ -17,12 +17,12 @@ export function PaperHoverRing({ state, layout, ink }: { state: MutableRefObject
   useFrame(({ camera }) => {
     const ring = group.current;
     if (!ring) return;
-    const { emphasis, drift } = state.current;
+    const { emphasis } = state.current;
     const id = hoveredPerson(emphasis);
     const disc = id ? layout.get(id) : undefined;
     ring.visible = !!disc;
     if (!id || !disc) return;
-    placeOf(layout, drift, id, ring.position);
+    placeOf(layout, state.current, id, ring.position);
     ring.quaternion.copy(camera.quaternion);
     ring.scale.setScalar(disc.radius * RING_SCALE);
   });

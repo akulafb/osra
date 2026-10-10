@@ -8,6 +8,7 @@ import { FamilyTree2D } from './FamilyTree2D';
 import { useViewMode } from '../hooks/useViewMode';
 import { useCanvasMode } from '../hooks/useCanvasMode';
 import { usePaperLayout } from '../hooks/usePaperLayout';
+import { SPREAD_MIN, type Spread } from '../lib/paperSpread';
 import { useWorkingRecord } from '../contexts/WorkingRecordContext';
 import { linkWriteOutcome } from '../hooks/useWorkingRecord';
 import { useNewNodesSinceSignIn } from '../hooks/useNewNodesSinceSignIn';
@@ -67,6 +68,7 @@ export const FamilyTree: React.FC = () => {
     useWorkingRecord();
   const isPaper3D = mode === '3D' && canvasMode === 'paper';
   const paperLayout = usePaperLayout(working, isPaper3D);
+  const paperSpread = useRef<Spread>(SPREAD_MIN);
   const {
     newMembers,
     showSeeWhosNewButton,
@@ -784,6 +786,7 @@ export const FamilyTree: React.FC = () => {
             onDissolveNode={handleConfirmDissolveDirect}
             lifecycles={lifecycles}
             pendingLinkPreview={pendingLinkPreview}
+            spread={paperSpread}
           />
         ) : mode === '3D' ? (
           <FamilyTree3D

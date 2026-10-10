@@ -168,7 +168,7 @@ Preconditions:
 
 - `paper-3d-momentum`: a drag keeps the view gliding for a moment after release (CameraControls `draggingSmoothTime` 0.3 s) and settles without bouncing back.
 - `paper-3d-idle-rotate`: 3 s after the last pointer, wheel or key input anywhere on the page, with nobody selected, the view turns slowly about the vertical axis: a point as far out as the screen edge moves about 15 px a second. It stops while a Person is selected (the camera holds still while the relatives wobble), a non-match a search hides included, and pauses on any input.
-- `paper-3d-zoom`: the wheel or a pinch zooms toward the cursor, on the plane through the orbit point, so discs in front of or behind that plane drift by parallax. The camera stops 32 units from its orbit point and at 3 overview distances back, and the orbit point stays in a box 2 tree radii around the tree's centre, so a full zoom-out always brings the tree back.
+- `paper-3d-zoom`: the wheel or a pinch zooms toward the cursor, on the plane through the orbit point, so discs in front of or behind that plane drift by parallax. The camera stops 32 units from its orbit point and at 3 overview distances back, and the orbit point stays in a box 1.7 tree radii around the tree's centre, so a full zoom-out from anywhere in it, looking any way, always brings the tree's centre back on screen.
 - `paper-3d-effects`: on a desktop (`isMobile()` false: wider than 1024 px and no phone UA) a soft depth of field keeps the orbit point sharp and blurs discs in front and behind, with a light animated grain. Lines stay sharp, because they write no depth. On a phone there is no depth of field and the grain is lighter. The duotone runs last, so the pair still paints the final image.
 - `paper-3d-reframe`: a resize or a turned phone reframes without a reload: the overview refits the tree, and a focused Person is framed again in the space the drawer leaves free (side drawer at 900 px and wider, bottom sheet below).
 
@@ -309,3 +309,26 @@ Preconditions:
 - In a throttled tab the 2D cards' 0.15 s opacity transition does not advance until a frame is drawn: take two or three `orca screenshot`s before reading `opacity`.
 - A 2D match can sit off-screen, where `ui.sh person` misses it; dispatch a `click` on its `.node-card` and say so.
 - The MUI ripple under COLLAPSE ALL mounts on the first mouseleave, so a fingerprint can differ by one `span` with the pointer's history; capture base and branch with the same steps in the same order.
+
+## Paper 3D Spread (LIN-129)
+
+### Sub-features
+
+- `paper-3d-spread`: INSTRUMENTS in Paper 3D shows SPREAD, a small slider under LABELS / LINKS / ARROWS, on desktop and phone; Cosmos shows none. It runs continuously from 1x (left, today's layout, where it starts on each load) to 3x. Dragging it moves every shown Person straight out from the tree's centre by that factor, with their lines and names; discs and names keep their size, so links lengthen and the tree keeps its shape. The camera holds still while dragging, except with a Person selected: it moves with them, so they stay put on screen while their relatives move away. The zoom-out limit and the orbit box grow with the Spread, so a full zoom-out, RESET VIEWPORT and R frame the whole spread tree. When the Spread drops while the orbit point sits outside the smaller box, both stay just large enough to hold it, so the camera does not move and a full zoom-out still brings the tree back. They shrink back as the orbit point moves in, never below the camera's distance, so a wheel-out never pulls the camera in, and are the current Spread's again once RESET VIEWPORT or R brings it to the centre. Hover, clicks, search, Connect Mode, Ghost Previews, the editing panel's rings and a newly added Person all sit at the spread places; adding a Person at 3x moves nobody else. The value survives Paper → Cosmos or 2D → Paper and is back at 1x after a reload; nothing is saved to `localStorage` or Supabase.
+
+### Driving it with ui.sh
+
+- Paper 3D at desktop size (`set viewport 1280 812 2`), tab in front, intro settled; open INSTRUMENTS. The slider's input is `input[aria-label="Spread"]`; its `aria-valuetext` reads the value (`1.0x`).
+- **Move it.** `ui.sh tap` the right end of the slider's rail (MUI jumps the thumb to a rail tap) for 3x, the middle for 2x; for a drag, dispatch `pointerdown` on the thumb and a run of `pointermove`s along the rail with `orca eval`, and say so.
+- **Spread, not zoom.** Record every disc's translation and scale from the instanced mesh (`getMatrixAt`, via R3F's `_roots`, see [search](#paper-search-lin-97)) at 1x and at 3x: each translation at 3x is the 1x one moved out from the same centre by 3, and every scale is unchanged. At 1x after the move back, the record equals the first one exactly.
+- **No re-render per tick.** The slider is uncontrolled and its `onChange` writes only the Spread ref the scene reads each frame (`PaperSpreadSlider.tsx`, `PaperSpreadRig.tsx`). A live check needs a React commit counter: when `window.__REACT_DEVTOOLS_GLOBAL_HOOK__` exists, wrap its `onCommitFiberRoot` with `orca eval`, drag, and expect commits only from the slider's own root updates, none per tick in the Canvas root (R3F's `_roots`). Without the hook, report it as checked in the code.
+- **Camera.** Read `controls.getTarget` and `getPosition` from R3F's store before and after a move with nobody selected: unchanged. Select a Person, move the slider, read again: target and position moved by the same vector, and the Person's disc projects to the same screen point. Repeat with a jump: at 3x, tap the rail's left end (1x); the Person still projects to the same point. With nobody selected, pan far out at 3x, then tap the left end: the target is unchanged. Twenty wheel notches out then bring the whole tree on screen, and a window resize leaves the target where it was.
+- **Limits.** At 3x, twenty wheel notches out then a capture: the whole tree is on screen. R and RESET VIEWPORT frame it whole too.
+- **Survives a switch.** Set 2x, switch to Cosmos and back (Canvas Mode switch) and to 2D and back: the slider reads `2.0x` and the record matches the 2x one. Reload: `1.0x`. `Object.keys(localStorage)` holds no new key.
+- **Proof.** Capture `paper-3d-spread 1x`, `3x`, `3x-selected`, `3x-zoomed-out`, `after-switch`, `after-reload`, `phone-instruments` and `cosmos-instruments`.
+
+### Gotchas
+
+- The INSTRUMENTS panel opens to at most 800 px high and clips what is below; with SPREAD added, check the last items (VISIBILITY) still show on a short viewport.
+- A selected Person behind a flight still in progress moves the flight's end with them; let the focus flight settle before reading the camera for the follow check.
+- The fog follows the camera's distance, so at 3x with the camera still, far Persons fade into the paper until you zoom out.

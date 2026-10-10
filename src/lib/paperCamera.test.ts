@@ -5,11 +5,13 @@ import { layoutPaperTree, type PaperLayout } from './paperLayout';
 import { paperFlyTo, paperFocusReach } from './paperFocus';
 import { paperFrame } from '../components/paper/paperScene';
 import { KINSHIP_FIXTURE_TREE } from './fixtures/kinshipFixtureTree';
+import { spreadPoint, type Spread } from './paperSpread';
 import {
   paperCameraLimits,
   paperFitDistance,
   paperIdleRotates,
   paperIdleRotateSpeed,
+  paperLimitsHolding,
   PAPER_IDLE_SECONDS,
   type PaperCameraLimits,
 } from './paperCamera';
@@ -69,6 +71,26 @@ describe('paperFitDistance', () => {
       expect(frustum.containsPoint(new THREE.Vector3(99, 0, 0))).toBe(true);
       expect(frustum.containsPoint(new THREE.Vector3(0, 99, 0))).toBe(true);
     }
+  });
+});
+
+describe('paperLimitsHolding', () => {
+  const frame = { center: { x: 5, y: -8, z: 12 }, radius: 500 };
+  const aspect = 1440 / 900;
+  const limits = paperCameraLimits(frame, FOV, aspect);
+  const half = (limits.boundary.max.x - limits.boundary.min.x) / 2;
+
+  it('keeps the limits when the box already holds the point', () => {
+    expect(paperLimitsHolding(limits, { x: 5 + half * 0.9, y: -8, z: 12 })).toEqual(limits);
+  });
+
+  it('grows the box around the same centre to hold the point, with the zoom-out limit in step', () => {
+    const held = paperLimitsHolding(limits, { x: 5 - half, y: -8 + 3 * half, z: 12 });
+    expect(inBoundary(held, { x: 5 - half, y: -8 + 3 * half, z: 12 })).toBe(true);
+    const grown = paperCameraLimits({ ...frame, radius: 3 * frame.radius }, FOV, aspect);
+    expect(held.boundary).toEqual(grown.boundary);
+    expect(held.minDistance).toBe(grown.minDistance);
+    expect(held.maxDistance).toBeCloseTo(grown.maxDistance, 6);
   });
 });
 
@@ -158,11 +180,65 @@ describe('paperCameraLimits', () => {
     }
   });
 
+  it('brings the tree back on screen when zoomed all the way out from a corner of the box, looking the way that puts its centre farthest off', () => {
+    for (const radius of [30, 200, 900]) {
+      const frame = { center: { x: 5, y: -8, z: 12 }, radius };
+      const centre = new THREE.Vector3(5, -8, 12);
+      for (const viewport of VIEWPORTS) {
+        const aspect = viewport.width / viewport.height;
+        const { boundary, maxDistance } = paperCameraLimits(frame, FOV, aspect);
+        const corner = new THREE.Vector3(boundary.max.x, boundary.max.y, boundary.min.z);
+        const toCentre = centre.clone().sub(corner);
+        const square = new THREE.Vector3(1, 0, 0).cross(toCentre).normalize();
+        const camera = new THREE.PerspectiveCamera(FOV, aspect, 1, 1e7);
+        camera.position.copy(centre).addScaledVector(square, Math.sqrt(maxDistance ** 2 - toCentre.lengthSq()));
+        expect(camera.position.distanceTo(corner)).toBeCloseTo(maxDistance, 6);
+        camera.up.copy(aspect > 1 ? toCentre : camera.position.clone().sub(corner).cross(toCentre));
+        camera.lookAt(corner);
+        camera.updateMatrixWorld();
+        const frustum = new THREE.Frustum().setFromProjectionMatrix(
+          new THREE.Matrix4().multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse)
+        );
+        expect(frustum.containsPoint(centre), `${radius} ${viewport.name}`).toBe(true);
+      }
+    }
+  });
+
   it('keeps the orbit point near the tree', () => {
     const frame = { center: { x: 10, y: 20, z: 30 }, radius: 200 };
     const limits = paperCameraLimits(frame, FOV, 1.5);
     expect(inBoundary(limits, { x: 10 + 200, y: 20, z: 30 })).toBe(true);
     expect(inBoundary(limits, { x: 10 + 2000, y: 20, z: 30 })).toBe(false);
     expect(inBoundary(limits, { x: 10, y: 20, z: 30 - 2000 })).toBe(false);
+  });
+});
+
+describe('paperCameraLimits at a Spread', () => {
+  const layout = layoutPaperTree(KINSHIP_FIXTURE_TREE);
+  const frame = paperFrame(layout, layout.keys());
+  const aspect = 1440 / 900;
+  const spreadOf = (factor: number) => ({ centre: frame.center, factor: factor as Spread });
+
+  it('is today\'s limits at 1x', () => {
+    expect(paperCameraLimits(frame, FOV, aspect, spreadOf(1))).toEqual(paperCameraLimits(frame, FOV, aspect));
+  });
+
+  it('stops zooming out the same few overviews back from the spread tree as from the still one', () => {
+    for (const factor of [1.5, 2, 3]) {
+      const { maxDistance } = paperCameraLimits(frame, FOV, aspect, spreadOf(factor));
+      expect(maxDistance, `${factor}x`).toBeGreaterThanOrEqual(2 * paperFitDistance(frame.radius * factor, FOV, aspect));
+    }
+  });
+
+  it('lets the orbit point reach the farthest spread Person, which the 1x box does not', () => {
+    const farthest = [...layout.values()].reduce((far, disc) =>
+      Math.hypot(disc.x - frame.center.x, disc.y - frame.center.y, disc.z - frame.center.z) >
+      Math.hypot(far.x - frame.center.x, far.y - frame.center.y, far.z - frame.center.z)
+        ? disc
+        : far
+    );
+    const out = spreadPoint(frame.center, farthest, 3 as Spread);
+    expect(inBoundary(paperCameraLimits(frame, FOV, aspect, spreadOf(3)), out)).toBe(true);
+    expect(inBoundary(paperCameraLimits(frame, FOV, aspect), out)).toBe(false);
   });
 });

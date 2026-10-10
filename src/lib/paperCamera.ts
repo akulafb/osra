@@ -1,4 +1,5 @@
 import type { Point3 } from './paperLayout';
+import { spreadFrame, type PaperSpread } from './paperSpread';
 
 /** How long the view must sit without pointer, wheel or key input before it starts to turn on its own. */
 export const PAPER_IDLE_SECONDS = 3;
@@ -21,7 +22,7 @@ const ZOOM_OUT_OVERVIEWS = 3;
 const MIN_SPAN = 100;
 
 /** How far the orbit point can wander from the tree's centre, in spans. */
-const BOUNDARY_SPANS = 2;
+const BOUNDARY_SPANS = 1.7;
 
 export function paperIdleRotates(secondsSinceInput: number, selected: boolean, hovered: boolean): boolean {
   return !selected && !hovered && secondsSinceInput >= PAPER_IDLE_SECONDS;
@@ -48,11 +49,17 @@ export interface PaperCameraLimits {
 }
 
 /**
- * The zoom limits and the orbit point's box for a tree framed by `frame`. From
- * anywhere in the box, zooming all the way out brings the tree's centre back
- * on screen.
+ * The zoom limits and the orbit point's box for a tree framed by `stillFrame`,
+ * drawn at `spread`. From anywhere in the box, zooming all the way out brings
+ * the tree's centre back on screen.
  */
-export function paperCameraLimits(frame: { center: Point3; radius: number }, fovDegrees: number, aspect: number): PaperCameraLimits {
+export function paperCameraLimits(
+  stillFrame: { center: Point3; radius: number },
+  fovDegrees: number,
+  aspect: number,
+  spread?: PaperSpread
+): PaperCameraLimits {
+  const frame = spread ? spreadFrame(stillFrame, spread) : stillFrame;
   const span = Math.max(frame.radius, MIN_SPAN);
   const half = span * BOUNDARY_SPANS;
   const { x, y, z } = frame.center;
@@ -60,5 +67,26 @@ export function paperCameraLimits(frame: { center: Point3; radius: number }, fov
     minDistance: MIN_DISTANCE,
     maxDistance: ZOOM_OUT_OVERVIEWS * paperFitDistance(span, fovDegrees, aspect),
     boundary: { min: { x: x - half, y: y - half, z: z - half }, max: { x: x + half, y: y + half, z: z + half } },
+  };
+}
+
+/**
+ * `limits` grown around the same centre until the box holds `point`, with the
+ * zoom-out limit grown in step, so a full zoom-out from anywhere in the box
+ * still brings the tree's centre back on screen.
+ */
+export function paperLimitsHolding(limits: PaperCameraLimits, point: Point3): PaperCameraLimits {
+  const { min, max } = limits.boundary;
+  const centre = { x: (min.x + max.x) / 2, y: (min.y + max.y) / 2, z: (min.z + max.z) / 2 };
+  const half = (max.x - min.x) / 2;
+  const reach = Math.max(Math.abs(point.x - centre.x), Math.abs(point.y - centre.y), Math.abs(point.z - centre.z));
+  if (reach <= half) return limits;
+  return {
+    minDistance: limits.minDistance,
+    maxDistance: (limits.maxDistance * reach) / half,
+    boundary: {
+      min: { x: centre.x - reach, y: centre.y - reach, z: centre.z - reach },
+      max: { x: centre.x + reach, y: centre.y + reach, z: centre.z + reach },
+    },
   };
 }

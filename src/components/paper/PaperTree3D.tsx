@@ -19,6 +19,7 @@ import type { PaperLayout, Point3 } from '../../lib/paperLayout';
 import type { LifecycleController } from '../../hooks/useLifecycles';
 import { holdingProgress, inLifecycle, paperLifecycleDisc, paperLifecycleDraws, steadyLines } from '../../lib/paperLifecycle';
 import { paperGhostLanding } from '../../lib/paperGhost';
+import { spreadCentre, spreadFrame, spreadInto, spreadPoint, toSpread, type Spread } from '../../lib/paperSpread';
 import { Tree3DOverlay, type Tree3DSceneCamera, type Tree3DSearch } from '../tree3d/Tree3DOverlay';
 import { useIsMobileDevice } from '../tree3d/useIsMobileDevice';
 import { PaperDiscs } from './PaperDiscs';
@@ -52,6 +53,8 @@ import { useTree3DEditing, type DirectConnectParams } from '../tree3d/useTree3DE
 import { PaperFlight } from './PaperFlight';
 import { PaperSearch } from './PaperSearch';
 import { usePaperKeys } from './usePaperKeys';
+import { PaperSpreadRig } from './PaperSpreadRig';
+import { PaperSpreadSlider } from './PaperSpreadSlider';
 
 export interface PaperTree3DProps {
   graphData: FamilyGraph;
@@ -100,6 +103,8 @@ export interface PaperTree3DProps {
   /** Spawn and Dissolve progress, drawn in ink. */
   lifecycles: LifecycleController;
   pendingLinkPreview?: { anchorId: string; existingId: string } | null;
+  /** The viewer's Spread, held by the host so it survives mode switches; the SPREAD slider writes it without a render. */
+  spread: MutableRefObject<Spread>;
 }
 
 const PAPER = GRAYSCALE_PAIR.paper;
@@ -161,6 +166,7 @@ export function PaperTree3D({
   onDissolveNode,
   lifecycles,
   pendingLinkPreview = null,
+  spread,
 }: PaperTree3DProps) {
   const { panel } = useTheme().palette;
   const isMobileDevice = useIsMobileDevice();
@@ -249,10 +255,15 @@ export function PaperTree3D({
     pendingLinkPreview && shownIdSet.has(pendingLinkPreview.anchorId) && shownIdSet.has(pendingLinkPreview.existingId)
       ? pendingLinkPreview
       : null;
-  const liveNodes = useMemo<LiveNodePosition[]>(
-    () => (layout ? shownIds.map((id) => ({ id, ...layout.get(id)! })) : []),
-    [layout, shownIds]
-  );
+  const liveNodes = useMemo<LiveNodePosition[]>(() => {
+    const { centre, factor } = emphasisState.current.spread;
+    return layout
+      ? shownIds.map((id) => {
+          const disc = layout.get(id)!;
+          return spreadInto(centre, disc, factor, { id, ...disc });
+        })
+      : [];
+  }, [layout, shownIds]);
 
   const { connect, dissolve, pickConnectTarget } = useTree3DEditing({
     graphData,
@@ -275,6 +286,19 @@ export function PaperTree3D({
 
   const frame = useMemo(() => (fixedLayout ? paperFrame(fixedLayout, fixedLayout.keys()) : null), [fixedLayout]);
 
+  const loadedCentre = layoutState.status === 'ready' ? spreadCentre(layoutState.layout, layoutState.newcomers) : null;
+  const [centreX, centreY, centreZ] = loadedCentre ? [loadedCentre.x, loadedCentre.y, loadedCentre.z] : [];
+  const centre = useMemo(
+    () => (centreX === undefined || centreY === undefined || centreZ === undefined ? null : { x: centreX, y: centreY, z: centreZ }),
+    [centreX, centreY, centreZ]
+  );
+
+  // A layout effect, so the spread is set before the scene's effects frame the camera.
+  useLayoutEffect(() => {
+    if (!centre) return;
+    emphasisState.current = { ...emphasisState.current, spread: { centre, factor: toSpread(spread.current) } };
+  }, [centre, spread]);
+
   const landingFrom = useRef({ layout: fixedLayout, shownLayout: layout, graphData });
   useLayoutEffect(() => {
     landingFrom.current = { layout: fixedLayout, shownLayout: layout, graphData };
@@ -284,7 +308,9 @@ export function PaperTree3D({
       ...GHOST_LOOK,
       landing: (anchorId, relation, otherParentId) => {
         const { layout: placed, shownLayout, graphData: graph } = landingFrom.current;
-        return placed ? paperGhostLanding(placed, graph, anchorId, relation, otherParentId, shownLayout ?? placed) : null;
+        const landing = placed ? paperGhostLanding(placed, graph, anchorId, relation, otherParentId, shownLayout ?? placed) : null;
+        const { centre, factor } = emphasisState.current.spread;
+        return landing && { ...landing, ...spreadPoint(centre, landing, factor) };
       },
     }),
     []
@@ -293,7 +319,7 @@ export function PaperTree3D({
   const fitFrame = useCallback(
     (smooth: boolean) => {
       if (!frame) return;
-      const { center, radius } = frame;
+      const { center, radius } = spreadFrame(frame, emphasisState.current.spread);
       void controlsRef.current?.fitToSphere(
         new THREE.Sphere(new THREE.Vector3(center.x, center.y, center.z), radius),
         smooth
@@ -312,7 +338,7 @@ export function PaperTree3D({
 
   const flyToOverview = useCallback(() => {
     if (!cluster) return fitFrame(true);
-    const { center, radius } = cluster;
+    const { center, radius } = spreadFrame(cluster, emphasisState.current.spread);
     void controlsRef.current?.fitToSphere(new THREE.Sphere(new THREE.Vector3(center.x, center.y, center.z), paperClusterView(radius)), true);
   }, [cluster, fitFrame]);
 
@@ -522,10 +548,11 @@ export function PaperTree3D({
               dollyToCursor
             />
             <ContextLossWatch onLost={handleSceneFailed} />
-            {layout && frame && (
+            {layout && frame && centre && (
               <>
                 <PaperView viewDistance={viewDistance} />
-                <PaperCameraRig frame={frame} state={emphasisState} modalOpen={isModalOpen} selected={!!interaction.selectedNodeId} />
+                <PaperSpreadRig spread={spread} centre={centre} layout={layout} liveNodes={liveNodes} state={emphasisState} />
+                <PaperCameraRig frame={frame} layout={layout} state={emphasisState} modalOpen={isModalOpen} selectedId={interaction.selectedNodeId} />
                 <PaperFlight held={heldKeys} viewDistance={viewDistance} state={emphasisState} paused={keyBlocks.flight} />
                 <InitialFraming fit={fitFrame} />
                 <PaperFocus
@@ -537,6 +564,7 @@ export function PaperTree3D({
                   drawerInset={openDrawerInset}
                   onOverview={flyToOverview}
                   flyTo={flyTo}
+                  state={emphasisState}
                 />
                 <PaperSearch
                   layout={layout}
@@ -631,6 +659,7 @@ export function PaperTree3D({
         onShowLinksChange={setShowLinks}
         showArrows={showArrows}
         onShowArrowsChange={setShowArrows}
+        instrumentsDisplayItems={<PaperSpreadSlider spread={spread} />}
         search={search}
         searchOpenRequested={searchOpenRequested}
         collapsedNodes={collapsedNodes}

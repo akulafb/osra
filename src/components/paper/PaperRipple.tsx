@@ -34,7 +34,7 @@ export function PaperRipple({
   useFrame(({ clock }) => {
     const segments = ref.current;
     if (!segments) return;
-    const { focus, drift } = state.current;
+    const { focus } = state.current;
     if (rippling.current.focus !== focus || rippling.current.lines !== lines) {
       rippling.current = { focus, lines, own: focus ? linesOf(lines, focus.id).slice(0, MAX_RIPPLE_LINES) : [] };
     }
@@ -48,8 +48,8 @@ export function PaperRipple({
     let moved = false;
     rippling.current.own.forEach((line, i) => {
       const otherId = line.sourceId === focus.id ? line.targetId : line.sourceId;
-      placeOf(layout, drift, focus.id, from);
-      placeOf(layout, drift, otherId, to);
+      placeOf(layout, state.current, focus.id, from);
+      placeOf(layout, state.current, otherId, to);
       const length = from.distanceTo(to);
       const startShare = length > 0 ? Math.min(0.5, (layout.get(focus.id)?.radius ?? 0) / length) : 0;
       const endShare = length > 0 ? Math.max(0.5, 1 - (layout.get(otherId)?.radius ?? 0) / length) : 1;

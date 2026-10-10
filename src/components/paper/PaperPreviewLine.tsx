@@ -23,9 +23,8 @@ export function PaperPreviewLine({
   return (
     <PaperSegmentLine
       place={(from, to) => {
-        const { drift } = state.current;
-        placeOf(layout, drift, fromId, from);
-        placeOf(layout, drift, toId, to);
+        placeOf(layout, state.current, fromId, from);
+        placeOf(layout, state.current, toId, to);
         return true;
       }}
       renderOrder={PAPER_LINE_RENDER_ORDER + 1}

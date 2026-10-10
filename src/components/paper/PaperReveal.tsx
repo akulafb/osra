@@ -3,6 +3,7 @@ import { useFrame, useThree } from '@react-three/fiber';
 import type { CameraControls } from '@react-three/drei';
 import type { PaperLayout, Point3 } from '../../lib/paperLayout';
 import { addOffsets } from '../../lib/paperHover';
+import { spreadOffsets } from '../../lib/paperSpread';
 import { paperRevealProgress, paperRevealShares, paperRevealSmoothTime, PAPER_REVEAL_SECONDS } from '../../lib/paperIntro';
 import type { PaperEmphasisState } from './paperEmphasis';
 import { PAPER_REVEAL_FRAME_PRIORITY, type PaperFrame } from './paperScene';
@@ -78,7 +79,7 @@ export function PaperReveal({ frame, layout, ids, selectedId, state, onDone }: P
       reveal.set(id, progress);
       pulls.set(id, { x: (center.x - disc.x) * pull, y: (center.y - disc.y) * pull, z: (center.z - disc.z) * pull });
     }
-    state.current = { ...state.current, drift: addOffsets(state.current.drift, pulls), reveal };
+    state.current = { ...state.current, drift: addOffsets(state.current.drift, spreadOffsets(pulls, state.current.spread.factor)), reveal };
   }, PAPER_REVEAL_FRAME_PRIORITY);
 
   return null;

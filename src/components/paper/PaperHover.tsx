@@ -45,6 +45,7 @@ export function PaperHover({ state, pointer, layout, ids, links, selectedId, mat
     inputs: null as typeof inputs | null,
     hoveredId: null as string | null,
     size: null as object | null,
+    spread: null as PaperEmphasisState['spread'] | null,
   });
   const seenCamera = useRef({ world: new THREE.Matrix4(), projection: new THREE.Matrix4() });
   const target = useRef(new Map<string, Point3>());
@@ -60,7 +61,8 @@ export function PaperHover({ state, pointer, layout, ids, links, selectedId, mat
     const last = seen.current;
     const viewed = seenCamera.current;
     const cameraMoved = !viewed.world.equals(camera.matrixWorld) || !viewed.projection.equals(camera.projectionMatrix);
-    const changed = pointer.current !== last.pointer || inputs !== last.inputs || size !== last.size || cameraMoved;
+    const { spread } = state.current;
+    const changed = pointer.current !== last.pointer || inputs !== last.inputs || size !== last.size || spread !== last.spread || cameraMoved;
 
     let hoveredId = last.hoveredId;
     if (changed) {
@@ -80,7 +82,7 @@ export function PaperHover({ state, pointer, layout, ids, links, selectedId, mat
       state.current = { ...state.current, emphasis, pointedId: hoveredId, focus };
       target.current = paperDrift(layout, emphasis);
     }
-    seen.current = { pointer: pointer.current, inputs, hoveredId, size };
+    seen.current = { pointer: pointer.current, inputs, hoveredId, size, spread };
 
     lean.current = easeDrift(lean.current, target.current, Math.min(delta, PAPER_MAX_FRAME_SECONDS));
     const { focus, emphasis } = state.current;
@@ -106,7 +108,7 @@ function personAt(
   for (const id of ids) {
     const disc = layout.get(id);
     if (!disc) continue;
-    placeOf(layout, state.drift, id, place);
+    placeOf(layout, state, id, place);
     const depth = -view.copy(place).applyMatrix4(camera.matrixWorldInverse).z;
     const radius = paperScreenRadius(disc.radius * sizeOf(state, id), depth, camera.fov, height) * camera.zoom;
     if (radius === 0) continue;
