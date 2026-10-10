@@ -832,6 +832,7 @@ export const FamilyTree2D: React.FC<FamilyTree2DProps> = ({
                   }}
                   onCancel={() => interaction.handleEscape()}
                   previewStroke={hud.pair?.ink}
+                  look={canvasMode}
                 />
               );
             })()}

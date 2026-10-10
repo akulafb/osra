@@ -1693,6 +1693,7 @@ export const FamilyTree3DContent: React.FC<FamilyTree3DProps> = ({
         searchMatches={searchMatches}
         onCreateRelative={onCreateRelative}
         onConnectExistingRelative={onConnectExistingRelative}
+        look="cosmos"
       />
     </div>
   );
