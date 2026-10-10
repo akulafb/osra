@@ -89,6 +89,10 @@ _Avoid_: Palette, Section colour, Duotone
 The Paper Pair shown with colour on while nobody with a family is focused: drawn at random on each load and each time a Person is closed, never the same as the last one.
 _Avoid_: Default pair, Home pair
 
+**Spread**:
+How far apart Paper 3D spaces its Persons, set by the viewer: the still layout grows outward from its centre while disc and label sizes stay the same, so the tree keeps its shape. A per-viewer setting that is not remembered; it never changes the Tree Record.
+_Avoid_: Radius, Separation, Node spacing, Zoom
+
 
 ### Direct Interaction
 

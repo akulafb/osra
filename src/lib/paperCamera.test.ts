@@ -5,6 +5,7 @@ import { layoutPaperTree, type PaperLayout } from './paperLayout';
 import { paperFlyTo, paperFocusReach } from './paperFocus';
 import { paperFrame } from '../components/paper/paperScene';
 import { KINSHIP_FIXTURE_TREE } from './fixtures/kinshipFixtureTree';
+import { spreadPoint, type Spread } from './paperSpread';
 import {
   paperCameraLimits,
   paperFitDistance,
@@ -164,5 +165,35 @@ describe('paperCameraLimits', () => {
     expect(inBoundary(limits, { x: 10 + 200, y: 20, z: 30 })).toBe(true);
     expect(inBoundary(limits, { x: 10 + 2000, y: 20, z: 30 })).toBe(false);
     expect(inBoundary(limits, { x: 10, y: 20, z: 30 - 2000 })).toBe(false);
+  });
+});
+
+describe('paperCameraLimits at a Spread', () => {
+  const layout = layoutPaperTree(KINSHIP_FIXTURE_TREE);
+  const frame = paperFrame(layout, layout.keys());
+  const aspect = 1440 / 900;
+  const spreadOf = (factor: number) => ({ centre: frame.center, factor: factor as Spread });
+
+  it('is today\'s limits at 1x', () => {
+    expect(paperCameraLimits(frame, FOV, aspect, spreadOf(1))).toEqual(paperCameraLimits(frame, FOV, aspect));
+  });
+
+  it('stops zooming out the same few overviews back from the spread tree as from the still one', () => {
+    for (const factor of [1.5, 2, 3]) {
+      const { maxDistance } = paperCameraLimits(frame, FOV, aspect, spreadOf(factor));
+      expect(maxDistance, `${factor}x`).toBeGreaterThanOrEqual(2 * paperFitDistance(frame.radius * factor, FOV, aspect));
+    }
+  });
+
+  it('lets the orbit point reach the farthest spread Person, which the 1x box does not', () => {
+    const farthest = [...layout.values()].reduce((far, disc) =>
+      Math.hypot(disc.x - frame.center.x, disc.y - frame.center.y, disc.z - frame.center.z) >
+      Math.hypot(far.x - frame.center.x, far.y - frame.center.y, far.z - frame.center.z)
+        ? disc
+        : far
+    );
+    const out = spreadPoint(frame.center, farthest, 3 as Spread);
+    expect(inBoundary(paperCameraLimits(frame, FOV, aspect, spreadOf(3)), out)).toBe(true);
+    expect(inBoundary(paperCameraLimits(frame, FOV, aspect), out)).toBe(false);
   });
 });

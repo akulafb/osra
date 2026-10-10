@@ -128,7 +128,7 @@ function LifecycleDisc({
     if (progress === null || !placed) return;
 
     const { centre, right, up, at, scale, matrix } = scratch;
-    placeOf(layout, state.current.drift, id, centre);
+    placeOf(layout, state.current, id, centre);
     const kept = inkOf(state.current, id);
     const frame = paperLifecycleDisc(kind, progress);
     disc.position.copy(centre);
@@ -211,13 +211,13 @@ function LifecycleLine({
       place={(from, to, segment) => {
         const progress = progressOf(lifecycleKey);
         if (progress === null || !layout.has(fromId) || !layout.has(toId)) return false;
-        const { drift, emphasis } = state.current;
+        const { emphasis } = state.current;
         const subject = emphasisSubject(emphasis);
         const own = subject === fromId || subject === toId;
         const kept = Math.min(inkOf(state.current, fromId), inkOf(state.current, toId));
         fadeInk(own ? colours.ink : colours.line, colours.paper, kept, (segment.material as unknown as { color: THREE.Color }).color);
-        placeOf(layout, drift, fromId, from);
-        placeOf(layout, drift, toId, to);
+        placeOf(layout, state.current, fromId, from);
+        placeOf(layout, state.current, toId, to);
         to.lerpVectors(from, to, paperLinkDrawn(kind, progress));
         return true;
       }}

@@ -99,6 +99,8 @@ interface Tree3DOverlayProps {
   uniqueClusters: string[];
   onEnsureClusterVisible3D: (cluster: string) => void;
   instrumentsSceneItems?: React.ReactNode;
+  /** Shown under the LABELS / LINKS / ARROWS switches; Paper 3D puts SPREAD here. */
+  instrumentsDisplayItems?: React.ReactNode;
   navKeys: React.ReactNode;
   /** Optional "See who's new!" control; rendered above NAV CONTROLS, same column */
   seeWhosNewButtonSlot?: React.ReactNode;
@@ -130,6 +132,7 @@ export function Tree3DOverlay({
   uniqueClusters,
   onEnsureClusterVisible3D,
   instrumentsSceneItems,
+  instrumentsDisplayItems,
   navKeys,
   seeWhosNewButtonSlot,
 }: Tree3DOverlayProps) {
@@ -321,6 +324,7 @@ export function Tree3DOverlay({
                 label="ARROWS"
                 sx={{ m: 0, color: panel.role.text, '& .MuiFormControlLabel-label': { fontSize: '0.7rem', fontWeight: 600, letterSpacing: '0.05em' } }}
               />
+              {instrumentsDisplayItems}
             </Box>
 
             {search && (

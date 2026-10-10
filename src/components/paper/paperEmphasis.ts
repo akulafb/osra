@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import type { Emphasis } from '../../lib/focusEmphasis';
 import type { PaperLayout, PaperLine, Point3 } from '../../lib/paperLayout';
+import { SPREAD_MIN, spreadInto, type PaperSpread } from '../../lib/paperSpread';
 
 /** How much of its ink a Person keeps in each emphasis; the rest fades into the paper. */
 const PAPER_3D_INK: Record<Emphasis, number> = {
@@ -14,8 +15,8 @@ const PAPER_3D_INK: Record<Emphasis, number> = {
 };
 
 /**
- * What the scene draws from on each frame. Both maps are replaced, never
- * changed in place: a part redraws when one is a new map.
+ * What the scene draws from on each frame. Its maps and the spread are
+ * replaced, never changed in place: a part redraws when one is new.
  */
 export interface PaperEmphasisState {
   emphasis: ReadonlyMap<string, Emphasis>;
@@ -29,6 +30,8 @@ export interface PaperEmphasisState {
   reveal: ReadonlyMap<string, number> | null;
   /** How much of their disc each Person keeps while a search shrinks the non-matches away; missing means whole. */
   size: ReadonlyMap<string, number>;
+  /** The viewer's Spread and the centre it spreads from; a new object whenever either changes. */
+  spread: PaperSpread;
 }
 
 export interface PaperFocus {
@@ -36,8 +39,10 @@ export interface PaperFocus {
   since: number;
 }
 
+export const NO_SPREAD: PaperSpread = { centre: { x: 0, y: 0, z: 0 }, factor: SPREAD_MIN };
+
 export function emptyEmphasisState(): PaperEmphasisState {
-  return { emphasis: new Map(), drift: new Map(), pointedId: null, focus: null, reveal: null, size: new Map() };
+  return { emphasis: new Map(), drift: new Map(), pointedId: null, focus: null, reveal: null, size: new Map(), spread: NO_SPREAD };
 }
 
 export function inkOf(state: PaperEmphasisState, id: string): number {
@@ -57,12 +62,18 @@ export function lineEndInks(state: PaperEmphasisState, line: PaperLine): [number
   return [inkOf(state, line.sourceId), inkOf(state, line.targetId)];
 }
 
-/** Where a Person is drawn: their layout place, plus any lean. */
-export function placeOf(layout: PaperLayout, drift: ReadonlyMap<string, Point3>, id: string, out: THREE.Vector3): THREE.Vector3 {
+/** Where a Person is drawn: their layout place spread out from the tree's centre, plus any lean. */
+export function placeOf(
+  layout: PaperLayout,
+  { drift, spread }: Pick<PaperEmphasisState, 'drift' | 'spread'>,
+  id: string,
+  out: THREE.Vector3
+): THREE.Vector3 {
   const disc = layout.get(id);
-  const lean = drift.get(id);
   if (!disc) return out.set(0, 0, 0);
-  return out.set(disc.x + (lean?.x ?? 0), disc.y + (lean?.y ?? 0), disc.z + (lean?.z ?? 0));
+  spreadInto(spread.centre, disc, spread.factor, out);
+  const lean = drift.get(id);
+  return lean ? out.set(out.x + lean.x, out.y + lean.y, out.z + lean.z) : out;
 }
 
 /** `colour` with `ink` of its ink kept, the rest faded into the paper. */

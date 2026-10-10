@@ -3,6 +3,7 @@ import { useFrame, useThree } from '@react-three/fiber';
 import type { CameraControls } from '@react-three/drei';
 import type { PaperLayout } from '../../lib/paperLayout';
 import { addOffsets } from '../../lib/paperHover';
+import { spreadOffsets } from '../../lib/paperSpread';
 import { paperFlyFrames, paperSearchMotionAt, paperSearchMotionFrom, PAPER_SEARCH_STILL, type PaperSearchMotion } from '../../lib/paperSearch';
 import type { PaperEmphasisState } from './paperEmphasis';
 import { PAPER_SEARCH_FRAME_PRIORITY, type PaperFrame } from './paperScene';
@@ -40,8 +41,8 @@ export function PaperSearch({ layout, matchIds, cluster, selectedId, state, flyT
 
     const { offsets, sizes, done } = paperSearchMotionAt(motion.current, clock.elapsedTime);
     if (done) settled.current = motion.current;
-    const { drift } = state.current;
-    state.current = { ...state.current, size: sizes, drift: addOffsets(drift, offsets) };
+    const { drift, spread } = state.current;
+    state.current = { ...state.current, size: sizes, drift: addOffsets(drift, spreadOffsets(offsets, spread.factor)) };
   }, PAPER_SEARCH_FRAME_PRIORITY);
 
   const framedFor = useRef<ReadonlySet<string> | null>(null);

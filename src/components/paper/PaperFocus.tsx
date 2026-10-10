@@ -6,8 +6,10 @@ import type { FamilyLink } from '../../types/graph';
 import type { PaperLayout } from '../../lib/paperLayout';
 import { paperFlyTo, paperFocusReach } from '../../lib/paperFocus';
 import { paperFlyFrames, paperSearchEmphasis } from '../../lib/paperSearch';
+import { spreadLayout } from '../../lib/paperSpread';
 import type { PersonDrawerInset } from '../../hooks/usePersonDrawerInset';
 import { playPaperTap } from './paperTap';
+import type { PaperEmphasisState } from './paperEmphasis';
 
 interface PaperFocusProps {
   selectedId: string | null;
@@ -20,6 +22,8 @@ interface PaperFocusProps {
   onOverview: () => void;
   /** Lets FIND ME fly to a Person who may already be focused. */
   flyTo: MutableRefObject<((id: string) => void) | null>;
+  /** Its Spread sets where the Person and their relatives are drawn. */
+  state: MutableRefObject<PaperEmphasisState>;
 }
 
 /**
@@ -27,7 +31,7 @@ interface PaperFocusProps {
  * focus flies back to the overview. A resize or a turned phone reframes the
  * same way.
  */
-export function PaperFocus({ selectedId, layout, ids, links, matchIds, drawerInset, onOverview, flyTo }: PaperFocusProps) {
+export function PaperFocus({ selectedId, layout, ids, links, matchIds, drawerInset, onOverview, flyTo, state }: PaperFocusProps) {
   const controls = useThree((three) => three.controls) as CameraControls | null;
   const canvas = useThree((three) => three.gl.domElement);
   const size = useThree((three) => three.size);
@@ -38,7 +42,8 @@ export function PaperFocus({ selectedId, layout, ids, links, matchIds, drawerIns
         onOverview();
         return true;
       }
-      const disc = layout.get(id);
+      const drawn = spreadLayout(layout, state.current.spread);
+      const disc = drawn.get(id);
       if (!controls || !disc || !(controls.camera instanceof THREE.PerspectiveCamera)) return false;
       const emphasis = paperSearchEmphasis({ ids, links, hoveredId: null, selectedId: id, matchIds });
       const rect = canvas.getBoundingClientRect();
@@ -46,7 +51,7 @@ export function PaperFocus({ selectedId, layout, ids, links, matchIds, drawerIns
       const drawerLeft = window.innerWidth - drawerInset.rightPx;
       const { position, target } = paperFlyTo({
         person: disc,
-        reach: paperFocusReach(layout, disc, emphasis),
+        reach: paperFocusReach(drawn, disc, emphasis),
         from: { position: controls.getPosition(new THREE.Vector3(), true), target: controls.getTarget(new THREE.Vector3(), true) },
         viewport: { width: rect.width, height: rect.height },
         inset: { rightPx: Math.max(0, rect.right - drawerLeft), bottomPx: Math.max(0, rect.bottom - sheetTop) },
@@ -55,7 +60,7 @@ export function PaperFocus({ selectedId, layout, ids, links, matchIds, drawerIns
       void controls.setLookAt(position.x, position.y, position.z, target.x, target.y, target.z, smooth);
       return true;
     },
-    [controls, canvas, layout, ids, links, matchIds, drawerInset, onOverview]
+    [controls, canvas, layout, ids, links, matchIds, drawerInset, onOverview, state]
   );
 
   useEffect(() => {

@@ -309,3 +309,26 @@ Preconditions:
 - In a throttled tab the 2D cards' 0.15 s opacity transition does not advance until a frame is drawn: take two or three `orca screenshot`s before reading `opacity`.
 - A 2D match can sit off-screen, where `ui.sh person` misses it; dispatch a `click` on its `.node-card` and say so.
 - The MUI ripple under COLLAPSE ALL mounts on the first mouseleave, so a fingerprint can differ by one `span` with the pointer's history; capture base and branch with the same steps in the same order.
+
+## Paper 3D Spread (LIN-129)
+
+### Sub-features
+
+- `paper-3d-spread`: INSTRUMENTS in Paper 3D shows SPREAD, a small slider under LABELS / LINKS / ARROWS, on desktop and phone; Cosmos shows none. It runs continuously from 1x (left, today's layout, where it starts on each load) to 3x. Dragging it moves every shown Person straight out from the tree's centre by that factor, with their lines and names; discs and names keep their size, so links lengthen and the tree keeps its shape. The camera holds still while dragging, except with a Person selected: it moves with them, so they stay put on screen while their relatives move away. The zoom-out limit and the orbit box grow with the Spread, so a full zoom-out, RESET VIEWPORT and R frame the whole spread tree. Hover, clicks, search, Connect Mode, Ghost Previews, the editing panel's rings and a newly added Person all sit at the spread places. The value survives Paper → Cosmos or 2D → Paper and is back at 1x after a reload; nothing is saved to `localStorage` or Supabase.
+
+### Driving it with ui.sh
+
+- Paper 3D at desktop size (`set viewport 1280 812 2`), tab in front, intro settled; open INSTRUMENTS. The slider's input is `input[aria-label="Spread"]`; its `aria-valuetext` reads the value (`1.0x`).
+- **Move it.** `ui.sh tap` the right end of the slider's rail (MUI jumps the thumb to a rail tap) for 3x, the middle for 2x; for a drag, dispatch `pointerdown` on the thumb and a run of `pointermove`s along the rail with `orca eval`, and say so.
+- **Spread, not zoom.** Record every disc's translation and scale from the instanced mesh (`getMatrixAt`, via R3F's `_roots`, see [search](#paper-search-lin-97)) at 1x and at 3x: each translation at 3x is the 1x one moved out from the same centre by 3, and every scale is unchanged. At 1x after the move back, the record equals the first one exactly.
+- **No re-render per tick.** The slider is uncontrolled and its `onChange` writes only the Spread ref the scene reads each frame (`PaperSpreadSlider.tsx`, `PaperSpreadRig.tsx`). A live check needs a React commit counter: when `window.__REACT_DEVTOOLS_GLOBAL_HOOK__` exists, wrap its `onCommitFiberRoot` with `orca eval`, drag, and expect commits only from the slider's own root updates, none per tick in the Canvas root (R3F's `_roots`). Without the hook, report it as checked in the code.
+- **Camera.** Read `controls.getTarget` and `getPosition` from R3F's store before and after a move with nobody selected: unchanged. Select a Person, move the slider, read again: target and position moved by the same vector, and the Person's disc projects to the same screen point.
+- **Limits.** At 3x, twenty wheel notches out then a capture: the whole tree is on screen. R and RESET VIEWPORT frame it whole too.
+- **Survives a switch.** Set 2x, switch to Cosmos and back (Canvas Mode switch) and to 2D and back: the slider reads `2.0x` and the record matches the 2x one. Reload: `1.0x`. `Object.keys(localStorage)` holds no new key.
+- **Proof.** Capture `paper-3d-spread 1x`, `3x`, `3x-selected`, `3x-zoomed-out`, `after-switch`, `after-reload`, `phone-instruments` and `cosmos-instruments`.
+
+### Gotchas
+
+- The INSTRUMENTS panel opens to at most 800 px high and clips what is below; with SPREAD added, check the last items (VISIBILITY) still show on a short viewport.
+- A selected Person behind a flight still in progress moves the flight's end with them; let the focus flight settle before reading the camera for the follow check.
+- The fog follows the camera's distance, so at 3x with the camera still, far Persons fade into the paper until you zoom out.

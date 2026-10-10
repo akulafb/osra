@@ -78,23 +78,23 @@ function PaperLineKind({
     () => ({ line: new THREE.Color(colour), ink: new THREE.Color(ink), paper: new THREE.Color(paper), out: new THREE.Color() }),
     [colour, ink, paper]
   );
-  const drawn = useRef<{ geometry?: object; colours?: object; emphasis?: PaperEmphasisState['emphasis']; drift?: PaperEmphasisState['drift'] }>({});
+  const drawn = useRef<{ geometry?: object; colours?: object } & Partial<Pick<PaperEmphasisState, 'emphasis' | 'drift' | 'spread'>>>({});
   const scratch = useMemo(() => ({ from: new THREE.Vector3(), to: new THREE.Vector3() }), []);
 
   useFrame(() => {
     const segments = ref.current;
     if (!segments) return;
     const { geometry } = segments;
-    const { emphasis, drift } = state.current;
+    const { emphasis, drift, spread } = state.current;
     const last = drawn.current;
     const fresh = last.geometry !== geometry;
 
-    if (fresh || drift !== last.drift) {
+    if (fresh || drift !== last.drift || spread !== last.spread) {
       const { from, to } = scratch;
       let moved = false;
       lines.forEach((line, i) => {
-        placeOf(layout, drift, line.sourceId, from);
-        placeOf(layout, drift, line.targetId, to);
+        placeOf(layout, state.current, line.sourceId, from);
+        placeOf(layout, state.current, line.targetId, to);
         if (setPaperSegment(geometry, i, from, to)) moved = true;
       });
       if (moved || fresh) geometry.computeBoundingSphere();
@@ -111,7 +111,7 @@ function PaperLineKind({
       setPaperColours(geometry, rgb);
     }
 
-    drawn.current = { geometry, colours, emphasis, drift };
+    drawn.current = { geometry, colours, emphasis, drift, spread };
   });
 
   return (
@@ -167,20 +167,20 @@ function PaperArrows({
     }),
     []
   );
-  const drawn = useRef<{ mesh?: object; colours?: object; emphasis?: PaperEmphasisState['emphasis']; drift?: PaperEmphasisState['drift'] }>({});
+  const drawn = useRef<{ mesh?: object; colours?: object } & Partial<Pick<PaperEmphasisState, 'emphasis' | 'drift' | 'spread'>>>({});
 
   useFrame(() => {
     const mesh = meshRef.current;
     if (!mesh) return;
-    const { emphasis, drift } = state.current;
+    const { emphasis, drift, spread } = state.current;
     const last = drawn.current;
     const fresh = last.mesh !== mesh;
 
-    if (fresh || drift !== last.drift) {
+    if (fresh || drift !== last.drift || spread !== last.spread) {
       const { parent, child, direction, up, quaternion, matrix, one } = scratch;
       arrows.forEach((line, i) => {
-        placeOf(layout, drift, line.sourceId, parent);
-        placeOf(layout, drift, line.targetId, child);
+        placeOf(layout, state.current, line.sourceId, parent);
+        placeOf(layout, state.current, line.targetId, child);
         direction.subVectors(child, parent);
         if (direction.lengthSq() === 0) direction.copy(up);
         direction.normalize();
@@ -199,7 +199,7 @@ function PaperArrows({
       if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
     }
 
-    drawn.current = { mesh, colours, emphasis, drift };
+    drawn.current = { mesh, colours, emphasis, drift, spread };
   });
 
   return <instancedMesh key={arrows.length} ref={meshRef} args={[geometry, material, arrows.length]} />;

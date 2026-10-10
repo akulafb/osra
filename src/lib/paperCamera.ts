@@ -1,4 +1,5 @@
 import type { Point3 } from './paperLayout';
+import { spreadFrame, type PaperSpread } from './paperSpread';
 
 /** How long the view must sit without pointer, wheel or key input before it starts to turn on its own. */
 export const PAPER_IDLE_SECONDS = 3;
@@ -48,11 +49,17 @@ export interface PaperCameraLimits {
 }
 
 /**
- * The zoom limits and the orbit point's box for a tree framed by `frame`. From
- * anywhere in the box, zooming all the way out brings the tree's centre back
- * on screen.
+ * The zoom limits and the orbit point's box for a tree framed by `frame`, drawn
+ * at `spread`. From anywhere in the box, zooming all the way out brings the
+ * tree's centre back on screen.
  */
-export function paperCameraLimits(frame: { center: Point3; radius: number }, fovDegrees: number, aspect: number): PaperCameraLimits {
+export function paperCameraLimits(
+  stillFrame: { center: Point3; radius: number },
+  fovDegrees: number,
+  aspect: number,
+  spread?: PaperSpread
+): PaperCameraLimits {
+  const frame = spread ? spreadFrame(stillFrame, spread) : stillFrame;
   const span = Math.max(frame.radius, MIN_SPAN);
   const half = span * BOUNDARY_SPANS;
   const { x, y, z } = frame.center;

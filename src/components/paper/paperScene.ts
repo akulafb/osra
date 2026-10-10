@@ -36,6 +36,9 @@ export function paperLineShown(type: FamilyLink['type'], toggles: { links: boole
 }
 
 export const PAPER_HOVER_FRAME_PRIORITY = -1;
+/** The Spread reaches the scene first, and the camera follows it, before anyone hit-tests or draws. */
+export const PAPER_SPREAD_FRAME_PRIORITY = PAPER_HOVER_FRAME_PRIORITY - 1;
+export const PAPER_CAMERA_FOLLOW_FRAME_PRIORITY = PAPER_SPREAD_FRAME_PRIORITY + 0.5;
 export const PAPER_REVEAL_FRAME_PRIORITY = PAPER_HOVER_FRAME_PRIORITY + 0.5;
 export const PAPER_SEARCH_FRAME_PRIORITY = PAPER_REVEAL_FRAME_PRIORITY + 0.25;
 

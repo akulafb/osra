@@ -34,20 +34,21 @@ interface PaperLabelsProps {
 export function PaperLabels({ nodes, layout, ink, viewDistance, state, lifecycleInk }: PaperLabelsProps) {
   const texts = useRef(new Map<string, TroikaText>());
   const anchors = useRef(new Map<string, THREE.Group>());
-  const placed = useRef({ layout, drift: state.current.drift });
+  const placed = useRef({ layout, drift: state.current.drift, spread: state.current.spread });
   const point = useRef(new THREE.Vector3());
 
   useFrame(({ camera }) => {
     const start = viewDistance.current;
     const end = start * LABEL_FADE_END;
-    const { drift } = state.current;
-    if (drift !== placed.current.drift || layout !== placed.current.layout) {
-      anchors.current.forEach((anchor, id) => placeOf(layout, drift, id, anchor.position));
-      placed.current = { layout, drift };
+    const { drift, spread } = state.current;
+    const last = placed.current;
+    if (drift !== last.drift || spread !== last.spread || layout !== last.layout) {
+      anchors.current.forEach((anchor, id) => placeOf(layout, state.current, id, anchor.position));
+      placed.current = { layout, drift, spread };
     }
     texts.current.forEach((text, id) => {
       if (!layout.has(id)) return;
-      placeOf(layout, drift, id, point.current);
+      placeOf(layout, state.current, id, point.current);
       const fade =
         depthFade(camera.position.distanceTo(point.current), start, end) *
         inkOf(state.current, id) *
@@ -72,7 +73,7 @@ export function PaperLabels({ nodes, layout, ink, viewDistance, state, lifecycle
               if (!anchor) anchors.current.delete(node.id);
               else if (anchors.current.get(node.id) !== anchor) {
                 anchors.current.set(node.id, anchor);
-                placeOf(layout, state.current.drift, node.id, anchor.position);
+                placeOf(layout, state.current, node.id, anchor.position);
               }
             }}
           >

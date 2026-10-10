@@ -32,9 +32,8 @@ export function PaperDiscs({ ids, layout, ink, paper, state, onPersonClick }: Pa
       const mesh = meshRef.current;
       if (!mesh) return;
       const { matrix, position, scale } = scratch;
-      const { drift } = state.current;
       discs.forEach((disc, i) => {
-        placeOf(layout, drift, ids[i], position);
+        placeOf(layout, state.current, ids[i], position);
         scale.setScalar(disc.radius * sizeOf(state.current, ids[i]));
         mesh.setMatrixAt(i, matrix.compose(position, quaternion, scale));
       });
@@ -62,12 +61,13 @@ export function PaperDiscs({ ids, layout, ink, paper, state, onPersonClick }: Pa
   }, [place, paint, camera, placedFacing, state]);
 
   useFrame(() => {
-    const { emphasis, drift, size } = state.current;
-    if (!placedFacing.equals(camera.quaternion) || drift !== drawn.current.drift || size !== drawn.current.size) {
+    const { emphasis, drift, size, spread } = state.current;
+    const last = drawn.current;
+    if (!placedFacing.equals(camera.quaternion) || drift !== last.drift || size !== last.size || spread !== last.spread) {
       place(camera.quaternion);
       placedFacing.copy(camera.quaternion);
     }
-    if (emphasis !== drawn.current.emphasis) paint();
+    if (emphasis !== last.emphasis) paint();
     drawn.current = state.current;
   });
 

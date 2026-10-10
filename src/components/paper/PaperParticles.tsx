@@ -39,7 +39,7 @@ export function PaperParticles({
   useFrame(({ clock, gl }) => {
     const dots = points.current;
     if (!dots) return;
-    const { emphasis, drift } = state.current;
+    const { emphasis } = state.current;
     const cached = flowing.current;
     if (cached.emphasis !== emphasis || cached.lines !== lines) {
       const subjectId = emphasisSubject(emphasis);
@@ -54,8 +54,8 @@ export function PaperParticles({
     for (const line of own) {
       const otherId = line.sourceId === subjectId ? line.targetId : line.sourceId;
       const { from, to } = scratch;
-      placeOf(layout, drift, subjectId!, from);
-      placeOf(layout, drift, otherId, to);
+      placeOf(layout, state.current, subjectId!, from);
+      placeOf(layout, state.current, otherId, to);
       const length = from.distanceTo(to);
       if (length === 0) continue;
       const count = Math.max(1, Math.round(length / PARTICLE_SPACING));
