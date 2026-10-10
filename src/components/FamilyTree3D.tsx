@@ -31,15 +31,8 @@ import {
 import { type PersonDrawerInset } from '../hooks/usePersonDrawerInset';
 import { TextureMenuSpring, Tree3DOverlay, type Tree3DSceneCamera, type Tree3DSearch } from './tree3d/Tree3DOverlay';
 import { useIsMobileDevice } from './tree3d/useIsMobileDevice';
-import { Manipulation3DPanel, Connect3DControls, Dissolve3DControls } from './Manipulation3DPanel';
-import {
-  Candidacy,
-  ConnectPair,
-  buildCandidacy,
-  candidacyFor,
-  candidateIds,
-} from './cards/connectCandidates';
-import { KinshipLinkType, ParentRole } from './cards/connectOptions';
+import { Manipulation3DPanel } from './Manipulation3DPanel';
+import { useTree3DEditing, type DirectConnectParams } from './tree3d/useTree3DEditing';
 import { CONNECT_ACCENT } from './cards/relationStyle';
 import { DirectManipulationController } from '../hooks/useDirectManipulation';
 import { needsCanvas } from '../lib/directManipulation';
@@ -78,9 +71,6 @@ function isPreviewLink(l: { type?: string }): boolean {
  */
 const CONNECT_ACCENT_3D = new THREE.Color(CONNECT_ACCENT);
 const CONNECT_NON_CANDIDATE_DIM = 0.2;
-/** Shared so that outside Connect Mode the candidacy identity never changes,
- *  and the scene is not asked to rebuild every node object for nothing. */
-const NO_CANDIDACY: Map<string, Candidacy> = new Map();
 
 const getPlanetMaterial = (nodeId: string, isMobileDevice: boolean = false) => {
   let hash = 0;
@@ -199,13 +189,7 @@ interface FamilyTree3DProps {
     otherParentId?: string | null;
   }) => Promise<void> | void;
   /** Connect Mode (LIN-50): creates the Kinship Link once a pair and kind are chosen. */
-  onDirectConnectNodes?: (params: {
-    sourceNodeId: string;
-    targetNodeId: string;
-    type: 'parent' | 'marriage' | 'divorce';
-    parentRole?: 'mother' | 'father' | null;
-    otherParentId?: string | null;
-  }) => Promise<void> | void;
+  onDirectConnectNodes?: (params: DirectConnectParams) => Promise<void> | void;
   /**
    * Spawn and Dissolve (LIN-55, ADR-0007). Cosmic FX are the 3D *renderings*
    * of these lifecycles, not lifecycles of their own: the module owns the
@@ -297,29 +281,13 @@ export const FamilyTree3DContent: React.FC<FamilyTree3DProps> = ({
   }, [graphData?.nodes]);
 
   // Connect Mode (LIN-50): driven by unified DirectManipulationController
-  const connectSource = useMemo(() => {
-    if (!interaction.connectSourceId || !graphData?.nodes) return null;
-    return graphData.nodes.find(n => n.id === interaction.connectSourceId) ?? null;
-  }, [interaction.connectSourceId, graphData?.nodes]);
-
-  const connectPair = useMemo<ConnectPair | null>(() => {
-    if (interaction.state.phase !== 'choosing-kinship' || !graphData?.nodes) return null;
-    const kinshipState = interaction.state;
-    const source = graphData.nodes.find(n => n.id === kinshipState.sourceNodeId);
-    const target = graphData.nodes.find(n => n.id === kinshipState.targetNodeId);
-    if (!source || !target) return null;
-    return { source, target };
-  }, [interaction.state, graphData?.nodes]);
-
-  const rejectedTarget = useMemo(() => {
-    if (!interaction.rejectedTarget || !graphData?.nodes) return null;
-    const node = graphData.nodes.find(n => n.id === interaction.rejectedTarget!.nodeId);
-    if (!node) return null;
-    return { node, reason: interaction.rejectedTarget!.reason };
-  }, [interaction.rejectedTarget, graphData?.nodes]);
-
   const connectModeRef = useRef<string | null>(null);
   connectModeRef.current = interaction.connectSourceId;
+  // Connect Mode's beam joins a chosen pair. Ids, not nodes, so the graph is
+  // rebuilt only when the pair changes.
+  const kinshipState = interaction.state.phase === 'choosing-kinship' ? interaction.state : null;
+  const beamSourceId = kinshipState?.sourceNodeId ?? null;
+  const beamTargetId = kinshipState?.targetNodeId ?? null;
 
   const confirmingDissolveId = interaction.confirmingDissolveId;
 
@@ -418,10 +386,10 @@ export const FamilyTree3DContent: React.FC<FamilyTree3DProps> = ({
         }
       }
 
-      if (connectPair && bothVisible(connectPair.source.id, connectPair.target.id)) {
+      if (beamSourceId && beamTargetId && bothVisible(beamSourceId, beamTargetId)) {
         previewLinks.push({
-          source: connectPair.source.id,
-          target: connectPair.target.id,
+          source: beamSourceId,
+          target: beamTargetId,
           type: 'preview',
         });
       }
@@ -441,7 +409,8 @@ export const FamilyTree3DContent: React.FC<FamilyTree3DProps> = ({
     visibleClusters3D,
     uniqueClusters,
     pendingLinkPreview,
-    connectPair,
+    beamSourceId,
+    beamTargetId,
   ]);
 
   /**
@@ -469,18 +438,18 @@ export const FamilyTree3DContent: React.FC<FamilyTree3DProps> = ({
     [filteredGraphData.nodes]
   );
 
-  const connectCandidacy = useMemo<Map<string, Candidacy>>(
-    () =>
-      connectSource
-        ? buildCandidacy(graphData, connectSource.id, filteredGraphData.nodes)
-        : NO_CANDIDACY,
-    [connectSource, graphData, filteredGraphData.nodes]
-  );
-
-  const connectCandidateIds = useMemo(
-    () => candidateIds(connectCandidacy),
-    [connectCandidacy]
-  );
+  const { connect: connectControls, dissolve: dissolveControls, pickConnectTarget } = useTree3DEditing({
+    graphData,
+    visibleNodes: filteredGraphData.nodes,
+    interaction,
+    selectedNode,
+    canDissolveSelected: !!canDissolveSelected,
+    onDirectConnectNodes,
+    onDissolveNode,
+  });
+  const connectSource = connectControls.sourceNode;
+  const connectPair = connectControls.pair;
+  const connectCandidateIds = connectControls.candidateIds;
 
   // Family cluster view on zoom-out (LIN-32): fades individuals into per-cluster
   // bubbles when zoomed out. `detailRef` (0..1) drives the node fade below;
@@ -612,32 +581,10 @@ export const FamilyTree3DContent: React.FC<FamilyTree3DProps> = ({
     animate();
   }, [interaction, boundsRef]);
 
-  const exitConnectMode = useCallback(() => {
-    interaction.handleEscape();
-  }, [interaction]);
-
-  const startConnectMode = useCallback(() => {
-    if (!selectedNode) return;
-    interaction.startConnect(selectedNode.id);
-  }, [selectedNode, interaction]);
-
-  /**
-   * Resolve the second click of the pair.
-   */
-  const pickConnectTarget = useCallback(
-    (node: FamilyNode) => {
-      const sourceId = interaction.connectSourceId;
-      if (!sourceId) return;
-      const verdict = candidacyFor(graphData, sourceId, node.id);
-      interaction.pickConnectTarget(node.id, verdict);
-    },
-    [interaction, graphData]
-  );
-
   const handleGraphNodeClick = useCallback(
     (node: FamilyNode) => {
       if (connectModeRef.current) {
-        pickConnectTarget(node);
+        pickConnectTarget(node.id);
         return;
       }
       handleNodeClick(node);
@@ -645,80 +592,9 @@ export const FamilyTree3DContent: React.FC<FamilyTree3DProps> = ({
     [handleNodeClick, pickConnectTarget]
   );
 
-  const handleConnectConfirm = useCallback(
-    async (type: KinshipLinkType, parentRole?: ParentRole, parentIsSource?: boolean, otherParentId?: string | null) => {
-      if (!connectPair) return;
-      // The picker may name the target as the parent, which flips the edge.
-      const flipped = type === 'parent' && parentIsSource === false;
-      await Promise.resolve(
-        onDirectConnectNodes?.({
-          sourceNodeId: flipped ? connectPair.target.id : connectPair.source.id,
-          targetNodeId: flipped ? connectPair.source.id : connectPair.target.id,
-          type,
-          parentRole,
-          otherParentId,
-        })
-      );
-      // Escape only steps back to targeting; a confirmed link is the end of
-      // Connect Mode, so land on the source as the 2D view does.
-      interaction.selectNode(connectPair.source.id);
-    },
-    [connectPair, onDirectConnectNodes, interaction]
-  );
-
   const handleGraphBackgroundClick = useCallback(() => {
     interaction.handleBackgroundClick();
   }, [interaction]);
-
-  const connectControls = useMemo<Connect3DControls>(
-    () => ({
-      sourceNode: connectSource,
-      pair: connectPair,
-      candidacy: connectCandidacy,
-      candidateIds: connectCandidateIds,
-      visibleNodes: filteredGraphData.nodes,
-      rejected: rejectedTarget,
-      onStart: startConnectMode,
-      onPickTarget: pickConnectTarget,
-      onCancelPair: () => interaction.handleEscape(),
-      onExit: exitConnectMode,
-      onConfirm: handleConnectConfirm,
-    }),
-    [
-      connectSource,
-      connectPair,
-      connectCandidacy,
-      connectCandidateIds,
-      filteredGraphData.nodes,
-      rejectedTarget,
-      startConnectMode,
-      pickConnectTarget,
-      exitConnectMode,
-      handleConnectConfirm,
-      interaction,
-    ]
-  );
-
-  /**
-   * Delete confirmation, mirroring Connect Mode's split: the panel offers the
-   * hit targets, the scene renders the state.
-   */
-  const handleDissolveConfirm = useCallback(async () => {
-    const node = selectedNode;
-    if (!node) return;
-    await Promise.resolve(onDissolveNode?.(node));
-  }, [selectedNode, onDissolveNode]);
-
-  const dissolveControls = useMemo<Dissolve3DControls>(
-    () => ({
-      canDissolve: !!canDissolveSelected,
-      isConfirming: confirmingDissolveId === selectedNode?.id,
-      onStart: () => selectedNode && interaction.startDissolve(selectedNode.id),
-      onCancel: () => interaction.handleEscape(),
-      onConfirm: handleDissolveConfirm,
-    }),
-    [canDissolveSelected, confirmingDissolveId, selectedNode, interaction, handleDissolveConfirm]
-  );
 
   // Reset View functionality
   const resetView = useCallback(() => {
@@ -1215,7 +1091,6 @@ export const FamilyTree3DContent: React.FC<FamilyTree3DProps> = ({
     connectSource,
     connectPair,
     confirmingDissolveId,
-    exitConnectMode,
     interaction,
   ]);
 

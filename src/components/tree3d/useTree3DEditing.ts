@@ -5,7 +5,7 @@ import type { Connect3DControls, Dissolve3DControls } from '../Manipulation3DPan
 import { buildCandidacy, candidacyFor, candidateIds, type Candidacy, type ConnectPair } from '../cards/connectCandidates';
 import type { KinshipLinkType, ParentRole } from '../cards/connectOptions';
 
-export interface PaperConnectParams {
+export interface DirectConnectParams {
   sourceNodeId: string;
   targetNodeId: string;
   type: KinshipLinkType;
@@ -13,20 +13,35 @@ export interface PaperConnectParams {
   otherParentId?: string | null;
 }
 
+/** Shared so that outside Connect Mode the candidacy identity never changes,
+ *  and the scene is not asked to rebuild every node object for nothing. */
 const NO_CANDIDACY: Map<string, Candidacy> = new Map();
 
 function nodeById(graph: FamilyGraph, id: string | null): FamilyNode | null {
   return id ? graph.nodes.find((n) => n.id === id) ?? null : null;
 }
 
+/** The ends of the link a confirmed pair writes: the picker may name the target as the parent, which flips the edge. */
+export function connectEnds(
+  pair: ConnectPair,
+  type: KinshipLinkType,
+  parentIsSource?: boolean
+): Pick<DirectConnectParams, 'sourceNodeId' | 'targetNodeId'> {
+  const flipped = type === 'parent' && parentIsSource === false;
+  return flipped
+    ? { sourceNodeId: pair.target.id, targetNodeId: pair.source.id }
+    : { sourceNodeId: pair.source.id, targetNodeId: pair.target.id };
+}
+
 /**
- * Connect Mode and the Dissolve question for the 3D editing panel, as Cosmos
- * offers them (LIN-50, LIN-51). The state stays in the direct-manipulation
- * controller and the writes in FamilyTree's handlers (ADR 0004).
+ * Connect Mode and the Dissolve question for the 3D editing panel (LIN-50,
+ * LIN-51), shared by Cosmos and Paper. The state stays in the
+ * direct-manipulation controller and the writes in FamilyTree's handlers
+ * (ADR 0004). `visibleNodes` are the people the scene draws.
  */
-export function usePaperEditing({
+export function useTree3DEditing({
   graphData,
-  shownNodes,
+  visibleNodes,
   interaction,
   selectedNode,
   canDissolveSelected,
@@ -34,11 +49,11 @@ export function usePaperEditing({
   onDissolveNode,
 }: {
   graphData: FamilyGraph;
-  shownNodes: FamilyNode[];
+  visibleNodes: FamilyNode[];
   interaction: DirectManipulationController;
   selectedNode: FamilyNode | null;
   canDissolveSelected: boolean;
-  onDirectConnectNodes?: (params: PaperConnectParams) => Promise<void> | void;
+  onDirectConnectNodes?: (params: DirectConnectParams) => Promise<void> | void;
   onDissolveNode?: (node: FamilyNode) => Promise<void> | void;
 }): { connect: Connect3DControls; dissolve: Dissolve3DControls; pickConnectTarget: (id: string) => void } {
   const sourceNode = useMemo(() => nodeById(graphData, interaction.connectSourceId), [graphData, interaction.connectSourceId]);
@@ -56,8 +71,8 @@ export function usePaperEditing({
   }, [interaction.rejectedTarget, graphData]);
 
   const candidacy = useMemo(
-    () => (sourceNode ? buildCandidacy(graphData, sourceNode.id, shownNodes) : NO_CANDIDACY),
-    [sourceNode, graphData, shownNodes]
+    () => (sourceNode ? buildCandidacy(graphData, sourceNode.id, visibleNodes) : NO_CANDIDACY),
+    [sourceNode, graphData, visibleNodes]
   );
   const candidates = useMemo(() => candidateIds(candidacy), [candidacy]);
 
@@ -73,16 +88,11 @@ export function usePaperEditing({
   const confirmConnect = useCallback(
     async (type: KinshipLinkType, parentRole?: ParentRole, parentIsSource?: boolean, otherParentId?: string | null) => {
       if (!pair) return;
-      const flipped = type === 'parent' && parentIsSource === false;
       await Promise.resolve(
-        onDirectConnectNodes?.({
-          sourceNodeId: flipped ? pair.target.id : pair.source.id,
-          targetNodeId: flipped ? pair.source.id : pair.target.id,
-          type,
-          parentRole,
-          otherParentId,
-        })
+        onDirectConnectNodes?.({ ...connectEnds(pair, type, parentIsSource), type, parentRole, otherParentId })
       );
+      // Escape only steps back to targeting; a confirmed link is the end of
+      // Connect Mode, so land on the source as the 2D view does.
       interaction.selectNode(pair.source.id);
     },
     [pair, onDirectConnectNodes, interaction]
@@ -94,7 +104,7 @@ export function usePaperEditing({
       pair,
       candidacy,
       candidateIds: candidates,
-      visibleNodes: shownNodes,
+      visibleNodes,
       rejected,
       onStart: () => selectedNode && interaction.startConnect(selectedNode.id),
       onPickTarget: (node) => pickConnectTarget(node.id),
@@ -102,7 +112,7 @@ export function usePaperEditing({
       onExit: () => interaction.handleEscape(),
       onConfirm: confirmConnect,
     }),
-    [sourceNode, pair, candidacy, candidates, shownNodes, rejected, selectedNode, interaction, pickConnectTarget, confirmConnect]
+    [sourceNode, pair, candidacy, candidates, visibleNodes, rejected, selectedNode, interaction, pickConnectTarget, confirmConnect]
   );
 
   const dissolve = useMemo<Dissolve3DControls>(

@@ -3,6 +3,7 @@ import {
   otherParentChoice,
   otherParentChoiceKey,
   resolveOtherParent,
+  resolveOtherParentFor,
   stillOfferedOtherParent,
 } from './otherParent';
 import type { FamilyLink } from '../types/graph';
@@ -168,5 +169,21 @@ describe('stillOfferedOtherParent', () => {
   it('is nobody for "Not known"', () => {
     expect(stillOfferedOtherParent(choose, null)).toBeNull();
     expect(stillOfferedOtherParent(choose, undefined)).toBeNull();
+  });
+});
+
+describe('resolveOtherParentFor', () => {
+  const links = [marriage('karim', 'rasha'), divorce('karim', 'mona'), parent('karim', 'sami'), parent('mona', 'sami')];
+
+  it('is the spouse the form sent, while the links still offer them', () => {
+    expect(resolveOtherParentFor(links, 'karim', 'mona')).toBe('mona');
+  });
+
+  it('is nobody for someone the links do not offer', () => {
+    expect(resolveOtherParentFor(links, 'karim', 'huda')).toBeNull();
+  });
+
+  it('never gives an existing child a third parent', () => {
+    expect(resolveOtherParentFor(links, 'karim', 'rasha', 'sami')).toBeNull();
   });
 });

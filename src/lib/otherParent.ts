@@ -105,3 +105,16 @@ export function stillOfferedOtherParent(choice: OtherParentChoice, sent: string 
       return choice.candidates.some((c) => c.personId === sent) ? sent : null;
   }
 }
+
+/**
+ * The other parent a new parent link takes with it (LIN-79): the one the form
+ * sent, if `links` still offer them, else none.
+ */
+export function resolveOtherParentFor(
+  links: readonly FamilyLink[],
+  parentId: string,
+  sent: string | null | undefined,
+  childId?: string
+): string | null {
+  return stillOfferedOtherParent(otherParentChoice(parentId, links, childId), sent);
+}

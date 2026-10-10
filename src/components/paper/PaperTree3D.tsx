@@ -48,7 +48,7 @@ import { PaperWebGLBoundary, PaperWebGLFallback } from './PaperWebGLFallback';
 import { browserHasWebGL } from './browserHasWebGL';
 import { isBackgroundTap, isTap, paperFrame, paperLineShown, type ScreenPoint } from './paperScene';
 import { PaperGraphHandle } from './PaperGraphHandle';
-import { usePaperEditing, type PaperConnectParams } from './usePaperEditing';
+import { useTree3DEditing, type DirectConnectParams } from '../tree3d/useTree3DEditing';
 import { PaperFlight } from './PaperFlight';
 import { PaperSearch } from './PaperSearch';
 import { usePaperKeys } from './usePaperKeys';
@@ -94,7 +94,7 @@ export interface PaperTree3DProps {
     targetNodeId: string;
     otherParentId?: string | null;
   }) => Promise<void> | void;
-  onDirectConnectNodes?: (params: PaperConnectParams) => Promise<void> | void;
+  onDirectConnectNodes?: (params: DirectConnectParams) => Promise<void> | void;
   canDissolveSelected: boolean;
   onDissolveNode?: (node: FamilyNode) => Promise<void> | void;
   /** Spawn and Dissolve progress, drawn in ink. */
@@ -254,9 +254,9 @@ export function PaperTree3D({
     [layout, shownIds]
   );
 
-  const { connect, dissolve, pickConnectTarget } = usePaperEditing({
+  const { connect, dissolve, pickConnectTarget } = useTree3DEditing({
     graphData,
-    shownNodes: shown.nodes,
+    visibleNodes: shown.nodes,
     interaction,
     selectedNode,
     canDissolveSelected,
@@ -282,9 +282,9 @@ export function PaperTree3D({
   const ghostLook = useMemo<GhostPreviewLook>(
     () => ({
       ...GHOST_LOOK,
-      landing: (anchorId, relation) => {
+      landing: (anchorId, relation, otherParentId) => {
         const { layout: placed, shownLayout, graphData: graph } = landingFrom.current;
-        return placed ? paperGhostLanding(placed, graph, anchorId, relation, shownLayout ?? placed) : null;
+        return placed ? paperGhostLanding(placed, graph, anchorId, relation, otherParentId, shownLayout ?? placed) : null;
       },
     }),
     []
