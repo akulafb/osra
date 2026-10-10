@@ -33,10 +33,31 @@ export function spreadPoint(centre: Point3, point: Point3, spread: Spread): Poin
   return spreadInto(centre, point, spread, { x: 0, y: 0, z: 0 });
 }
 
-/** The Spread the scene draws with, and the one centre it spreads from: the tree's, computed once per layout. */
+/** The Spread the scene draws with, and the one centre it spreads from: the tree's, computed once per load. */
 export interface PaperSpread {
   centre: Point3;
   factor: Spread;
+}
+
+/**
+ * The centre every Person spreads out from: the middle of the full layout made
+ * at load. Newcomers placed since leave it where it is, so a newcomer moves
+ * nobody else at any Spread (ADR 0014).
+ */
+export function spreadCentre(layout: PaperLayout, newcomers: ReadonlySet<string>): Point3 {
+  const min = { x: Infinity, y: Infinity, z: Infinity };
+  const max = { x: -Infinity, y: -Infinity, z: -Infinity };
+  for (const [id, disc] of layout) {
+    if (newcomers.has(id)) continue;
+    min.x = Math.min(min.x, disc.x);
+    min.y = Math.min(min.y, disc.y);
+    min.z = Math.min(min.z, disc.z);
+    max.x = Math.max(max.x, disc.x);
+    max.y = Math.max(max.y, disc.y);
+    max.z = Math.max(max.z, disc.z);
+  }
+  if (min.x === Infinity) return { x: 0, y: 0, z: 0 };
+  return { x: (min.x + max.x) / 2, y: (min.y + max.y) / 2, z: (min.z + max.z) / 2 };
 }
 
 /** How far a Person at `point` in the layout moves when the Spread goes from `from` to `to`: the camera moves the same to keep them put on screen. */
@@ -68,7 +89,7 @@ export function spreadOffsets(offsets: ReadonlyMap<string, Point3>, spread: Spre
   return spreadOut;
 }
 
-/** The layout as drawn at `spread`, for the readers that work from a whole layout once (a focus flight, a Ghost Preview's landing). */
+/** The layout as drawn at `spread`, for a reader that works from a whole layout once, such as a focus flight. */
 export function spreadLayout(layout: PaperLayout, spread: PaperSpread): PaperLayout {
   if (spread.factor === 1) return layout;
   const spreadOut = new Map<string, PaperDisc>();

@@ -1,12 +1,13 @@
-import { useEffect, useMemo, useRef, type MutableRefObject } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, type MutableRefObject } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import type { CameraControls } from '@react-three/drei';
 import * as THREE from 'three';
 import { paperCameraLimits, paperIdleRotates, paperIdleRotateSpeed, PAPER_MAX_FRAME_SECONDS } from '../../lib/paperCamera';
 import type { PaperLayout } from '../../lib/paperLayout';
-import { spreadFollow, type PaperSpread } from '../../lib/paperSpread';
+import type { PaperSpread } from '../../lib/paperSpread';
 import type { PaperEmphasisState } from './paperEmphasis';
-import { PAPER_CAMERA_FOLLOW_FRAME_PRIORITY, type PaperFrame } from './paperScene';
+import { PAPER_CAMERA_FOLLOW_FRAME_PRIORITY, PAPER_CAMERA_LIMITS_FRAME_PRIORITY, type PaperFrame } from './paperScene';
+import { followSpread, limitCamera } from './paperSpreadCamera';
 
 const INPUT_EVENTS = ['pointerdown', 'pointermove', 'wheel', 'keydown'] as const;
 
@@ -35,38 +36,34 @@ interface Limited {
  */
 export function PaperCameraRig({ frame, layout, state, modalOpen, selectedId }: PaperCameraRigProps) {
   const controls = useThree((three) => three.controls) as CameraControls | null;
+  const camera = useThree((three) => three.camera);
   const size = useThree((three) => three.size);
   const lastInput = useRef(performance.now());
+  const followed = useRef<PaperSpread | null>(null);
   const limited = useRef<Limited | null>(null);
-  const scratch = useMemo(() => ({ now: new THREE.Vector3(), end: new THREE.Vector3(), box: new THREE.Box3() }), []);
 
-  useFrame(({ camera }) => {
+  useFrame(() => {
+    const { spread } = state.current;
+    const from = followed.current;
+    followed.current = spread;
+    const place = selectedId ? layout.get(selectedId) : undefined;
+    if (!controls || !from || from === spread || !place) return;
+    followSpread(controls, place, from, spread);
+  }, PAPER_CAMERA_FOLLOW_FRAME_PRIORITY);
+
+  const limit = useCallback(() => {
     if (!controls || !(camera instanceof THREE.PerspectiveCamera) || !(size.width > 0 && size.height > 0)) return;
     const { spread } = state.current;
     const aspect = size.width / size.height;
     const last = limited.current;
     if (last && last.controls === controls && last.frame === frame && last.spread === spread && last.aspect === aspect && last.fov === camera.fov) return;
-
-    const { minDistance, maxDistance, boundary } = paperCameraLimits(frame, camera.fov, aspect, spread);
-    controls.minDistance = minDistance;
-    controls.maxDistance = maxDistance;
-    const { min, max } = boundary;
-    scratch.box.min.set(min.x, min.y, min.z);
-    scratch.box.max.set(max.x, max.y, max.z);
-    controls.setBoundary(scratch.box);
+    limitCamera(controls, paperCameraLimits(frame, camera.fov, aspect, spread), !!last && last.spread !== spread);
     limited.current = { controls, frame, spread, aspect, fov: camera.fov };
+  }, [controls, camera, frame, size.width, size.height, state]);
 
-    const place = selectedId ? layout.get(selectedId) : undefined;
-    if (!last || last.spread === spread || !place) return;
-    const d = spreadFollow(place, last.spread, spread);
-    const { now, end } = scratch;
-    controls.getTarget(now, false).add(d);
-    controls.getTarget(end, true).add(d);
-    // camera-controls' moveTo without a transition also snaps the target to its end, so a flight in progress gets its end back with a second, smooth move.
-    const flying = !now.equals(end);
-    void controls.moveTo(now.x, now.y, now.z, false);
-    if (flying) void controls.moveTo(end.x, end.y, end.z, true);
-  }, PAPER_CAMERA_FOLLOW_FRAME_PRIORITY);
+  // A layout effect, so the limits are set before the first fit: camera-controls clamps a distance only as it is set.
+  useLayoutEffect(() => limit(), [limit]);
+  useFrame(() => limit(), PAPER_CAMERA_LIMITS_FRAME_PRIORITY);
 
   useEffect(() => {
     const onInput = () => {

@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { layoutPaperTree } from './paperLayout';
+import { layoutPaperTree, placeNewcomer } from './paperLayout';
 import { paperFrame } from '../components/paper/paperScene';
 import { KINSHIP_FIXTURE_TREE } from './fixtures/kinshipFixtureTree';
-import { SPREAD_MAX, SPREAD_MIN, spreadFollow, spreadFrame, spreadLayout, spreadOffsets, spreadPoint, toSpread, type Spread } from './paperSpread';
+import { SPREAD_MAX, SPREAD_MIN, spreadCentre, spreadFollow, spreadFrame, spreadLayout, spreadOffsets, spreadPoint, toSpread, type Spread } from './paperSpread';
 
 const at = (n: number) => n as Spread;
 
@@ -123,5 +123,26 @@ describe('spreadLayout', () => {
 
   it('is the still layout itself at 1x', () => {
     expect(spreadLayout(layout, { centre, factor: at(1) })).toBe(layout);
+  });
+});
+
+describe('spreadCentre', () => {
+  const loaded = layoutPaperTree(KINSHIP_FIXTURE_TREE);
+  const outermost = [...loaded].reduce((far, next) => (next[1].x > far[1].x ? next : far))[0];
+  const withNewcomer = placeNewcomer(loaded, 'newcomer', [{ source: outermost, target: 'newcomer', type: 'parent' }]);
+
+  it('is the middle of the full layout made at load', () => {
+    expect(spreadCentre(loaded, new Set())).toEqual(paperFrame(loaded, loaded.keys()).center);
+  });
+
+  it('stays where it was when a newcomer is placed at the edge of the tree', () => {
+    expect(paperFrame(withNewcomer, withNewcomer.keys()).center).not.toEqual(paperFrame(loaded, loaded.keys()).center);
+    expect(spreadCentre(withNewcomer, new Set(['newcomer']))).toEqual(spreadCentre(loaded, new Set()));
+  });
+
+  it('leaves every other Person where they were drawn when a newcomer arrives at 3x', () => {
+    const before = spreadLayout(loaded, { centre: spreadCentre(loaded, new Set()), factor: at(3) });
+    const after = spreadLayout(withNewcomer, { centre: spreadCentre(withNewcomer, new Set(['newcomer'])), factor: at(3) });
+    for (const [id, disc] of before) expect(after.get(id), id).toEqual(disc);
   });
 });

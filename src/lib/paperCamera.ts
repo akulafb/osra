@@ -49,9 +49,9 @@ export interface PaperCameraLimits {
 }
 
 /**
- * The zoom limits and the orbit point's box for a tree framed by `frame`, drawn
- * at `spread`. From anywhere in the box, zooming all the way out brings the
- * tree's centre back on screen.
+ * The zoom limits and the orbit point's box for a tree framed by `stillFrame`,
+ * drawn at `spread`. From anywhere in the box, zooming all the way out brings
+ * the tree's centre back on screen.
  */
 export function paperCameraLimits(
   stillFrame: { center: Point3; radius: number },

@@ -19,7 +19,7 @@ import type { PaperLayout, Point3 } from '../../lib/paperLayout';
 import type { LifecycleController } from '../../hooks/useLifecycles';
 import { holdingProgress, inLifecycle, paperLifecycleDisc, paperLifecycleDraws, steadyLines } from '../../lib/paperLifecycle';
 import { paperGhostLanding } from '../../lib/paperGhost';
-import { spreadFrame, spreadInto, spreadPoint, toSpread, type Spread } from '../../lib/paperSpread';
+import { spreadCentre, spreadFrame, spreadInto, spreadPoint, toSpread, type Spread } from '../../lib/paperSpread';
 import { Tree3DOverlay, type Tree3DSceneCamera, type Tree3DSearch } from '../tree3d/Tree3DOverlay';
 import { useIsMobileDevice } from '../tree3d/useIsMobileDevice';
 import { PaperDiscs } from './PaperDiscs';
@@ -286,11 +286,18 @@ export function PaperTree3D({
 
   const frame = useMemo(() => (fixedLayout ? paperFrame(fixedLayout, fixedLayout.keys()) : null), [fixedLayout]);
 
+  const loadedCentre = layoutState.status === 'ready' ? spreadCentre(layoutState.layout, layoutState.newcomers) : null;
+  const [centreX, centreY, centreZ] = loadedCentre ? [loadedCentre.x, loadedCentre.y, loadedCentre.z] : [];
+  const centre = useMemo(
+    () => (centreX === undefined || centreY === undefined || centreZ === undefined ? null : { x: centreX, y: centreY, z: centreZ }),
+    [centreX, centreY, centreZ]
+  );
+
   // A layout effect, so the spread is set before the scene's effects frame the camera.
   useLayoutEffect(() => {
-    if (!frame) return;
-    emphasisState.current = { ...emphasisState.current, spread: { centre: frame.center, factor: toSpread(spread.current) } };
-  }, [frame, spread]);
+    if (!centre) return;
+    emphasisState.current = { ...emphasisState.current, spread: { centre, factor: toSpread(spread.current) } };
+  }, [centre, spread]);
 
   const landingFrom = useRef({ layout: fixedLayout, shownLayout: layout, graphData });
   useLayoutEffect(() => {
@@ -541,10 +548,10 @@ export function PaperTree3D({
               dollyToCursor
             />
             <ContextLossWatch onLost={handleSceneFailed} />
-            {layout && frame && (
+            {layout && frame && centre && (
               <>
                 <PaperView viewDistance={viewDistance} />
-                <PaperSpreadRig spread={spread} centre={frame.center} layout={layout} liveNodes={liveNodes} state={emphasisState} />
+                <PaperSpreadRig spread={spread} centre={centre} layout={layout} liveNodes={liveNodes} state={emphasisState} />
                 <PaperCameraRig frame={frame} layout={layout} state={emphasisState} modalOpen={isModalOpen} selectedId={interaction.selectedNodeId} />
                 <PaperFlight held={heldKeys} viewDistance={viewDistance} state={emphasisState} paused={keyBlocks.flight} />
                 <InitialFraming fit={fitFrame} />

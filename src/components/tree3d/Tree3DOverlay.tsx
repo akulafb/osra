@@ -99,7 +99,7 @@ interface Tree3DOverlayProps {
   uniqueClusters: string[];
   onEnsureClusterVisible3D: (cluster: string) => void;
   instrumentsSceneItems?: React.ReactNode;
-  /** Shown under the LABELS / LINKS / ARROWS switches; Paper 3D puts SPREAD here. */
+  /** Shown under the LABELS / LINKS / ARROWS switches. */
   instrumentsDisplayItems?: React.ReactNode;
   navKeys: React.ReactNode;
   /** Optional "See who's new!" control; rendered above NAV CONTROLS, same column */
