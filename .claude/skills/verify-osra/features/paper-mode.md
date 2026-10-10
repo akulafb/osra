@@ -226,6 +226,7 @@ Preconditions:
 - `paper-3d-connect-preview`: in AddRelativeModal (drawer `+ Add Relative`), focusing a connect-to-existing match draws a dashed ink line from the selected Person to that match while both are shown.
 - `paper-3d-connect`: the drawer's `Connect Nodes...` (desktop and phone) or the panel's `🔗 Connect` enters Connect Mode: the panel shows "Connect <name> to…" and "Click a person, or pick from the list." (Cosmos: "Click a glowing planet…") (on a phone the sheet hides first), the Person stays focused, the candidates keep full ink and everyone else, their relatives included, is ghosted at 0.2 ink. Clicking a candidate disc opens the kinship picker and keeps that disc marked; `Establish Link` writes through the same handler as Cosmos. `Cancel (Esc)` or Escape leaves it. On a phone the panel docks at the bottom with only the ring on the disc.
 - The panel, the Ghost Node card and the Connect picker read the live pair's tokens only in Paper; Cosmos keeps its colours.
+- The host sets the look (LIN-125): `FamilyTree3D` passes Cosmos and `PaperTree3D` Paper to the panel, which hands it to the Connect targeting body and picker; `FamilyTree2D` passes its Canvas Mode to the 2D picker. So the Connect copy, the picker's selected-choice tint and the `Establish Link` ink follow the scene, in 2D and 3D.
 
 ### Driving it with ui.sh
 

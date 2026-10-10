@@ -1,5 +1,6 @@
 import React from 'react';
 import { Node2D, FamilyGraph } from '../types/graph';
+import type { CanvasMode } from '../lib/canvasMode';
 import { ConnectPickerCard, PICKER_CARD_WIDTH } from './cards/ConnectPickerCard';
 
 /**
@@ -20,6 +21,7 @@ export interface InlineConnectPickerProps {
   ) => Promise<void> | void;
   onCancel: () => void;
   previewStroke?: string;
+  look: CanvasMode;
 }
 
 export const PICKER_WIDTH = PICKER_CARD_WIDTH;
@@ -33,6 +35,7 @@ export const InlineConnectPicker: React.FC<InlineConnectPickerProps> = ({
   onConfirm,
   previewStroke = '#c084fc',
   onCancel,
+  look,
 }) => {
   // Position between source and target, or centered on target
   const posX = (sourceNode.x + targetNode.x) / 2;
@@ -68,6 +71,7 @@ export const InlineConnectPicker: React.FC<InlineConnectPickerProps> = ({
           isAdmin={isAdmin}
           onConfirm={onConfirm}
           onCancel={onCancel}
+          look={look}
         />
       </foreignObject>
     </g>
