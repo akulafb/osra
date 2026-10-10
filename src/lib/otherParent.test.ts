@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   otherParentChoice,
   otherParentChoiceKey,
+  pickedOtherParent,
   resolveOtherParent,
   resolveOtherParentFor,
   stillOfferedOtherParent,
@@ -107,6 +108,30 @@ describe('resolveOtherParent', () => {
 
   it('is nobody when the pick is not one of the candidates', () => {
     expect(resolveOtherParent(choose, 'huda')).toBeNull();
+  });
+});
+
+describe('pickedOtherParent', () => {
+  const choose = otherParentChoice('karim', [marriage('karim', 'rasha'), divorce('karim', 'mona')]);
+
+  it('is the preselected current spouse until the user picks', () => {
+    expect(pickedOtherParent(choose, undefined)).toBe('rasha');
+  });
+
+  it('is the user\'s pick once they pick', () => {
+    expect(pickedOtherParent(choose, 'mona')).toBe('mona');
+  });
+
+  it('is nobody once the user picks "Not known"', () => {
+    expect(pickedOtherParent(choose, null)).toBeNull();
+  });
+
+  it('is the only spouse before any pick', () => {
+    expect(pickedOtherParent({ kind: 'one', personId: 'ebtisam' }, undefined)).toBe('ebtisam');
+  });
+
+  it('is nobody when there is no other parent', () => {
+    expect(pickedOtherParent({ kind: 'none' }, undefined)).toBeNull();
   });
 });
 

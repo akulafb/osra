@@ -35,7 +35,7 @@ import { Manipulation3DPanel } from './Manipulation3DPanel';
 import { useTree3DEditing, type DirectConnectParams } from './tree3d/useTree3DEditing';
 import { CONNECT_ACCENT } from './cards/relationStyle';
 import { DirectManipulationController } from '../hooks/useDirectManipulation';
-import { needsCanvas } from '../lib/directManipulation';
+import { connectBeamEnds, needsCanvas } from '../lib/directManipulation';
 
 // V3 Shared Assets - paths resolved at runtime for WebP when supported
 const planetTexturePaths = [
@@ -283,11 +283,7 @@ export const FamilyTree3DContent: React.FC<FamilyTree3DProps> = ({
   // Connect Mode (LIN-50): driven by unified DirectManipulationController
   const connectModeRef = useRef<string | null>(null);
   connectModeRef.current = interaction.connectSourceId;
-  // Connect Mode's beam joins a chosen pair. Ids, not nodes, so the graph is
-  // rebuilt only when the pair changes.
-  const kinshipState = interaction.state.phase === 'choosing-kinship' ? interaction.state : null;
-  const beamSourceId = kinshipState?.sourceNodeId ?? null;
-  const beamTargetId = kinshipState?.targetNodeId ?? null;
+  const { sourceId: beamSourceId, targetId: beamTargetId } = connectBeamEnds(interaction.state);
 
   const confirmingDissolveId = interaction.confirmingDissolveId;
 

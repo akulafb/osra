@@ -107,6 +107,12 @@ export function backgroundClickAction(): DirectManipulationAction {
   return { type: 'BACKGROUND_CLICK' };
 }
 
+export function connectBeamEnds(state: DirectManipulationState): { sourceId: string | null; targetId: string | null } {
+  return state.phase === 'choosing-kinship'
+    ? { sourceId: state.sourceNodeId, targetId: state.targetNodeId }
+    : { sourceId: null, targetId: null };
+}
+
 /**
  * Whether the canvas is being asked a question: a target to pick, a Ghost Node
  * to name, a Dissolve to confirm. Chrome that covers the canvas has to step

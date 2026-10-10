@@ -67,7 +67,6 @@ export const GhostNodeCard: React.FC<GhostNodeCardProps> = ({
   const [name, setName] = useState('');
   const choice = relation === 'child' && otherParentChoice ? otherParentChoice : NO_OTHER_PARENT;
   const [otherParentId, setOtherParentId] = useOtherParentPick(choice);
-  // Before paint, so the preview never draws a frame without the pick.
   useLayoutEffect(() => {
     onOtherParentChange?.(otherParentId);
   }, [otherParentId, onOtherParentChange]);

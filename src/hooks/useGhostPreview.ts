@@ -40,8 +40,7 @@ export interface GhostPreviewLook {
  *
  * The marker rides the force simulation rather than freezing it. Direction is
  * resolved once when the action opens and held, so the preview stays put
- * relative to its anchor while the camera orbits. A host landing is resolved
- * again when the other-parent pick changes, since the pick moves it.
+ * relative to its anchor while the camera orbits.
  */
 export function useGhostPreview(params: {
   fgRef: ForceGraphRef;

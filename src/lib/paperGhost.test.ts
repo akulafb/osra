@@ -3,7 +3,7 @@ import { layoutPaperTree } from './paperLayout';
 import { paperGhostLanding } from './paperGhost';
 import { packMatches, paperSearchLayout } from './paperSearch';
 import { relativeToKinshipLinks } from './treeRecord';
-import { otherParentChoice, resolveOtherParent, resolveOtherParentFor } from './otherParent';
+import { otherParentChoice, pickedOtherParent, resolveOtherParentFor } from './otherParent';
 import { followWorkingRecord, type ReadyPaperLayout } from '../hooks/usePaperLayout';
 import { FIXTURE_IDS, KINSHIP_FIXTURE_TREE } from './fixtures/kinshipFixtureTree';
 import type { FamilyGraph, RelativeDirection } from '../types/graph';
@@ -11,14 +11,10 @@ import type { FamilyGraph, RelativeDirection } from '../types/graph';
 const TREE: FamilyGraph = KINSHIP_FIXTURE_TREE;
 const ready: ReadyPaperLayout = { status: 'ready', layout: layoutPaperTree(TREE), newcomers: new Set() };
 
-/** What the Ghost Node card sends as the other parent: the pick, or until the user picks, the preselection. */
 function cardPick(anchorId: string, relation: RelativeDirection, picked?: string | null): string | null {
-  if (relation !== 'child') return null;
-  const choice = otherParentChoice(anchorId, TREE.links);
-  return resolveOtherParent(choice, picked === undefined && choice.kind === 'choose' ? choice.preselectedId : picked);
+  return relation === 'child' ? pickedOtherParent(otherParentChoice(anchorId, TREE.links), picked) : null;
 }
 
-/** The Working Record after the Ghost Node card is submitted: FamilyTree's optimistic write. */
 function afterSubmit(anchorId: string, relation: RelativeDirection, sent: string | null, personId: string): FamilyGraph {
   const otherParentId = relation === 'child' ? resolveOtherParentFor(TREE.links, anchorId, sent) : null;
   const otherParent = otherParentId ? TREE.nodes.find((n) => n.id === otherParentId)! : null;

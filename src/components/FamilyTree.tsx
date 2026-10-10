@@ -240,7 +240,6 @@ export const FamilyTree: React.FC = () => {
     interaction.startDissolve(selectedNode.id);
   }, [selectedNode, canDissolveNode, interaction]);
 
-  /** `resolveOtherParentFor` against the Working Record. */
   const otherParentToLink = useCallback(
     (parentId: string, sent: string | null | undefined, childId?: string): string | null =>
       resolveOtherParentFor(working?.links ?? [], parentId, sent, childId),
