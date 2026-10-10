@@ -128,7 +128,6 @@ export interface Manipulation3DPanelProps {
   }) => Promise<void> | void;
   /** The Ghost Preview's colours in the scene; Paper draws it in ink. */
   ghostLook?: GhostPreviewLook;
-  /** Cosmos or Paper, set by the host and passed to the Connect bodies. */
   look: CanvasMode;
 }
 

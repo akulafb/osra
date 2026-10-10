@@ -13,11 +13,11 @@ describe('connectAimTarget', () => {
 
 describe('pickerChoiceTint', () => {
   it('tints a Cosmos choice with its own accent at 20%', () => {
-    expect(pickerChoiceTint('cosmos', '#c084fc', '#38bdf8')).toBe('rgba(192, 132, 252, 0.2)');
+    expect(pickerChoiceTint('cosmos', { accent: '#c084fc', connectAccent: '#38bdf8' })).toBe('rgba(192, 132, 252, 0.2)');
   });
 
   it('tints a Paper choice with the connect accent, mixed so CSS-variable colours work', () => {
-    expect(pickerChoiceTint('paper', 'var(--choice)', 'var(--connect)')).toBe(
+    expect(pickerChoiceTint('paper', { accent: 'var(--choice)', connectAccent: 'var(--connect)' })).toBe(
       'color-mix(in srgb, var(--connect) 20%, transparent)'
     );
   });

@@ -19,8 +19,7 @@ import { pickerChoiceTint, pickerConfirmInk } from './connectLook';
  * impossible choices disabled up front.
  *
  * Presentational and unpositioned — the 2D view mounts it inside an SVG
- * `<foreignObject>`; the 3D view mounts it in the docked panel. The host sets
- * its `look`.
+ * `<foreignObject>`.
  */
 export interface ConnectPickerCardProps {
   sourceId: string;
@@ -102,7 +101,7 @@ export const ConnectPickerCard: React.FC<ConnectPickerCardProps> = ({
     padding: '6px 8px',
     borderRadius: '6px',
     border: selectedRel === selection ? `1.5px solid ${accent}` : `1px solid ${panel.border.subtle}`,
-    background: selectedRel === selection ? pickerChoiceTint(look, accent, hud.connect.accent) : hud.picker.choice,
+    background: selectedRel === selection ? pickerChoiceTint(look, { accent, connectAccent: hud.connect.accent }) : hud.picker.choice,
     color: enabled ? panel.ink.strong : panel.ink.ghost,
     cursor: enabled ? 'pointer' : 'not-allowed',
     fontSize: '11px',
