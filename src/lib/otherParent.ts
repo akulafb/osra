@@ -74,6 +74,14 @@ export function resolveOtherParent(choice: OtherParentChoice, picked: string | n
 }
 
 /**
+ * The other parent a form sends: the user's pick, or until they pick
+ * (`undefined`), a `choose`'s preselected spouse.
+ */
+export function pickedOtherParent(choice: OtherParentChoice, pick: string | null | undefined): string | null {
+  return resolveOtherParent(choice, pick === undefined && choice.kind === 'choose' ? choice.preselectedId : pick);
+}
+
+/**
  * What a choice offers, as a string: its kind and candidates, in order. Two
  * choices with the same key offer the same thing, so a pick made from one
  * still stands for the other.
@@ -104,4 +112,17 @@ export function stillOfferedOtherParent(choice: OtherParentChoice, sent: string 
     case 'choose':
       return choice.candidates.some((c) => c.personId === sent) ? sent : null;
   }
+}
+
+/**
+ * The other parent a new parent link takes with it (LIN-79): the one the form
+ * sent, if `links` still offer them, else none.
+ */
+export function resolveOtherParentFor(
+  links: readonly FamilyLink[],
+  parentId: string,
+  sent: string | null | undefined,
+  childId?: string
+): string | null {
+  return stillOfferedOtherParent(otherParentChoice(parentId, links, childId), sent);
 }

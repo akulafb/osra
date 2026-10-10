@@ -249,6 +249,7 @@ export const Manipulation3DPanel: React.FC<Manipulation3DPanelProps> = ({
   };
   const [relation, setRelation] = useState<RelativeDirection | null>(null);
   const [previewName, setPreviewName] = useState('');
+  const [previewOtherParentId, setPreviewOtherParentId] = useState<string | null>(null);
 
   const selectedId = selectedNode?.id ?? null;
   // People already linked to the anchor: a Person Match may name them, but
@@ -271,6 +272,7 @@ export const Manipulation3DPanel: React.FC<Manipulation3DPanelProps> = ({
     relation,
     name: previewName,
     enabled: visible,
+    otherParentId: previewOtherParentId,
     look: ghostLook,
   });
 
@@ -539,6 +541,7 @@ export const Manipulation3DPanel: React.FC<Manipulation3DPanelProps> = ({
             onConnectExisting={handleConnectExisting}
             onCancel={closeGhostNode}
             onNameChange={setPreviewName}
+            onOtherParentChange={setPreviewOtherParentId}
           />
         )}
 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { useTheme } from '@mui/material/styles';
 import { FamilyNode, RelativeDirection } from '../../types/graph';
 import { readMatchResolution, SPELLING_MATCH_LABEL } from '../../lib/personMatch';
@@ -43,6 +43,8 @@ export interface GhostNodeCardProps {
    * handler, so hosts never render a frame behind what the input shows.
    */
   onNameChange?: (name: string) => void;
+  /** Observes the other parent the card would send, from the first render, so the 3D Ghost Preview can land with it. */
+  onOtherParentChange?: (otherParentId: string | null) => void;
 }
 
 export const GHOST_CARD_WIDTH = 190;
@@ -59,11 +61,15 @@ export const GhostNodeCard: React.FC<GhostNodeCardProps> = ({
   onConnectExisting,
   onCancel,
   onNameChange,
+  onOtherParentChange,
 }) => {
   const { panel, hud } = useTheme().palette;
   const [name, setName] = useState('');
   const choice = relation === 'child' && otherParentChoice ? otherParentChoice : NO_OTHER_PARENT;
   const [otherParentId, setOtherParentId] = useOtherParentPick(choice);
+  useLayoutEffect(() => {
+    onOtherParentChange?.(otherParentId);
+  }, [otherParentId, onOtherParentChange]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [confirmedDifferentPerson, setConfirmedDifferentPerson] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
