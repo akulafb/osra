@@ -21,8 +21,12 @@ export interface GhostPreviewLook {
   color: string;
   labelColor: string;
   labelBackground: string;
-  /** Where the host's layout will land the new Tree Node; without it the marker sits a fixed distance away on screen. */
-  landing?: (anchorNodeId: string, relation: RelativeDirection) => GhostPreviewLanding | null;
+  /**
+   * Where the host's layout will land the new Tree Node, given the other
+   * parent the card would send; without it the marker sits a fixed distance
+   * away on screen.
+   */
+  landing?: (anchorNodeId: string, relation: RelativeDirection, otherParentId: string | null) => GhostPreviewLanding | null;
 }
 
 /**
@@ -48,9 +52,12 @@ export function useGhostPreview(params: {
   name: string;
   /** Off on touch: 3D manipulation is desktop-only for v1 (ADR 0002). */
   enabled: boolean;
+  /** The other parent the card would send; it moves a landing, so only a look with one reads it. */
+  otherParentId?: string | null;
   look?: GhostPreviewLook;
 }): void {
   const { fgRef, nodes, anchorNodeId, relation, name, enabled, look } = params;
+  const landingOtherParentId = look?.landing ? params.otherParentId ?? null : null;
 
   // Held in a ref so the render loop is not torn down and rebuilt whenever the
   // caller passes a new array identity — the useClusterBubbles precedent.
@@ -70,7 +77,7 @@ export function useGhostPreview(params: {
     // Resolved once, then held — the preview must not swing around as the
     // camera orbits, only follow its anchor.
     const { x = 0, y = 0, z = 0 } = nodesRef.current.find((n) => n.id === anchorNodeId) ?? {};
-    const landing = look?.landing?.(anchorNodeId, relation) ?? null;
+    const landing = look?.landing?.(anchorNodeId, relation, landingOtherParentId) ?? null;
     const { offset, radius, labelHeight } = ghostPreviewPlacement(camera.quaternion, relation, { x, y, z }, landing);
     const color = new THREE.Color(look?.color ?? relationColor(relation));
 
@@ -178,7 +185,7 @@ export function useGhostPreview(params: {
       labelMaterial.dispose();
       labelRef.current = null;
     };
-  }, [active, relation, anchorNodeId, fgRef, look]);
+  }, [active, relation, anchorNodeId, fgRef, look, landingOtherParentId]);
 
   // The label is updated in place rather than by rebuilding the marker, so
   // typing does not restart the breathing animation on every keystroke.

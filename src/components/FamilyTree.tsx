@@ -35,7 +35,7 @@ import {
   relativeToKinshipLinks,
   type AddLinkParams,
 } from '../lib/treeRecord';
-import { otherParentChoice, stillOfferedOtherParent } from '../lib/otherParent';
+import { resolveOtherParentFor } from '../lib/otherParent';
 import { getLinkEndpoints } from '../lib/familyGraph';
 import { useLifecycles } from '../hooks/useLifecycles';
 
@@ -240,13 +240,9 @@ export const FamilyTree: React.FC = () => {
     interaction.startDissolve(selectedNode.id);
   }, [selectedNode, canDissolveNode, interaction]);
 
-  /**
-   * The other parent a new parent link takes with it (LIN-79): the one the form
-   * sent, if the Working Record still offers them, else none.
-   */
-  const resolveOtherParentFor = useCallback(
+  const otherParentToLink = useCallback(
     (parentId: string, sent: string | null | undefined, childId?: string): string | null =>
-      stillOfferedOtherParent(otherParentChoice(parentId, working?.links ?? [], childId), sent),
+      resolveOtherParentFor(working?.links ?? [], parentId, sent, childId),
     [working?.links]
   );
 
@@ -275,7 +271,7 @@ export const FamilyTree: React.FC = () => {
       const personId = crypto.randomUUID();
       const firstName = params.firstName.trim().slice(0, MAX_PERSON_NAME_LENGTH);
       const otherParentId =
-        params.relation === 'child' ? resolveOtherParentFor(params.targetNodeId, params.otherParentId) : null;
+        params.relation === 'child' ? otherParentToLink(params.targetNodeId, params.otherParentId) : null;
       const otherParent = otherParentId
         ? working?.nodes.find((n) => n.id === otherParentId) ?? { id: otherParentId }
         : null;
@@ -318,7 +314,7 @@ export const FamilyTree: React.FC = () => {
         reportWriteFailure(e, 'Failed to create relative.');
       });
     },
-    [user, isAdmin, session?.access_token, lifecycles, write, working?.links, working?.nodes, resolveOtherParentFor]
+    [user, isAdmin, session?.access_token, lifecycles, write, working?.links, working?.nodes, otherParentToLink]
   );
 
   const handleConnectExistingRelativeDirect = useCallback(
@@ -335,7 +331,7 @@ export const FamilyTree: React.FC = () => {
           ...relativeToKinshipLink(params.targetNodeId, params.existingNodeId, params.relation),
           otherParentId:
             params.relation === 'child'
-              ? resolveOtherParentFor(params.targetNodeId, params.otherParentId, params.existingNodeId)
+              ? otherParentToLink(params.targetNodeId, params.otherParentId, params.existingNodeId)
               : null,
         };
         const pending = pendingKinshipLinks(kinship, working?.nodes ?? []);
@@ -357,7 +353,7 @@ export const FamilyTree: React.FC = () => {
         reportWriteFailure(e, 'Failed to connect relative.');
       }
     },
-    [user, isAdmin, session?.access_token, lifecycles, write, working?.nodes, resolveOtherParentFor]
+    [user, isAdmin, session?.access_token, lifecycles, write, working?.nodes, otherParentToLink]
   );
 
   const handleConfirmDissolveDirect = useCallback(
@@ -439,7 +435,7 @@ export const FamilyTree: React.FC = () => {
         parentRole: params.type === 'parent' ? params.parentRole ?? null : null,
         otherParentId:
           params.type === 'parent'
-            ? resolveOtherParentFor(params.sourceNodeId, params.otherParentId, params.targetNodeId)
+            ? otherParentToLink(params.sourceNodeId, params.otherParentId, params.targetNodeId)
             : null,
       };
       const pending = pendingKinshipLinks(kinship, working?.nodes ?? []);
@@ -454,7 +450,7 @@ export const FamilyTree: React.FC = () => {
         reportWriteFailure(e, 'Failed to create kinship link.');
       });
     },
-    [user, isAdmin, session?.access_token, lifecycles, write, working?.nodes, resolveOtherParentFor]
+    [user, isAdmin, session?.access_token, lifecycles, write, working?.nodes, otherParentToLink]
   );
 
   // Visible nodes for search (depends on mode)

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { otherParentChoiceKey, resolveOtherParent, type OtherParentChoice } from '../lib/otherParent';
+import { otherParentChoiceKey, pickedOtherParent, type OtherParentChoice } from '../lib/otherParent';
 
 /**
  * The other parent a form will link, and a setter for the user's pick. Until
@@ -14,6 +14,5 @@ export function useOtherParentPick(choice: OtherParentChoice): [string | null, (
   // Once the choice offers something else, the pick is gone for good, even if
   // the same offer comes back (the modal reopening on the same parent).
   if (pick && pick.key !== key) setPick(null);
-  const picked = pick && pick.key === key ? pick.id : choice.kind === 'choose' ? choice.preselectedId : null;
-  return [resolveOtherParent(choice, picked), (id) => setPick({ key, id })];
+  return [pickedOtherParent(choice, pick && pick.key === key ? pick.id : undefined), (id) => setPick({ key, id })];
 }

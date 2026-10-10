@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
-import { alpha, useTheme } from '@mui/material/styles';
-import { useCanvasMode } from '../../hooks/useCanvasMode';
+import { useTheme } from '@mui/material/styles';
+import type { CanvasMode } from '../../lib/canvasMode';
 import { FamilyGraph } from '../../types/graph';
 import {
   buildConnectOptions,
@@ -12,14 +12,14 @@ import {
 import { OtherParentPicker } from './OtherParentPicker';
 import { NO_OTHER_PARENT, otherParentChoice } from '../../lib/otherParent';
 import { useOtherParentPick } from '../../hooks/useOtherParentPick';
+import { pickerChoiceTint, pickerConfirmInk } from './connectLook';
 
 /**
  * The inline kinship picker: choose which Kinship Link joins two people, with
  * impossible choices disabled up front.
  *
  * Presentational and unpositioned — the 2D view mounts it inside an SVG
- * `<foreignObject>`; the 3D view (LIN-48, not yet built) will mount it in a
- * screen-docked panel.
+ * `<foreignObject>`.
  */
 export interface ConnectPickerCardProps {
   sourceId: string;
@@ -36,6 +36,7 @@ export interface ConnectPickerCardProps {
     otherParentId?: string | null
   ) => Promise<void> | void;
   onCancel: () => void;
+  look: CanvasMode;
 }
 
 export const PICKER_CARD_WIDTH = 260;
@@ -49,9 +50,9 @@ export const ConnectPickerCard: React.FC<ConnectPickerCardProps> = ({
   isAdmin = true,
   onConfirm,
   onCancel,
+  look,
 }) => {
   const { panel, hud } = useTheme().palette;
-  const { mode: canvasMode } = useCanvasMode();
   const [selectedRel, setSelectedRel] = useState<ConnectSelection>('marriage');
   const [parentRole, setParentRole] = useState<ParentRole>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -100,7 +101,7 @@ export const ConnectPickerCard: React.FC<ConnectPickerCardProps> = ({
     padding: '6px 8px',
     borderRadius: '6px',
     border: selectedRel === selection ? `1.5px solid ${accent}` : `1px solid ${panel.border.subtle}`,
-    background: selectedRel === selection ? (canvasMode === 'paper' ? `color-mix(in srgb, ${hud.connect.accent} 20%, transparent)` : alpha(accent, 0.2)) : hud.picker.choice,
+    background: selectedRel === selection ? pickerChoiceTint(look, { accent, connectAccent: hud.connect.accent }) : hud.picker.choice,
     color: enabled ? panel.ink.strong : panel.ink.ghost,
     cursor: enabled ? 'pointer' : 'not-allowed',
     fontSize: '11px',
@@ -277,7 +278,7 @@ export const ConnectPickerCard: React.FC<ConnectPickerCardProps> = ({
             borderRadius: '6px',
             border: 'none',
             background: hud.picker.confirm,
-            color: canvasMode === 'paper' ? hud.card.onAccent : panel.ink.strong,
+            color: pickerConfirmInk(look, { onAccent: hud.card.onAccent, strong: panel.ink.strong }),
             fontSize: '11px',
             fontWeight: 700,
             cursor: isSubmitting ? 'default' : 'pointer',

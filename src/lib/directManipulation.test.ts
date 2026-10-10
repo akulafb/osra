@@ -12,6 +12,7 @@ import {
   escapeAction,
   backgroundClickAction,
   needsCanvas,
+  connectBeamEnds,
 } from './directManipulation';
 
 describe('directManipulation state machine', () => {
@@ -335,6 +336,31 @@ describe('directManipulation state machine', () => {
     it('gives the canvas back when the action is escaped', () => {
       const targeting = directManipulationReducer(selected, startConnectAction('p1'));
       expect(needsCanvas(directManipulationReducer(targeting, escapeAction()))).toBe(false);
+    });
+  });
+
+  describe('connectBeamEnds', () => {
+    const selected = directManipulationReducer(
+      initialDirectManipulationState,
+      selectNodeAction('p1')
+    );
+    const targeting = directManipulationReducer(selected, startConnectAction('p1'));
+
+    it('joins the chosen pair while the kinship is being chosen', () => {
+      const choosing = directManipulationReducer(
+        targeting,
+        pickConnectTargetAction('p2', { ok: true })
+      );
+      expect(connectBeamEnds(choosing)).toEqual({ sourceId: 'p1', targetId: 'p2' });
+    });
+
+    it('draws no beam before a target is chosen', () => {
+      expect(connectBeamEnds(targeting)).toEqual({ sourceId: null, targetId: null });
+    });
+
+    it('draws no beam outside Connect Mode', () => {
+      expect(connectBeamEnds(initialDirectManipulationState)).toEqual({ sourceId: null, targetId: null });
+      expect(connectBeamEnds(selected)).toEqual({ sourceId: null, targetId: null });
     });
   });
 });

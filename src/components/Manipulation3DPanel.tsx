@@ -12,7 +12,7 @@ import { connectedPersonIds } from '../lib/personMatch';
 import { otherParentChoice } from '../lib/otherParent';
 import { countUnreachable } from '../utils/connectTargeting';
 import { useGhostPreview, type GhostPreviewLook } from '../hooks/useGhostPreview';
-import { useCanvasMode } from '../hooks/useCanvasMode';
+import type { CanvasMode } from '../lib/canvasMode';
 import { useTargetVisibility } from '../hooks/useTargetVisibility';
 
 /**
@@ -128,6 +128,7 @@ export interface Manipulation3DPanelProps {
   }) => Promise<void> | void;
   /** The Ghost Preview's colours in the scene; Paper draws it in ink. */
   ghostLook?: GhostPreviewLook;
+  look: CanvasMode;
 }
 
 /**
@@ -237,10 +238,10 @@ export const Manipulation3DPanel: React.FC<Manipulation3DPanelProps> = ({
   onCreateRelative,
   onConnectExistingRelative,
   ghostLook,
+  look,
 }) => {
   const { panel, hud } = useTheme().palette;
-  const isPaper = useCanvasMode().mode === 'paper';
-  const look = {
+  const accents = {
     idle: hud.manipulation.idle,
     dissolve: hud.manipulation.dissolve,
     connect: hud.connect.accent,
@@ -248,6 +249,7 @@ export const Manipulation3DPanel: React.FC<Manipulation3DPanelProps> = ({
   };
   const [relation, setRelation] = useState<RelativeDirection | null>(null);
   const [previewName, setPreviewName] = useState('');
+  const [previewOtherParentId, setPreviewOtherParentId] = useState<string | null>(null);
 
   const selectedId = selectedNode?.id ?? null;
   // People already linked to the anchor: a Person Match may name them, but
@@ -270,6 +272,7 @@ export const Manipulation3DPanel: React.FC<Manipulation3DPanelProps> = ({
     relation,
     name: previewName,
     enabled: visible,
+    otherParentId: previewOtherParentId,
     look: ghostLook,
   });
 
@@ -305,11 +308,13 @@ export const Manipulation3DPanel: React.FC<Manipulation3DPanelProps> = ({
   useEffect(() => {
     setRelation(null);
     setPreviewName('');
+    setPreviewOtherParentId(null);
   }, [selectedId]);
 
   const closeGhostNode = useCallback(() => {
     setRelation(null);
     setPreviewName('');
+    setPreviewOtherParentId(null);
   }, []);
 
   const handleSubmit = useCallback(
@@ -349,12 +354,12 @@ export const Manipulation3DPanel: React.FC<Manipulation3DPanelProps> = ({
   const inConnectMode = Boolean(connect.sourceNode);
   const isConfirmingDissolve = dissolve.isConfirming && !inConnectMode && !relation;
   const accent = inConnectMode
-    ? look.connect
+    ? accents.connect
     : isConfirmingDissolve
-      ? look.dissolve
+      ? accents.dissolve
       : relation
-        ? look.relation(relation)
-        : look.idle;
+        ? accents.relation(relation)
+        : accents.idle;
 
   // The kinship picker is wider than the Ghost Node card, so the panel takes
   // whichever card it is currently holding.
@@ -430,8 +435,8 @@ export const Manipulation3DPanel: React.FC<Manipulation3DPanelProps> = ({
                 aria-label={`Confirm dissolving ${selectedNode.firstName}`}
                 style={{
                   flex: 1,
-                  background: look.dissolve,
-                  border: `1.5px solid ${look.dissolve}`,
+                  background: accents.dissolve,
+                  border: `1.5px solid ${accents.dissolve}`,
                   borderRadius: 999,
                   color: hud.card.onRelation,
                   cursor: 'pointer',
@@ -473,9 +478,9 @@ export const Manipulation3DPanel: React.FC<Manipulation3DPanelProps> = ({
                 onClick={() => setRelation(rel)}
                 style={{
                   background: hud.editor.pill,
-                  border: `1.5px solid ${look.relation(rel)}`,
+                  border: `1.5px solid ${accents.relation(rel)}`,
                   borderRadius: 999,
-                  color: look.relation(rel),
+                  color: accents.relation(rel),
                   cursor: 'pointer',
                   fontSize: 11,
                   fontWeight: 700,
@@ -491,9 +496,9 @@ export const Manipulation3DPanel: React.FC<Manipulation3DPanelProps> = ({
               onClick={startConnect}
               style={{
                 background: hud.editor.pill,
-                border: `1.5px solid ${look.connect}`,
+                border: `1.5px solid ${accents.connect}`,
                 borderRadius: 999,
-                color: look.connect,
+                color: accents.connect,
                 cursor: 'pointer',
                 fontSize: 11,
                 fontWeight: 700,
@@ -509,9 +514,9 @@ export const Manipulation3DPanel: React.FC<Manipulation3DPanelProps> = ({
                 onClick={startDissolve}
                 style={{
                   background: hud.editor.pill,
-                  border: `1.5px solid ${look.dissolve}`,
+                  border: `1.5px solid ${accents.dissolve}`,
                   borderRadius: 999,
-                  color: look.dissolve,
+                  color: accents.dissolve,
                   cursor: 'pointer',
                   fontSize: 11,
                   fontWeight: 700,
@@ -538,6 +543,7 @@ export const Manipulation3DPanel: React.FC<Manipulation3DPanelProps> = ({
             onConnectExisting={handleConnectExisting}
             onCancel={closeGhostNode}
             onNameChange={setPreviewName}
+            onOtherParentChange={setPreviewOtherParentId}
           />
         )}
 
@@ -553,7 +559,7 @@ export const Manipulation3DPanel: React.FC<Manipulation3DPanelProps> = ({
             onQueryChange={onSearchQueryChange}
             onPickTarget={connect.onPickTarget}
             onExit={connect.onExit}
-            aimTarget={isPaper ? 'a person' : undefined}
+            look={look}
           />
         )}
 
@@ -566,6 +572,7 @@ export const Manipulation3DPanel: React.FC<Manipulation3DPanelProps> = ({
             graphData={graphData}
             onConfirm={connect.onConfirm}
             onCancel={connect.onCancelPair}
+            look={look}
           />
         )}
       </div>

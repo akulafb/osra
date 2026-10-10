@@ -2,7 +2,9 @@ import { describe, it, expect } from 'vitest';
 import {
   otherParentChoice,
   otherParentChoiceKey,
+  pickedOtherParent,
   resolveOtherParent,
+  resolveOtherParentFor,
   stillOfferedOtherParent,
 } from './otherParent';
 import type { FamilyLink } from '../types/graph';
@@ -109,6 +111,30 @@ describe('resolveOtherParent', () => {
   });
 });
 
+describe('pickedOtherParent', () => {
+  const choose = otherParentChoice('karim', [marriage('karim', 'rasha'), divorce('karim', 'mona')]);
+
+  it('is the preselected current spouse until the user picks', () => {
+    expect(pickedOtherParent(choose, undefined)).toBe('rasha');
+  });
+
+  it('is the user\'s pick once they pick', () => {
+    expect(pickedOtherParent(choose, 'mona')).toBe('mona');
+  });
+
+  it('is nobody once the user picks "Not known"', () => {
+    expect(pickedOtherParent(choose, null)).toBeNull();
+  });
+
+  it('is the only spouse before any pick', () => {
+    expect(pickedOtherParent({ kind: 'one', personId: 'ebtisam' }, undefined)).toBe('ebtisam');
+  });
+
+  it('is nobody when there is no other parent', () => {
+    expect(pickedOtherParent({ kind: 'none' }, undefined)).toBeNull();
+  });
+});
+
 describe('otherParentChoiceKey', () => {
   const karimLinks = [marriage('karim', 'rasha'), divorce('karim', 'mona')];
 
@@ -168,5 +194,21 @@ describe('stillOfferedOtherParent', () => {
   it('is nobody for "Not known"', () => {
     expect(stillOfferedOtherParent(choose, null)).toBeNull();
     expect(stillOfferedOtherParent(choose, undefined)).toBeNull();
+  });
+});
+
+describe('resolveOtherParentFor', () => {
+  const links = [marriage('karim', 'rasha'), divorce('karim', 'mona'), parent('karim', 'sami'), parent('mona', 'sami')];
+
+  it('is the spouse the form sent, while the links still offer them', () => {
+    expect(resolveOtherParentFor(links, 'karim', 'mona')).toBe('mona');
+  });
+
+  it('is nobody for someone the links do not offer', () => {
+    expect(resolveOtherParentFor(links, 'karim', 'huda')).toBeNull();
+  });
+
+  it('never gives an existing child a third parent', () => {
+    expect(resolveOtherParentFor(links, 'karim', 'rasha', 'sami')).toBeNull();
   });
 });

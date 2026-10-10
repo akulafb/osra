@@ -3,7 +3,7 @@ import { layoutPaperTree } from './paperLayout';
 import { paperGhostLanding } from './paperGhost';
 import { packMatches, paperSearchLayout } from './paperSearch';
 import { relativeToKinshipLinks } from './treeRecord';
-import { otherParentChoice, resolveOtherParent } from './otherParent';
+import { otherParentChoice, pickedOtherParent, resolveOtherParentFor } from './otherParent';
 import { followWorkingRecord, type ReadyPaperLayout } from '../hooks/usePaperLayout';
 import { FIXTURE_IDS, KINSHIP_FIXTURE_TREE } from './fixtures/kinshipFixtureTree';
 import type { FamilyGraph, RelativeDirection } from '../types/graph';
@@ -11,9 +11,12 @@ import type { FamilyGraph, RelativeDirection } from '../types/graph';
 const TREE: FamilyGraph = KINSHIP_FIXTURE_TREE;
 const ready: ReadyPaperLayout = { status: 'ready', layout: layoutPaperTree(TREE), newcomers: new Set() };
 
-/** The Working Record after the Ghost Node card is submitted for an anchor with no other parent to pick: FamilyTree's optimistic write. */
-function afterSubmit(anchorId: string, relation: RelativeDirection, personId: string): FamilyGraph {
-  const otherParentId = relation === 'child' ? resolveOtherParent(otherParentChoice(anchorId, TREE.links), null) : null;
+function cardPick(anchorId: string, relation: RelativeDirection, picked?: string | null): string | null {
+  return relation === 'child' ? pickedOtherParent(otherParentChoice(anchorId, TREE.links), picked) : null;
+}
+
+function afterSubmit(anchorId: string, relation: RelativeDirection, sent: string | null, personId: string): FamilyGraph {
+  const otherParentId = relation === 'child' ? resolveOtherParentFor(TREE.links, anchorId, sent) : null;
   const otherParent = otherParentId ? TREE.nodes.find((n) => n.id === otherParentId)! : null;
   return {
     nodes: [...TREE.nodes, { id: personId, firstName: 'Newcomer' }],
@@ -31,19 +34,42 @@ describe('paperGhostLanding: the Ghost Preview shows where the newcomer will lan
   ];
 
   it.each(cases)('lands %s exactly where the submitted Person is placed', (_, anchorId, relation) => {
-    const landing = paperGhostLanding(ready.layout, TREE, anchorId, relation);
-    const placed = followWorkingRecord(ready, afterSubmit(anchorId, relation, 'a1b2c3d4-real-uuid')).layout.get('a1b2c3d4-real-uuid');
+    const sent = cardPick(anchorId, relation);
+    const landing = paperGhostLanding(ready.layout, TREE, anchorId, relation, sent);
+    const placed = followWorkingRecord(ready, afterSubmit(anchorId, relation, sent, 'a1b2c3d4-real-uuid')).layout.get('a1b2c3d4-real-uuid');
     expect(landing).not.toBeNull();
     expect(landing).toEqual(placed);
   });
 
-  it('has no landing when the card offers a choice of other parent, since the pick moves the newcomer', () => {
-    expect(otherParentChoice(FIXTURE_IDS.layla, TREE.links).kind).toBe('choose');
-    expect(paperGhostLanding(ready.layout, TREE, FIXTURE_IDS.layla, 'child')).toBeNull();
+  describe('a child of a parent with two spouses, where the card offers a choice of other parent', () => {
+    const anchorId = FIXTURE_IDS.layla;
+    const picks: [string, string | null | undefined][] = [
+      ['the preselected current spouse', undefined],
+      ['a former spouse', FIXTURE_IDS.tarek],
+      ['"Not known"', null],
+    ];
+
+    it('offers a choice', () => {
+      expect(otherParentChoice(anchorId, TREE.links).kind).toBe('choose');
+    });
+
+    it.each(picks)('lands with %s exactly where the submitted Person is placed', (_, picked) => {
+      const sent = cardPick(anchorId, 'child', picked);
+      const landing = paperGhostLanding(ready.layout, TREE, anchorId, 'child', sent);
+      const placed = followWorkingRecord(ready, afterSubmit(anchorId, 'child', sent, 'a1b2c3d4-real-uuid')).layout.get('a1b2c3d4-real-uuid');
+      expect(landing).not.toBeNull();
+      expect(landing).toEqual(placed);
+    });
+
+    it('moves with the pick', () => {
+      const withKarim = paperGhostLanding(ready.layout, TREE, anchorId, 'child', FIXTURE_IDS.karim);
+      const withTarek = paperGhostLanding(ready.layout, TREE, anchorId, 'child', FIXTURE_IDS.tarek);
+      expect(withKarim).not.toEqual(withTarek);
+    });
   });
 
   it('has no landing for an anchor the layout has not placed', () => {
-    expect(paperGhostLanding(ready.layout, TREE, 'nobody', 'child')).toBeNull();
+    expect(paperGhostLanding(ready.layout, TREE, 'nobody', 'child', null)).toBeNull();
   });
 
   describe('during a search, when the anchor sits in the match cluster', () => {
@@ -52,8 +78,8 @@ describe('paperGhostLanding: the Ghost Preview shows where the newcomer will lan
     const anchorId = FIXTURE_IDS.khalil;
 
     it('lands beside the anchor where the cluster drew it, keeping the still offset and size', () => {
-      const still = paperGhostLanding(ready.layout, TREE, anchorId, 'parent')!;
-      const landing = paperGhostLanding(ready.layout, TREE, anchorId, 'parent', shown)!;
+      const still = paperGhostLanding(ready.layout, TREE, anchorId, 'parent', null)!;
+      const landing = paperGhostLanding(ready.layout, TREE, anchorId, 'parent', null, shown)!;
       const fixedAnchor = ready.layout.get(anchorId)!;
       const shownAnchor = shown.get(anchorId)!;
       expect(shownAnchor).not.toEqual(fixedAnchor);
@@ -64,8 +90,8 @@ describe('paperGhostLanding: the Ghost Preview shows where the newcomer will lan
     });
 
     it('lands exactly where it does outside a search when the shown layout is the still one', () => {
-      const still = paperGhostLanding(ready.layout, TREE, anchorId, 'parent');
-      expect(paperGhostLanding(ready.layout, TREE, anchorId, 'parent', ready.layout)).toEqual(still);
+      const still = paperGhostLanding(ready.layout, TREE, anchorId, 'parent', null);
+      expect(paperGhostLanding(ready.layout, TREE, anchorId, 'parent', null, ready.layout)).toEqual(still);
     });
   });
 });
