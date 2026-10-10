@@ -19,6 +19,7 @@ export interface AppliedLimits {
   controls: CameraControls;
   requested: PaperCameraLimits;
   heldTarget: Point3;
+  heldDistance: number;
 }
 
 export function stepSpreadCamera(
@@ -29,18 +30,26 @@ export function stepSpreadCamera(
 ): AppliedLimits {
   if (follow) moveWith(controls, follow);
   const target = controls.getTarget(end, true);
-  const same = last?.controls === controls;
-  if (!follow && same && sameLimits(last.requested, limits) && samePoint(target, last.heldTarget)) return last;
-  limitHolding(controls, limits, same);
+  const endDistance = controls.getSpherical(sphere, true).radius;
+  const sameControls = last?.controls === controls;
+  if (
+    !follow &&
+    sameControls &&
+    sameLimits(last.requested, limits) &&
+    samePoint(target, last.heldTarget) &&
+    endDistance === last.heldDistance
+  )
+    return last;
+  limitHolding(controls, limits, sameControls);
   const { x, y, z } = controls.getTarget(end, true);
-  return { controls, requested: limits, heldTarget: { x, y, z } };
+  return { controls, requested: limits, heldTarget: { x, y, z }, heldDistance: controls.getSpherical(sphere, true).radius };
 }
 
-function limitHolding(controls: CameraControls, limits: PaperCameraLimits, applied: boolean): void {
+function limitHolding(controls: CameraControls, limits: PaperCameraLimits, sameControls: boolean): void {
   const held = paperLimitsHolding(limits, controls.getTarget(end, true));
-  const notCloserThanCamera = applied ? Math.min(controls.getSpherical(sphere, true).radius, controls.maxDistance) : 0;
+  const cameraDistanceFloor = sameControls ? Math.min(controls.getSpherical(sphere, true).radius, controls.maxDistance) : 0;
   controls.minDistance = held.minDistance;
-  controls.maxDistance = Math.max(held.maxDistance, notCloserThanCamera);
+  controls.maxDistance = Math.max(held.maxDistance, cameraDistanceFloor);
   const { min, max } = held.boundary;
   box.min.set(min.x, min.y, min.z);
   box.max.set(max.x, max.y, max.z);

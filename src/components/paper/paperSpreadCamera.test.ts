@@ -141,6 +141,7 @@ describe("stepSpreadCamera's limits", () => {
     void controls.dollyTo(1e9, false);
     controls.update(0);
     const zoomedOut = controls.distance;
+    expect(zoomedOut).toBe(limitsAt(3).maxDistance);
     last = stepSpreadCamera(controls, limitsAt(1), null, last);
     for (let i = 0; i < 120; i++) {
       void controls.moveTo(1000, 1000, 1000, true);
@@ -166,6 +167,29 @@ describe("stepSpreadCamera's limits", () => {
     void controls.moveTo(-3 * boxFace(3).x, 0, 0, true);
     stepSpreadCamera(controls, limitsAt(1), null, last);
     expect(settle(controls).toArray()).toEqual([limitsAt(1).boundary.min.x, 0, 0]);
+  });
+
+  it('shrinks the zoom-out limit back to the current Spread\'s when RESET VIEWPORT fits the tree after a drop with the orbit point at the centre', () => {
+    const { controls } = controlsAt(3, new THREE.Vector3(0, 0, 0));
+    let last = stepSpreadCamera(controls, limitsAt(3), null, null);
+    void controls.dollyTo(1e9, false);
+    controls.update(0);
+    last = stepSpreadCamera(controls, limitsAt(1), null, last);
+    expect(controls.maxDistance).toBe(limitsAt(3).maxDistance);
+    void controls.fitToSphere(new THREE.Sphere(new THREE.Vector3(), still.radius), true);
+    stepSpreadCamera(controls, limitsAt(1), null, last);
+    expect(controls.maxDistance).toBe(limitsAt(1).maxDistance);
+  });
+
+  it('shrinks the zoom-out limit back to the current Spread\'s when the user zooms in at the centre after a drop', () => {
+    const { controls } = controlsAt(3, new THREE.Vector3(0, 0, 0));
+    let last = stepSpreadCamera(controls, limitsAt(3), null, null);
+    void controls.dollyTo(1e9, false);
+    controls.update(0);
+    last = stepSpreadCamera(controls, limitsAt(1), null, last);
+    void controls.dollyTo(1500, true);
+    stepSpreadCamera(controls, limitsAt(1), null, last);
+    expect(controls.maxDistance).toBe(limitsAt(1).maxDistance);
   });
 
   it('clamps a fit made after it to its zoom limits, so a small tree loads at the closest distance', () => {
