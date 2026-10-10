@@ -308,11 +308,13 @@ export const Manipulation3DPanel: React.FC<Manipulation3DPanelProps> = ({
   useEffect(() => {
     setRelation(null);
     setPreviewName('');
+    setPreviewOtherParentId(null);
   }, [selectedId]);
 
   const closeGhostNode = useCallback(() => {
     setRelation(null);
     setPreviewName('');
+    setPreviewOtherParentId(null);
   }, []);
 
   const handleSubmit = useCallback(
