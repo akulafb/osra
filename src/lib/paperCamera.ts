@@ -22,7 +22,7 @@ const ZOOM_OUT_OVERVIEWS = 3;
 const MIN_SPAN = 100;
 
 /** How far the orbit point can wander from the tree's centre, in spans. */
-const BOUNDARY_SPANS = 2;
+const BOUNDARY_SPANS = 1.7;
 
 export function paperIdleRotates(secondsSinceInput: number, selected: boolean, hovered: boolean): boolean {
   return !selected && !hovered && secondsSinceInput >= PAPER_IDLE_SECONDS;

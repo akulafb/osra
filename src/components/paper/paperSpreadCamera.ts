@@ -8,28 +8,34 @@ const now = new THREE.Vector3();
 const end = new THREE.Vector3();
 const box = new THREE.Box3();
 
-/** The selected Person, at `place` in the layout, while the Spread goes from `from` to `to`. */
 export interface SpreadFollow {
   place: Point3;
   from: PaperSpread;
   to: PaperSpread;
 }
 
-/**
- * The camera's step for a frame where the Spread or the limits changed: moves
- * the camera as far as the followed Person moves, so they stay put on screen,
- * then sets `limits`.
- */
-export function stepSpreadCamera(controls: CameraControls, limits: PaperCameraLimits, follow: SpreadFollow | null): void {
-  if (follow) moveWith(controls, follow);
-  limitCamera(controls, limits);
+/** What a camera's limits were last set from, and the orbit point they were set to hold. */
+export interface SpreadCameraLimited {
+  controls: CameraControls;
+  limits: PaperCameraLimits;
+  target: Point3;
 }
 
-/**
- * Sets the zoom limits and the orbit point's box, both grown to hold the orbit
- * point where it is, so new limits never pull the camera.
- */
-export function limitCamera(controls: CameraControls, limits: PaperCameraLimits): void {
+export function stepSpreadCamera(
+  controls: CameraControls,
+  limits: PaperCameraLimits,
+  follow: SpreadFollow | null,
+  last: SpreadCameraLimited | null
+): SpreadCameraLimited {
+  if (follow) moveWith(controls, follow);
+  const target = controls.getTarget(end, true);
+  if (!follow && last?.controls === controls && sameLimits(last.limits, limits) && samePoint(target, last.target)) return last;
+  limitHolding(controls, limits);
+  const { x, y, z } = controls.getTarget(end, true);
+  return { controls, limits, target: { x, y, z } };
+}
+
+function limitHolding(controls: CameraControls, limits: PaperCameraLimits): void {
   const held = paperLimitsHolding(limits, controls.getTarget(end, true));
   controls.minDistance = held.minDistance;
   controls.maxDistance = held.maxDistance;
@@ -37,6 +43,19 @@ export function limitCamera(controls: CameraControls, limits: PaperCameraLimits)
   box.min.set(min.x, min.y, min.z);
   box.max.set(max.x, max.y, max.z);
   controls.setBoundary(box);
+}
+
+function sameLimits(a: PaperCameraLimits, b: PaperCameraLimits): boolean {
+  return (
+    a.minDistance === b.minDistance &&
+    a.maxDistance === b.maxDistance &&
+    samePoint(a.boundary.min, b.boundary.min) &&
+    samePoint(a.boundary.max, b.boundary.max)
+  );
+}
+
+function samePoint(a: Point3, b: Point3): boolean {
+  return a.x === b.x && a.y === b.y && a.z === b.z;
 }
 
 // Lifts the box so a move onto a larger Spread is not cut short; stepSpreadCamera sets it again straight after.

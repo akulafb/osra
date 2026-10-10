@@ -7,7 +7,7 @@ import type { PaperLayout } from '../../lib/paperLayout';
 import type { PaperSpread } from '../../lib/paperSpread';
 import type { PaperEmphasisState } from './paperEmphasis';
 import { PAPER_CAMERA_SPREAD_FRAME_PRIORITY, type PaperFrame } from './paperScene';
-import { limitCamera, stepSpreadCamera } from './paperSpreadCamera';
+import { stepSpreadCamera, type SpreadCameraLimited } from './paperSpreadCamera';
 
 const INPUT_EVENTS = ['pointerdown', 'pointermove', 'wheel', 'keydown'] as const;
 
@@ -18,14 +18,6 @@ interface PaperCameraRigProps {
   state: MutableRefObject<PaperEmphasisState>;
   modalOpen: boolean;
   selectedId: string | null;
-}
-
-interface Limited {
-  controls: CameraControls;
-  frame: PaperFrame;
-  spread: PaperSpread;
-  aspect: number;
-  fov: number;
 }
 
 /**
@@ -40,37 +32,29 @@ export function PaperCameraRig({ frame, layout, state, modalOpen, selectedId }: 
   const size = useThree((three) => three.size);
   const lastInput = useRef(performance.now());
   const followed = useRef<PaperSpread | null>(null);
-  const limited = useRef<Limited | null>(null);
+  const limited = useRef<SpreadCameraLimited | null>(null);
 
-  // The limits at the current Spread, or null when nothing they rest on changed since they were last set and `force` is off.
-  const nextLimits = useCallback(
-    (force: boolean) => {
-      if (!controls || !(camera instanceof THREE.PerspectiveCamera) || !(size.width > 0 && size.height > 0)) return null;
-      const { spread } = state.current;
-      const aspect = size.width / size.height;
-      const last = limited.current;
-      if (!force && last && last.controls === controls && last.frame === frame && last.spread === spread && last.aspect === aspect && last.fov === camera.fov) return null;
-      limited.current = { controls, frame, spread, aspect, fov: camera.fov };
-      return paperCameraLimits(frame, camera.fov, aspect, spread);
-    },
-    [controls, camera, frame, size.width, size.height, state]
-  );
+  const currentLimits = useCallback(() => {
+    if (!(camera instanceof THREE.PerspectiveCamera) || !(size.width > 0 && size.height > 0)) return null;
+    return paperCameraLimits(frame, camera.fov, size.width / size.height, state.current.spread);
+  }, [camera, frame, size.width, size.height, state]);
 
   // A layout effect, so the limits are set before the first fit: camera-controls clamps a distance only as it is set.
   useLayoutEffect(() => {
-    const limits = nextLimits(false);
-    if (controls && limits) limitCamera(controls, limits);
-  }, [controls, nextLimits]);
+    const limits = currentLimits();
+    if (controls && limits) limited.current = stepSpreadCamera(controls, limits, null, limited.current);
+  }, [controls, currentLimits]);
 
   useFrame(() => {
     const { spread } = state.current;
     const from = followed.current;
     followed.current = spread;
     if (!controls) return;
+    const limits = currentLimits();
+    if (!limits) return;
     const place = selectedId ? layout.get(selectedId) : undefined;
     const follow = from && from !== spread && place ? { place, from, to: spread } : null;
-    const limits = nextLimits(follow !== null);
-    if (limits) stepSpreadCamera(controls, limits, follow);
+    limited.current = stepSpreadCamera(controls, limits, follow, limited.current);
   }, PAPER_CAMERA_SPREAD_FRAME_PRIORITY);
 
   useEffect(() => {
