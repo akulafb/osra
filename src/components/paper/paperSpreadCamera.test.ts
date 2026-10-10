@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, vi } from 'vitest';
+import { describe, it, expect, beforeAll } from 'vitest';
 import * as THREE from 'three';
 import CameraControlsImpl from 'camera-controls';
 import { paperCameraLimits } from '../../lib/paperCamera';
@@ -120,12 +120,39 @@ describe('stepSpreadCamera', () => {
 });
 
 describe("stepSpreadCamera's limits", () => {
-  it('leaves the camera alone while neither the limits nor the orbit point move', () => {
+  it('leaves the camera, a flight in progress and the limits as they were while neither the limits nor the orbit point move', () => {
     const { controls } = controlsAt(1, new THREE.Vector3(100, 0, 0));
     const last = stepSpreadCamera(controls, limitsAt(1), null, null);
-    const setBoundary = vi.spyOn(controls, 'setBoundary');
-    expect(stepSpreadCamera(controls, limitsAt(1), null, last)).toBe(last);
-    expect(setBoundary).not.toHaveBeenCalled();
+    void controls.moveTo(200, 0, 0, true);
+    controls.update(1 / 60);
+    const orbitPoint = controls.getTarget(new THREE.Vector3(), false).toArray();
+    const { distance, minDistance, maxDistance } = controls;
+    stepSpreadCamera(controls, limitsAt(1), null, last);
+    expect(controls.getTarget(new THREE.Vector3(), false).toArray()).toEqual(orbitPoint);
+    expect([controls.distance, controls.minDistance, controls.maxDistance]).toEqual([distance, minDistance, maxDistance]);
+    expect(settle(controls).toArray()).toEqual([200, 0, 0]);
+    void controls.moveTo(-3 * boxFace(1).x, 0, 0, true);
+    expect(settle(controls).toArray()).toEqual([limitsAt(1).boundary.min.x, 0, 0]);
+  });
+
+  it('never pulls a fully zoomed-out camera in when the user pans towards the centre after a drop from the 3x box corner', () => {
+    const { controls } = controlsAt(3, boxCorner(3));
+    let last = stepSpreadCamera(controls, limitsAt(3), null, null);
+    void controls.dollyTo(1e9, false);
+    controls.update(0);
+    const zoomedOut = controls.distance;
+    last = stepSpreadCamera(controls, limitsAt(1), null, last);
+    for (let i = 0; i < 120; i++) {
+      void controls.moveTo(1000, 1000, 1000, true);
+      last = stepSpreadCamera(controls, limitsAt(1), null, last);
+      controls.update(1 / 60);
+    }
+    void controls.dolly(-50, true);
+    for (let i = 0; i < 120; i++) {
+      last = stepSpreadCamera(controls, limitsAt(1), null, last);
+      controls.update(1 / 60);
+    }
+    expect(controls.distance).toBeGreaterThanOrEqual(zoomedOut);
   });
 
   it('shrinks the limits back to the current Spread\'s once the orbit point returns to the centre after a drop', () => {

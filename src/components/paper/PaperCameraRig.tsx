@@ -7,7 +7,7 @@ import type { PaperLayout } from '../../lib/paperLayout';
 import type { PaperSpread } from '../../lib/paperSpread';
 import type { PaperEmphasisState } from './paperEmphasis';
 import { PAPER_CAMERA_SPREAD_FRAME_PRIORITY, type PaperFrame } from './paperScene';
-import { stepSpreadCamera, type SpreadCameraLimited } from './paperSpreadCamera';
+import { stepSpreadCamera, type AppliedLimits } from './paperSpreadCamera';
 
 const INPUT_EVENTS = ['pointerdown', 'pointermove', 'wheel', 'keydown'] as const;
 
@@ -32,7 +32,7 @@ export function PaperCameraRig({ frame, layout, state, modalOpen, selectedId }: 
   const size = useThree((three) => three.size);
   const lastInput = useRef(performance.now());
   const followed = useRef<PaperSpread | null>(null);
-  const limited = useRef<SpreadCameraLimited | null>(null);
+  const limited = useRef<AppliedLimits | null>(null);
 
   const currentLimits = useCallback(() => {
     if (!(camera instanceof THREE.PerspectiveCamera) || !(size.width > 0 && size.height > 0)) return null;

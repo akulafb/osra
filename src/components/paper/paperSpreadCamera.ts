@@ -7,6 +7,7 @@ import { spreadFollow, type PaperSpread } from '../../lib/paperSpread';
 const now = new THREE.Vector3();
 const end = new THREE.Vector3();
 const box = new THREE.Box3();
+const sphere = new THREE.Spherical();
 
 export interface SpreadFollow {
   place: Point3;
@@ -14,31 +15,32 @@ export interface SpreadFollow {
   to: PaperSpread;
 }
 
-/** What a camera's limits were last set from, and the orbit point they were set to hold. */
-export interface SpreadCameraLimited {
+export interface AppliedLimits {
   controls: CameraControls;
-  limits: PaperCameraLimits;
-  target: Point3;
+  requested: PaperCameraLimits;
+  heldTarget: Point3;
 }
 
 export function stepSpreadCamera(
   controls: CameraControls,
   limits: PaperCameraLimits,
   follow: SpreadFollow | null,
-  last: SpreadCameraLimited | null
-): SpreadCameraLimited {
+  last: AppliedLimits | null
+): AppliedLimits {
   if (follow) moveWith(controls, follow);
   const target = controls.getTarget(end, true);
-  if (!follow && last?.controls === controls && sameLimits(last.limits, limits) && samePoint(target, last.target)) return last;
-  limitHolding(controls, limits);
+  const same = last?.controls === controls;
+  if (!follow && same && sameLimits(last.requested, limits) && samePoint(target, last.heldTarget)) return last;
+  limitHolding(controls, limits, same);
   const { x, y, z } = controls.getTarget(end, true);
-  return { controls, limits, target: { x, y, z } };
+  return { controls, requested: limits, heldTarget: { x, y, z } };
 }
 
-function limitHolding(controls: CameraControls, limits: PaperCameraLimits): void {
+function limitHolding(controls: CameraControls, limits: PaperCameraLimits, applied: boolean): void {
   const held = paperLimitsHolding(limits, controls.getTarget(end, true));
+  const notCloserThanCamera = applied ? Math.min(controls.getSpherical(sphere, true).radius, controls.maxDistance) : 0;
   controls.minDistance = held.minDistance;
-  controls.maxDistance = held.maxDistance;
+  controls.maxDistance = Math.max(held.maxDistance, notCloserThanCamera);
   const { min, max } = held.boundary;
   box.min.set(min.x, min.y, min.z);
   box.max.set(max.x, max.y, max.z);
