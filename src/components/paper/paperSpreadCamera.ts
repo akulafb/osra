@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import type { CameraControls } from '@react-three/drei';
-import type { PaperCameraLimits } from '../../lib/paperCamera';
+import { paperLimitsHolding, type PaperCameraLimits } from '../../lib/paperCamera';
 import type { Point3 } from '../../lib/paperLayout';
 import { spreadFollow, type PaperSpread } from '../../lib/paperSpread';
 
@@ -8,13 +8,39 @@ const now = new THREE.Vector3();
 const end = new THREE.Vector3();
 const box = new THREE.Box3();
 
+/** The selected Person, at `place` in the layout, while the Spread goes from `from` to `to`. */
+export interface SpreadFollow {
+  place: Point3;
+  from: PaperSpread;
+  to: PaperSpread;
+}
+
 /**
- * Moves the camera as far as a Person at `place` in the layout moves when the
- * Spread goes from `from` to `to`, so they stay put on screen. It runs before
- * `limitCamera` in the same frame: it reads the target before a smaller box can
- * clamp it, and lifts the old box so a larger Spread's move is not cut short.
+ * The camera's step for a frame where the Spread or the limits changed: moves
+ * the camera as far as the followed Person moves, so they stay put on screen,
+ * then sets `limits`.
  */
-export function followSpread(controls: CameraControls, place: Point3, from: PaperSpread, to: PaperSpread): void {
+export function stepSpreadCamera(controls: CameraControls, limits: PaperCameraLimits, follow: SpreadFollow | null): void {
+  if (follow) moveWith(controls, follow);
+  limitCamera(controls, limits);
+}
+
+/**
+ * Sets the zoom limits and the orbit point's box, both grown to hold the orbit
+ * point where it is, so new limits never pull the camera.
+ */
+export function limitCamera(controls: CameraControls, limits: PaperCameraLimits): void {
+  const held = paperLimitsHolding(limits, controls.getTarget(end, true));
+  controls.minDistance = held.minDistance;
+  controls.maxDistance = held.maxDistance;
+  const { min, max } = held.boundary;
+  box.min.set(min.x, min.y, min.z);
+  box.max.set(max.x, max.y, max.z);
+  controls.setBoundary(box);
+}
+
+// Lifts the box so a move onto a larger Spread is not cut short; stepSpreadCamera sets it again straight after.
+function moveWith(controls: CameraControls, { place, from, to }: SpreadFollow): void {
   const d = spreadFollow(place, from, to);
   controls.getTarget(now, false).add(d);
   controls.getTarget(end, true).add(d);
@@ -23,19 +49,4 @@ export function followSpread(controls: CameraControls, place: Point3, from: Pape
   const flying = !now.equals(end);
   void controls.moveTo(now.x, now.y, now.z, false);
   if (flying) void controls.moveTo(end.x, end.y, end.z, true);
-}
-
-/**
- * Sets the zoom limits and the orbit point's box. With `holdTarget`, the box
- * also holds the orbit point where it is, so a smaller Spread never pulls the
- * camera.
- */
-export function limitCamera(controls: CameraControls, limits: PaperCameraLimits, holdTarget: boolean): void {
-  controls.minDistance = limits.minDistance;
-  controls.maxDistance = limits.maxDistance;
-  const { min, max } = limits.boundary;
-  box.min.set(min.x, min.y, min.z);
-  box.max.set(max.x, max.y, max.z);
-  if (holdTarget) box.expandByPoint(controls.getTarget(end, true));
-  controls.setBoundary(box);
 }

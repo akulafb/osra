@@ -11,6 +11,7 @@ import {
   paperFitDistance,
   paperIdleRotates,
   paperIdleRotateSpeed,
+  paperLimitsHolding,
   PAPER_IDLE_SECONDS,
   type PaperCameraLimits,
 } from './paperCamera';
@@ -70,6 +71,25 @@ describe('paperFitDistance', () => {
       expect(frustum.containsPoint(new THREE.Vector3(99, 0, 0))).toBe(true);
       expect(frustum.containsPoint(new THREE.Vector3(0, 99, 0))).toBe(true);
     }
+  });
+});
+
+describe('paperLimitsHolding', () => {
+  const frame = { center: { x: 5, y: -8, z: 12 }, radius: 500 };
+  const aspect = 1440 / 900;
+  const limits = paperCameraLimits(frame, FOV, aspect);
+
+  it('keeps the limits when the box already holds the point', () => {
+    expect(paperLimitsHolding(limits, { x: 5 + 900, y: -8, z: 12 })).toEqual(limits);
+  });
+
+  it('grows the box around the same centre to hold the point, with the zoom-out limit in step', () => {
+    const held = paperLimitsHolding(limits, { x: 5 - 1000, y: -8 + 3000, z: 12 });
+    expect(inBoundary(held, { x: 5 - 1000, y: -8 + 3000, z: 12 })).toBe(true);
+    const grown = paperCameraLimits({ ...frame, radius: 1500 }, FOV, aspect);
+    expect(held.boundary).toEqual(grown.boundary);
+    expect(held.minDistance).toBe(grown.minDistance);
+    expect(held.maxDistance).toBeCloseTo(grown.maxDistance, 6);
   });
 });
 

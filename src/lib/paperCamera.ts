@@ -69,3 +69,24 @@ export function paperCameraLimits(
     boundary: { min: { x: x - half, y: y - half, z: z - half }, max: { x: x + half, y: y + half, z: z + half } },
   };
 }
+
+/**
+ * `limits` grown around the same centre until the box holds `point`, with the
+ * zoom-out limit grown in step, so a full zoom-out from anywhere in the box
+ * still brings the tree's centre back on screen.
+ */
+export function paperLimitsHolding(limits: PaperCameraLimits, point: Point3): PaperCameraLimits {
+  const { min, max } = limits.boundary;
+  const centre = { x: (min.x + max.x) / 2, y: (min.y + max.y) / 2, z: (min.z + max.z) / 2 };
+  const half = (max.x - min.x) / 2;
+  const reach = Math.max(Math.abs(point.x - centre.x), Math.abs(point.y - centre.y), Math.abs(point.z - centre.z));
+  if (reach <= half) return limits;
+  return {
+    minDistance: limits.minDistance,
+    maxDistance: (limits.maxDistance * reach) / half,
+    boundary: {
+      min: { x: centre.x - reach, y: centre.y - reach, z: centre.z - reach },
+      max: { x: centre.x + reach, y: centre.y + reach, z: centre.z + reach },
+    },
+  };
+}
