@@ -2,6 +2,8 @@ import React from 'react';
 import { useTheme } from '@mui/material/styles';
 import { FamilyNode } from '../types/graph';
 import { TargetOption } from './cards/connectCandidates';
+import { connectAimTarget } from './cards/connectLook';
+import type { CanvasMode } from '../lib/canvasMode';
 
 /**
  * The body of the docked panel while Connect Mode is aiming (LIN-50).
@@ -31,7 +33,7 @@ export interface ConnectTargetingBodyProps {
   onQueryChange?: (query: string) => void;
   onPickTarget: (node: FamilyNode) => void;
   onExit: () => void;
-  aimTarget?: 'a glowing planet' | 'a person';
+  look: CanvasMode;
 }
 
 export const ConnectTargetingBody: React.FC<ConnectTargetingBodyProps> = ({
@@ -45,7 +47,7 @@ export const ConnectTargetingBody: React.FC<ConnectTargetingBodyProps> = ({
   onQueryChange,
   onPickTarget,
   onExit,
-  aimTarget = 'a glowing planet',
+  look,
 }) => {
   const { panel, hud } = useTheme().palette;
   const truncated = Math.max(0, optionTotal - options.length);
@@ -58,7 +60,7 @@ export const ConnectTargetingBody: React.FC<ConnectTargetingBodyProps> = ({
       <div style={{ fontSize: 10, color: hud.editor.caption, lineHeight: 1.4 }}>
         {candidateCount === 0
           ? 'No one in view can be linked to this person yet.'
-          : `Click ${aimTarget}, or pick from the list.`}
+          : `Click ${connectAimTarget(look)}, or pick from the list.`}
         {unreachableCount > 0 && (
           <>
             {' '}

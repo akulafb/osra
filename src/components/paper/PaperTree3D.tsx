@@ -660,6 +660,7 @@ export function PaperTree3D({
         onCreateRelative={onCreateRelative}
         onConnectExistingRelative={onConnectExistingRelative}
         ghostLook={ghostLook}
+        look="paper"
       />
     </div>
   );
