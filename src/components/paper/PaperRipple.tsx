@@ -6,6 +6,7 @@ import type { PaperLayout, PaperLine } from '../../lib/paperLayout';
 import { linesOf } from '../../lib/paperHover';
 import { paperRippleProgress, paperRipplePulse } from '../../lib/paperFocus';
 import { placeOf, type PaperEmphasisState } from './paperEmphasis';
+import { paperLinkControlPoint, paperQuadraticPoint } from './paperScene';
 import { PAPER_LINE_RENDER_ORDER, setPaperSegment } from './paperScene';
 
 const MAX_RIPPLE_LINES = 64;
@@ -26,7 +27,13 @@ export function PaperRipple({
   const ref = useRef<ElementRef<typeof Line>>(null);
   const points = useMemo(() => Array.from({ length: MAX_RIPPLE_LINES * 2 }, () => [0, 0, 0] as [number, number, number]), []);
   const scratch = useMemo(
-    () => ({ from: new THREE.Vector3(), to: new THREE.Vector3(), tailAt: new THREE.Vector3(), headAt: new THREE.Vector3() }),
+    () => ({
+      from: new THREE.Vector3(),
+      to: new THREE.Vector3(),
+      control: new THREE.Vector3(),
+      tailAt: new THREE.Vector3(),
+      headAt: new THREE.Vector3(),
+    }),
     []
   );
   const rippling = useRef({ focus: null as PaperEmphasisState['focus'], lines, own: [] as PaperLine[] });
@@ -54,8 +61,9 @@ export function PaperRipple({
       const startShare = length > 0 ? Math.min(0.5, (layout.get(focus.id)?.radius ?? 0) / length) : 0;
       const endShare = length > 0 ? Math.max(0.5, 1 - (layout.get(otherId)?.radius ?? 0) / length) : 1;
       const along = (share: number) => startShare + (endShare - startShare) * share;
-      tailAt.lerpVectors(from, to, along(tail));
-      headAt.lerpVectors(from, to, along(head));
+      paperLinkControlPoint(from, to, undefined, scratch.control);
+      paperQuadraticPoint(from, scratch.control, to, along(tail), tailAt);
+      paperQuadraticPoint(from, scratch.control, to, along(head), headAt);
       if (setPaperSegment(geometry, i, tailAt, headAt)) moved = true;
     });
     geometry.instanceCount = rippling.current.own.length;

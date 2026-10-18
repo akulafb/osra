@@ -4,7 +4,7 @@ import * as THREE from 'three';
 import type { PaperLayout, PaperLine } from '../../lib/paperLayout';
 import { emphasisSubject, linesOf } from '../../lib/paperHover';
 import { placeOf, type PaperEmphasisState } from './paperEmphasis';
-
+import { paperLinkControlPoint, paperQuadraticPoint } from './paperScene';
 const MAX_PARTICLES = 600;
 const PARTICLE_SPACING = 18;
 const PARTICLE_SPEED = 24;
@@ -33,7 +33,7 @@ export function PaperParticles({
   useLayoutEffect(() => () => geometry.dispose(), [geometry]);
   const dot = useMemo(roundDot, []);
   useLayoutEffect(() => () => dot.dispose(), [dot]);
-  const scratch = useMemo(() => ({ from: new THREE.Vector3(), to: new THREE.Vector3() }), []);
+  const scratch = useMemo(() => ({ from: new THREE.Vector3(), to: new THREE.Vector3(), control: new THREE.Vector3(), curr: new THREE.Vector3() }), []);
   const flowing = useRef({ emphasis: null as PaperEmphasisState['emphasis'] | null, lines, subjectId: null as string | null, own: [] as PaperLine[] });
 
   useFrame(({ clock, gl }) => {
@@ -58,10 +58,12 @@ export function PaperParticles({
       placeOf(layout, state.current, otherId, to);
       const length = from.distanceTo(to);
       if (length === 0) continue;
+      paperLinkControlPoint(from, to, undefined, scratch.control);
       const count = Math.max(1, Math.round(length / PARTICLE_SPACING));
       for (let i = 0; i < count && n < MAX_PARTICLES; i++, n++) {
         const t = ((time * PARTICLE_SPEED) / length + i / count) % 1;
-        position.setXYZ(n, from.x + (to.x - from.x) * t, from.y + (to.y - from.y) * t, from.z + (to.z - from.z) * t);
+        paperQuadraticPoint(from, scratch.control, to, t, scratch.curr);
+        position.setXYZ(n, scratch.curr.x, scratch.curr.y, scratch.curr.z);
       }
     }
     if (n > 0) {

@@ -4,10 +4,13 @@ import {
   depthFade,
   isBackgroundTap,
   isTap,
+  PAPER_CURVE_SEGMENTS,
   paperFrame,
   paperLabelSize,
   paperLineSegments,
   paperLineShown,
+  paperLinkControlPoint,
+  paperQuadraticPoint,
   paperScreenPoint,
   setPaperColours,
   setPaperSegment,
@@ -51,9 +54,15 @@ describe('depthFade', () => {
     expect(depthFade(10, 10, 20)).toBe(1);
   });
 
-  it('is gone from where the fade ends', () => {
+  it('is gone from where the fade ends by default', () => {
     expect(depthFade(20, 10, 20)).toBe(0);
     expect(depthFade(99, 10, 20)).toBe(0);
+  });
+
+  it('respects a floor so distant labels remain greyed out rather than gone', () => {
+    expect(depthFade(20, 10, 20, 0.28)).toBe(0.28);
+    expect(depthFade(99, 10, 20, 0.28)).toBe(0.28);
+    expect(depthFade(15, 10, 20, 0.28)).toBeCloseTo(0.28 + (1 - 0.28) * 0.5);
   });
 
   it('fades evenly in between', () => {
@@ -64,6 +73,38 @@ describe('depthFade', () => {
   it('steps at the start when the window is empty', () => {
     expect(depthFade(9, 10, 10)).toBe(1);
     expect(depthFade(11, 10, 10)).toBe(0);
+  });
+});
+
+describe('paperLinkControlPoint and paperQuadraticPoint', () => {
+  it('calculates a control point that deflects outward from the centre', () => {
+    const from = { x: 10, y: 0, z: 0 };
+    const to = { x: 10, y: 10, z: 0 };
+    const ctrl = paperLinkControlPoint(from, to, { x: 0, y: 0, z: 0 });
+    expect(ctrl.y).toBeCloseTo(5);
+    expect(ctrl.x).toBeGreaterThan(10); // bows outward away from centre (0, 0, 0)
+  });
+
+  it('is symmetric when reversing endpoints', () => {
+    const from = { x: -5, y: 12, z: 3 };
+    const to = { x: 15, y: 8, z: -2 };
+    const forward = paperLinkControlPoint(from, to);
+    const backward = paperLinkControlPoint(to, from);
+    expect(forward.x).toBeCloseTo(backward.x);
+    expect(forward.y).toBeCloseTo(backward.y);
+    expect(forward.z).toBeCloseTo(backward.z);
+  });
+
+  it('evaluates quadratic bezier points from start to end', () => {
+    const from = { x: 0, y: 0, z: 0 };
+    const ctrl = { x: 5, y: 10, z: 0 };
+    const to = { x: 10, y: 0, z: 0 };
+    const start = paperQuadraticPoint(from, ctrl, to, 0);
+    const mid = paperQuadraticPoint(from, ctrl, to, 0.5);
+    const end = paperQuadraticPoint(from, ctrl, to, 1);
+    expect(start).toEqual(from);
+    expect(mid.y).toBeCloseTo(5);
+    expect(end).toEqual(to);
   });
 });
 
@@ -98,9 +139,22 @@ describe('paperLabelSize', () => {
 });
 
 describe('paperLineSegments', () => {
-  it('gives each line as its start and end points, in order', () => {
-    const segments = paperLineSegments([line('a', 'c', 'parent'), line('c', 'b', 'parent')], layout);
+  it('gives each line as straight start and end points when segmentsPerLine is 1', () => {
+    const segments = paperLineSegments([line('a', 'c', 'parent'), line('c', 'b', 'parent')], layout, 1);
     expect(segments).toEqual([[-10, 0, 0], [0, 6, 0], [0, 6, 0], [10, 0, 0]]);
+  });
+
+  it('subdivides each line into curved segments by default', () => {
+    const lines = [line('a', 'b', 'marriage')];
+    const segments = paperLineSegments(lines, layout);
+    expect(segments.length).toBe(PAPER_CURVE_SEGMENTS * 2);
+    // First segment starts at a
+    expect(segments[0]).toEqual([-10, 0, 0]);
+    // Last segment ends at b
+    expect(segments[segments.length - 1]).toEqual([10, 0, 0]);
+    // Intermediate points curve outward from centre (0, 0, 0)
+    const midIdx = PAPER_CURVE_SEGMENTS;
+    expect(Math.hypot(segments[midIdx][0], segments[midIdx][1], segments[midIdx][2])).toBeGreaterThan(0);
   });
 
   it('leaves out a line whose Person has no disc', () => {

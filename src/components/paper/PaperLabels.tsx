@@ -9,8 +9,9 @@ import { depthFade, paperLabelSize } from './paperScene';
 
 const PAPER_LABEL_FONT_URL = '/fonts/kawkab-mono/KawkabMono-Regular.woff';
 
-/** Labels are whole up to the orbit target's distance and gone at this multiple of it. */
+/** Labels are whole up to the orbit target's distance and greyed out past this multiple of it. */
 const LABEL_FADE_END = 1.8;
+const LABEL_FAR_INK = 0.28;
 const LABEL_GAP = 1.5;
 const OUTLINE_PER_WEIGHT = 0.07;
 const HIDDEN_BELOW = 0.02;
@@ -50,7 +51,7 @@ export function PaperLabels({ nodes, layout, ink, viewDistance, state, lifecycle
       if (!layout.has(id)) return;
       placeOf(layout, state.current, id, point.current);
       const fade =
-        depthFade(camera.position.distanceTo(point.current), start, end) *
+        depthFade(camera.position.distanceTo(point.current), start, end, LABEL_FAR_INK) *
         inkOf(state.current, id) *
         lifecycleInk(id) *
         sizeOf(state.current, id) ** LABEL_REVEAL_POWER;

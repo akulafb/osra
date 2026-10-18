@@ -6,7 +6,17 @@ import type { FamilyLink } from '../../types/graph';
 import type { PaperLayout, PaperLine } from '../../lib/paperLayout';
 import { emphasisSubject, linesOf } from '../../lib/paperHover';
 import { fadeInk, inkOf, lineEndInks, placeOf, type PaperEmphasisState } from './paperEmphasis';
-import { PAPER_DASH, PAPER_LINE_RENDER_ORDER, PAPER_LINE_STYLE, paperLineSegments, setPaperColours, setPaperSegment } from './paperScene';
+import {
+  PAPER_CURVE_SEGMENTS,
+  PAPER_DASH,
+  PAPER_LINE_RENDER_ORDER,
+  PAPER_LINE_STYLE,
+  paperLineSegments,
+  paperLinkControlPoint,
+  paperQuadraticPoint,
+  setPaperColours,
+  setPaperSegment,
+} from './paperScene';
 
 interface PaperLinesProps {
   lines: readonly PaperLine[];
@@ -71,16 +81,24 @@ function PaperLineKind({
 }) {
   const ref = useRef<LineSegments>(null);
   const style = PAPER_LINE_STYLE[type];
-  const points = useMemo(() => paperLineSegments(lines, layout), [lines, layout]);
+  const points = useMemo(() => paperLineSegments(lines, layout, PAPER_CURVE_SEGMENTS), [lines, layout]);
   const vertexColors = useMemo(() => points.map(() => [1, 1, 1] as [number, number, number]), [points]);
-  const rgb = useMemo(() => new Float32Array(lines.length * 6), [lines]);
+  const rgb = useMemo(() => new Float32Array(lines.length * PAPER_CURVE_SEGMENTS * 6), [lines]);
   const colours = useMemo(
     () => ({ line: new THREE.Color(colour), ink: new THREE.Color(ink), paper: new THREE.Color(paper), out: new THREE.Color() }),
     [colour, ink, paper]
   );
   const drawn = useRef<{ geometry?: object; colours?: object } & Partial<Pick<PaperEmphasisState, 'emphasis' | 'drift' | 'spread'>>>({});
-  const scratch = useMemo(() => ({ from: new THREE.Vector3(), to: new THREE.Vector3() }), []);
-
+  const scratch = useMemo(
+    () => ({
+      from: new THREE.Vector3(),
+      to: new THREE.Vector3(),
+      control: new THREE.Vector3(),
+      prev: new THREE.Vector3(),
+      curr: new THREE.Vector3(),
+    }),
+    []
+  );
   useFrame(() => {
     const segments = ref.current;
     if (!segments) return;
@@ -90,12 +108,22 @@ function PaperLineKind({
     const fresh = last.geometry !== geometry;
 
     if (fresh || drift !== last.drift || spread !== last.spread) {
-      const { from, to } = scratch;
+      const { from, to, control, prev, curr } = scratch;
       let moved = false;
       lines.forEach((line, i) => {
         placeOf(layout, state.current, line.sourceId, from);
         placeOf(layout, state.current, line.targetId, to);
-        if (setPaperSegment(geometry, i, from, to)) moved = true;
+        paperLinkControlPoint(from, to, undefined, control);
+        prev.copy(from);
+        let dashDist = 0;
+        for (let s = 1; s <= PAPER_CURVE_SEGMENTS; s++) {
+          const t = s / PAPER_CURVE_SEGMENTS;
+          paperQuadraticPoint(from, control, to, t, curr);
+          const segIdx = i * PAPER_CURVE_SEGMENTS + (s - 1);
+          if (setPaperSegment(geometry, segIdx, prev, curr, dashDist)) moved = true;
+          dashDist += prev.distanceTo(curr);
+          prev.copy(curr);
+        }
       });
       if (moved || fresh) geometry.computeBoundingSphere();
     }
@@ -105,8 +133,15 @@ function PaperLineKind({
       lines.forEach((line, i) => {
         const colour = own.has(line) ? colours.ink : colours.line;
         const [source, target] = lineEndInks(state.current, line);
-        fadeInk(colour, colours.paper, source, colours.out).toArray(rgb, i * 6);
-        fadeInk(colour, colours.paper, target, colours.out).toArray(rgb, i * 6 + 3);
+        for (let s = 0; s < PAPER_CURVE_SEGMENTS; s++) {
+          const t0 = s / PAPER_CURVE_SEGMENTS;
+          const t1 = (s + 1) / PAPER_CURVE_SEGMENTS;
+          const ink0 = source + (target - source) * t0;
+          const ink1 = source + (target - source) * t1;
+          const segIdx = i * PAPER_CURVE_SEGMENTS + s;
+          fadeInk(colour, colours.paper, ink0, colours.out).toArray(rgb, segIdx * 6);
+          fadeInk(colour, colours.paper, ink1, colours.out).toArray(rgb, segIdx * 6 + 3);
+        }
       });
       setPaperColours(geometry, rgb);
     }
@@ -159,6 +194,7 @@ function PaperArrows({
     () => ({
       parent: new THREE.Vector3(),
       child: new THREE.Vector3(),
+      control: new THREE.Vector3(),
       direction: new THREE.Vector3(),
       up: new THREE.Vector3(0, 1, 0),
       quaternion: new THREE.Quaternion(),
@@ -177,11 +213,13 @@ function PaperArrows({
     const fresh = last.mesh !== mesh;
 
     if (fresh || drift !== last.drift || spread !== last.spread) {
-      const { parent, child, direction, up, quaternion, matrix, one } = scratch;
+      const { parent, child, control, direction, up, quaternion, matrix, one } = scratch;
       arrows.forEach((line, i) => {
         placeOf(layout, state.current, line.sourceId, parent);
         placeOf(layout, state.current, line.targetId, child);
-        direction.subVectors(child, parent);
+        paperLinkControlPoint(parent, child, undefined, control);
+        direction.subVectors(child, control);
+        if (direction.lengthSq() === 0) direction.subVectors(child, parent);
         if (direction.lengthSq() === 0) direction.copy(up);
         direction.normalize();
         quaternion.setFromUnitVectors(up, direction);
