@@ -68,11 +68,11 @@ export function paperFrame(layout: PaperLayout, ids: Iterable<string>): PaperFra
   return { center, radius };
 }
 
-/** How much ink is left at `distance` from the camera: all of it up to `start`, none from `end`. */
-export function depthFade(distance: number, start: number, end: number): number {
+/** How much ink is left at `distance` from the camera: all of it up to `start`, floor from `end`. */
+export function depthFade(distance: number, start: number, end: number, floor: number = 0): number {
   if (distance <= start) return 1;
-  if (distance >= end) return 0;
-  return (end - distance) / (end - start);
+  if (distance >= end) return floor;
+  return floor + ((1 - floor) * (end - distance)) / (end - start);
 }
 
 const projected = new THREE.Vector3();
@@ -119,14 +119,139 @@ export const PAPER_RING_POINTS: [number, number, number][] = Array.from({ length
   return [Math.cos(a), Math.sin(a), 0];
 });
 
-/** The lines as consecutive start and end points, for one draw call. */
-export function paperLineSegments(lines: readonly PaperLine[], layout: PaperLayout): [number, number, number][] {
+export const PAPER_CURVE_SEGMENTS = 8;
+export const PAPER_CURVE_DEFLECTION_RATIO = 0.16;
+export const PAPER_CURVE_MAX_DEFLECTION = 24;
+
+/**
+ * The quadratic bezier control point for a line between `from` and `to`.
+ * It deflects perpendicularly from the chord midpoint, bowing outward from `centre`.
+ */
+export function paperLinkControlPoint<T extends Point3 = Point3>(
+  from: Point3,
+  to: Point3,
+  centre: Point3 = { x: 0, y: 0, z: 0 },
+  out?: T
+): T {
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  const dz = to.z - from.z;
+  const dist = Math.hypot(dx, dy, dz);
+  const midX = (from.x + to.x) / 2;
+  const midY = (from.y + to.y) / 2;
+  const midZ = (from.z + to.z) / 2;
+  if (dist < 1e-4) {
+    if (out) {
+      out.x = midX;
+      out.y = midY;
+      out.z = midZ;
+      return out;
+    }
+    return { x: midX, y: midY, z: midZ } as T;
+  }
+
+  // Vector from centre to midpoint
+  const rx = midX - centre.x;
+  const ry = midY - centre.y;
+  const rz = midZ - centre.z;
+
+  // Project r onto chord d
+  const dotRd = rx * dx + ry * dy + rz * dz;
+  const chordSq = dist * dist;
+  let px = rx - (dotRd / chordSq) * dx;
+  let py = ry - (dotRd / chordSq) * dy;
+  let pz = rz - (dotRd / chordSq) * dz;
+  let pLen = Math.hypot(px, py, pz);
+
+  // Fallback if midpoint lies directly on centre or collinear with chord:
+  // use a canonical chord direction so swapping from/to gives the same normal.
+  if (pLen < 1e-3) {
+    const sign = (dx !== 0 ? dx : (dy !== 0 ? dy : dz)) >= 0 ? 1 : -1;
+    const ndx = (dx / dist) * sign;
+    const ndy = (dy / dist) * sign;
+    const ndz = (dz / dist) * sign;
+    if (Math.abs(ndy) < 0.9) {
+      px = -ndz;
+      py = 0;
+      pz = ndx;
+    } else {
+      px = 0;
+      py = ndz;
+      pz = -ndy;
+    }
+    pLen = Math.hypot(px, py, pz);
+  }
+
+  const nx = px / pLen;
+  const ny = py / pLen;
+  const nz = pz / pLen;
+  const deflection = Math.min(dist * PAPER_CURVE_DEFLECTION_RATIO, PAPER_CURVE_MAX_DEFLECTION);
+
+  const cx = midX + nx * deflection;
+  const cy = midY + ny * deflection;
+  const cz = midZ + nz * deflection;
+
+  if (out) {
+    out.x = cx;
+    out.y = cy;
+    out.z = cz;
+    return out;
+  }
+  return { x: cx, y: cy, z: cz } as T;
+}
+
+/** Evaluates a point on a quadratic Bezier curve at parameter t in [0, 1]. */
+export function paperQuadraticPoint<T extends Point3 = Point3>(
+  from: Point3,
+  control: Point3,
+  to: Point3,
+  t: number,
+  out?: T
+): T {
+  const inv = 1 - t;
+  const c0 = inv * inv;
+  const c1 = 2 * inv * t;
+  const c2 = t * t;
+  const x = c0 * from.x + c1 * control.x + c2 * to.x;
+  const y = c0 * from.y + c1 * control.y + c2 * to.y;
+  const z = c0 * from.z + c1 * control.z + c2 * to.z;
+  if (out) {
+    out.x = x;
+    out.y = y;
+    out.z = z;
+    return out;
+  }
+  return { x, y, z } as T;
+}
+
+/** The lines as consecutive start and end points of curved segments, for one draw call. */
+export function paperLineSegments(
+  lines: readonly PaperLine[],
+  layout: PaperLayout,
+  segmentsPerLine: number = PAPER_CURVE_SEGMENTS,
+  centre?: Point3
+): [number, number, number][] {
   const segments: [number, number, number][] = [];
   for (const line of lines) {
     const a = layout.get(line.sourceId);
     const b = layout.get(line.targetId);
     if (!a || !b) continue;
-    segments.push([a.x, a.y, a.z], [b.x, b.y, b.z]);
+    if (segmentsPerLine <= 1) {
+      segments.push([a.x, a.y, a.z], [b.x, b.y, b.z]);
+      continue;
+    }
+    const ctrl = paperLinkControlPoint(a, b, centre);
+    let prevX = a.x;
+    let prevY = a.y;
+    let prevZ = a.z;
+    for (let s = 1; s <= segmentsPerLine; s++) {
+      const t = s / segmentsPerLine;
+      const pt = paperQuadraticPoint(a, ctrl, b, t);
+      segments.push([prevX, prevY, prevZ], [pt.x, pt.y, pt.z]);
+      prevX = pt.x;
+      prevY = pt.y;
+      prevZ = pt.z;
+    }
   }
   return segments;
 }
@@ -151,7 +276,13 @@ export function setPaperColours(geometry: THREE.BufferGeometry, rgb: Float32Arra
  * `computeLineDistances` allocates a new GPU buffer on every call, and three never frees the one it replaces.
  * Each segment's dashes start at its own start, where drei lays them end to end. True when the ends moved.
  */
-export function setPaperSegment(geometry: THREE.BufferGeometry, index: number, from: Point3, to: Point3): boolean {
+export function setPaperSegment(
+  geometry: THREE.BufferGeometry,
+  index: number,
+  from: Point3,
+  to: Point3,
+  dashStart: number = 0
+): boolean {
   const start = geometry.attributes.instanceStart as THREE.InterleavedBufferAttribute;
   const ends = start.data.array as Float32Array;
   const at = index * 6;
@@ -166,9 +297,11 @@ export function setPaperSegment(geometry: THREE.BufferGeometry, index: number, f
   if (distance) {
     const distances = distance.data.array as Float32Array;
     const length = Math.fround(Math.hypot(to.x - from.x, to.y - from.y, to.z - from.z));
-    if (distances[index * 2] !== 0 || distances[index * 2 + 1] !== length) {
-      distances[index * 2] = 0;
-      distances[index * 2 + 1] = length;
+    const startDist = Math.fround(dashStart);
+    const endDist = Math.fround(dashStart + length);
+    if (distances[index * 2] !== startDist || distances[index * 2 + 1] !== endDist) {
+      distances[index * 2] = startDist;
+      distances[index * 2 + 1] = endDist;
       distance.data.needsUpdate = true;
     }
   }
