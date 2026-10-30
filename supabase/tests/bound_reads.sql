@@ -1,5 +1,6 @@
 -- =============================================================================
--- bound-reads: checks that only a bound account or an admin reads family data
+-- bound-reads: checks that only a bound account or an admin reads Persons and
+-- Kinship Links
 -- =============================================================================
 -- Runs against a database where the bound-reads migration has been applied, as
 -- a superuser (postgres). Everything happens inside one transaction that is
@@ -13,11 +14,7 @@
 
 BEGIN;
 
--- claim_invite_secure reads these two; the plain-Postgres stub leaves them out.
-ALTER TABLE auth.users ADD COLUMN IF NOT EXISTS raw_user_meta_data jsonb;
-ALTER TABLE auth.users ADD COLUMN IF NOT EXISTS email text;
-
--- Ids: aaa1 = bound member, ad01 = bound admin, ad02 = admin with node_id NULL,
+-- Ids: aaa1 = bound account, ad01 = bound admin, ad02 = admin with node_id NULL,
 -- bbb1 = no public.users row, bbb2 = node_id NULL, ccc1 = no row until it claims.
 INSERT INTO auth.users (id) VALUES
   ('00000000-0000-0000-0000-00000000aaa1'),
@@ -50,6 +47,8 @@ INSERT INTO public.node_invites (node_id, token, expires_at, created_by_user_id)
 
 CREATE TEMP TABLE reads (who text, path text, seen bigint);
 GRANT ALL ON reads TO authenticated;
+CREATE TEMP TABLE claimed (who text, ids uuid[]);
+GRANT ALL ON claimed TO authenticated;
 
 -- What each account reads, recorded while acting as that account.
 DO $$
@@ -62,20 +61,18 @@ BEGIN
     INSERT INTO reads SELECT u, 'nodes', count(*) FROM public.nodes;
     INSERT INTO reads SELECT u, 'links', count(*) FROM public.links;
     INSERT INTO reads SELECT u, 'users', count(*) FROM public.users;
-    INSERT INTO reads SELECT u, 'claimed', cardinality(public.get_claimed_node_ids());
+    INSERT INTO claimed SELECT u, ARRAY(SELECT x FROM unnest(public.get_claimed_node_ids()) x ORDER BY x);
     INSERT INTO reads SELECT u, 'metrics', (public.get_public_metrics() ->> 'individuals')::bigint;
     INSERT INTO reads SELECT u, 'invite', (public.get_invite_by_token('tok-claim') IS NOT NULL)::int;
     RESET ROLE;
   END LOOP;
 END $$;
 
-SELECT * FROM reads ORDER BY who, path;
-
 CREATE FUNCTION pg_temp.seen(p_who text, p_path text) RETURNS bigint
 LANGUAGE sql STABLE
 AS $$ SELECT seen FROM reads WHERE who = p_who AND path = p_path $$;
 
--- An account that is neither bound nor an admin reads no family data.
+-- An account that is neither bound nor an admin reads no Persons or Kinship Links.
 DO $$
 DECLARE
   u text;
@@ -83,12 +80,12 @@ BEGIN
   FOREACH u IN ARRAY ARRAY['bbb1', 'bbb2'] LOOP
     ASSERT pg_temp.seen(u, 'nodes') = 0, u || ' should read 0 nodes, read ' || pg_temp.seen(u, 'nodes');
     ASSERT pg_temp.seen(u, 'links') = 0, u || ' should read 0 links, read ' || pg_temp.seen(u, 'links');
-    ASSERT pg_temp.seen(u, 'claimed') = 0, u || ' should get no claimed ids, got ' || pg_temp.seen(u, 'claimed');
+    ASSERT (SELECT ids FROM claimed WHERE who = u) = '{}'::uuid[], u || ' should get no claimed ids, got ' || (SELECT ids FROM claimed WHERE who = u)::text;
   END LOOP;
 END $$;
 
--- A bound member and both admins read every row and every claimed id. The two
--- bound accounts hold the two claimed Persons.
+-- A bound account and both admins read every row and every claimed id. The two
+-- bound accounts hold the two claimed Persons, f1 and e1.
 DO $$
 DECLARE
   u text;
@@ -96,7 +93,8 @@ BEGIN
   FOREACH u IN ARRAY ARRAY['aaa1', 'ad01', 'ad02'] LOOP
     ASSERT pg_temp.seen(u, 'nodes') = 5, u || ' should read 5 nodes, read ' || pg_temp.seen(u, 'nodes');
     ASSERT pg_temp.seen(u, 'links') = 3, u || ' should read 3 links, read ' || pg_temp.seen(u, 'links');
-    ASSERT pg_temp.seen(u, 'claimed') = 2, u || ' should get 2 claimed ids, got ' || pg_temp.seen(u, 'claimed');
+    ASSERT (SELECT ids FROM claimed WHERE who = u) = ARRAY['00000000-0000-0000-0000-0000000000e1', '00000000-0000-0000-0000-0000000000f1']::uuid[],
+      u || ' should get e1 and f1 as claimed ids, got ' || (SELECT ids FROM claimed WHERE who = u)::text;
   END LOOP;
 END $$;
 
@@ -240,7 +238,7 @@ END $$;
 
 -- The write seam still works for a bound non-admin once reads are narrowed: the
 -- RPCs, a direct edit of a 1-degree Person, and the triggers those fire. aaa1 is
--- bound to f1, so c1 is a child and c3 is outside the network until linked.
+-- bound to f1, so c1 is a child.
 DO $$
 DECLARE
   created json;
@@ -279,18 +277,34 @@ END $$;
 -- The same writes stay refused for an unbound account.
 DO $$
 DECLARE
+  u text;
+  caller uuid;
+  created json;
+  linked json;
   edited bigint;
 BEGIN
-  PERFORM set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-00000000bbb2","role":"authenticated"}', true);
-  SET LOCAL ROLE authenticated;
-  WITH upd AS (
-    UPDATE public.nodes SET first_name = 'Forged'
-    WHERE id = '00000000-0000-0000-0000-0000000000f1'
-    RETURNING id
-  )
-  SELECT count(*) INTO edited FROM upd;
-  RESET ROLE;
-  ASSERT edited = 0, 'bbb2 should edit no Person, edited ' || edited;
+  FOREACH u IN ARRAY ARRAY['bbb1', 'bbb2'] LOOP
+    caller := ('00000000-0000-0000-0000-00000000' || u)::uuid;
+    PERFORM set_config('request.jwt.claims', json_build_object('sub', caller, 'role', 'authenticated')::text, true);
+    SET LOCAL ROLE authenticated;
+    created := public.create_relative_secure(
+      'Forged', 'child', '00000000-0000-0000-0000-0000000000f1', caller, 'father', NULL, 'female'
+    );
+    linked := public.link_existing_relative_secure(
+      '00000000-0000-0000-0000-0000000000c3', 'child', '00000000-0000-0000-0000-0000000000f1', caller
+    );
+    WITH upd AS (
+      UPDATE public.nodes SET first_name = 'Forged'
+      WHERE id = '00000000-0000-0000-0000-0000000000f1'
+      RETURNING id
+    )
+    SELECT count(*) INTO edited FROM upd;
+    RESET ROLE;
+    ASSERT created ->> 'message' = 'Unauthorized', u || ' should not create a Person: ' || created::text;
+    ASSERT linked ->> 'message' = 'Unauthorized', u || ' should not link a Person: ' || linked::text;
+    ASSERT edited = 0, u || ' should edit no Person, edited ' || edited;
+  END LOOP;
+  ASSERT NOT EXISTS (SELECT 1 FROM public.nodes WHERE first_name = 'Forged'), 'no refused write should leave a Person';
 END $$;
 
 SELECT 'bound_reads: all checks passed' AS result;

@@ -4,7 +4,7 @@
 
 ## Overview
 
-My goal was to create a collaborative family tree platform where multiple family clusters can coexist and interconnect through marriage links, where everyone signed in sees the whole tree, but each user can only edit their immediate family network (self, parents, children, siblings, spouse, and step and co-parent equivalents). With a little bit of fun.
+My goal was to create a collaborative family tree platform where multiple family clusters can coexist and interconnect through marriage links, where everyone bound to a Person sees the whole tree, but each user can only edit their immediate family network (self, parents, children, siblings, spouse, and step and co-parent equivalents). With a little bit of fun.
 
 ## System Architecture
 
