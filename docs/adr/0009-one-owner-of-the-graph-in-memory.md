@@ -82,6 +82,7 @@ production):
   the browser rather than in CI. The gap is deliberate.
 - LIN-58 now has one seam to replace instead of two call sites to keep in step: the provider's
   internals become `useWorkingRecord`, and `write` reaches the modals through the same context.
+  *Amended by ADR-0016:* only `useRecorder` reads `write` from the context; the modals take a `recorder` prop.
 - `carryPositions` (`:59-109`) is pure and therefore the one part of this module the `.test.ts`
   harness could reach if it lived in `src/lib/`. It stays where it is: LIN-58's D7 folds it into
   `projectWorkingRecord`, narrowing it from every node on every fetch to the one node that

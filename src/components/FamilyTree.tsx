@@ -10,9 +10,8 @@ import { useCanvasMode } from '../hooks/useCanvasMode';
 import { usePaperLayout } from '../hooks/usePaperLayout';
 import { SPREAD_MIN, type Spread } from '../lib/paperSpread';
 import { useWorkingRecord } from '../contexts/WorkingRecordContext';
-import { linkWriteOutcome } from '../hooks/useWorkingRecord';
 import { useNewNodesSinceSignIn } from '../hooks/useNewNodesSinceSignIn';
-import { FamilyLink, FamilyNode, RelativeDirection } from '../types/graph';
+import { FamilyNode, RelativeDirection } from '../types/graph';
 import { useAuth } from '../contexts/AuthContext';
 import AdminManageLinksModal from './modals/AdminManageLinksModal';
 import AdminAddPersonModal from './modals/AdminAddPersonModal';
@@ -29,27 +28,8 @@ import { NewMembersModal } from './NewMembersModal';
 import { PersonDetailDrawer } from './PersonDetailDrawer';
 import { bottomRightControlsClear, usePersonDrawerInset } from '../hooks/usePersonDrawerInset';
 import { isMobile } from '../utils/device';
-import {
-  createTreeRecord,
-  pendingKinshipLinks,
-  relativeToKinshipLink,
-  relativeToKinshipLinks,
-  type AddLinkParams,
-} from '../lib/treeRecord';
-import { resolveOtherParentFor } from '../lib/otherParent';
-import { getLinkEndpoints } from '../lib/familyGraph';
 import { useLifecycles } from '../hooks/useLifecycles';
-
-/** What `treeRecord` sanitises a name to, so an optimistic Person reads the same as the confirmed one. */
-const MAX_PERSON_NAME_LENGTH = 200;
-
-/** The Spawn subjects of the Kinship Links a write is about to create, one per link. */
-function linkSpawnSubjects(links: readonly FamilyLink[]) {
-  return links.map((link) => {
-    const { sourceId, targetId } = getLinkEndpoints(link);
-    return { kind: 'link' as const, aId: sourceId, bId: targetId };
-  });
-}
+import { useRecorder } from '../hooks/useRecorder';
 
 /**
  * A rejected write has already reverted itself and unwound its lifecycle, so
@@ -61,11 +41,10 @@ function reportWriteFailure(error: unknown, fallback: string): void {
 }
 
 export const FamilyTree: React.FC = () => {
-  const { user, userProfile, isAdmin, session } = useAuth();
+  const { user, userProfile, isAdmin } = useAuth();
   const { mode, switchMode, isHydrated } = useViewMode();
   const { mode: canvasMode } = useCanvasMode();
-  const { working, confirmedNodes, confirmedLinks, isLoading, error, reload, write } =
-    useWorkingRecord();
+  const { working, confirmedNodes, confirmedLinks, isLoading, error, reload } = useWorkingRecord();
   const isPaper3D = mode === '3D' && canvasMode === 'paper';
   const paperLayout = usePaperLayout(working, isPaper3D);
   const paperSpread = useRef<Spread>(SPREAD_MIN);
@@ -216,6 +195,7 @@ export const FamilyTree: React.FC = () => {
    * gone; this component only says *what* happened and to *whom*.
    */
   const lifecycles = useLifecycles(mode === '3D' ? '3d' : '2d');
+  const recorder = useRecorder(lifecycles);
 
   /**
    * Whether this user may dissolve a given Tree Node.
@@ -242,20 +222,10 @@ export const FamilyTree: React.FC = () => {
     interaction.startDissolve(selectedNode.id);
   }, [selectedNode, canDissolveNode, interaction]);
 
-  const otherParentToLink = useCallback(
-    (parentId: string, sent: string | null | undefined, childId?: string): string | null =>
-      resolveOtherParentFor(working?.links ?? [], parentId, sent, childId),
-    [working?.links]
-  );
-
   /**
-   * Spawn a Person and the Kinship Link that carries them in.
-   *
-   * The Person's uuid is minted here (D11) so the lifecycle can be keyed on it
-   * before the network answers, the Spawn starts first, and `write` puts them
-   * on the canvas before `commit` runs. Nothing here is awaited by the caller:
-   * the Ghost Node used to sit in `isSubmitting` for four round-trips beside
-   * the Tree Node it had already become, and now dismisses immediately.
+   * The canvas's writes. Nothing here is awaited by the caller: the Ghost Node
+   * used to sit in `isSubmitting` for four round-trips beside the Tree Node it
+   * had already become, and now dismisses immediately.
    */
   const handleCreateRelativeDirect = useCallback(
     (params: {
@@ -264,59 +234,16 @@ export const FamilyTree: React.FC = () => {
       targetNodeId: string;
       otherParentId?: string | null;
     }) => {
-      if (!user) return;
-      const record = createTreeRecord({
-        userId: user.id,
-        isAdmin,
-        sessionToken: session?.access_token,
-      });
-      const personId = crypto.randomUUID();
-      const firstName = params.firstName.trim().slice(0, MAX_PERSON_NAME_LENGTH);
-      const otherParentId =
-        params.relation === 'child' ? otherParentToLink(params.targetNodeId, params.otherParentId) : null;
-      const otherParent = otherParentId
-        ? working?.nodes.find((n) => n.id === otherParentId) ?? { id: otherParentId }
-        : null;
-      const pending = relativeToKinshipLinks(
-        params.targetNodeId,
-        personId,
-        params.relation,
-        working?.links ?? [],
-        undefined,
-        otherParent
-      );
-      const nodeSubject = { kind: 'node' as const, id: personId };
-      const linkSubjects = linkSpawnSubjects(pending);
-
-      // The Person and the Kinship Links are subjects of the same Spawn, on
-      // the same clock. Only one parent line is drawn to a child (ADR 0012), so
-      // both parent links spawn and the drawn one shows it.
-      lifecycles.start('spawn', nodeSubject);
-      linkSubjects.forEach((subject) => lifecycles.start('spawn', subject));
-
-      // The two cluster fields are derived server-side from the anchor and the
-      // other parent, so they are deliberately absent until the server says
-      // what they are rather than guessed and corrected.
-      void write(
-        [
-          { kind: 'person-upsert', person: { id: personId, firstName } },
-          ...pending.map((link) => ({ kind: 'link-upsert' as const, link })),
-        ],
-        async () => ({
-          kind: 'confirmed',
-          rows: await record.addPerson({
-            id: personId,
-            firstName,
-            link: { targetId: params.targetNodeId, relation: params.relation, otherParentId },
-          }),
+      void recorder
+        .addRelative({
+          anchorId: params.targetNodeId,
+          relation: params.relation,
+          firstName: params.firstName,
+          otherParentId: params.otherParentId,
         })
-      ).catch((e) => {
-        lifecycles.abort('spawn', nodeSubject);
-        linkSubjects.forEach((subject) => lifecycles.abort('spawn', subject));
-        reportWriteFailure(e, 'Failed to create relative.');
-      });
+        .catch((e) => reportWriteFailure(e, 'Failed to create relative.'));
     },
-    [user, isAdmin, session?.access_token, lifecycles, write, working?.links, working?.nodes, otherParentToLink]
+    [recorder]
   );
 
   const handleConnectExistingRelativeDirect = useCallback(
@@ -326,60 +253,23 @@ export const FamilyTree: React.FC = () => {
       targetNodeId: string;
       otherParentId?: string | null;
     }) => {
-      if (!user) return;
-      try {
-        // Refuses `sibling` outright: it is several Kinship Links, not one.
-        const kinship: AddLinkParams = {
-          ...relativeToKinshipLink(params.targetNodeId, params.existingNodeId, params.relation),
-          otherParentId:
-            params.relation === 'child'
-              ? otherParentToLink(params.targetNodeId, params.otherParentId, params.existingNodeId)
-              : null,
-        };
-        const pending = pendingKinshipLinks(kinship, working?.nodes ?? []);
-        const record = createTreeRecord({
-          userId: user.id,
-          isAdmin,
-          sessionToken: session?.access_token,
-        });
-        const subjects = linkSpawnSubjects(pending);
-        subjects.forEach((subject) => lifecycles.start('spawn', subject));
-        void write(
-          pending.map((link) => ({ kind: 'link-upsert' as const, link })),
-          async () => linkWriteOutcome(await record.addLink(kinship))
-        ).catch((e) => {
-          subjects.forEach((subject) => lifecycles.abort('spawn', subject));
-          reportWriteFailure(e, 'Failed to connect relative.');
-        });
-      } catch (e) {
-        reportWriteFailure(e, 'Failed to connect relative.');
-      }
+      void recorder
+        .connectRelative({
+          anchorId: params.targetNodeId,
+          existingId: params.existingNodeId,
+          relation: params.relation,
+          otherParentId: params.otherParentId,
+        })
+        .catch((e) => reportWriteFailure(e, 'Failed to connect relative.'));
     },
-    [user, isAdmin, session?.access_token, lifecycles, write, working?.nodes, otherParentToLink]
+    [recorder]
   );
 
   const handleConfirmDissolveDirect = useCallback(
     async (node: FamilyNode) => {
-      if (!user || !canDissolveNode(node.id)) return;
-      const record = createTreeRecord({
-        userId: user.id,
-        isAdmin,
-        sessionToken: session?.access_token,
-      });
+      if (!canDissolveNode(node.id)) return;
       try {
-        // The Dissolve starts now, the Person leaves the Working Record now,
-        // and the write runs underneath both. `write` reverts the data if it
-        // rejects and the lifecycle unwinds the visual — the refetch that used
-        // to stand in for the first half is the line ADR-0007 deferred here.
-        await lifecycles.run({
-          kind: 'dissolve',
-          subject: { kind: 'node', id: node.id },
-          commit: () =>
-            write([{ kind: 'person-remove', id: node.id }], async () => ({
-              kind: 'confirmed',
-              rows: await record.removePerson({ id: node.id }),
-            })),
-        });
+        await recorder.removePerson(node.id);
         if (selectedNode?.id === node.id) {
           interaction.deselect();
         }
@@ -387,33 +277,7 @@ export const FamilyTree: React.FC = () => {
         reportWriteFailure(e, 'Delete failed.');
       }
     },
-    [user, isAdmin, session?.access_token, selectedNode?.id, interaction, lifecycles, write, canDissolveNode]
-  );
-
-  /**
-   * Dissolve a Kinship Link, for the admin link manager. Same lifecycle as an
-   * in-canvas Dissolve — the modal supplies the confirmation, the canvas plays
-   * the animation, and the modal reports a rejection this rethrows.
-   */
-  const handleDissolveLink = useCallback(
-    async (params: { id: string; aId: string; bId: string }) => {
-      if (!user) return;
-      const record = createTreeRecord({
-        userId: user.id,
-        isAdmin,
-        sessionToken: session?.access_token,
-      });
-      await lifecycles.run({
-        kind: 'dissolve',
-        subject: { kind: 'link', aId: params.aId, bId: params.bId },
-        commit: () =>
-          write([{ kind: 'link-remove', id: params.id }], async () => ({
-            kind: 'confirmed',
-            rows: await record.removeLink({ id: params.id }),
-          })),
-      });
-    },
-    [user, isAdmin, session?.access_token, lifecycles, write]
+    [recorder, selectedNode?.id, interaction, canDissolveNode]
   );
 
   const handleDirectConnectNodes = useCallback(
@@ -424,35 +288,17 @@ export const FamilyTree: React.FC = () => {
       parentRole?: 'mother' | 'father' | null;
       otherParentId?: string | null;
     }) => {
-      if (!user) return;
-      const record = createTreeRecord({
-        userId: user.id,
-        isAdmin,
-        sessionToken: session?.access_token,
-      });
-      const kinship: AddLinkParams = {
-        sourceId: params.sourceNodeId,
-        targetId: params.targetNodeId,
-        type: params.type,
-        parentRole: params.type === 'parent' ? params.parentRole ?? null : null,
-        otherParentId:
-          params.type === 'parent'
-            ? otherParentToLink(params.sourceNodeId, params.otherParentId, params.targetNodeId)
-            : null,
-      };
-      const pending = pendingKinshipLinks(kinship, working?.nodes ?? []);
-      const subjects = linkSpawnSubjects(pending);
-
-      subjects.forEach((subject) => lifecycles.start('spawn', subject));
-      void write(
-        pending.map((link) => ({ kind: 'link-upsert' as const, link })),
-        async () => linkWriteOutcome(await record.addLink(kinship))
-      ).catch((e) => {
-        subjects.forEach((subject) => lifecycles.abort('spawn', subject));
-        reportWriteFailure(e, 'Failed to create kinship link.');
-      });
+      void recorder
+        .connectPersons({
+          sourceId: params.sourceNodeId,
+          targetId: params.targetNodeId,
+          type: params.type,
+          parentRole: params.parentRole,
+          otherParentId: params.otherParentId,
+        })
+        .catch((e) => reportWriteFailure(e, 'Failed to create kinship link.'));
     },
-    [user, isAdmin, session?.access_token, lifecycles, write, working?.nodes, otherParentToLink]
+    [recorder]
   );
 
   // Visible nodes for search (depends on mode)
@@ -685,6 +531,7 @@ export const FamilyTree: React.FC = () => {
           <AddRelativeModal
             isOpen={isAddModalOpen}
             onClose={() => setIsAddModalOpen(false)}
+            recorder={recorder}
             targetNode={selectedNode}
             existingNodes={working.nodes}
             visibleIds={visibleIds}
@@ -694,6 +541,7 @@ export const FamilyTree: React.FC = () => {
           <EditNodeModal
             isOpen={isEditModalOpen}
             onClose={() => setIsEditModalOpen(false)}
+            recorder={recorder}
             targetNode={selectedNode}
             existingNodes={working.nodes}
             visibleIds={visibleIds}
@@ -704,20 +552,16 @@ export const FamilyTree: React.FC = () => {
         <AdminManageLinksModal
           isOpen={adminManageLinksOpen}
           onClose={() => setAdminManageLinksOpen(false)}
+          recorder={recorder}
           graph={working}
           nodeId={selectedNode.id}
-          session={session}
-          isAdmin={isAdmin}
-          onDissolveLink={handleDissolveLink}
         />
       )}
       {isAdmin && user && (
         <AdminAddPersonModal
           isOpen={adminAddPersonOpen}
           onClose={() => setAdminAddPersonOpen(false)}
-          session={session}
-          isAdmin={isAdmin}
-          userId={user.id}
+          recorder={recorder}
         />
       )}
       {userProfile?.node_id && (

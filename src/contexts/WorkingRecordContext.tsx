@@ -15,9 +15,8 @@ const WorkingRecordContext = createContext<WorkingRecordController | undefined>(
  * stayed invisible to every answer the chat gave for the rest of the session.
  * A provider makes the second copy unreachable rather than merely absent.
  *
- * Since LIN-58 it also carries `write`, so the four modals that used to be
- * handed `onSuccess={refetch}` reach the sequencer through the same owner
- * instead of through four props.
+ * Since LIN-58 it also carries `write`, the sequencer, which the Recorder
+ * reaches through the same owner (ADR-0016).
  */
 export function WorkingRecordProvider({ children }: { children: React.ReactNode }) {
   const controller = useWorkingRecordOwner();

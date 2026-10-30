@@ -5,32 +5,17 @@ import { useAuth } from '../contexts/AuthContext';
 import { dropOrphanLinks } from '../lib/sanitizeFamilyGraph';
 import { kinshipLinksFromRows, personFromRow } from '../lib/treeRecordRows';
 import {
-  applyPending,
-  confirmPending,
-  dropPending,
   emptyWorkingRecord,
   projectWorkingRecord,
-  revertPending,
   withConfirmedSnapshot,
-  type RecordChange,
   type WorkingRecordState,
 } from '../lib/workingRecord';
-import type { AddLinkResult, ConfirmedRows } from '../lib/treeRecord';
+import { createWriteSequencer, type WriteSequencer } from '../lib/writeSequencer';
 import type { FamilyGraph, FamilyLink, FamilyNode } from '../types/graph';
 import type { Database } from '../types/database';
 import { supabaseHeaders, supabasePublishableKey, supabaseUrl } from '../lib/supabaseConfig';
 
 type NodeRow = Database['public']['Tables']['nodes']['Row'];
-
-/**
- * What a write reported back. A rejection throws `TreeRecordError` instead of
- * arriving here, because a caller has to be told about it; `empty` is the
- * server accepting a write and doing nothing (`already_connected`), which is
- * not a failure and has nothing to tell (D10).
- */
-export type WriteOutcome =
-  | { kind: 'confirmed'; rows: ConfirmedRows }
-  | { kind: 'empty' };
 
 export interface WorkingRecordController {
   /** Rendering, filters, search, bounds and Person Match read this (D13). */
@@ -47,17 +32,10 @@ export interface WorkingRecordController {
   error: string | null;
   /** Full re-read of the Tree Record. Retry button only (D14). */
   reload: () => Promise<void>;
-  /** apply → commit → confirm | revert | drop (D9). Rethrows a rejection after reverting. */
-  write: (changes: RecordChange[], commit: () => Promise<WriteOutcome>) => Promise<void>;
-}
-
-/**
- * `addLink`'s three outcomes in the sequencer's vocabulary (D10). The server
- * can accept a write and insert nothing, because the Kinship Link already
- * existed; that drops the Pending Change without ever calling it a failure.
- */
-export function linkWriteOutcome(result: AddLinkResult): WriteOutcome {
-  return result.alreadyConnected ? { kind: 'empty' } : { kind: 'confirmed', rows: result };
+  /** The Working Record as of now, for reading at the moment of a write rather than as a render closed over it. */
+  latest: () => FamilyGraph | null;
+  /** The sequencer. The Recorder is its one caller (ADR-0016). */
+  write: WriteSequencer;
 }
 
 interface Projection {
@@ -76,14 +54,15 @@ interface Projection {
 const NOTHING_YET: Projection = { working: null, confirmedNodes: null, confirmedLinks: [] };
 
 /**
- * The owner of the Working Record and the sequencer for every write (LIN-58).
+ * The owner of the Working Record and of the one sequencer every write goes
+ * through (LIN-58).
  *
  * `WorkingRecordProvider` is the one caller, and every reader goes through
  * `useWorkingRecord()` on the context (ADR-0009) — hence the name: calling this
  * mints a *second* record, and the second would never see the first's writes.
  *
- * The record itself lives in a ref rather than in React state. Two writes can
- * be in flight at once, and each one has to confirm or revert against whatever
+ * The record itself lives in a ref rather than in React state. Two Pending
+ * Changes can be held at once, and each one has to confirm or revert against whatever
  * the *other* has done since — not against the record its own render closed
  * over. State holds only the projection, which is what re-renders the canvas.
  */
@@ -94,7 +73,6 @@ export function useWorkingRecordOwner(): WorkingRecordController {
   // node objects it was handed, so the last projection is what the next one
   // reuses them from.
   const projectedRef = useRef<FamilyGraph | null>(null);
-  const changeCounterRef = useRef(0);
   const [projection, setProjection] = useState<Projection>(NOTHING_YET);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -136,25 +114,11 @@ export function useWorkingRecordOwner(): WorkingRecordController {
     }
   }, [session, user, reload]);
 
-  const write = useCallback(
-    async (changes: RecordChange[], commit: () => Promise<WriteOutcome>): Promise<void> => {
-      const changeId = `change-${(changeCounterRef.current += 1)}`;
-      advance(applyPending(recordRef.current, changeId, changes));
-      let outcome: WriteOutcome;
-      try {
-        outcome = await commit();
-      } catch (err) {
-        advance(revertPending(recordRef.current, changeId));
-        throw err;
-      }
-      advance(
-        outcome.kind === 'confirmed'
-          ? confirmPending(recordRef.current, changeId, outcome.rows)
-          : dropPending(recordRef.current, changeId)
-      );
-    },
-    [advance]
-  );
+  const latest = useCallback(() => projectedRef.current, []);
+
+  // Held for the life of the owner, not memoized: it numbers the Pending Changes,
+  // and a second one could reuse the id of a change still waiting on the server.
+  const [write] = useState(() => createWriteSequencer({ current: () => recordRef.current, advance }));
 
   return {
     working: projection.working,
@@ -163,6 +127,7 @@ export function useWorkingRecordOwner(): WorkingRecordController {
     isLoading,
     error,
     reload,
+    latest,
     write,
   };
 }

@@ -1030,7 +1030,7 @@ describe('treeRecord module', () => {
 
     it('refuses to convert sibling to single kinship link', () => {
       expect(() => relativeToKinshipLink('anchor-1', 'sibling-1', 'sibling')).toThrowError(
-        /Sibling is a composite relationship/
+        /cannot be connected as a sibling/
       );
     });
   });

@@ -3,6 +3,23 @@ import { FamilyLink, FamilyNode, PersonGender, RelativeDirection } from '../type
 import { kinshipLinksFromRows, personsFromRows } from './treeRecordRows';
 import { publishableKeyFor, supabaseHeaders } from './supabaseConfig';
 
+/** The longest given name the Tree Record stores. */
+export const MAX_PERSON_NAME_LENGTH = 200;
+
+/** The longest family cluster name the Tree Record stores. */
+export const MAX_CLUSTER_LENGTH = 100;
+
+/** The given name as the Tree Record stores it. Refuses a blank one. */
+export function storedPersonName(firstName: string): string {
+  const name = firstName.trim().slice(0, MAX_PERSON_NAME_LENGTH);
+  if (!name) throw new TreeRecordError('refused', 'Name cannot be empty.');
+  return name;
+}
+
+/** The family cluster as a new Person stores it: `null` when blank. */
+export const storedCluster = (cluster: string | null | undefined): string | null =>
+  cluster?.trim().slice(0, MAX_CLUSTER_LENGTH) || null;
+
 export type TreeRecordErrorKind = 'refused' | 'not-authorized' | 'network' | 'conflict' | 'unknown';
 
 export class TreeRecordError extends Error {
@@ -184,7 +201,7 @@ export function relativeToKinshipLink(
     case 'sibling':
       throw new TreeRecordError(
         'refused',
-        'Sibling is a composite relationship derived from shared parents; it cannot be converted to a single direct Kinship Link.'
+        'An existing person cannot be connected as a sibling: siblings share parents, so connect them to the parents instead.'
       );
   }
 }
@@ -394,10 +411,7 @@ export function createTreeRecord(
   const { supabaseUrl, supabaseKey, fetchFn } = resolveEnv(config);
 
   const addPerson = async (params: AddPersonParams): Promise<ConfirmedRows> => {
-    const sanitizedName = params.firstName.trim().slice(0, 200);
-    if (!sanitizedName) {
-      throw new TreeRecordError('refused', 'Name cannot be empty.');
-    }
+    const sanitizedName = storedPersonName(params.firstName);
 
     if (params.link) {
       refuseOtherParentUnlessChild(params.link.otherParentId, params.link.relation === 'child');
@@ -463,8 +477,8 @@ export function createTreeRecord(
 
     const payload: Record<string, unknown> = {
       first_name: sanitizedName,
-      paternal_family_cluster: params.paternalCluster?.trim().slice(0, 100) || null,
-      maternal_family_cluster: params.maternalCluster?.trim().slice(0, 100) || null,
+      paternal_family_cluster: storedCluster(params.paternalCluster),
+      maternal_family_cluster: storedCluster(params.maternalCluster),
       created_by_user_id: identity.userId,
     };
     if (params.gender) {
@@ -593,10 +607,7 @@ export function createTreeRecord(
     const updateData: Record<string, unknown> = {};
 
     if (params.firstName !== undefined) {
-      const sanitizedName = params.firstName.trim().slice(0, 200);
-      if (!sanitizedName) {
-        throw new TreeRecordError('refused', 'Name cannot be empty.');
-      }
+      const sanitizedName = storedPersonName(params.firstName);
       updateData.first_name = sanitizedName;
     }
 
@@ -606,10 +617,10 @@ export function createTreeRecord(
 
     if (identity.isAdmin) {
       if (params.paternalCluster !== undefined) {
-        updateData.paternal_family_cluster = params.paternalCluster ? params.paternalCluster.trim().slice(0, 100) : null;
+        updateData.paternal_family_cluster = params.paternalCluster ? params.paternalCluster.trim().slice(0, MAX_CLUSTER_LENGTH) : null;
       }
       if (params.maternalCluster !== undefined) {
-        updateData.maternal_family_cluster = params.maternalCluster ? params.maternalCluster.trim().slice(0, 100) : null;
+        updateData.maternal_family_cluster = params.maternalCluster ? params.maternalCluster.trim().slice(0, MAX_CLUSTER_LENGTH) : null;
       }
     }
 

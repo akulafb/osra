@@ -23,9 +23,9 @@ import {
  * The one clock for Spawn and Dissolve (LIN-55, ADR-0007).
  *
  * The pure machine in `src/lib/lifecycle.ts` owns phases; this hook owns the
- * single `requestAnimationFrame` that drives them and the sequencing of the
- * write a lifecycle is optimistic about. Nothing else in the app may schedule
- * animation time — the fragmentation this replaces was four fragments on three
+ * single `requestAnimationFrame` that drives them. The Recorder sequences the
+ * write a lifecycle is optimistic about (ADR-0016). Nothing else in the app may
+ * schedule animation time — the fragmentation this replaces was four fragments on three
  * timers, none of which agreed.
  *
  * Per-frame progress is deliberately *not* React state. The set of active
@@ -42,23 +42,12 @@ export interface LifecycleController {
   progressOf: (key: string) => number | null;
   /** Notified every frame while anything is playing. */
   subscribe: (listener: () => void) => () => void;
-  /** Play a lifecycle with no write behind it. */
+  /** Play a lifecycle. */
   start: (
     kind: LifecycleKind,
     subject: LifecycleSubject,
     geometry?: SubjectGeometry | null
   ) => void;
-  /**
-   * Play a lifecycle optimistically over a write: the animation starts now,
-   * and unwinds if the write rejects. Rethrows, so callers still handle the
-   * failure — the lifecycle only owns the visual half of the rollback.
-   */
-  run: <T>(params: {
-    kind: LifecycleKind;
-    subject: LifecycleSubject;
-    commit: () => Promise<T>;
-    geometry?: SubjectGeometry | null;
-  }) => Promise<T>;
   abort: (kind: LifecycleKind, subject: LifecycleSubject) => void;
   /** Pin where the subject was, once, so a relayout cannot move it. */
   captureGeometry: (key: string, geometry: SubjectGeometry) => void;
@@ -135,24 +124,6 @@ export function useLifecycles(view: LifecycleView): LifecycleController {
     [dispatch]
   );
 
-  const run = useCallback(
-    async <T,>(params: {
-      kind: LifecycleKind;
-      subject: LifecycleSubject;
-      commit: () => Promise<T>;
-      geometry?: SubjectGeometry | null;
-    }): Promise<T> => {
-      start(params.kind, params.subject, params.geometry);
-      try {
-        return await params.commit();
-      } catch (error) {
-        abort(params.kind, params.subject);
-        throw error;
-      }
-    },
-    [start, abort]
-  );
-
   const controller = useMemo<LifecycleController>(
     () => ({
       view,
@@ -168,14 +139,13 @@ export function useLifecycles(view: LifecycleView): LifecycleController {
         };
       },
       start,
-      run,
       abort,
       captureGeometry: (key: string, geometry: SubjectGeometry) => {
         dispatch(captureGeometryAction(key, geometry));
       },
       nodeIdIn: (kind: LifecycleKind) => nodeIdInLifecycle(activeLifecycles(stateRef.current), kind),
     }),
-    [view, lifecycles, start, run, abort, dispatch]
+    [view, lifecycles, start, abort, dispatch]
   );
 
   return controller;
