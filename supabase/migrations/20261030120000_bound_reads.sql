@@ -13,7 +13,8 @@
 --    can no longer execute it.
 -- 3. links_parent_role_follows_gender is a SECURITY DEFINER BEFORE trigger, so its
 --    error reached anon and unbound accounts before RLS refused the write, and
---    gave a known id's first name and gender. It now stays silent for them.
+--    gave a known id's first name and gender. It now refuses them first, with
+--    RLS's own error, including a write a SECURITY DEFINER function makes for them.
 -- 4. A database that has drifted from the migrations could keep the gap open and
 --    still exit 0. The last step fails the migration instead.
 --
@@ -63,9 +64,11 @@ GRANT EXECUTE ON FUNCTION public.get_claimed_node_ids() TO authenticated, servic
 
 -- -----------------------------------------------------------------------------
 -- 3. TRIGGER on links: a parent link's role follows the parent's gender.
--- Supersedes 20261001130000_lin76_person_gender.sql. One change: the first check.
--- RLS refuses these callers right after this trigger, so they get that refusal for
--- every id. The role setting, because current_user is postgres in here.
+-- Supersedes 20261001130000_lin76_person_gender.sql. One change: the first check
+-- gives anon and unbound accounts RLS's own refusal, so it is the same for every id.
+-- It also stops a SECURITY DEFINER function, which RLS does not, when an admin
+-- unbinds the caller after the function's own check. The role setting, because
+-- current_user is postgres in here.
 -- -----------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.links_parent_role_follows_gender()
 RETURNS trigger
@@ -79,7 +82,7 @@ DECLARE
   v_role text;
 BEGIN
   IF current_setting('role', true) IN ('anon', 'authenticated') AND NOT (is_admin() OR is_bound()) THEN
-    RETURN NEW;
+    RAISE EXCEPTION 'new row violates row-level security policy for table "links"' USING ERRCODE = '42501';
   END IF;
 
   IF NEW.type <> 'parent' THEN
