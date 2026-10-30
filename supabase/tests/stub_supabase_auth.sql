@@ -4,7 +4,8 @@
 -- A Supabase database already has all of this; never run it there.
 --
 --   * the roles anon, authenticated, service_role (service_role bypasses RLS)
---   * auth.users, with only the columns these read: id, raw_user_meta_data, email
+--   * auth.users, with only the columns the tests and migrations read: id,
+--     raw_user_meta_data, email
 --   * auth.uid() and auth.jwt(), read from request.jwt.claims the way Supabase's do
 -- =============================================================================
 

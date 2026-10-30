@@ -16,7 +16,8 @@
 --    gave a known id's first name and gender. It now refuses them first, with
 --    RLS's own error, including a write a SECURITY DEFINER function makes for them.
 -- 4. A database that has drifted from the migrations could keep the gap open and
---    still exit 0. The last step fails the migration instead.
+--    still exit 0. The last step fails the migration on the drifts it lists, on each
+--    database it runs on. Other drift, such as a redefined is_bound(), still exits 0.
 --
 -- Unchanged: get_public_metrics, get_invite_by_token and claim_invite_secure are
 -- SECURITY DEFINER, as are the write functions and triggers that read nodes and
@@ -113,8 +114,9 @@ ALTER FUNCTION public.links_parent_role_follows_gender() OWNER TO postgres;
 
 -- -----------------------------------------------------------------------------
 -- 4. CHECK: the database matches what this migration relies on
--- Fails the migration on the dev run, before prod, rather than leaving the gap
--- open or the SECURITY DEFINER functions subject to the new policies.
+-- Fails the migration, on each database it runs on, for each drift below that
+-- would leave the gap open or the SECURITY DEFINER functions subject to the new
+-- policies. A failed run rolls back, so the old policies stay until it is cleared.
 -- -----------------------------------------------------------------------------
 DO $$
 DECLARE
@@ -128,7 +130,7 @@ BEGIN
     AND pol.polcmd IN ('r', '*')
     AND pol.polname <> c.relname || '_select_bound_or_admin';
   IF v_found IS NOT NULL THEN
-    RAISE EXCEPTION 'bound-reads: other permissive policies open reads: %', v_found;
+    RAISE EXCEPTION 'bound-reads: other permissive read policies: %', v_found;
   END IF;
 
   SELECT string_agg(c.relname, ', ') INTO v_found
@@ -157,7 +159,7 @@ BEGIN
     AND EXISTS (
       SELECT 1 FROM pg_class c
       WHERE c.oid IN ('public.nodes'::regclass, 'public.links'::regclass)
-        AND c.relowner <> p.proowner
+        AND (c.relowner <> p.proowner OR c.relforcerowsecurity)
     );
   IF v_found IS NOT NULL THEN
     RAISE EXCEPTION 'bound-reads: SECURITY DEFINER functions subject to RLS on nodes or links: %', v_found;

@@ -144,7 +144,6 @@ BEGIN
   ASSERT invite_found, 'anon should find the invite by its token';
 END $$;
 
--- Runs one statement as a caller, and returns how it ended.
 CREATE FUNCTION pg_temp.attempt(p_role text, p_sub text, p_sql text) RETURNS text
 LANGUAGE plpgsql
 AS $$
@@ -152,7 +151,7 @@ DECLARE
   n bigint;
   ended text;
 BEGIN
-  PERFORM set_config('request.jwt.claims', COALESCE(json_build_object('sub', '00000000-0000-0000-0000-00000000' || p_sub, 'role', p_role)::text, ''), true);
+  PERFORM set_config('request.jwt.claims', json_build_object('sub', '00000000-0000-0000-0000-00000000' || p_sub, 'role', p_role)::text, true);
   EXECUTE format('SET LOCAL ROLE %I', p_role);
   BEGIN
     EXECUTE p_sql;
@@ -197,7 +196,6 @@ BEGIN
   END LOOP;
 END $$;
 
--- Everyone who may read the Person still gets the gender error when it applies.
 DO $$
 DECLARE
   caller text[];
