@@ -4,10 +4,32 @@ An interactive visual family tree platform enabling collaborative genealogy expl
 
 ## Language
 
+### Platform
+
+**Owner**:
+The person who owns Osra as a whole. There is one, and they use Osra as a Member like everyone else.
+_Avoid_: Operator, Tree owner
+
+**Tree**:
+A named, shared family space with its own Tree Record and Members. A Tree can span any number of family names.
+_Avoid_: Family, Graph, Workspace, One user's view
+
+**Member**:
+An account with access to a Tree, bound to a Person in that Tree. One account can be a Member of many Trees, as a different Person in each.
+_Avoid_: Person, Profile
+
+**Master Admin**:
+The one Member who manages a Tree. The role can be handed to another Member.
+_Avoid_: Owner, Tree owner
+
+**Admin**:
+A Member appointed to help run a Tree. The role applies only inside that Tree.
+_Avoid_: Global admin, Platform admin
+
 ### Core Entities
 
 **Person**:
-A family member record in the database identified by `first_name` and optional cluster affiliations, with a gender (male, female, or not recorded).
+A family member record in the database identified by `first_name` and optional cluster affiliations, with a gender (male, female, or not recorded). A Person belongs to exactly one Tree.
 _Avoid_: User, Member, Profile (when referring to family nodes)
 
 **Tree Node**:
@@ -19,7 +41,7 @@ A typed genealogical edge connecting two Persons (`parent`, `marriage`, or `divo
 _Avoid_: Edge, Connection, Wire, Branch
 
 **Tree Record**:
-The persisted set of Persons and Kinship Links — the authoritative family tree, as distinct from the Tree Nodes drawn on a canvas.
+The persisted set of a Tree's Persons and Kinship Links — the authoritative family tree, as distinct from the Tree Nodes drawn on a canvas.
 _Avoid_: Family tree (already names three view components), Graph, Store, Database
 
 **Working Record**:
