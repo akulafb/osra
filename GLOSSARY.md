@@ -93,6 +93,10 @@ _Avoid_: Default pair, Home pair
 How far apart Paper 3D spaces its Persons, set by the viewer: the still layout grows outward from its centre while disc and label sizes stay the same, so the tree keeps its shape. A per-viewer setting that is not remembered; it never changes the Tree Record.
 _Avoid_: Radius, Separation, Node spacing, Zoom
 
+**Camera Director**:
+The one module that moves the camera in Paper 3D: zoom limits and box, following a focused Person through a Spread change, framing, flights to a Person, the reveal swing, keyed flight and the idle turn, and the order they happen in. Everything else asks it; nothing else moves the camera.
+_Avoid_: Camera rig (that is the thin React adapter), Camera controller, Camera manager
+
 
 ### Direct Interaction
 

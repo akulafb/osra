@@ -1,19 +1,14 @@
 import { useCallback, useEffect, useRef, type MutableRefObject } from 'react';
 import { useThree } from '@react-three/fiber';
-import type { CameraControls } from '@react-three/drei';
-import * as THREE from 'three';
 import type { FamilyLink } from '../../types/graph';
-import type { PaperLayout } from '../../lib/paperLayout';
-import { paperFlyTo, paperFocusReach } from '../../lib/paperFocus';
 import { paperFlyFrames, paperSearchEmphasis } from '../../lib/paperSearch';
-import { spreadLayout } from '../../lib/paperSpread';
 import type { PersonDrawerInset } from '../../hooks/usePersonDrawerInset';
+import type { PaperCameraDirector } from './paperCameraDirector';
 import { playPaperTap } from './paperTap';
-import type { PaperEmphasisState } from './paperEmphasis';
 
 interface PaperFocusProps {
+  director: PaperCameraDirector;
   selectedId: string | null;
-  layout: PaperLayout;
   ids: readonly string[];
   links: readonly FamilyLink[];
   matchIds: ReadonlySet<string> | null;
@@ -22,8 +17,6 @@ interface PaperFocusProps {
   onOverview: () => void;
   /** Lets FIND ME fly to a Person who may already be focused. */
   flyTo: MutableRefObject<((id: string) => void) | null>;
-  /** Its Spread sets where the Person and their relatives are drawn. */
-  state: MutableRefObject<PaperEmphasisState>;
 }
 
 /**
@@ -31,8 +24,7 @@ interface PaperFocusProps {
  * focus flies back to the overview. A resize or a turned phone reframes the
  * same way.
  */
-export function PaperFocus({ selectedId, layout, ids, links, matchIds, drawerInset, onOverview, flyTo, state }: PaperFocusProps) {
-  const controls = useThree((three) => three.controls) as CameraControls | null;
+export function PaperFocus({ director, selectedId, ids, links, matchIds, drawerInset, onOverview, flyTo }: PaperFocusProps) {
   const canvas = useThree((three) => three.gl.domElement);
   const size = useThree((three) => three.size);
 
@@ -42,25 +34,19 @@ export function PaperFocus({ selectedId, layout, ids, links, matchIds, drawerIns
         onOverview();
         return true;
       }
-      const drawn = spreadLayout(layout, state.current.spread);
-      const disc = drawn.get(id);
-      if (!controls || !disc || !(controls.camera instanceof THREE.PerspectiveCamera)) return false;
       const emphasis = paperSearchEmphasis({ ids, links, hoveredId: null, selectedId: id, matchIds });
       const rect = canvas.getBoundingClientRect();
       const sheetTop = window.innerHeight * (1 - drawerInset.bottomVh / 100);
       const drawerLeft = window.innerWidth - drawerInset.rightPx;
-      const { position, target } = paperFlyTo({
-        person: disc,
-        reach: paperFocusReach(drawn, disc, emphasis),
-        from: { position: controls.getPosition(new THREE.Vector3(), true), target: controls.getTarget(new THREE.Vector3(), true) },
+      return director.flyToPerson({
+        id,
+        emphasis,
         viewport: { width: rect.width, height: rect.height },
         inset: { rightPx: Math.max(0, rect.right - drawerLeft), bottomPx: Math.max(0, rect.bottom - sheetTop) },
-        fovDegrees: controls.camera.fov,
+        smooth,
       });
-      void controls.setLookAt(position.x, position.y, position.z, target.x, target.y, target.z, smooth);
-      return true;
     },
-    [controls, canvas, layout, ids, links, matchIds, drawerInset, onOverview, state]
+    [director, canvas, ids, links, matchIds, drawerInset, onOverview]
   );
 
   useEffect(() => {
@@ -72,7 +58,6 @@ export function PaperFocus({ selectedId, layout, ids, links, matchIds, drawerIns
 
   const seen = useRef<string | null | undefined>(undefined);
   useEffect(() => {
-    if (!controls) return;
     const previous = seen.current;
     seen.current = selectedId;
     if (selectedId === previous) return;
@@ -82,7 +67,7 @@ export function PaperFocus({ selectedId, layout, ids, links, matchIds, drawerIns
     } else if (previous) {
       onOverview();
     }
-  }, [controls, selectedId, fly, onOverview]);
+  }, [selectedId, fly, onOverview]);
 
   const reframe = useRef(() => {});
   reframe.current = () => {

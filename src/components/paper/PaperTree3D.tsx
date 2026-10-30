@@ -19,7 +19,7 @@ import type { PaperLayout, Point3 } from '../../lib/paperLayout';
 import type { LifecycleController } from '../../hooks/useLifecycles';
 import { holdingProgress, inLifecycle, paperLifecycleDisc, paperLifecycleDraws, steadyLines } from '../../lib/paperLifecycle';
 import { paperGhostLanding } from '../../lib/paperGhost';
-import { spreadCentre, spreadFrame, spreadInto, spreadPoint, toSpread, type Spread } from '../../lib/paperSpread';
+import { spreadCentre, spreadInto, spreadPoint, toSpread, type Spread } from '../../lib/paperSpread';
 import { Tree3DOverlay, type Tree3DSceneCamera, type Tree3DSearch } from '../tree3d/Tree3DOverlay';
 import { useIsMobileDevice } from '../tree3d/useIsMobileDevice';
 import { PaperDiscs } from './PaperDiscs';
@@ -43,14 +43,14 @@ import { wakePaperTap } from './paperTap';
 import { paperFlySmoothTime, PAPER_FLY_SECONDS } from '../../lib/paperFocus';
 import { PAPER_DRAG_SMOOTH_SECONDS } from '../../lib/paperCamera';
 import { paperEffects } from '../../lib/paperEffects';
-import { packMatches, paperClusterView, paperEscape, paperSearchCount, paperSearchLayout, paperSearchOrder } from '../../lib/paperSearch';
+import { packMatches, paperEscape, paperSearchCount, paperSearchLayout, paperSearchOrder } from '../../lib/paperSearch';
+import { createPaperCameraDirector, type PaperCameraDirector } from './paperCameraDirector';
 import { emptyEmphasisState, type PaperEmphasisState } from './paperEmphasis';
 import { PaperWebGLBoundary, PaperWebGLFallback } from './PaperWebGLFallback';
 import { browserHasWebGL } from './browserHasWebGL';
 import { isBackgroundTap, isTap, paperFrame, paperLineShown, type ScreenPoint } from './paperScene';
 import { PaperGraphHandle } from './PaperGraphHandle';
 import { useTree3DEditing, type DirectConnectParams } from '../tree3d/useTree3DEditing';
-import { PaperFlight } from './PaperFlight';
 import { PaperSearch } from './PaperSearch';
 import { usePaperKeys } from './usePaperKeys';
 import { PaperSpreadRig } from './PaperSpreadRig';
@@ -178,10 +178,13 @@ export function PaperTree3D({
   const [showArrows, setShowArrows] = useState(false);
   const [arrival, setArrival] = useState<PaperArrival>(() => (paperIntroPending() ? 'loader' : 'crossfade'));
 
-  const controlsRef = useRef<CameraControls | null>(null);
+  const [director, setDirector] = useState<PaperCameraDirector | null>(null);
   const pointerDown = useRef<ScreenPoint | null>(null);
   const hoverPointer = useRef<ScreenPoint | null>(null);
   const emphasisState = useRef<PaperEmphasisState>(emptyEmphasisState());
+  const attachControls = useCallback((controls: CameraControls | null) => {
+    setDirector(controls && createPaperCameraDirector(controls, () => emphasisState.current));
+  }, []);
   const personClick = useRef<MouseEvent | null>(null);
   const doubleClickTargetId = useRef<string | null>(null);
   const pendingDeselect = useRef<number | undefined>(undefined);
@@ -316,18 +319,6 @@ export function PaperTree3D({
     []
   );
 
-  const fitFrame = useCallback(
-    (smooth: boolean) => {
-      if (!frame) return;
-      const { center, radius } = spreadFrame(frame, emphasisState.current.spread);
-      void controlsRef.current?.fitToSphere(
-        new THREE.Sphere(new THREE.Vector3(center.x, center.y, center.z), radius),
-        smooth
-      );
-    },
-    [frame]
-  );
-
   const focusPerson = useCallback(
     (nodeId: string) => {
       interaction.selectNode(nodeId);
@@ -336,11 +327,7 @@ export function PaperTree3D({
     [interaction]
   );
 
-  const flyToOverview = useCallback(() => {
-    if (!cluster) return fitFrame(true);
-    const { center, radius } = spreadFrame(cluster, emphasisState.current.spread);
-    void controlsRef.current?.fitToSphere(new THREE.Sphere(new THREE.Vector3(center.x, center.y, center.z), paperClusterView(radius)), true);
-  }, [cluster, fitFrame]);
+  const flyToOverview = useCallback(() => director?.flyToOverview(cluster), [director, cluster]);
 
   const resetView = useCallback(() => {
     const focusFliesHome = interaction.state.phase === 'selected';
@@ -541,30 +528,35 @@ export function PaperTree3D({
             <color attach="background" args={[PAPER]} />
             <fog attach="fog" args={[PAPER, 1, 100000]} />
             <CameraControls
-              ref={controlsRef}
+              ref={attachControls}
               makeDefault
               smoothTime={FLY_SMOOTH_TIME}
               draggingSmoothTime={PAPER_DRAG_SMOOTH_SECONDS}
               dollyToCursor
             />
             <ContextLossWatch onLost={handleSceneFailed} />
-            {layout && frame && centre && (
+            {layout && frame && centre && director && (
               <>
                 <PaperView viewDistance={viewDistance} />
                 <PaperSpreadRig spread={spread} centre={centre} layout={layout} liveNodes={liveNodes} state={emphasisState} />
-                <PaperCameraRig frame={frame} layout={layout} state={emphasisState} modalOpen={isModalOpen} selectedId={interaction.selectedNodeId} />
-                <PaperFlight held={heldKeys} viewDistance={viewDistance} state={emphasisState} paused={keyBlocks.flight} />
-                <InitialFraming fit={fitFrame} />
-                <PaperFocus
-                  selectedId={interaction.selectedNodeId}
+                <PaperCameraRig
+                  director={director}
+                  frame={frame}
                   layout={layout}
+                  modalOpen={isModalOpen}
+                  selectedId={interaction.selectedNodeId}
+                  held={heldKeys}
+                  flightPaused={keyBlocks.flight}
+                />
+                <PaperFocus
+                  director={director}
+                  selectedId={interaction.selectedNodeId}
                   ids={shownIds}
                   links={graphData.links}
                   matchIds={matchIds}
                   drawerInset={openDrawerInset}
                   onOverview={flyToOverview}
                   flyTo={flyTo}
-                  state={emphasisState}
                 />
                 <PaperSearch
                   layout={layout}
@@ -587,7 +579,7 @@ export function PaperTree3D({
                 />
                 <PaperGraphHandle handle={graphHandle} />
                 {arrival === 'revealing' && (
-                  <PaperReveal frame={frame} layout={layout} ids={shownIds} selectedId={interaction.selectedNodeId} state={emphasisState} onDone={handleArrived} />
+                  <PaperReveal director={director} frame={frame} layout={layout} ids={shownIds} selectedId={interaction.selectedNodeId} state={emphasisState} onDone={handleArrived} />
                 )}
                 <PaperDiscs ids={discIds} layout={layout} ink={INK} paper={PAPER} state={emphasisState} onPersonClick={handlePersonClick} />
                 <PaperHoverRing state={emphasisState} layout={layout} ink={INK} />
@@ -708,17 +700,6 @@ function PaperView({ viewDistance }: { viewDistance: MutableRefObject<number> })
       scene.fog.far = distance * FOG_FAR;
     }
   });
-  return null;
-}
-
-function InitialFraming({ fit }: { fit: (smooth: boolean) => void }) {
-  const controls = useThree((state) => state.controls);
-  const framed = useRef(false);
-  useEffect(() => {
-    if (!controls || framed.current) return;
-    framed.current = true;
-    fit(false);
-  }, [controls, fit]);
   return null;
 }
 

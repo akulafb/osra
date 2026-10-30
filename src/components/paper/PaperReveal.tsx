@@ -1,18 +1,15 @@
 import { useEffect, useMemo, useRef, type MutableRefObject } from 'react';
-import { useFrame, useThree } from '@react-three/fiber';
-import type { CameraControls } from '@react-three/drei';
+import { useFrame } from '@react-three/fiber';
 import type { PaperLayout, Point3 } from '../../lib/paperLayout';
 import { addOffsets } from '../../lib/paperHover';
 import { spreadOffsets } from '../../lib/paperSpread';
-import { paperRevealProgress, paperRevealShares, paperRevealSmoothTime, PAPER_REVEAL_SECONDS } from '../../lib/paperIntro';
+import { paperRevealProgress, paperRevealShares, PAPER_REVEAL_SECONDS } from '../../lib/paperIntro';
+import type { PaperCameraDirector } from './paperCameraDirector';
 import type { PaperEmphasisState } from './paperEmphasis';
 import { PAPER_REVEAL_FRAME_PRIORITY, type PaperFrame } from './paperScene';
 
-const SWING_AZIMUTH = 0.9;
-const SWING_POLAR = 0.35;
-const SWING_BACK = 1.6;
-
 interface PaperRevealProps {
+  director: PaperCameraDirector;
   frame: PaperFrame;
   layout: PaperLayout;
   ids: readonly string[];
@@ -26,38 +23,19 @@ interface PaperRevealProps {
  * nearest first, while the camera swings in to where it already stands. Both
  * run on the scene clock and end within PAPER_REVEAL_SECONDS (ADR 0011).
  */
-export function PaperReveal({ frame, layout, ids, selectedId, state, onDone }: PaperRevealProps) {
-  const controls = useThree((three) => three.controls) as CameraControls | null;
+export function PaperReveal({ director, frame, layout, ids, selectedId, state, onDone }: PaperRevealProps) {
   const shares = useMemo(() => paperRevealShares(layout, ids, frame.center), [layout, ids, frame.center]);
   const startedAt = useRef<number | null>(null);
   const done = useRef(false);
-  const landing = useRef<{ distance: number; azimuth: number; polar: number } | null>(null);
   const finish = useRef(onDone);
   finish.current = onDone;
 
-  useEffect(() => {
-    if (!controls) return;
-    const smoothTime = controls.smoothTime;
-    // Kept across StrictMode's second run, which would otherwise land where the first one started.
-    const { distance, azimuth, polar } = (landing.current ??= {
-      distance: controls.distance,
-      azimuth: controls.azimuthAngle,
-      polar: controls.polarAngle,
-    });
-    controls.smoothTime = paperRevealSmoothTime(false);
-    void controls.rotateTo(azimuth - SWING_AZIMUTH, polar - SWING_POLAR, false);
-    void controls.dollyTo(distance * SWING_BACK, false);
-    void controls.rotateTo(azimuth, polar, true);
-    void controls.dollyTo(distance, true);
-    return () => {
-      controls.smoothTime = smoothTime;
-    };
-  }, [controls]);
+  useEffect(() => director.swingIn(), [director]);
 
   const startedWith = useRef(selectedId);
   useEffect(() => {
-    if (controls && selectedId !== startedWith.current) controls.smoothTime = paperRevealSmoothTime(true);
-  }, [controls, selectedId]);
+    if (selectedId !== startedWith.current) director.hurrySwing();
+  }, [director, selectedId]);
 
   useFrame(({ clock }) => {
     if (done.current) return;
