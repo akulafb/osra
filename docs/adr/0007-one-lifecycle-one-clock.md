@@ -65,7 +65,8 @@ Four further leaks followed from the fragmentation:
 4. **`run(subject, commit)` sequences the write.** The hook starts the
    lifecycle, awaits the `treeRecord` call underneath it, and aborts on
    rejection; the pure machine still never awaits anything. `treeRecord` remains
-   the only writer.
+   the only writer. *Amended by ADR-0016:* `run` is gone. The Recorder sequences
+   the lifecycle over `start` and `abort`.
 
 5. **Abort is a real unwind.** `ABORT` re-runs progress from wherever it had
    reached back down to zero, re-materializing a node whose delete failed.

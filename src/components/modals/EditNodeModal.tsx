@@ -4,17 +4,15 @@ import { useTheme, type Theme } from '@mui/material/styles';
 import { useAuth } from '../../contexts/AuthContext';
 import { FamilyNode, PersonGender } from '../../types/graph';
 import { formatNodeDisplayName } from '../../utils/nodeDisplayName';
-import { createTreeRecord } from '../../lib/treeRecord';
+import { MAX_CLUSTER_LENGTH, MAX_PERSON_NAME_LENGTH } from '../../lib/treeRecord';
+import type { Recorder } from '../../lib/recorder';
 import { readMatchResolution, SPELLING_MATCH_LABEL } from '../../lib/personMatch';
 import { usePersonMatch } from '../../hooks/usePersonMatch';
-import { useWorkingRecord } from '../../contexts/WorkingRecordContext';
-
-const MAX_NAME_LENGTH = 200;
-const MAX_CLUSTER_LENGTH = 100;
 
 interface EditNodeModalProps {
   isOpen: boolean;
   onClose: () => void;
+  recorder: Recorder;
   targetNode: FamilyNode;
   /** The whole Tree Record, unfiltered — a filter must not hide a Person Match. */
   existingNodes: FamilyNode[];
@@ -25,12 +23,12 @@ interface EditNodeModalProps {
 export default function EditNodeModal({
   isOpen,
   onClose,
+  recorder,
   targetNode,
   existingNodes,
   visibleIds,
 }: EditNodeModalProps) {
-  const { user, isAdmin, session } = useAuth();
-  const { write } = useWorkingRecord();
+  const { isAdmin } = useAuth();
   const theme = useTheme();
   const { modal, panel, primary } = theme.palette;
   const [name, setName] = useState('');
@@ -90,8 +88,7 @@ export default function EditNodeModal({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const sanitizedName = name.trim().slice(0, MAX_NAME_LENGTH);
-    if (!user || !sanitizedName) return;
+    if (!name.trim()) return;
 
     if (mustConfirm) {
       setError('Someone else is already called that — confirm this is a different person.');
@@ -103,45 +100,13 @@ export default function EditNodeModal({
     setSuccessMessage(null);
 
     try {
-      const record = createTreeRecord({
-        userId: user.id,
-        isAdmin,
-        sessionToken: session?.access_token,
+      await recorder.editPerson({
+        person: targetNode,
+        firstName: name,
+        gender,
+        paternalCluster: familyCluster,
+        maternalCluster: maternalFamilyCluster,
       });
-      const paternalCluster = isAdmin ? familyCluster : undefined;
-      const maternalCluster = isAdmin ? maternalFamilyCluster : undefined;
-      // Sent only when changed: a gender change makes the seam read the
-      // Person's parent links back, since the server may have given them a role.
-      const changedGender = gender !== (targetNode.gender ?? null) ? gender : undefined;
-
-      // The edited Person goes onto the canvas now and the server row replaces
-      // them wholesale on confirmation (D12) — including the two cluster fields
-      // an admin left alone, which is why the unedited values are carried here
-      // rather than dropped.
-      await write(
-        [
-          {
-            kind: 'person-upsert',
-            person: {
-              ...targetNode,
-              firstName: sanitizedName,
-              familyCluster: paternalCluster ?? targetNode.familyCluster,
-              maternalFamilyCluster: maternalCluster ?? targetNode.maternalFamilyCluster,
-              gender,
-            },
-          },
-        ],
-        async () => ({
-          kind: 'confirmed',
-          rows: await record.editPerson({
-            id: targetNode.id,
-            firstName: sanitizedName,
-            gender: changedGender,
-            paternalCluster,
-            maternalCluster,
-          }),
-        })
-      );
 
       setSuccessMessage('Changes saved successfully!');
 
@@ -178,10 +143,10 @@ export default function EditNodeModal({
             <input
               type="text"
               value={name}
-              onChange={(e) => setName(e.target.value.slice(0, MAX_NAME_LENGTH))}
+              onChange={(e) => setName(e.target.value.slice(0, MAX_PERSON_NAME_LENGTH))}
               placeholder="Given name"
               style={inputStyle(theme)}
-              maxLength={MAX_NAME_LENGTH}
+              maxLength={MAX_PERSON_NAME_LENGTH}
               required
               disabled={isSubmitting}
             />

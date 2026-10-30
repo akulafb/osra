@@ -9,8 +9,8 @@
  * Everything here is pure and synchronous. Time arrives as a `now` argument,
  * never from `Date.now()` or a timer, so the whole machine is testable in the
  * `node` environment without a DOM — the `directManipulation.ts` precedent
- * (ADR-0004). The async write that a lifecycle is optimistic about lives in
- * `useLifecycles.ts`, not here.
+ * (ADR-0004). The Recorder sequences the async write that a lifecycle is
+ * optimistic about (ADR-0016), not this module.
  */
 
 /** The two lifecycles named in `GLOSSARY.md`. */

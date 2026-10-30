@@ -38,6 +38,10 @@ _Avoid_: Optimistic update, In-flight write, Draft
 What the Tree Record did with a write, in one of three forms: *confirmed* — rows came back and fold into the Confirmed Snapshot; *reverted* — refused, so the Pending Change is dropped and nothing else moves; *accepted-but-empty* — accepted having written nothing, because the Kinship Link already existed. The third is dropped like a revert but is not a failure, so nothing is reported to the user.
 _Avoid_: Success/failure, Error, Result, No-op
 
+**Recorder**:
+The one module every surface tells what the user meant to record, which decides what is drawn, what is written and what plays. The canvas and the modals state the same intent and get the same result.
+_Avoid_: Write service, Mutations, Tree Record client (that is the write seam beneath it)
+
 **Relative Direction**:
 The direction an Action Handle points — Parent, Child, Spouse or Sibling — expressed relative to an anchor Person. It is not a Kinship Link type: Parent and Child both resolve to a `parent` link with the endpoints reversed, Spouse resolves to `marriage`, Sibling resolves to a `parent` link from the anchor's own parents, and `divorce` has no Relative Direction at all.
 _Avoid_: Relation type, Link type, Relationship

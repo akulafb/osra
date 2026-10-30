@@ -7,6 +7,7 @@ import { relationLabel } from './relationStyle';
 import { OtherParentPicker } from './OtherParentPicker';
 import { NO_OTHER_PARENT, type OtherParentChoice } from '../../lib/otherParent';
 import { useOtherParentPick } from '../../hooks/useOtherParentPick';
+import { MAX_PERSON_NAME_LENGTH } from '../../lib/treeRecord';
 
 /**
  * The Ghost Node card: name input, Person Match dropdown, submit and cancel.
@@ -183,7 +184,7 @@ export const GhostNodeCard: React.FC<GhostNodeCardProps> = ({
           type="text"
           value={name}
           onChange={(e) => {
-            const next = e.target.value.slice(0, 100);
+            const next = e.target.value.slice(0, MAX_PERSON_NAME_LENGTH);
             setName(next);
             // A confirmation answers a question about one name; a different
             // name is a different question.
