@@ -211,6 +211,75 @@ BEGIN
   END LOOP;
 END $$;
 
+CREATE FUNCTION pg_temp.write_as_owner(p_sql text) RETURNS void
+LANGUAGE plpgsql SECURITY DEFINER
+AS $$ BEGIN EXECUTE p_sql; END; $$;
+
+-- RLS does not stop a SECURITY DEFINER function, as when an admin unbinds the
+-- caller after the function's own check. The trigger still refuses these callers,
+-- whether the role is wrong or right, and on the path a gender edit takes.
+DO $$
+DECLARE
+  caller text[];
+  write text;
+  ended text;
+  links_before bigint;
+  links_after bigint;
+BEGIN
+  INSERT INTO public.links (source_node_id, target_node_id, type) VALUES
+    ('00000000-0000-0000-0000-0000000000c1', '00000000-0000-0000-0000-0000000000c3', 'parent');
+  SELECT count(*) INTO links_before FROM public.links;
+  FOREACH caller SLICE 1 IN ARRAY ARRAY[['anon', NULL], ['authenticated', 'bbb1'], ['authenticated', 'bbb2']] LOOP
+    FOREACH write IN ARRAY ARRAY[
+      $q$INSERT INTO public.links (source_node_id, target_node_id, type, parent_role) VALUES ('00000000-0000-0000-0000-0000000000f1', '00000000-0000-0000-0000-0000000000c3', 'parent', 'mother')$q$,
+      $q$INSERT INTO public.links (source_node_id, target_node_id, type, parent_role) VALUES ('00000000-0000-0000-0000-0000000000f1', '00000000-0000-0000-0000-0000000000c3', 'parent', 'father')$q$,
+      $q$INSERT INTO public.links (source_node_id, target_node_id, type) VALUES ('00000000-0000-0000-0000-0000000000f1', '00000000-0000-0000-0000-0000000000c3', 'parent')$q$,
+      $q$INSERT INTO public.links (source_node_id, target_node_id, type) VALUES ('00000000-0000-0000-0000-0000000000c2', '00000000-0000-0000-0000-0000000000c3', 'marriage')$q$,
+      $q$UPDATE public.links SET parent_role = 'mother' WHERE source_node_id = '00000000-0000-0000-0000-0000000000f1' AND type = 'parent'$q$,
+      $q$UPDATE public.nodes SET gender = 'male' WHERE id = '00000000-0000-0000-0000-0000000000c1'$q$
+    ] LOOP
+      ended := pg_temp.attempt(caller[1], caller[2], format('SELECT pg_temp.write_as_owner(%L)', write));
+      ASSERT ended = '42501: new row violates row-level security policy for table "links"',
+        caller[1] || ' ' || COALESCE(caller[2], '') || ' should be refused, got "' || ended || '" on ' || write;
+    END LOOP;
+  END LOOP;
+  SELECT count(*) INTO links_after FROM public.links;
+  ASSERT links_after = links_before, 'a refused write should store no link, links went from ' || links_before || ' to ' || links_after;
+  ASSERT NOT EXISTS (
+    SELECT 1 FROM public.links
+    WHERE source_node_id = '00000000-0000-0000-0000-0000000000f1' AND parent_role IS DISTINCT FROM 'father' AND type = 'parent'
+  ), 'a refused write should change no parent role';
+  DELETE FROM public.links WHERE source_node_id = '00000000-0000-0000-0000-0000000000c1';
+END $$;
+
+-- Everyone who may read the Person still stores a correct role, directly or through
+-- a SECURITY DEFINER function, and a missing role is still filled in.
+DO $$
+DECLARE
+  caller text[];
+  write text;
+  ended text;
+BEGIN
+  FOREACH caller SLICE 1 IN ARRAY ARRAY[['authenticated', 'aaa1'], ['authenticated', 'ad01'], ['authenticated', 'ad02'], ['service_role', NULL]] LOOP
+    FOREACH write IN ARRAY ARRAY[
+      $q$INSERT INTO public.links (source_node_id, target_node_id, type, parent_role) VALUES ('00000000-0000-0000-0000-0000000000f1', '00000000-0000-0000-0000-0000000000e1', 'parent', 'father')$q$,
+      $q$INSERT INTO public.links (source_node_id, target_node_id, type) VALUES ('00000000-0000-0000-0000-0000000000f1', '00000000-0000-0000-0000-0000000000e1', 'parent')$q$
+    ] LOOP
+      ended := pg_temp.attempt(caller[1], caller[2], write);
+      ASSERT ended = '1 rows', caller[1] || ' ' || COALESCE(caller[2], '') || ' should store the link, got "' || ended || '" on ' || write;
+      ASSERT (SELECT parent_role FROM public.links WHERE source_node_id = '00000000-0000-0000-0000-0000000000f1' AND target_node_id = '00000000-0000-0000-0000-0000000000e1' AND type = 'parent') = 'father',
+        caller[1] || ' ' || COALESCE(caller[2], '') || ' should store the role father on ' || write;
+      DELETE FROM public.links WHERE source_node_id = '00000000-0000-0000-0000-0000000000f1' AND target_node_id = '00000000-0000-0000-0000-0000000000e1' AND type = 'parent';
+
+      ended := pg_temp.attempt(caller[1], caller[2], format('SELECT pg_temp.write_as_owner(%L)', write));
+      ASSERT ended = '1 rows', caller[1] || ' ' || COALESCE(caller[2], '') || ' should store the link through a SECURITY DEFINER function, got "' || ended || '" on ' || write;
+      ASSERT (SELECT parent_role FROM public.links WHERE source_node_id = '00000000-0000-0000-0000-0000000000f1' AND target_node_id = '00000000-0000-0000-0000-0000000000e1' AND type = 'parent') = 'father',
+        caller[1] || ' ' || COALESCE(caller[2], '') || ' should store the role father through a SECURITY DEFINER function on ' || write;
+      DELETE FROM public.links WHERE source_node_id = '00000000-0000-0000-0000-0000000000f1' AND target_node_id = '00000000-0000-0000-0000-0000000000e1' AND type = 'parent';
+    END LOOP;
+  END LOOP;
+END $$;
+
 -- An unbound account that claims an invite is bound: it reads everything at once.
 DO $$
 DECLARE
