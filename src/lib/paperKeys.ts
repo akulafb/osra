@@ -104,6 +104,11 @@ export function paperEventFlightKey(event: Pick<PaperKeyEvent, 'key' | 'code'>):
 }
 
 /** The camera move for `seconds` with these keys held, or null when it stands still. */
+export interface PaperHeldKeys {
+  keys: Set<PaperFlightKey>;
+  boost: boolean;
+}
+
 export function paperFlightStep(
   held: ReadonlySet<PaperFlightKey>,
   boost: boolean,
