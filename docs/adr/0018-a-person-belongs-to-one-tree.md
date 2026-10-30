@@ -6,7 +6,7 @@ Edits do not cross between Trees, and Members of one Tree see nothing of another
 
 ## Considered Options
 
-- **One shared graph, with Trees as views of it.** No duplicates, but someone has to decide who edits a shared grandmother, one bad edit reaches several families, and sharing is very hard to undo.
+- **One shared graph, with Trees as views of it.** No duplicates, but someone has to decide who edits a shared grandmother, one bad edit reaches several Trees, and sharing is very hard to undo.
 - **Refuse a second Tree.** No duplicates, but a cousin could not add their in-laws' side.
 - **Linked Trees now.** Rejected for now: nothing needs it yet, and it can be added later on top of copies that remember their source.
 
