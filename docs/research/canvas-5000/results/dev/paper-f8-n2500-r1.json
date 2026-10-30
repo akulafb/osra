@@ -1,0 +1,140 @@
+{
+ "params": {
+  "n": 2500,
+  "view": "paper",
+  "seed": 1,
+  "families": 8,
+  "panMs": 3000
+ },
+ "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.7871.250 Safari/537.36",
+ "devicePixelRatio": 2,
+ "viewport": [
+  902,
+  812
+ ],
+ "heapAtStart": {
+  "usedMB": 109.4,
+  "totalMB": 161.2
+ },
+ "generateMs": 25.3,
+ "persons": 2500,
+ "kinshipLinks": 3836,
+ "generations": 8,
+ "nodesBodyKB": 546.2,
+ "linksBodyKB": 983,
+ "largestFamily": {
+  "name": "Family B",
+  "size": 552
+ },
+ "timingsMs": {
+  "mount": 0,
+  "nodesRequest": 16.3,
+  "jsonDone": 30.3,
+  "canvas": 114.4,
+  "ready": 4488.8
+ },
+ "parseJsonMs": 2.1,
+ "longTasksMs": {
+  "count": 34,
+  "total": 4593,
+  "max": 614
+ },
+ "heapAfterReady": {
+  "usedMB": 282.3,
+  "totalMB": 320.4
+ },
+ "domElements": 519,
+ "panFrames": {
+  "frames": 28,
+  "fps": 8.7,
+  "p50Ms": 116.7,
+  "p95Ms": 117.7,
+  "maxMs": 133.3,
+  "over33Ms": 27
+ },
+ "panFrameTimesMs": [
+  116.7,
+  100,
+  116.7,
+  99.9,
+  116.7,
+  116.7,
+  116.6,
+  115.7,
+  117.6,
+  116.7,
+  116.7,
+  116.7,
+  116.6,
+  116.7,
+  116.7,
+  100,
+  116.6,
+  116.6,
+  116.8,
+  115.6,
+  117.7,
+  115.7,
+  117.6,
+  133.3,
+  100.1,
+  116.6,
+  116.7
+ ],
+ "zoomFrames": {
+  "frames": 13,
+  "fps": 3.9,
+  "p50Ms": 116.7,
+  "p95Ms": 1817.8,
+  "maxMs": 1817.8,
+  "over33Ms": 12
+ },
+ "zoomFrameTimesMs": [
+  98.9,
+  1817.8,
+  99.9,
+  116.7,
+  100,
+  100,
+  116.6,
+  116.8,
+  133.2,
+  116.7,
+  116.7,
+  116.6
+ ],
+ "heapAfterPan": {
+  "usedMB": 403.2,
+  "totalMB": 444.9
+ },
+ "requestedUrls": [
+  "http://harness.invalid/rest/v1/nodes?order=created_at.asc&select=*",
+  "http://harness.invalid/rest/v1/links?order=created_at.asc&select=*",
+  "http://harness.invalid/rest/v1/rpc/get_claimed_node_ids"
+ ],
+ "isolatedRunsMs": {
+  "decodeRows": [
+   0.1,
+   0.6,
+   0.9
+  ],
+  "layout2dTree": [
+   5.9,
+   4,
+   5.4
+  ],
+  "layoutPaper": [
+   597.4,
+   588.5,
+   597.5
+  ]
+ },
+ "layout2dScope": {
+  "persons": 552
+ },
+ "heapAtEnd": {
+  "usedMB": 79.2,
+  "totalMB": 277.1
+ },
+ "done": true
+}

@@ -1,0 +1,123 @@
+{
+ "params": {
+  "n": 5000,
+  "view": "2d",
+  "seed": 1,
+  "families": 1,
+  "panMs": 3000
+ },
+ "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.7871.250 Safari/537.36",
+ "devicePixelRatio": 2,
+ "viewport": [
+  902,
+  812
+ ],
+ "heapAtStart": {
+  "usedMB": 39.4,
+  "totalMB": 45.9
+ },
+ "generateMs": 80.3,
+ "persons": 5000,
+ "kinshipLinks": 7708,
+ "generations": 12,
+ "nodesBodyKB": 1092.5,
+ "linksBodyKB": 1975.2,
+ "largestFamily": {
+  "name": "Family A",
+  "size": 5000
+ },
+ "svgElements": 35012,
+ "timingsMs": {
+  "mount": 0,
+  "nodesRequest": 21.4,
+  "jsonDone": 54.6,
+  "recordVisible": 250.2,
+  "presetClick": 255.1,
+  "ready": 7303.9
+ },
+ "parseJsonMs": 4.4,
+ "longTasksMs": {
+  "count": 7,
+  "total": 2044,
+  "max": 770
+ },
+ "heapAfterReady": {
+  "usedMB": 119.6,
+  "totalMB": 160.9
+ },
+ "domElements": 35410,
+ "panFrames": {
+  "frames": 14,
+  "fps": 4.2,
+  "p50Ms": 233.3,
+  "p95Ms": 266.8,
+  "maxMs": 266.8,
+  "over33Ms": 13
+ },
+ "panFrameTimesMs": [
+  249.9,
+  266.8,
+  233.3,
+  265.8,
+  233.3,
+  234.2,
+  216.7,
+  233.3,
+  233.3,
+  233.4,
+  216.6,
+  216.7,
+  233.4
+ ],
+ "zoomFrames": {
+  "frames": 8,
+  "fps": 2.5,
+  "p50Ms": 416.6,
+  "p95Ms": 450.1,
+  "maxMs": 450.1,
+  "over33Ms": 7
+ },
+ "zoomFrameTimesMs": [
+  416.6,
+  366.7,
+  450,
+  366.6,
+  450.1,
+  333.3,
+  433.3
+ ],
+ "heapAfterPan": {
+  "usedMB": 195.8,
+  "totalMB": 267.9
+ },
+ "requestedUrls": [
+  "http://harness.invalid/rest/v1/nodes?order=created_at.asc&select=*",
+  "http://harness.invalid/rest/v1/links?order=created_at.asc&select=*",
+  "http://harness.invalid/rest/v1/rpc/get_claimed_node_ids"
+ ],
+ "isolatedRunsMs": {
+  "decodeRows": [
+   0.4,
+   0.3,
+   0.5
+  ],
+  "layout2dTree": [
+   192.2,
+   156.7,
+   148.7
+  ],
+  "layoutPaper": [
+   1321.4,
+   1298.3,
+   1273.9
+  ]
+ },
+ "layout2dScope": {
+  "persons": 5000
+ },
+ "heapAtEnd": {
+  "usedMB": 354.5,
+  "totalMB": 416.6
+ },
+ "done": true
+}

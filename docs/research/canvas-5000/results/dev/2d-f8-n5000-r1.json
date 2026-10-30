@@ -1,0 +1,205 @@
+{
+ "params": {
+  "n": 5000,
+  "view": "2d",
+  "seed": 1,
+  "families": 8,
+  "panMs": 3000
+ },
+ "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.7871.250 Safari/537.36",
+ "devicePixelRatio": 2,
+ "viewport": [
+  902,
+  812
+ ],
+ "heapAtStart": {
+  "usedMB": 39.4,
+  "totalMB": 45.9
+ },
+ "generateMs": 80.2,
+ "persons": 5000,
+ "kinshipLinks": 7684,
+ "generations": 9,
+ "nodesBodyKB": 1092.4,
+ "linksBodyKB": 1969,
+ "largestFamily": {
+  "name": "Family A",
+  "size": 1090
+ },
+ "svgElements": 7424,
+ "timingsMs": {
+  "mount": 0,
+  "nodesRequest": 21.8,
+  "jsonDone": 56.1,
+  "recordVisible": 270.3,
+  "presetClick": 275.8,
+  "ready": 6242.1
+ },
+ "parseJsonMs": 4.8,
+ "longTasksMs": {
+  "count": 3,
+  "total": 523,
+  "max": 297
+ },
+ "heapAfterReady": {
+  "usedMB": 62.5,
+  "totalMB": 93.8
+ },
+ "domElements": 7829,
+ "panFrames": {
+  "frames": 62,
+  "fps": 20.1,
+  "p50Ms": 50,
+  "p95Ms": 66.6,
+  "maxMs": 67.7,
+  "over33Ms": 56
+ },
+ "panFrameTimesMs": [
+  50,
+  50,
+  49,
+  67.7,
+  50,
+  50,
+  50,
+  50,
+  50,
+  50,
+  50,
+  66.7,
+  50,
+  49.9,
+  50.1,
+  50,
+  50,
+  33.3,
+  66.6,
+  33.4,
+  66.7,
+  33.3,
+  50,
+  50,
+  50,
+  50,
+  50,
+  50,
+  50,
+  50,
+  50,
+  49.4,
+  50.6,
+  50,
+  50,
+  49,
+  50,
+  51,
+  33,
+  50.4,
+  49.6,
+  50.4,
+  49,
+  50.1,
+  49.9,
+  51,
+  33.2,
+  50,
+  50.1,
+  49.9,
+  50.1,
+  49.9,
+  50.1,
+  50,
+  50,
+  50,
+  50,
+  49.9,
+  50.1,
+  50,
+  50
+ ],
+ "zoomFrames": {
+  "frames": 42,
+  "fps": 13.5,
+  "p50Ms": 67.5,
+  "p95Ms": 99.9,
+  "maxMs": 100,
+  "over33Ms": 41
+ },
+ "zoomFrameTimesMs": [
+  51,
+  83.3,
+  83.4,
+  65.6,
+  67.7,
+  83.2,
+  66.7,
+  83.4,
+  66.7,
+  66.6,
+  83.4,
+  83.3,
+  66.6,
+  83.4,
+  66.6,
+  83.4,
+  65.7,
+  84.3,
+  66.6,
+  82.4,
+  67.7,
+  66.7,
+  83.2,
+  66.8,
+  65.6,
+  67.7,
+  83.3,
+  66.6,
+  83.4,
+  50,
+  100,
+  66.7,
+  66.1,
+  67.3,
+  99.9,
+  66.7,
+  65.8,
+  67.5,
+  100,
+  66.7,
+  83.3
+ ],
+ "heapAfterPan": {
+  "usedMB": 98.6,
+  "totalMB": 169
+ },
+ "requestedUrls": [
+  "http://harness.invalid/rest/v1/nodes?order=created_at.asc&select=*",
+  "http://harness.invalid/rest/v1/links?order=created_at.asc&select=*",
+  "http://harness.invalid/rest/v1/rpc/get_claimed_node_ids"
+ ],
+ "isolatedRunsMs": {
+  "decodeRows": [
+   0.2,
+   0.6,
+   1
+  ],
+  "layout2dTree": [
+   11.5,
+   16.2,
+   15.6
+  ],
+  "layoutPaper": [
+   1287.2,
+   1263.9,
+   1306.2
+  ]
+ },
+ "layout2dScope": {
+  "persons": 1090
+ },
+ "heapAtEnd": {
+  "usedMB": 113.2,
+  "totalMB": 175.8
+ },
+ "done": true
+}
