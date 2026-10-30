@@ -34,9 +34,9 @@ CREATE POLICY users_delete_admin_only ON public.users
 -- ============================================================================
 -- NODES
 -- ============================================================================
-CREATE POLICY nodes_select_authenticated ON public.nodes
+CREATE POLICY nodes_select_bound_or_admin ON public.nodes
   FOR SELECT TO authenticated
-  USING (true);
+  USING ((select is_admin()) OR (select is_bound()));
 
 CREATE POLICY nodes_insert_by_bound_users ON public.nodes
   FOR INSERT TO authenticated
@@ -68,9 +68,9 @@ CREATE POLICY nodes_delete_admin_only ON public.nodes
 -- ============================================================================
 -- LINKS
 -- ============================================================================
-CREATE POLICY links_select_authenticated ON public.links
+CREATE POLICY links_select_bound_or_admin ON public.links
   FOR SELECT TO authenticated
-  USING (true);
+  USING ((select is_admin()) OR (select is_bound()));
 
 CREATE POLICY links_insert_1degree_or_admin ON public.links
   FOR INSERT TO authenticated

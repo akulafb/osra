@@ -4,7 +4,8 @@
 -- A Supabase database already has all of this; never run it there.
 --
 --   * the roles anon, authenticated, service_role (service_role bypasses RLS)
---   * auth.users, with only the id column
+--   * auth.users, with only the columns the tests and migrations read: id,
+--     raw_user_meta_data, email
 --   * auth.uid() and auth.jwt(), read from request.jwt.claims the way Supabase's do
 -- =============================================================================
 
@@ -26,7 +27,7 @@ GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
 CREATE SCHEMA IF NOT EXISTS auth;
 GRANT USAGE ON SCHEMA auth TO anon, authenticated, service_role;
 
-CREATE TABLE IF NOT EXISTS auth.users (id uuid PRIMARY KEY);
+CREATE TABLE IF NOT EXISTS auth.users (id uuid PRIMARY KEY, raw_user_meta_data jsonb, email text);
 
 CREATE OR REPLACE FUNCTION auth.uid() RETURNS uuid
 LANGUAGE sql STABLE
