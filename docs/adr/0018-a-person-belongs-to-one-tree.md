@@ -1,6 +1,6 @@
 # 0018 A Person Belongs to One Tree
 
-Each Person belongs to exactly one Tree, and each Tree sees only its own Persons (LIN-85). Someone who is a Person on one Tree can be a Member of it and also start their own, empty or from a copied branch. One account can be a Member of many Trees, as a different Person in each, so the binding of an account to a Person moves from the account to its membership of a Tree.
+Each Person belongs to exactly one Tree, and each Tree sees only its own Persons (LIN-85). Someone who is a Person on one Tree can be a Member of it and also start their own, empty at launch, and from a copied branch once copying exists. One account can be a Member of many Trees, as a different Person in each, so the binding of an account to a Person moves from the account to its membership of a Tree. This amends ADR 0008's `isClaimed`, which reads `users.node_id`.
 
 Edits do not cross between Trees, and Members of one Tree see nothing of another. A copied Person remembers where it was copied from, which keeps later linking possible. Linking itself is not planned: it is a question for the far future.
 

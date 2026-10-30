@@ -8,5 +8,5 @@ Every Tree lives in one Supabase project, and isolation between Trees rests on r
 
 ## Consequences
 
-- One bad policy can expose every family, which is why each policy needs its Tree-isolation test.
+- One bad policy can expose every Tree, which is why each policy needs its Tree-isolation test.
 - The data stays in plain Postgres, so lock-in to Supabase is limited.

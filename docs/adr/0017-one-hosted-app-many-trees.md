@@ -1,6 +1,6 @@
 # 0017 One Hosted App, Many Trees
 
-Osra becomes one app the Owner hosts, holding every Tree, and any Tree can be exported at any time (LIN-85). Trees are shared between relatives, so storing them on a user's device would still need a hosted sync service, and hosting is the only option with nothing for users to set up.
+Osra becomes one app the Owner hosts, holding every Tree, and any Tree can be exported at any time (LIN-85). Trees are shared between relatives, so storing them on a user's device would still need a hosted sync service, and hosting is the only option with nothing for users to set up. Osra is a small self-sustaining product, and paid plans and marketing are not ruled out later.
 
 ## Considered Options
 
@@ -9,5 +9,5 @@ Osra becomes one app the Owner hosts, holding every Tree, and any Tree can be ex
 
 ## Consequences
 
-- The Owner is responsible for sensitive family data, including children's: privacy law, deletion requests and breaches.
+- The Owner keeps a host's duties for sensitive family data, including children's: privacy law and breaches. Requests go to the Master Admin (ADR 0023).
 - The Owner pays to run the platform, so anything costly per user, such as AI chat, needs its own way to be paid for.
