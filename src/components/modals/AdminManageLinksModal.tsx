@@ -6,7 +6,6 @@ import FormControl from '@mui/material/FormControl';
 import InputLabel from '@mui/material/InputLabel';
 import MenuItem from '@mui/material/MenuItem';
 import Select from '@mui/material/Select';
-import type { Session } from '@supabase/supabase-js';
 import type { FamilyGraph, FamilyLink, FamilyNode } from '../../types/graph';
 import { formatNodeDisplayName } from '../../utils/nodeDisplayName';
 import { getNodeId } from '../../lib/familyGraph';
@@ -15,21 +14,14 @@ import {
   type ExcludeLinkSpec,
   type ProposedLink,
 } from '../../lib/adminGraphValidation';
-import { createTreeRecord } from '../../lib/treeRecord';
-import { useWorkingRecord } from '../../contexts/WorkingRecordContext';
+import type { Recorder } from '../../lib/recorder';
 
 interface AdminManageLinksModalProps {
   isOpen: boolean;
   onClose: () => void;
+  recorder: Recorder;
   graph: FamilyGraph;
   nodeId: string;
-  session: Session | null;
-  isAdmin: boolean;
-  /**
-   * Dissolve a Kinship Link. Owned by the host so the deletion runs inside the
-   * Dissolve lifecycle rather than as a second, unanimated delete path.
-   */
-  onDissolveLink: (params: { id: string; aId: string; bId: string }) => Promise<void>;
 }
 
 function toExcludeSpec(link: FamilyLink): ExcludeLinkSpec {
@@ -44,13 +36,10 @@ function toExcludeSpec(link: FamilyLink): ExcludeLinkSpec {
 export default function AdminManageLinksModal({
   isOpen,
   onClose,
+  recorder,
   graph,
   nodeId,
-  session,
-  isAdmin,
-  onDissolveLink,
 }: AdminManageLinksModalProps) {
-  const { write } = useWorkingRecord();
   const theme = useTheme();
   const { modal, panel } = theme.palette;
   const [editing, setEditing] = useState<FamilyLink | null>(null);
@@ -141,9 +130,9 @@ export default function AdminManageLinksModal({
     setSubmitting(true);
     setError(null);
     try {
-      // The host runs the write inside a Dissolve, so a link deleted here
-      // frays on the canvas exactly as one deleted in the tree does (LIN-55).
-      await onDissolveLink({
+      // The write runs inside a Dissolve, so a link deleted here frays on the
+      // canvas exactly as one deleted in the tree does (LIN-55).
+      await recorder.removeLink({
         id: link.id,
         aId: getNodeId(link.source),
         bId: getNodeId(link.target),
@@ -159,43 +148,16 @@ export default function AdminManageLinksModal({
   const handleSaveEdit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editing?.id || !proposedEdit || !editValidation.ok) return;
-    const linkId = editing.id;
-    const parentRole =
-      proposedEdit.type === 'parent' ? proposedEdit.parentRole ?? null : null;
     setSubmitting(true);
     setError(null);
     try {
-      const record = createTreeRecord({
-        userId: session?.user?.id || '',
-        isAdmin,
-        sessionToken: session?.access_token,
+      await recorder.editLink({
+        id: editing.id,
+        source: proposedEdit.source,
+        target: proposedEdit.target,
+        type: proposedEdit.type,
+        parentRole: proposedEdit.parentRole ?? null,
       });
-      // The re-pointed Kinship Link redraws now and the server row replaces it
-      // on confirmation (D9, D12).
-      await write(
-        [
-          {
-            kind: 'link-upsert',
-            link: {
-              id: linkId,
-              source: proposedEdit.source,
-              target: proposedEdit.target,
-              type: proposedEdit.type,
-              parentRole,
-            },
-          },
-        ],
-        async () => ({
-          kind: 'confirmed',
-          rows: await record.editLink({
-            id: linkId,
-            sourceId: proposedEdit.source,
-            targetId: proposedEdit.target,
-            type: proposedEdit.type,
-            parentRole,
-          }),
-        })
-      );
       setEditing(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Update failed.');

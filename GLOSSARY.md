@@ -60,6 +60,10 @@ _Avoid_: Optimistic update, In-flight write, Draft
 What the Tree Record did with a write, in one of three forms: *confirmed* — rows came back and fold into the Confirmed Snapshot; *reverted* — refused, so the Pending Change is dropped and nothing else moves; *accepted-but-empty* — accepted having written nothing, because the Kinship Link already existed. The third is dropped like a revert but is not a failure, so nothing is reported to the user.
 _Avoid_: Success/failure, Error, Result, No-op
 
+**Recorder**:
+The one module every surface tells what the user meant to record, which decides what is drawn, what is written and what plays. The canvas and the modals state the same intent and get the same result.
+_Avoid_: Write service, Mutations, Tree Record client (that is the write seam beneath it)
+
 **Relative Direction**:
 The direction an Action Handle points — Parent, Child, Spouse or Sibling — expressed relative to an anchor Person. It is not a Kinship Link type: Parent and Child both resolve to a `parent` link with the endpoints reversed, Spouse resolves to `marriage`, Sibling resolves to a `parent` link from the anchor's own parents, and `divorce` has no Relative Direction at all.
 _Avoid_: Relation type, Link type, Relationship
@@ -114,6 +118,10 @@ _Avoid_: Default pair, Home pair
 **Spread**:
 How far apart Paper 3D spaces its Persons, set by the viewer: the still layout grows outward from its centre while disc and label sizes stay the same, so the tree keeps its shape. A per-viewer setting that is not remembered; it never changes the Tree Record.
 _Avoid_: Radius, Separation, Node spacing, Zoom
+
+**Camera Director**:
+The one module that moves the camera in Paper 3D: zoom limits and box, following a focused Person through a Spread change, framing, flights to a Person, the reveal swing, keyed flight and the idle turn, and the order they happen in. Everything else asks it; nothing else moves the camera.
+_Avoid_: Camera rig (that is the thin React adapter), Camera controller, Camera manager
 
 
 ### Direct Interaction

@@ -17,6 +17,7 @@ flowchart TB
     Invite["Invite page<br/>“Is this you?” → claim"]
     Tree["Family Tree 3D / 2D<br/>Action Handles · Ghost Node · Connect Mode"]
     Chat["Family Chat 🤖"]
+    Recorder["Recorder<br/>recorder.ts · what is drawn, written and played"]
     Seam["Tree Record seam<br/>treeRecord.ts · every write returns its rows"]
     WR["Working Record<br/>Confirmed Snapshot + Pending Changes"]
     Tools["Chat tools<br/>relatives · Kinship Paths · Kinship Terms"]
@@ -39,7 +40,9 @@ flowchart TB
   Landing -- Google sign-in --> Auth
   Landing -. public metrics .-> REST
   Invite -- claim invite --> RPC
-  Tree -- Pending Change --> Seam
+  Tree -- intent --> Recorder
+  Recorder -- Pending Change --> WR
+  Recorder -- write --> Seam
   Seam -- writes --> REST
   REST -- /rpc --> RPC
   Seam -. confirmed / reverted .-> WR
@@ -62,7 +65,7 @@ flowchart TB
   classDef gate fill:#ffedd5,stroke:#ea580c,stroke-width:1.5px,color:#0f172a
   classDef data fill:#fee2e2,stroke:#dc2626,stroke-width:1.5px,color:#0f172a
   classDef ext fill:#fef9c3,stroke:#ca8a04,stroke-width:1.5px,color:#0f172a
-  class Landing,Invite,Tree,Seam,WR ui
+  class Landing,Invite,Tree,Recorder,Seam,WR ui
   class Chat,Tools chat
   class Auth,FnSpell,FnChat supa
   class REST,RPC gate
@@ -309,12 +312,15 @@ src/
 │   ├── AuthContext.tsx           # Authentication state management
 │   └── WorkingRecordContext.tsx  # The one owner of the Working Record
 ├── hooks/
-│   ├── useWorkingRecord.ts       # Working Record state and the write sequencer
+│   ├── useWorkingRecord.ts       # Working Record state; holds the write sequencer
+│   ├── useRecorder.ts            # Wires the Recorder to the session, record and clock
 │   ├── useDirectManipulation.ts  # Action Handle / Connect Mode state machine
 │   └── useFamilyChat.ts          # Chat state: question, answer, limit lines
 ├── lib/
 │   ├── supabase.ts               # Supabase client configuration
 │   ├── supabaseConfig.ts         # Project URL and publishable key per project ref
+│   ├── recorder.ts               # Turns an intent into what is drawn, written and played
+│   ├── writeSequencer.ts         # apply → commit → confirm, revert or drop
 │   ├── treeRecord.ts             # The write seam: every write to the Tree Record
 │   ├── workingRecord.ts          # Confirmed snapshot + pending changes, projected
 │   ├── familyGraph.ts            # Relatives, 1-degree network, Kinship Paths
@@ -493,4 +499,4 @@ Admins or existing family members can generate invite tokens for specific nodes.
 
 ### Tree Record and Working Record
 
-The **Tree Record** is the family tree as stored in Supabase. Every write goes through one seam (`src/lib/treeRecord.ts`) and returns the rows it wrote. The browser holds a **Working Record**: the last Confirmed Snapshot with the user's Pending Changes on top, recomputed rather than patched, so a refused write rolls back without leaving the view out of step ([ADR 0003](docs/adr/0003-tree-record-write-seam.md), [ADR 0008](docs/adr/0008-working-record-representation.md), [ADR 0009](docs/adr/0009-one-owner-of-the-graph-in-memory.md)). The terms are defined in [GLOSSARY.md](GLOSSARY.md).
+The **Tree Record** is the family tree as stored in Supabase. Every surface tells the **Recorder** (`src/lib/recorder.ts`) what the user meant to record, and the Recorder decides what is drawn, written and played ([ADR 0016](docs/adr/0016-one-recorder-for-every-record-change.md)). Every write goes through one seam (`src/lib/treeRecord.ts`) and returns the rows it wrote. The browser holds a **Working Record**: the last Confirmed Snapshot with the user's Pending Changes on top, recomputed rather than patched, so a refused write rolls back without leaving the view out of step ([ADR 0003](docs/adr/0003-tree-record-write-seam.md), [ADR 0008](docs/adr/0008-working-record-representation.md), [ADR 0009](docs/adr/0009-one-owner-of-the-graph-in-memory.md)). The terms are defined in [GLOSSARY.md](GLOSSARY.md).

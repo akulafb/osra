@@ -1,6 +1,5 @@
 import { useEffect, useRef, type MutableRefObject } from 'react';
-import { useFrame, useThree } from '@react-three/fiber';
-import type { CameraControls } from '@react-three/drei';
+import { useFrame } from '@react-three/fiber';
 import type { PaperLayout } from '../../lib/paperLayout';
 import { addOffsets } from '../../lib/paperHover';
 import { spreadOffsets } from '../../lib/paperSpread';
@@ -27,7 +26,6 @@ interface PaperSearchProps {
  * match; clearing the search frames the overview.
  */
 export function PaperSearch({ layout, matchIds, cluster, selectedId, state, flyTo, onOverview }: PaperSearchProps) {
-  const controls = useThree((three) => three.controls) as CameraControls | null;
   const seen = useRef<{ layout: PaperLayout; matchIds: ReadonlySet<string> | null } | null>(null);
   const motion = useRef<PaperSearchMotion>(PAPER_SEARCH_STILL);
   const settled = useRef<PaperSearchMotion | null>(null);
@@ -47,11 +45,11 @@ export function PaperSearch({ layout, matchIds, cluster, selectedId, state, flyT
 
   const framedFor = useRef<ReadonlySet<string> | null>(null);
   useEffect(() => {
-    if (framedFor.current === matchIds || !controls) return;
+    if (framedFor.current === matchIds) return;
     framedFor.current = matchIds;
     if (selectedId && layout.has(selectedId) && paperFlyFrames(selectedId, matchIds) === 'person') flyTo.current?.(selectedId);
     else if (cluster || !matchIds) onOverview();
-  }, [controls, matchIds, cluster, selectedId, layout, flyTo, onOverview]);
+  }, [matchIds, cluster, selectedId, layout, flyTo, onOverview]);
 
   return null;
 }

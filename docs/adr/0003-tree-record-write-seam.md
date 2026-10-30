@@ -39,7 +39,7 @@ This fragmentation produced:
 
 4. **Explicit Edge Conversion**:
    - The module interface speaks **Kinship Link** (absolute edges).
-   - A single named edge helper `relativeToKinshipLink(anchorTargetId, otherNodeId, relation, parentRole)` converts user-facing **Relative Direction** into absolute Kinship Links at component boundaries.
+   - A single named edge helper `relativeToKinshipLink(anchorTargetId, otherNodeId, relation, parentRole)` converts user-facing **Relative Direction** into absolute Kinship Links at component boundaries. *Amended by ADR-0016:* the Recorder calls the helper, not the components.
 
 5. **Structured Error Hierarchy**:
    - `TreeRecordError` with typed discriminant `kind: 'refused' | 'not-authorized' | 'network' | 'conflict' | 'unknown'`.

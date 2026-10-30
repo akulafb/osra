@@ -2,16 +2,11 @@ import { useEffect, useRef, type MutableRefObject } from 'react';
 import {
   paperEventFlightKey,
   paperKeyDown,
-  type PaperFlightKey,
+  type PaperHeldKeys,
   type PaperKeyAction,
   type PaperKeyBlocks,
   type PaperKeyFocus,
 } from '../../lib/paperKeys';
-
-export interface PaperHeldKeys {
-  keys: Set<PaperFlightKey>;
-  boost: boolean;
-}
 
 interface PaperKeysOptions {
   blocked: PaperKeyBlocks;

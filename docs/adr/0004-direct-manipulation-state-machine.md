@@ -49,7 +49,7 @@ Direct-manipulation interaction states were previously duplicated across `Family
 
 6. **Separation of Synchronous State from Async Mutations**:
    - The state machine is strictly synchronous.
-   - On action commitment, the machine emits typed intent callbacks (`onCommitCreateRelative`, `onCommitConnect`, `onCommitDissolve`) to `FamilyTree.tsx`, which executes `createTreeRecord` operations and coordinates animation lifecycles.
+   - On action commitment, the machine emits typed intent callbacks (`onCommitCreateRelative`, `onCommitConnect`, `onCommitDissolve`) to `FamilyTree.tsx`, which executes `createTreeRecord` operations and coordinates animation lifecycles. *Amended by ADR-0016:* `FamilyTree.tsx` hands those intents to the Recorder, which makes the write and plays the lifecycle. The state machine stays synchronous.
 
 ## Considered and Rejected
 

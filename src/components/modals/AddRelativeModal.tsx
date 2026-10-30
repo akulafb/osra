@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useMemo, useSyncExternalStore } from 'react';
 import Button from '@mui/material/Button';
 import { useTheme, type Theme } from '@mui/material/styles';
-import { useAuth } from '../../contexts/AuthContext';
 import { useCanvasMode } from '../../hooks/useCanvasMode';
 import { FamilyLink, FamilyNode, PersonGender } from '../../types/graph';
 import { formatNodeDisplayName } from '../../utils/nodeDisplayName';
@@ -11,23 +10,16 @@ import {
   SPELLING_MATCH_LABEL,
 } from '../../lib/personMatch';
 import { usePersonMatch } from '../../hooks/usePersonMatch';
-import {
-  createTreeRecord,
-  parentRoleForGender,
-  pendingKinshipLinks,
-  relativeToKinshipLink,
-  relativeToKinshipLinks,
-  type AddLinkParams,
-} from '../../lib/treeRecord';
-import { NO_OTHER_PARENT, otherParentChoice, stillOfferedOtherParent } from '../../lib/otherParent';
+import { MAX_PERSON_NAME_LENGTH, parentRoleForGender } from '../../lib/treeRecord';
+import type { Recorder } from '../../lib/recorder';
+import { NO_OTHER_PARENT, otherParentChoice } from '../../lib/otherParent';
 import { useOtherParentPick } from '../../hooks/useOtherParentPick';
-import { useWorkingRecord } from '../../contexts/WorkingRecordContext';
-import { linkWriteOutcome } from '../../hooks/useWorkingRecord';
 import { addRelativeOverlayStyle } from './addRelativeOverlay';
 
 interface AddRelativeModalProps {
   isOpen: boolean;
   onClose: () => void;
+  recorder: Recorder;
   targetNode: FamilyNode;
   /** The whole Tree Record, unfiltered — a filter must not hide a Person Match. */
   existingNodes: FamilyNode[];
@@ -40,8 +32,6 @@ interface AddRelativeModalProps {
 }
 
 type RelationshipType = 'parent' | 'child' | 'spouse' | 'sibling';
-
-const MAX_NAME_LENGTH = 200;
 
 function subscribePreviewNarrow(cb: () => void) {
   const mq = window.matchMedia('(max-width: 768px)');
@@ -60,14 +50,13 @@ function getPreviewNarrowServer() {
 export default function AddRelativeModal({
   isOpen,
   onClose,
+  recorder,
   targetNode,
   existingNodes,
   visibleIds,
   existingLinks,
   onPendingConnectTargetChange,
 }: AddRelativeModalProps) {
-  const { user, isAdmin, session } = useAuth();
-  const { write } = useWorkingRecord();
   const theme = useTheme();
   const { modal, panel, primary } = theme.palette;
   const isPaper = useCanvasMode().mode === 'paper';
@@ -130,7 +119,6 @@ export default function AddRelativeModal({
   // one that disagrees: when the anchor's gender is recorded, adding a child
   // has no "I am the…" choice to make.
   const anchorParentRole = parentRoleForGender(targetNode.gender);
-  const childParentRole = anchorParentRole ?? parentRole;
 
   useEffect(() => {
     if (!isOpen) return;
@@ -149,106 +137,14 @@ export default function AddRelativeModal({
     [isOpen, relationship, targetNode.id, existingLinks, selectedExistingId]
   );
   const [otherParentId, setOtherParentId] = useOtherParentPick(otherParent);
-  // At submit, the same rule as the canvas handlers: only someone the latest
-  // links still offer for this child is linked.
-  const otherParentToLink = (childId?: string) =>
-    relationship === 'child'
-      ? stillOfferedOtherParent(otherParentChoice(targetNode.id, existingLinks ?? [], childId), otherParentId)
-      : null;
   const personName = (id: string) => {
     const person = existingNodes.find((p) => p.id === id);
     return person ? formatNodeDisplayName(person) : 'Unknown';
   };
 
-  /**
-   * Both paths apply to the Working Record before the request goes out, and
-   * confirm, revert or drop against what it answers (D9). The modal still
-   * awaits: it is the one surface that reports a rejection inline rather than
-   * through a browser alert.
-   */
-  const linkExisting = async (existingId: string) => {
-    if (!user) return;
-    const record = createTreeRecord({
-      userId: user.id,
-      isAdmin,
-      sessionToken: session?.access_token,
-    });
-    // A sibling shares parents rather than being linked to the anchor, so no
-    // single Kinship Link says it; this is the long-standing approximation,
-    // unchanged.
-    const existingParentRole = parentRoleForGender(
-      existingNodes.find((person) => person.id === existingId)?.gender
-    );
-    const linkedOtherParentId = otherParentToLink(existingId);
-    const kinship: AddLinkParams =
-      relationship === 'sibling'
-        ? { sourceId: targetNode.id, targetId: existingId, type: 'parent', parentRole: null }
-        : {
-            ...relativeToKinshipLink(
-              targetNode.id,
-              existingId,
-              relationship,
-              relationship === 'parent' ? existingParentRole : childParentRole
-            ),
-            otherParentId: linkedOtherParentId,
-          };
-
-    await write(
-      pendingKinshipLinks(kinship, existingNodes).map((link) => ({ kind: 'link-upsert' as const, link })),
-      async () => linkWriteOutcome(await record.addLink(kinship))
-    );
-  };
-
-  const createNew = async (sanitizedName: string) => {
-    if (!user) return;
-    const record = createTreeRecord({
-      userId: user.id,
-      isAdmin,
-      sessionToken: session?.access_token,
-    });
-    // The Person's uuid is minted here so the optimistic Person and the row
-    // the server writes are the same Person (D11).
-    const personId = crypto.randomUUID();
-    // The new Person is the parent when adding a parent, so the link's role
-    // comes from the gender being entered; the server derives the same.
-    const linkRole = relationship === 'parent' ? parentRoleForGender(gender) : childParentRole;
-    const linkedOtherParentId = otherParentToLink();
-
-    await write(
-      [
-        { kind: 'person-upsert', person: { id: personId, firstName: sanitizedName, gender } },
-        ...relativeToKinshipLinks(
-          targetNode.id,
-          personId,
-          relationship,
-          existingLinks ?? [],
-          linkRole,
-          linkedOtherParentId
-            ? existingNodes.find((p) => p.id === linkedOtherParentId) ?? { id: linkedOtherParentId }
-            : null
-        ).map((link) => ({ kind: 'link-upsert' as const, link })),
-      ],
-      async () => ({
-        kind: 'confirmed',
-        rows: await record.addPerson({
-          id: personId,
-          firstName: sanitizedName,
-          gender,
-          link: {
-            targetId: targetNode.id,
-            relation: relationship,
-            parentRole: childParentRole,
-            otherParentId: linkedOtherParentId,
-          },
-        }),
-      })
-    );
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const sanitizedName = name.trim().slice(0, MAX_NAME_LENGTH);
-    if (!user || !sanitizedName) return;
+    if (!name.trim()) return;
 
     if (mustConfirmMatch && !confirmedDifferentPerson && !selectedExistingId) {
       setError('Choose an existing person to connect to, or confirm this is a different person.');
@@ -258,11 +154,27 @@ export default function AddRelativeModal({
     setIsSubmitting(true);
     setError(null);
 
+    // Both paths reach the canvas before the request goes out. The modal still
+    // awaits: it is the one surface that reports a rejection inline rather than
+    // through a browser alert.
     try {
       if (selectedExistingId) {
-        await linkExisting(selectedExistingId);
+        await recorder.connectRelative({
+          anchorId: targetNode.id,
+          existingId: selectedExistingId,
+          relation: relationship,
+          parentRole,
+          otherParentId,
+        });
       } else {
-        await createNew(sanitizedName);
+        await recorder.addRelative({
+          anchorId: targetNode.id,
+          relation: relationship,
+          firstName: name,
+          gender,
+          parentRole,
+          otherParentId,
+        });
       }
       onClose();
     } catch (err) {
@@ -344,10 +256,10 @@ export default function AddRelativeModal({
             <input
               type="text"
               value={name}
-              onChange={(e) => setName(e.target.value.slice(0, MAX_NAME_LENGTH))}
+              onChange={(e) => setName(e.target.value.slice(0, MAX_PERSON_NAME_LENGTH))}
               placeholder="Given name only"
               style={inputStyle(theme)}
-              maxLength={MAX_NAME_LENGTH}
+              maxLength={MAX_PERSON_NAME_LENGTH}
               required
             />
           </div>

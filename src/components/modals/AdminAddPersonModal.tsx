@@ -2,30 +2,21 @@ import React, { useState, useEffect } from 'react';
 import Button from '@mui/material/Button';
 import Alert from '@mui/material/Alert';
 import { useTheme, type Theme } from '@mui/material/styles';
-import type { Session } from '@supabase/supabase-js';
 import { validateOrphanNodeName } from '../../lib/adminGraphValidation';
-import { createTreeRecord } from '../../lib/treeRecord';
-import { useWorkingRecord } from '../../contexts/WorkingRecordContext';
-
-const MAX_NAME = 200;
-const MAX_CLUSTER = 100;
+import { MAX_CLUSTER_LENGTH, MAX_PERSON_NAME_LENGTH } from '../../lib/treeRecord';
+import type { Recorder } from '../../lib/recorder';
 
 interface AdminAddPersonModalProps {
   isOpen: boolean;
   onClose: () => void;
-  session: Session | null;
-  isAdmin: boolean;
-  userId: string;
+  recorder: Recorder;
 }
 
 export default function AdminAddPersonModal({
   isOpen,
   onClose,
-  session,
-  isAdmin,
-  userId,
+  recorder,
 }: AdminAddPersonModalProps) {
-  const { write } = useWorkingRecord();
   const theme = useTheme();
   const { modal, panel } = theme.palette;
   const [name, setName] = useState('');
@@ -57,40 +48,11 @@ export default function AdminAddPersonModal({
     setSubmitting(true);
     setError(null);
     try {
-      const record = createTreeRecord({
-        userId,
-        isAdmin,
-        sessionToken: session?.access_token,
+      await recorder.addStandalonePerson({
+        firstName: name,
+        paternalCluster: paternal,
+        maternalCluster: maternal,
       });
-      const personId = crypto.randomUUID();
-      const firstName = name.trim().slice(0, MAX_NAME);
-      const paternalCluster = paternal.trim().slice(0, MAX_CLUSTER) || null;
-      const maternalCluster = maternal.trim().slice(0, MAX_CLUSTER) || null;
-
-      // A standalone Person has no Kinship Link, so nothing but the Person
-      // itself is optimistic here.
-      await write(
-        [
-          {
-            kind: 'person-upsert',
-            person: {
-              id: personId,
-              firstName,
-              familyCluster: paternalCluster ?? undefined,
-              maternalFamilyCluster: maternalCluster ?? undefined,
-            },
-          },
-        ],
-        async () => ({
-          kind: 'confirmed',
-          rows: await record.addPerson({
-            id: personId,
-            firstName,
-            paternalCluster,
-            maternalCluster,
-          }),
-        })
-      );
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong.');
@@ -110,7 +72,7 @@ export default function AdminAddPersonModal({
           <label style={labelStyle(theme)}>First name</label>
           <input
             value={name}
-            onChange={(e) => setName(e.target.value.slice(0, MAX_NAME))}
+            onChange={(e) => setName(e.target.value.slice(0, MAX_PERSON_NAME_LENGTH))}
             style={inputStyle(theme)}
             required
             disabled={submitting}
@@ -118,14 +80,14 @@ export default function AdminAddPersonModal({
           <label style={labelStyle(theme)}>Paternal family cluster (optional)</label>
           <input
             value={paternal}
-            onChange={(e) => setPaternal(e.target.value.slice(0, MAX_CLUSTER))}
+            onChange={(e) => setPaternal(e.target.value.slice(0, MAX_CLUSTER_LENGTH))}
             style={inputStyle(theme)}
             disabled={submitting}
           />
           <label style={labelStyle(theme)}>Maternal family cluster (optional)</label>
           <input
             value={maternal}
-            onChange={(e) => setMaternal(e.target.value.slice(0, MAX_CLUSTER))}
+            onChange={(e) => setMaternal(e.target.value.slice(0, MAX_CLUSTER_LENGTH))}
             style={inputStyle(theme)}
             disabled={submitting}
           />
