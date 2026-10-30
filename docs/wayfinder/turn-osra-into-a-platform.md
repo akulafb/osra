@@ -78,9 +78,9 @@ None yet.
 ### Spec: sign-up, first run and invites
 
 - **Type:** `wayfinder:grilling`
-- **Blocked by:** Spec: separating Trees in the database
+- **Blocked by:** Spec: separating Trees in the database; Can the canvas handle 5,000 Persons?
 
-**Question:** What does a new account see and do, with and without an invite (ADR 0022)? It covers giving a name, the first Person and renamable Tree, landing on the canvas, "Start your own Tree", the Tree switcher, the invite rules, and enforcing the limits of one Tree as Master Admin and 5,000 Persons per Tree, which the Owner can lift.
+**Question:** What does a new account see and do, with and without an invite (ADR 0022)? It covers giving a name, the first Person and renamable Tree, landing on the canvas, "Start your own Tree", the Tree switcher, the invite rules, and enforcing the limits of one Tree as Master Admin and 5,000 Persons per Tree, which the Owner can lift. The canvas research found that panning falls to about 4 fps at 5,000 Persons (dev build, one machine), so this spec decides whether rendering changes or the limit drops to about 1,000, and its tickets name that work.
 
 ### Spec: chat limits and cap
 
