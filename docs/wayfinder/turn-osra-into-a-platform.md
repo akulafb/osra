@@ -56,7 +56,7 @@ None yet.
 
 - **Type:** `wayfinder:research`
 - **Blocked by:** nothing
-- **Findings:** none yet
+- **Findings:** `docs/research/canvas-5000.md` on branch `research/canvas-5000`
 
 **Question:** A Tree can hold 5,000 Persons (ADR 0022), and the browser loads all of a Tree's Persons and Kinship Links and walks them there (ADR 0019). Where do load, layout and rendering break down at 1,000, 2,500 and 5,000 made-up Persons, in the 2D and Paper 3D views? What would have to change, or does the limit have to come down?
 
