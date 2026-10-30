@@ -186,7 +186,7 @@ BEGIN
   created := public.create_relative_secure(
     'Nour', 'child', '00000000-0000-0000-0000-0000000000f1', '00000000-0000-0000-0000-00000000aaa1', 'father', NULL, 'female'
   );
-  v_new := (created ->> 'node_id')::uuid;
+  v_new := (created ->> 'new_node_id')::uuid;
   linked := public.link_existing_relative_secure(
     '00000000-0000-0000-0000-0000000000c2', 'child', '00000000-0000-0000-0000-0000000000e1', '00000000-0000-0000-0000-00000000aaa1'
   );
@@ -198,7 +198,7 @@ BEGIN
   SELECT count(*) INTO edited FROM upd;
   RESET ROLE;
   ASSERT v_new IS NOT NULL, 'create_relative_secure should create a Person: ' || created::text;
-  ASSERT linked IS NOT NULL AND (linked ->> 'success') IS DISTINCT FROM 'false', 'link_existing_relative_secure should link: ' || coalesce(linked::text, 'NULL');
+  ASSERT (linked ->> 'success')::boolean, 'link_existing_relative_secure should link: ' || linked::text;
   ASSERT edited = 1, 'aaa1 should edit a 1-degree Person, edited ' || edited;
   ASSERT EXISTS (SELECT 1 FROM public.nodes WHERE id = v_new AND first_name = 'Nour'), 'the created Person should exist';
   ASSERT EXISTS (
