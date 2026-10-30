@@ -1,4 +1,4 @@
-# 0021 A Tree's Data Is Its Master Admin's to Answer For
+# 0023 A Tree's Data Is Its Master Admin's to Answer For
 
 Requests about a Tree go to its Master Admin, never to the Owner (LIN-85). The Master Admin and Admins can export a whole Tree as GEDCOM at any time, and Members can't bulk export. A Person asking to be removed asks the Master Admin. If the Master Admin ignores them, that stays between the two of them.
 
@@ -10,12 +10,12 @@ The Owner keeps one contact address, listed only in the terms and `security.txt`
 
 ## Considered Options
 
-- **The Owner steps in when a Master Admin doesn't respond.** Rejected: the Owner does not want to deal with Members, and ADR 0018 keeps them out of other families' Trees.
+- **The Owner steps in when a Master Admin doesn't respond.** Rejected: the Owner does not want to deal with Members, and ADR 0020 keeps them out of other families' Trees.
 - **Legal research and lawyer review.** Rejected by the Owner.
 
 ## Consequences
 
-- Terms can only limit liability as far as the law allows, so the Owner keeps a host's duties for sensitive family data (ADR 0015) and carries the risk of having no legal review.
+- Terms can only limit liability as far as the law allows, so the Owner keeps a host's duties for sensitive family data (ADR 0017) and carries the risk of having no legal review.
 - A legal demand can still reach the Owner through the contact address.
 - A Tree whose Master Admin has gone and which has no Admins can never be managed again.
 - Sending the 90-day notice means Osra must be able to send email.

@@ -1,4 +1,4 @@
-# 0018 Roles Belong to a Tree, and the Owner Has No Global Access
+# 0020 Roles Belong to a Tree, and the Owner Has No Global Access
 
 Every role applies inside one Tree: one Master Admin, any number of Admins, and Members who keep the 1-Degree Network write rule (LIN-85). There is no global admin role, so the Owner sees another family's Tree only if its Master Admin invites them. Every Member reads the whole Tree they belong to, and Admins can remove a Member.
 

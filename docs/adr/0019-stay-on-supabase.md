@@ -1,4 +1,4 @@
-# 0017 Stay on Supabase, Not a Graph Database
+# 0019 Stay on Supabase, Not a Graph Database
 
 Every Tree lives in one Supabase project, and isolation between Trees rests on row-level policies, each with a test proving one Tree cannot read another (LIN-85). Family data looks like a graph, but Osra does not query it like one: the browser loads a Tree's Persons and Kinship Links and walks them there, so the database only has to return a small set of rows to the right people.
 

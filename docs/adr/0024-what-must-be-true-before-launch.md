@@ -1,4 +1,4 @@
-# 0022 What Must Be True Before Launch
+# 0024 What Must Be True Before Launch
 
 Osra opens to the public only when all of these hold (LIN-85): Trees are separated in the database, the first Tree has moved in, chat limits and the cap work, sign-up has terms and privacy pages, export and deletion work, and real family data is out of the repo. Paid plans, copying a branch, GEDCOM import and the native apps come after launch.
 

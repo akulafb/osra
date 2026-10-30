@@ -1,4 +1,4 @@
-# 0016 A Person Belongs to One Tree
+# 0018 A Person Belongs to One Tree
 
 Each Person belongs to exactly one Tree, and each Tree sees only its own Persons (LIN-85). Someone who is a Person on one Tree can be a Member of it and also start their own, empty or from a copied branch. One account can be a Member of many Trees, as a different Person in each, so the binding of an account to a Person moves from the account to its membership of a Tree.
 

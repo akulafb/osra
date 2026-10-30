@@ -1,4 +1,4 @@
-# 0015 One Hosted App, Many Trees
+# 0017 One Hosted App, Many Trees
 
 Osra becomes one app the Owner hosts, holding every Tree, and any Tree can be exported at any time (LIN-85). Trees are shared between relatives, so storing them on a user's device would still need a hosted sync service, and hosting is the only option with nothing for users to set up.
 
