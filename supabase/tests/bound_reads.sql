@@ -27,12 +27,12 @@ INSERT INTO auth.users (id) VALUES
   ('00000000-0000-0000-0000-00000000bbb2'),
   ('00000000-0000-0000-0000-00000000ccc1');
 
-INSERT INTO public.nodes (id, first_name, paternal_family_cluster) VALUES
-  ('00000000-0000-0000-0000-0000000000f1', 'Fadi', 'Badran'),
-  ('00000000-0000-0000-0000-0000000000e1', 'Ebtisam', 'Kutob'),
-  ('00000000-0000-0000-0000-0000000000c1', 'Ali', 'Badran'),
-  ('00000000-0000-0000-0000-0000000000c2', 'Celine', 'Badran'),
-  ('00000000-0000-0000-0000-0000000000c3', 'Seif', 'Badran');
+INSERT INTO public.nodes (id, first_name, paternal_family_cluster, gender) VALUES
+  ('00000000-0000-0000-0000-0000000000f1', 'Fadi', 'Badran', 'male'),
+  ('00000000-0000-0000-0000-0000000000e1', 'Ebtisam', 'Kutob', NULL),
+  ('00000000-0000-0000-0000-0000000000c1', 'Ali', 'Badran', NULL),
+  ('00000000-0000-0000-0000-0000000000c2', 'Celine', 'Badran', NULL),
+  ('00000000-0000-0000-0000-0000000000c3', 'Seif', 'Badran', NULL);
 
 INSERT INTO public.links (source_node_id, target_node_id, type) VALUES
   ('00000000-0000-0000-0000-0000000000f1', '00000000-0000-0000-0000-0000000000e1', 'marriage'),
@@ -144,6 +144,73 @@ BEGIN
   ASSERT n = 0, 'anon should read no nodes or links';
   ASSERT m = 5, 'anon should count 5 individuals';
   ASSERT invite_found, 'anon should find the invite by its token';
+END $$;
+
+-- Runs one statement as a caller, and returns how it ended.
+CREATE FUNCTION pg_temp.attempt(p_role text, p_sub text, p_sql text) RETURNS text
+LANGUAGE plpgsql
+AS $$
+DECLARE
+  n bigint;
+  ended text;
+BEGIN
+  PERFORM set_config('request.jwt.claims', COALESCE(json_build_object('sub', '00000000-0000-0000-0000-00000000' || p_sub, 'role', p_role)::text, ''), true);
+  EXECUTE format('SET LOCAL ROLE %I', p_role);
+  BEGIN
+    EXECUTE p_sql;
+    GET DIAGNOSTICS n = ROW_COUNT;
+    ended := n || ' rows';
+  EXCEPTION WHEN OTHERS THEN
+    ended := SQLSTATE || ': ' || SQLERRM;
+  END;
+  RESET ROLE;
+  RETURN ended;
+END;
+$$;
+
+-- No trigger on nodes or links tells anon or an unbound account anything about a
+-- Person: a real id, with a gender (f1) or without (c1), ends the same way as an
+-- id that is no Person.
+DO $$
+DECLARE
+  caller text[];
+  probe text;
+  person text;
+  unknown_ended text;
+  ended text;
+BEGIN
+  FOREACH caller SLICE 1 IN ARRAY ARRAY[['anon', NULL], ['authenticated', 'bbb1'], ['authenticated', 'bbb2']] LOOP
+    FOREACH probe IN ARRAY ARRAY[
+      $q$INSERT INTO public.links (source_node_id, target_node_id, type, parent_role) VALUES (%L, '00000000-0000-0000-0000-0000000000c2', 'parent', 'mother')$q$,
+      $q$INSERT INTO public.links (source_node_id, target_node_id, type) VALUES (%L, '00000000-0000-0000-0000-0000000000c2', 'parent')$q$,
+      $q$UPDATE public.links SET parent_role = 'mother' WHERE source_node_id = %L$q$,
+      $q$UPDATE public.nodes SET gender = 'female' WHERE id = %L$q$,
+      $q$UPDATE public.nodes SET paternal_family_cluster = 'Forged' WHERE id = %L$q$,
+      $q$INSERT INTO public.nodes (id, first_name) VALUES (%L, 'Forged')$q$,
+      $q$INSERT INTO public.nodes (id, first_name) VALUES (%L, 'Forged') ON CONFLICT (id) DO NOTHING$q$
+    ] LOOP
+      unknown_ended := pg_temp.attempt(caller[1], caller[2], format(probe, '11111111-1111-4111-8111-111111111111'));
+      FOREACH person IN ARRAY ARRAY['00000000-0000-0000-0000-0000000000f1', '00000000-0000-0000-0000-0000000000c1'] LOOP
+        ended := pg_temp.attempt(caller[1], caller[2], format(probe, person));
+        ASSERT ended = unknown_ended,
+          caller[1] || ' ' || COALESCE(caller[2], '') || ' can tell ' || person || ' from an unknown id: "' || ended || '" against "' || unknown_ended || '" on ' || probe;
+      END LOOP;
+    END LOOP;
+  END LOOP;
+END $$;
+
+-- Everyone who may read the Person still gets the gender error when it applies.
+DO $$
+DECLARE
+  caller text[];
+  ended text;
+BEGIN
+  FOREACH caller SLICE 1 IN ARRAY ARRAY[['authenticated', 'aaa1'], ['authenticated', 'ad01'], ['authenticated', 'ad02'], ['service_role', NULL]] LOOP
+    ended := pg_temp.attempt(caller[1], caller[2],
+      $q$INSERT INTO public.links (source_node_id, target_node_id, type, parent_role) VALUES ('00000000-0000-0000-0000-0000000000f1', '00000000-0000-0000-0000-0000000000c2', 'parent', 'mother')$q$);
+    ASSERT ended = 'P0001: Fadi is recorded as male, so they can only be a father here, not a mother.',
+      caller[1] || ' ' || COALESCE(caller[2], '') || ' should get the gender error, got "' || ended || '"';
+  END LOOP;
 END $$;
 
 -- An unbound account that claims an invite is bound: it reads everything at once.
